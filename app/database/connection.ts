@@ -1,0 +1,44 @@
+import mongoose from "mongoose";
+
+import { ENV } from "~/configs/env.config";
+
+const connectMongoDB = () => {
+  console.info("Connecting to MongoDB...");
+  mongoose
+    .connect(ENV.MONGO.URI, {
+      maxPoolSize: 100,
+    })
+    .catch((err: any) => {
+      console.error("Error connecting MongoDB: " + err);
+      console.info(`MongoDB reconnecting in ${ENV.MONGO.RECONNECT_INTERVAL / 1000}s`);
+      setTimeout(connectMongoDB, ENV.MONGO.RECONNECT_INTERVAL);
+    });
+};
+
+export const initMongoDB = () => {
+  if (process.env.NODE_ENV === "development") {
+    mongoose.set("debug", true);
+    mongoose.set("debug", { color: true });
+  }
+
+  connectMongoDB();
+
+  mongoose.connection.on("connected", () => {
+    console.info("Connected to MongoDB!");
+  });
+
+  mongoose.connection.on("reconnected", () => {
+    console.info("MongoDB reconnected!");
+  });
+
+  mongoose.connection.on("error", (error: any) => {
+    console.error(`Error in MongoDB connection: ${error}`);
+    mongoose
+      .disconnect()
+      .catch((err: any) => console.error(`Error disconnecting from MongoDB: ${err}`));
+  });
+
+  mongoose.connection.on("disconnected", () => {
+    console.error(`MongoDB disconnected!`);
+  });
+};

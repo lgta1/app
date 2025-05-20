@@ -5,13 +5,16 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
-    "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "start": "pm2-runtime start ecosystem.config.js",
+    "typecheck": "react-router typegen && tsc",
+    "lint": "eslint . --ext .ts,.tsx --fix"
   },
   "dependencies": {
+    "@react-router/fs-routes": "^7.6.0",
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",
     "isbot": "^5.1.27",
+    "mongoose": "^8.15.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.5.3"
@@ -22,6 +25,15 @@
     "@types/node": "^20",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "eslint": "^8.53.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-simple-import-sort": "^10.0.0",
+    "eslint-plugin-unused-imports": "^3.2.0",
+    "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss": "^4.1.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.3",
