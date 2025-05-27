@@ -1,14 +1,203 @@
 import type { Route } from "./+types/_index";
 
-import { Welcome } from "~/welcome/welcome";
+import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
+import { InfinityLoadingTrigger } from "~/components/infinity-loading-trigger";
+import { MangaCard } from "~/components/manga-card";
+import RatingItem from "~/components/rating-item";
+import RatingItemUser from "~/components/rating-item-user";
+import { TopBanner } from "~/components/top-banner";
+import type { MangaType } from "~/database/models/manga.model";
+import { useInfinityLoading } from "~/hooks/use-infinity-loading";
+import { getLeaderboard } from "~/queries/leaderboad.server";
+import { getHotManga, getNewManga } from "~/queries/manga.server";
+import { getTopUser } from "~/queries/user.server";
+
+export async function loader() {
+  const [
+    hotManga,
+    newManga,
+    topUser,
+    dailyLeaderboard,
+    weeklyLeaderboard,
+    monthlyLeaderboard,
+  ] = await Promise.all([
+    getHotManga(),
+    getNewManga(1, 16),
+    getTopUser(),
+    getLeaderboard("daily"),
+    getLeaderboard("weekly"),
+    getLeaderboard("monthly"),
+  ]);
+
+  return {
+    hotManga,
+    newManga,
+    topUser,
+    dailyLeaderboard,
+    weeklyLeaderboard,
+    monthlyLeaderboard,
+  };
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
+    { title: "WuxiaWorld - Đọc truyện online" },
+    { name: "description", content: "WuxiaWorld - Nền tảng đọc truyện online" },
   ];
 }
 
-export default function Home() {
-  return <Welcome />;
+export default function Index({ loaderData }: Route.ComponentProps) {
+  const {
+    hotManga,
+    newManga,
+    topUser,
+    dailyLeaderboard,
+    weeklyLeaderboard,
+    monthlyLeaderboard,
+  } = loaderData;
+
+  const {
+    data: mangaList,
+    isLoading,
+    hasMore,
+    loadingRef,
+    loadMore,
+  } = useInfinityLoading<MangaType>({
+    initialData: newManga,
+    apiUrl: "/api/new-manga",
+    limit: 16,
+    autoLoad: false,
+  });
+
+  return (
+    <div className="container mx-auto px-4 py-6">
+      <DialogWarningAdultContent />
+
+      <TopBanner bannerItems={dailyLeaderboard as MangaType[]} />
+
+      <img className="pt-10" src="/images/home/vnht.svg" alt="" />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
+        {/* Section truyện mới cập nhật */}
+        <section className="mt-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative h-[15px] w-[15px]">
+                <img
+                  src="/images/home/star-icon-1.svg"
+                  alt=""
+                  className="absolute top-0 left-[4.62px] h-4"
+                />
+              </div>
+              <h2 className="text-txt-primary text-xl font-semibold uppercase">
+                truyện mới cập nhật
+              </h2>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-5 2xl:grid-cols-6">
+            {mangaList?.map((manga) => <MangaCard key={manga.id} manga={manga} />)}
+          </div>
+
+          {/* Loading indicator và trigger cho infinity scroll */}
+          <div ref={loadingRef}>
+            <InfinityLoadingTrigger
+              isAutoLoad={false}
+              isLoading={isLoading}
+              hasMore={hasMore}
+              onLoadMore={loadMore}
+            />
+          </div>
+        </section>
+
+        {/* Section bảng xếp hạng */}
+        <section className="mt-8">
+          <div className="space-y-10">
+            {/* Bảng Xếp Hạng */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="relative h-[15px] w-[15px]">
+                  <img
+                    src="/images/home/star-icon-1.svg"
+                    alt=""
+                    className="absolute top-0 left-[4.62px] h-4"
+                  />
+                </div>
+                <h2 className="text-txt-primary text-xl font-semibold uppercase">
+                  bảng xếp hạng
+                </h2>
+              </div>
+
+              <div className="bg-bgc-layer1 border-bd-default overflow-hidden rounded-2xl border p-0">
+                {/* Tab Navigation */}
+                <div className="border-bd-default flex border-b">
+                  <button className="border-lav-500 text-txt-primary flex-1 border-b-2 bg-transparent px-3 py-3 text-base font-semibold">
+                    Top tháng
+                  </button>
+                  <button className="text-txt-secondary hover:text-txt-primary flex-1 border-b-0 bg-transparent px-3 py-3 text-base font-medium transition-colors">
+                    Top tuần
+                  </button>
+                </div>
+
+                {/* Ranking List */}
+                <div className="space-y-0 pb-4">
+                  {monthlyLeaderboard.map((manga, index) => (
+                    <RatingItem
+                      key={(manga as MangaType).id}
+                      manga={manga as MangaType}
+                      index={index + 1}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* TOP DOANH THU */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="relative h-[15px] w-[15px]">
+                  <img
+                    src="/images/home/star-icon-1.svg"
+                    alt=""
+                    className="absolute top-0 left-[4.62px] h-4"
+                  />
+                </div>
+                <h2 className="text-txt-primary text-xl font-semibold uppercase">
+                  TOP DOANH THU
+                </h2>
+              </div>
+
+              <div className="bg-bgc-layer1 border-bd-default space-y-0 overflow-hidden rounded-2xl border p-0 py-4">
+                {hotManga.map((manga, index) => (
+                  <RatingItem key={manga.id} manga={manga} index={index + 1} />
+                ))}
+              </div>
+            </div>
+
+            {/* TOP THÀNH VIÊN */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="relative h-[15px] w-[15px]">
+                  <img
+                    src="/images/home/star-icon-1.svg"
+                    alt=""
+                    className="absolute top-0 left-[4.62px] h-4"
+                  />
+                </div>
+                <h2 className="text-txt-primary text-xl font-semibold uppercase">
+                  TOP THÀNH VIÊN
+                </h2>
+              </div>
+
+              <div className="bg-bgc-layer1 border-bd-default space-y-0 overflow-hidden rounded-2xl border p-0 py-4">
+                {topUser.map((user, index) => (
+                  <RatingItemUser key={user.id} user={user} index={index + 1} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }

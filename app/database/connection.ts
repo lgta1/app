@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import mongooseLeanId from "mongoose-lean-id";
 
 import { ENV } from "~/configs/env.config";
 
@@ -16,10 +17,13 @@ const connectMongoDB = () => {
 };
 
 export const initMongoDB = () => {
-  if (process.env.NODE_ENV === "development") {
+  if (ENV.NODE_ENV === "development") {
     mongoose.set("debug", true);
     mongoose.set("debug", { color: true });
   }
+
+  // Thiết lập plugin lean-id cho tất cả schema
+  mongoose.plugin(mongooseLeanId);
 
   connectMongoDB();
 

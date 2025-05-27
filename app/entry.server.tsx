@@ -1,24 +1,30 @@
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
-import type { AppLoadContext, EntryContext } from "react-router";
+import type { EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import { PassThrough } from "node:stream";
 
 import { initMongoDB } from "~/database/connection";
+import { initLeaderboardScheduler } from "~/jobs/leaderboard.server";
 
 export const streamTimeout = 5_000;
 
 // Initialize MongoDB
 initMongoDB();
 
+// Initialize Leaderboard Scheduler (chỉ chạy ở production)
+if (process.env.NODE_ENV === "production") {
+  initLeaderboardScheduler();
+}
+
 export default function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   routerContext: EntryContext,
-  loadContext: AppLoadContext,
+  // loadContext: AppLoadContext,
   // If you have middleware enabled:
   // loadContext: unstable_RouterContextProvider
 ) {
