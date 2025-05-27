@@ -29,8 +29,6 @@ const LeaderboardSchema = new Schema<LeaderboardType>(
 
 // Index cho performance
 LeaderboardSchema.index({ rank: 1 });
-LeaderboardSchema.index({ score: -1 });
-LeaderboardSchema.index({ calculated_at: -1 });
 
 // Tạo các models cho từng loại leaderboard
 export const DailyLeaderboardModel = model(

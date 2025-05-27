@@ -25,9 +25,7 @@ const InteractionSchema = new Schema<InteractionType>(
   },
 );
 
-// Index cho performance
-InteractionSchema.index({ created_at: 1 });
-InteractionSchema.index({ story_id: 1, type: 1 });
-InteractionSchema.index({ story_id: 1, created_at: -1 });
+// Index tối ưu cho leaderboard aggregation
+InteractionSchema.index({ created_at: 1, story_id: 1, type: 1 });
 
 export const InteractionModel = model("Interaction", InteractionSchema);
