@@ -1,11 +1,13 @@
 import { redirect } from "react-router";
 import crypto from "crypto";
 
+import { ROLES } from "~/constants";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors";
 import {
   createUserSession,
   destroySession,
+  getUserId,
   getUserSession,
 } from "~/helpers/session.server";
 
@@ -16,6 +18,34 @@ const generateSalt = () => {
 const hashPassword = (password: string, salt: string) => {
   return crypto.pbkdf2Sync(password, salt, 10000, 64, "sha512").toString("hex");
 };
+
+/**
+ * Yêu cầu user phải đăng nhập, nếu không sẽ redirect về login
+ */
+export async function requireLogin(request: Request): Promise<string> {
+  const userId = await getUserId(request);
+
+  if (!userId) {
+    throw redirect("/login");
+  }
+
+  return userId;
+}
+
+export async function requireAdminLogin(request: Request): Promise<string> {
+  const userId = await getUserId(request);
+
+  if (!userId) {
+    throw redirect("/login");
+  }
+
+  const user = await UserModel.findById(userId);
+  if (!user || user.role !== ROLES.ADMIN) {
+    throw redirect("/");
+  }
+
+  return userId;
+}
 
 export async function logout(request: Request) {
   const session = await getUserSession(request);

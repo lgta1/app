@@ -10,22 +10,28 @@
     "lint": "eslint . --ext .ts,.tsx --fix"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@radix-ui/react-dialog": "^1.1.14",
     "@react-router/fs-routes": "^7.6.0",
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",
+    "@types/minio": "^7.1.1",
     "@types/mongoose-lean-id": "^1.0.0",
     "@types/node-cron": "^3.0.11",
+    "@types/uuid": "^10.0.0",
     "isbot": "^5.1.27",
     "lucide-react": "^0.511.0",
+    "minio": "^8.0.5",
     "mongoose": "^8.15.0",
     "mongoose-lean-id": "^1.0.0",
     "node-cron": "^4.0.7",
     "pm2": "^6.0.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-hot-toast": "^2.5.2",
     "react-router": "^7.5.3",
-    "react-router-dom": "^7.6.0"
+    "react-router-dom": "^7.6.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@react-router/dev": "^7.5.3",

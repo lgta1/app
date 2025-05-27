@@ -1,28 +1,15 @@
 import type { ActionFunctionArgs } from "react-router";
 
-import { ROLES } from "~/constants";
-import { UserModel } from "~/database/models/user.model";
+import { requireAdminLogin } from "~/helpers/auth.server";
 import {
   calculateLeaderboard,
   type LeaderboardPeriod,
 } from "~/helpers/leaderboard.server";
-import { getUserId } from "~/helpers/session.server";
 import { calculateAllLeaderboards } from "~/jobs/leaderboard.server";
 
 export async function loader({ request }: ActionFunctionArgs) {
   try {
-    const userId = await getUserId(request);
-    if (!userId) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await UserModel.findOne({ _id: userId });
-    if (user?.role !== ROLES.ADMIN) {
-      return Response.json(
-        { error: "You are not authorized to access this resource" },
-        { status: 401 },
-      );
-    }
+    await requireAdminLogin(request);
 
     const url = new URL(request.url);
     const period = url.searchParams.get("period") as string;

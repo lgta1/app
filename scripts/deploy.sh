@@ -19,7 +19,7 @@ fi
 
 # Khởi động PM2
 echo "Khởi động PM2..."
-pm2 start ecosystem.config.cjs
+pm2 start ecosystem.ubuntu.config.cjs
 
 # Kiểm tra status
 echo "Kiểm tra status..."
