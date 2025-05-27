@@ -8,6 +8,14 @@ export const ENV = {
   SESSION: {
     SECRET: process.env.SESSION_SECRET || "s3crets3crets3cret_must_be_changed",
   },
+  MINIO: {
+    ENDPOINT: process.env.MINIO_ENDPOINT || "localhost",
+    PORT: Number(process.env.MINIO_PORT) || 9000,
+    ACCESS_KEY: process.env.MINIO_ACCESS_KEY || "minioadmin",
+    SECRET_KEY: process.env.MINIO_SECRET_KEY || "minioadmin",
+    USE_SSL: process.env.MINIO_USE_SSL === "true" || false,
+    DEFAULT_BUCKET: process.env.MINIO_DEFAULT_BUCKET || "uploads",
+  },
   NODE_ENV: process.env.NODE_ENV || "development",
   LEADERBOARD: {
     daily: {
