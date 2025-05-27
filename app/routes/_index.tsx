@@ -1,3 +1,5 @@
+import * as Tabs from "@radix-ui/react-tabs";
+
 import type { Route } from "./+types/_index";
 
 import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
@@ -70,7 +72,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   });
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container-ad mx-auto px-4 py-6">
       <DialogWarningAdultContent />
 
       <TopBanner bannerItems={dailyLeaderboard as MangaType[]} />
@@ -95,7 +97,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-5 2xl:grid-cols-6">
+          <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4 2xl:grid-cols-5">
             {mangaList?.map((manga) => <MangaCard key={manga.id} manga={manga} />)}
           </div>
 
@@ -129,26 +131,44 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               </div>
 
               <div className="bg-bgc-layer1 border-bd-default overflow-hidden rounded-2xl border p-0">
-                {/* Tab Navigation */}
-                <div className="border-bd-default flex border-b">
-                  <button className="border-lav-500 text-txt-primary flex-1 border-b-2 bg-transparent px-3 py-3 text-base font-semibold">
-                    Top tháng
-                  </button>
-                  <button className="text-txt-secondary hover:text-txt-primary flex-1 border-b-0 bg-transparent px-3 py-3 text-base font-medium transition-colors">
-                    Top tuần
-                  </button>
-                </div>
+                <Tabs.Root defaultValue="weekly" className="w-full">
+                  {/* Tab Navigation */}
+                  <Tabs.List className="border-bd-default flex border-b">
+                    <Tabs.Trigger
+                      value="weekly"
+                      className="data-[state=active]:border-lav-500 data-[state=active]:text-txt-primary text-txt-secondary hover:text-txt-primary flex-1 cursor-pointer bg-transparent px-3 py-3 text-base font-medium transition-colors data-[state=active]:border-b-2 data-[state=active]:font-semibold"
+                    >
+                      Top tuần
+                    </Tabs.Trigger>
+                    <Tabs.Trigger
+                      value="monthly"
+                      className="data-[state=active]:border-lav-500 data-[state=active]:text-txt-primary text-txt-secondary hover:text-txt-primary flex-1 cursor-pointer bg-transparent px-3 py-3 text-base font-medium transition-colors data-[state=active]:border-b-2 data-[state=active]:font-semibold"
+                    >
+                      Top tháng
+                    </Tabs.Trigger>
+                  </Tabs.List>
 
-                {/* Ranking List */}
-                <div className="space-y-0 pb-4">
-                  {monthlyLeaderboard.map((manga, index) => (
-                    <RatingItem
-                      key={(manga as MangaType).id}
-                      manga={manga as MangaType}
-                      index={index + 1}
-                    />
-                  ))}
-                </div>
+                  {/* Ranking Lists */}
+                  <Tabs.Content value="weekly" className="space-y-0 pb-4">
+                    {weeklyLeaderboard.map((manga, index) => (
+                      <RatingItem
+                        key={(manga as MangaType).id}
+                        manga={manga as MangaType}
+                        index={index + 1}
+                      />
+                    ))}
+                  </Tabs.Content>
+
+                  <Tabs.Content value="monthly" className="space-y-0 pb-4">
+                    {monthlyLeaderboard.map((manga, index) => (
+                      <RatingItem
+                        key={(manga as MangaType).id}
+                        manga={manga as MangaType}
+                        index={index + 1}
+                      />
+                    ))}
+                  </Tabs.Content>
+                </Tabs.Root>
               </div>
             </div>
 
