@@ -7,3 +7,13 @@ export const getTopUser = async () => {
     .select("-password -salt")
     .lean();
 };
+
+export const getListUser = async (page: number = 1, limit: number = 10) => {
+  const skip = (page - 1) * limit;
+  return await UserModel.find({})
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .select("-password -salt")
+    .lean();
+};
