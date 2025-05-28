@@ -1,6 +1,6 @@
 import { isValidObjectId } from "mongoose";
 
-import { ROLES } from "~/constants";
+import { ROLES } from "~/constants/user";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors";
 import { getUserId } from "~/helpers/session.server";

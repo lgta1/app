@@ -1,3 +1,4 @@
+import { ROLES } from "~/constants/user";
 import { MangaModel } from "~/database/models/manga.model";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors";
@@ -45,5 +46,24 @@ export const unlikeManga = async (request: Request, mangaId: string) => {
   return {
     success: true,
     message: "Bỏ thích truyện thành công",
+  };
+};
+
+export const deleteManga = async (request: Request, mangaId: string) => {
+  const userId = await getUserId(request);
+  if (!userId) {
+    throw new BusinessError("Bạn cần đăng nhập để xóa truyện");
+  }
+
+  const user = await UserModel.findById(userId);
+  if (user?.role !== ROLES.ADMIN) {
+    throw new BusinessError("Bạn không có quyền xóa truyện");
+  }
+
+  await MangaModel.findByIdAndDelete(mangaId);
+
+  return {
+    success: true,
+    message: "Xóa truyện thành công",
   };
 };

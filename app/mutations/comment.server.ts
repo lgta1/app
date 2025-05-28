@@ -1,6 +1,6 @@
 import { isValidObjectId } from "mongoose";
 
-import { ROLES } from "~/constants";
+import { ROLES } from "~/constants/user";
 import { CommentModel } from "~/database/models/comment.model";
 import { sanitizeCommentContent, validateCommentContent } from "~/helpers/comment.server";
 

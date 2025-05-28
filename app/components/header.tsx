@@ -1,16 +1,66 @@
 import { Link } from "react-router";
 import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 
+import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
+
 interface HeaderProps {
   isAuthenticated?: boolean;
+  isAdmin?: boolean;
   username?: string;
   notificationCount?: number;
 }
+
+const getNavigationItems = (isMobile: boolean, isAdmin: boolean) => {
+  const navigationItems = isAdmin ? ADMIN_NAVIGATION_ITEMS : NAVIGATION_ITEMS;
+
+  return navigationItems
+    .filter((nav) => (isMobile && nav.mobile) || (!isMobile && nav))
+    .map((item) => {
+      if (item.isDropdown) {
+        return (
+          <div key={item.href} className="flex items-center justify-start gap-1">
+            <Link
+              to={item.href}
+              className="text-txt-primary text-sm leading-normal font-semibold"
+            >
+              {item.label}
+            </Link>
+            <ChevronDown className="text-txt-primary h-3 w-3" />
+          </div>
+        );
+      }
+
+      if (item.isSpecial) {
+        return (
+          <div key={item.href} className="flex h-6 items-center justify-center">
+            {item.icon}
+            <Link
+              to={item.href}
+              className="text-txt-primary text-sm leading-normal font-semibold"
+            >
+              {item.label}
+            </Link>
+          </div>
+        );
+      }
+
+      return (
+        <Link
+          key={item.href}
+          to={item.href}
+          className="text-txt-primary text-sm leading-normal font-semibold"
+        >
+          {item.label}
+        </Link>
+      );
+    });
+};
 
 export function Header({
   isAuthenticated = false,
   username = "",
   notificationCount = 0,
+  isAdmin = false,
 }: HeaderProps) {
   return (
     <header className="flex w-full flex-col">
@@ -133,73 +183,12 @@ export function Header({
 
       {/* Navigation links - chỉ hiển thị ở desktop */}
       <nav className="hidden items-center justify-center gap-8 self-stretch overflow-hidden bg-[rgba(9,16,26,0.34)] px-8 py-3 md:inline-flex">
-        <Link to="/" className="text-lav-500 text-sm leading-normal font-semibold">
-          Trang chủ
-        </Link>
-        <div className="flex items-center justify-start gap-1">
-          <Link
-            to="/the-loai"
-            className="text-txt-primary text-sm leading-normal font-semibold"
-          >
-            Thể loại
-          </Link>
-          <ChevronDown className="text-txt-primary h-3 w-3" />
-        </div>
-        <Link
-          to="/dang-truyen"
-          className="text-txt-primary text-sm leading-normal font-semibold"
-        >
-          Đăng truyện
-        </Link>
-        <Link
-          to="/xep-hang"
-          className="text-txt-primary text-sm leading-normal font-semibold"
-        >
-          Xếp hạng
-        </Link>
-        <div className="flex h-6 items-center justify-center">
-          <img src="/images/icons/waifu-icon.png" alt="Waifu" className="h-6" />
-          <Link
-            to="/trieu-hoi-waifu"
-            className="text-txt-primary text-sm leading-normal font-semibold"
-          >
-            Triệu hồi Waifu
-          </Link>
-        </div>
-        <Link
-          to="/dien-dan"
-          className="text-txt-primary text-sm leading-normal font-semibold"
-        >
-          Diễn đàn
-        </Link>
+        {getNavigationItems(false, isAdmin)}
       </nav>
 
       {/* Mobile Navigation Menu - Hiển thị menu trên mobile */}
       <nav className="flex w-full flex-row items-center justify-center gap-8 bg-[rgba(9,16,26,0.34)] px-8 py-3 md:hidden">
-        <div className="flex items-center gap-1">
-          <Link
-            to="/the-loai"
-            className="text-txt-primary flex items-center justify-start gap-1 text-sm leading-normal font-semibold"
-          >
-            Thể loại
-          </Link>
-          <ChevronDown className="text-txt-primary h-3 w-3" />
-        </div>
-        <Link
-          to="/xep-hang"
-          className="text-txt-primary text-sm leading-normal font-semibold"
-        >
-          Xếp hạng
-        </Link>
-        <div className="flex items-center gap-[-5px]">
-          <img src="/images/icons/waifu-icon.png" alt="Waifu" className="h-6" />
-          <Link
-            to="/trieu-hoi-waifu"
-            className="text-txt-primary text-sm leading-normal font-semibold"
-          >
-            Triệu hồi Waifu
-          </Link>
-        </div>
+        {getNavigationItems(true, isAdmin)}
       </nav>
     </header>
   );

@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 import crypto from "crypto";
 
-import { ROLES } from "~/constants";
+import { ROLES } from "~/constants/user";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors";
 import {

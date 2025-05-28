@@ -14,6 +14,8 @@ import "./app.css";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
+import { ROLES } from "~/constants/user";
+import { UserModel } from "~/database/models/user.model";
 import { getUserId } from "~/helpers/session.server";
 
 export const links: Route.LinksFunction = () => [
@@ -57,24 +59,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const userId = await getUserId(request);
+  const user = await UserModel.findById(userId).select("role");
 
   if (userId) {
     return {
       isAuthenticated: true,
+      isAdmin: user?.role === ROLES.ADMIN,
     };
   }
 
   return {
     isAuthenticated: false,
+    isAdmin: false,
   };
 }
 
 export default function App() {
-  const { isAuthenticated } = useLoaderData<typeof loader>();
+  const { isAuthenticated, isAdmin } = useLoaderData<typeof loader>();
 
   return (
     <>
-      <Header isAuthenticated={isAuthenticated} />
+      <Header isAuthenticated={isAuthenticated} isAdmin={isAdmin} />
       <Outlet />
       <Footer />
     </>

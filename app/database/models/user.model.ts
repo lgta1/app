@@ -1,6 +1,6 @@
 import { model, Schema } from "mongoose";
 
-import { GENDERS, ROLES } from "~/constants";
+import { GENDERS, ROLES } from "~/constants/user";
 
 export type UserType = {
   id: string;
