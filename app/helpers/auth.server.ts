@@ -82,9 +82,9 @@ export async function login({
   // Create a session
   const response = await createUserSession({
     request,
-    userId: user.id,
     remember: true,
     redirectUrl: isAdmin(user.role) ? "/admin/member" : redirectUrl,
+    user,
   });
 
   if (!response) {

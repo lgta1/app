@@ -15,8 +15,7 @@ import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundar
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
 import { ROLES } from "~/constants/user";
-import { UserModel } from "~/database/models/user.model";
-import { getUserId } from "~/helpers/session.server";
+import { getUserInfoFromSession } from "~/helpers/session.server";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -58,13 +57,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const userId = await getUserId(request);
-  const user = await UserModel.findById(userId).select("role");
+  const user = await getUserInfoFromSession(request);
 
-  if (userId) {
+  if (user) {
     return {
       isAuthenticated: true,
       isAdmin: [ROLES.ADMIN, ROLES.MOD].includes(user?.role || ""),
+      user,
     };
   }
 
@@ -75,11 +74,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function App() {
-  const { isAuthenticated, isAdmin } = useLoaderData<typeof loader>();
+  const { isAuthenticated, isAdmin, user } = useLoaderData<typeof loader>();
 
   return (
     <>
-      <Header isAuthenticated={isAuthenticated} isAdmin={isAdmin} />
+      <Header isAuthenticated={isAuthenticated} isAdmin={isAdmin} user={user} />
       <Outlet />
       <Footer />
     </>

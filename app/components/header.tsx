@@ -1,12 +1,13 @@
 import { Link, NavLink } from "react-router";
-import { Bell, ChevronDown, Menu, Search } from "lucide-react";
+import { Bell, ChevronDown, CircleUserRound, Menu, Search } from "lucide-react";
 
 import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
+import type { UserType } from "~/database/models/user.model";
 
 interface HeaderProps {
   isAuthenticated?: boolean;
   isAdmin?: boolean;
-  username?: string;
+  user?: UserType;
   notificationCount?: number;
 }
 
@@ -68,9 +69,20 @@ const getNavigationItems = (isMobile: boolean, isAdmin: boolean) => {
     });
 };
 
+const getTitleImgPath = (user: UserType) => {
+  if (user.faction === 0) {
+    if (user.level <= 3) {
+      return `/images/title/0/${user.level}_${user.gender}.png`;
+    }
+    return `/images/title/0/${user.level}.png`;
+  } else if (user.faction === 1) {
+    return `/images/title/1/${user.level}.png`;
+  }
+};
+
 export function Header({
   isAuthenticated = false,
-  username = "",
+  user,
   notificationCount = 0,
   isAdmin = false,
 }: HeaderProps) {
@@ -131,14 +143,15 @@ export function Header({
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="bg-bgc-layer2 h-8 w-8 overflow-hidden rounded-full">
-                    {/* Avatar có thể thay bằng ảnh người dùng */}
-                  </div>
+                  <CircleUserRound className="h-7 w-7" />
                   <div className="flex items-center gap-2">
                     <span className="text-txt-primary text-base font-medium">
-                      {username}
+                      {user?.name}
                     </span>
-                    <ChevronDown className="text-txt-primary h-5 w-5" />
+                    {user && (
+                      <img src={getTitleImgPath(user)} alt="Title" className="h-6 w-28" />
+                    )}
+                    <ChevronDown className="text-txt-primary h-4 w-4" />
                   </div>
                 </div>
               </>
