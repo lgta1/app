@@ -1,10 +1,18 @@
+import toast, { Toaster } from "react-hot-toast";
 import {
   type ActionFunctionArgs,
+  type ClientActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from "react-router";
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
-import { Check, ChevronDown, Clock } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
+
+import { Pagination } from "~/components/pagination";
+import { ReportCard } from "~/components/report.card";
+import { REPORT_TYPE } from "~/constants/report";
+import type { ReportType } from "~/database/models/report.model";
+import { deleteReport, getReports } from "~/queries/report.server";
 
 export const meta: MetaFunction = () => {
   return [
@@ -13,101 +21,60 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-// Mock data types
-interface ReportType {
-  id: string;
-  reporterName: string;
-  reportType: "truyện" | "bình luận";
-  targetName: string;
-  content: string;
-  timestamp: string;
-  date: string;
-}
-
+// Interface cho dữ liệu loader
 interface LoaderData {
   reports: ReportType[];
-  selectedTypes: ("truyện" | "bình luận")[];
+  selectedTypes: string[];
   sortBy: string;
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
-// Mock data
-const mockReports: ReportType[] = [
-  {
-    id: "1",
-    reporterName: "Nguyễn Văn A",
-    reportType: "truyện",
-    targetName: "Đã Chăm Rồi Thì Hãy Chịu Trách Nhiệm Đi!",
-    content:
-      "Tôi báo cáo truyện này vì nó chứa quá nhiều quảng cáo trá hình cho các sản phẩm không liên quan. Các quảng cáo được chèn vào một cách vụng về, làm gián đoạn mạch truyện và gây khó chịu cho người đọc. Truyện đã trở thành một công cụ quảng cáo hơn là một tác phẩm giải trí.",
-    timestamp: "12:30",
-    date: "23/04/2025",
-  },
-  {
-    id: "2",
-    reporterName: "Nguyễn Văn A",
-    reportType: "bình luận",
-    targetName: "Trần Thị B",
-    content:
-      "Tôi báo cáo truyện này vì nó chứa quá nhiều quảng cáo trá hình cho các sản phẩm không liên quan. Các quảng cáo được chèn vào một cách vụng về, làm gián đoạn mạch truyện và gây khó chịu cho người đọc. Truyện đã trở thành một công cụ quảng cáo hơn là một tác phẩm giải trí.",
-    timestamp: "12:30",
-    date: "23/04/2025",
-  },
-  {
-    id: "3",
-    reporterName: "Lê Thị C",
-    reportType: "truyện",
-    targetName: "Tình Yêu Không Có Lỗi, Lỗi Ở Bạn Thích Tôi",
-    content:
-      "Truyện này có nội dung không phù hợp với độ tuổi, chứa nhiều cảnh bạo lực và tình dục quá mức. Tôi nghĩ nó cần được kiểm duyệt kỹ hơn trước khi đăng tải.",
-    timestamp: "14:15",
-    date: "23/04/2025",
-  },
-  {
-    id: "4",
-    reporterName: "Phạm Văn D",
-    reportType: "bình luận",
-    targetName: "Hoàng Thị E",
-    content:
-      "Người dùng này liên tục spam bình luận không liên quan đến nội dung truyện, gây ảnh hưởng đến trải nghiệm đọc của người khác.",
-    timestamp: "09:45",
-    date: "22/04/2025",
-  },
-  {
-    id: "5",
-    reporterName: "Trần Văn F",
-    reportType: "truyện",
-    targetName: "Ma Thổi Đèn Phần 9",
-    content:
-      "Truyện này vi phạm bản quyền, được copy nguyên văn từ tác phẩm gốc mà không có sự cho phép của tác giả.",
-    timestamp: "16:30",
-    date: "22/04/2025",
-  },
-];
+const LIMIT_PER_PAGE = 10;
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
   const url = new URL(request.url);
   const sortBy = url.searchParams.get("sort") || "newest";
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
 
   // Get selected types from query params
   const reportTypes = url.searchParams.getAll("reportType");
-  const selectedTypes: ("truyện" | "bình luận")[] =
+  const selectedTypes: string[] =
     reportTypes.length > 0
       ? reportTypes.filter(
-          (type): type is "truyện" | "bình luận" =>
-            type === "truyện" || type === "bình luận",
+          (type): type is string =>
+            type === REPORT_TYPE.MANGA || type === REPORT_TYPE.COMMENT,
         )
-      : ["truyện", "bình luận"]; // Default to show both if no selection
+      : [REPORT_TYPE.MANGA, REPORT_TYPE.COMMENT]; // Default to show both if no selection
 
-  // Filter reports based on selected types
-  const filteredReports = mockReports.filter((report) =>
-    selectedTypes.includes(report.reportType),
-  );
+  try {
+    const result = await getReports({
+      reportTypes: selectedTypes,
+      sortBy,
+      page,
+      limit: LIMIT_PER_PAGE,
+    });
 
-  return {
-    reports: filteredReports,
-    selectedTypes,
-    sortBy,
-  };
+    return {
+      reports: result.reports,
+      selectedTypes,
+      sortBy,
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages,
+    };
+  } catch (error) {
+    console.error("Error loading reports:", error);
+    return {
+      reports: [],
+      selectedTypes,
+      sortBy,
+      total: 0,
+      page: 1,
+      totalPages: 1,
+    };
+  }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -116,16 +83,34 @@ export async function action({ request }: ActionFunctionArgs) {
   const reportId = formData.get("reportId");
 
   if (action === "delete" && typeof reportId === "string") {
-    // Handle delete logic here
-    return { success: true, message: "Xóa báo cáo thành công" };
+    try {
+      const success = await deleteReport(reportId);
+      if (success) {
+        return { success: true, message: "Xóa báo cáo thành công" };
+      } else {
+        return { success: false, message: "Không thể xóa báo cáo" };
+      }
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      return { success: false, message: "Có lỗi xảy ra khi xóa báo cáo" };
+    }
   }
 
   if (action === "view" && typeof reportId === "string") {
-    // Handle view logic here
+    // Handle view logic here - redirect to detail page or show modal
     return { success: true, message: "Xem báo cáo thành công" };
   }
 
   return { success: false, message: "Hành động không hợp lệ" };
+}
+
+export async function clientAction({ serverAction }: ClientActionFunctionArgs) {
+  const actionData = await serverAction<{ success: boolean; message: string }>();
+  if (actionData.success) {
+    toast.success(actionData.message);
+  } else {
+    toast.error(actionData.message);
+  }
 }
 
 interface CheckboxOptionProps {
@@ -152,116 +137,21 @@ function CheckboxOption({ checked, children, onClick }: CheckboxOptionProps) {
   );
 }
 
-interface ReportCardProps {
-  report: ReportType;
-  onDeleteClick: (reportId: string) => void;
-  onViewClick: (reportId: string) => void;
-}
-
-function ReportCard({ report, onDeleteClick, onViewClick }: ReportCardProps) {
-  const reportTypeColor =
-    report.reportType === "truyện" ? "text-[#25EBAC]" : "text-[#FFE133]";
-
-  return (
-    <div className="border-bd-default bg-bgc-layer2 relative flex flex-col gap-4 self-stretch rounded-xl border p-6">
-      {/* Timestamp */}
-      <div className="inline-flex items-center gap-2">
-        <div className="relative h-4 w-4 overflow-hidden">
-          <div className="absolute top-[0.67px] left-[0.67px] h-3.5 w-3.5">
-            <Clock className="text-txt-secondary h-3.5 w-3.5" />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
-            {report.timestamp}
-          </div>
-          <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
-            {report.date}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Info - Responsive Layout */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-20">
-        <div className="flex flex-col gap-4 md:flex-row md:gap-8 lg:gap-20">
-          <div className="inline-flex w-full flex-col gap-0.5 md:w-24">
-            <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
-              Người báo cáo
-            </div>
-            <div className="text-txt-primary font-sans text-base leading-normal font-semibold">
-              {report.reporterName}
-            </div>
-          </div>
-
-          <div className="inline-flex w-full flex-col gap-0.5 md:w-24">
-            <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
-              Loại báo cáo
-            </div>
-            <div
-              className={`font-sans text-base leading-normal font-semibold ${reportTypeColor}`}
-            >
-              {report.reportType === "truyện" ? "Truyện" : "Bình luận"}
-            </div>
-          </div>
-        </div>
-
-        <div className="inline-flex flex-col gap-0.5">
-          <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
-            Đối tượng báo cáo
-          </div>
-          <div className="text-txt-primary font-sans text-base leading-normal font-semibold">
-            {report.targetName}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex flex-col gap-0.5 self-stretch">
-        <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
-          Nội dung
-        </div>
-        <div className="text-txt-primary font-sans text-base leading-normal font-semibold">
-          {report.content}
-        </div>
-      </div>
-
-      {/* Action Buttons - Responsive Position */}
-      <div className="flex items-center gap-2 self-end lg:absolute lg:top-4 lg:right-6">
-        <button
-          onClick={() => onDeleteClick(report.id)}
-          className="flex items-center justify-center gap-2.5 rounded-xl border border-[#E03F46] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)]"
-        >
-          <div className="text-center font-sans text-sm leading-tight font-semibold text-[#E03F46]">
-            Xóa
-          </div>
-        </button>
-
-        <button
-          onClick={() => onViewClick(report.id)}
-          className="flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)]"
-        >
-          <div className="text-center font-sans text-sm leading-tight font-semibold text-black">
-            Xem
-          </div>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminReport() {
-  const { reports, selectedTypes } = useLoaderData<LoaderData>();
+  const { reports, selectedTypes, total, page, totalPages } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const submit = useSubmit();
 
-  const handleTypeToggle = (type: "truyện" | "bình luận") => {
+  const handleTypeToggle = (type: string) => {
     const params = new URLSearchParams(searchParams);
 
     // Remove all existing reportType params
     params.delete("reportType");
+    // Reset to page 1 when filtering
+    params.delete("page");
 
     // Calculate new selected types
-    let newSelectedTypes: ("truyện" | "bình luận")[];
+    let newSelectedTypes: string[];
     if (selectedTypes.includes(type)) {
       // If currently selected, remove it
       newSelectedTypes = selectedTypes.filter((t) => t !== type);
@@ -275,6 +165,12 @@ export default function AdminReport() {
       params.append("reportType", reportType);
     });
 
+    submit(params, { method: "get" });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage.toString());
     submit(params, { method: "get" });
   };
 
@@ -294,9 +190,16 @@ export default function AdminReport() {
 
   return (
     <div className="container mx-auto my-8 w-full max-w-[1220px] px-4 lg:px-0">
+      <Toaster position="bottom-right" />
+
       {/* Title */}
       <div className="text-txt-primary mb-6 w-full text-center font-sans text-4xl leading-10 font-semibold">
         Quản lý Report
+      </div>
+
+      {/* Stats */}
+      <div className="text-txt-secondary mb-4 text-center font-sans text-sm font-medium">
+        Tổng số báo cáo: {total} | Trang {page} / {totalPages}
       </div>
 
       {/* Main Container */}
@@ -306,14 +209,14 @@ export default function AdminReport() {
           {/* Checkbox Options */}
           <div className="flex items-start gap-6">
             <CheckboxOption
-              checked={selectedTypes.includes("truyện")}
-              onClick={() => handleTypeToggle("truyện")}
+              checked={selectedTypes.includes(REPORT_TYPE.MANGA)}
+              onClick={() => handleTypeToggle(REPORT_TYPE.MANGA)}
             >
               Report Truyện
             </CheckboxOption>
             <CheckboxOption
-              checked={selectedTypes.includes("bình luận")}
-              onClick={() => handleTypeToggle("bình luận")}
+              checked={selectedTypes.includes(REPORT_TYPE.COMMENT)}
+              onClick={() => handleTypeToggle(REPORT_TYPE.COMMENT)}
             >
               Report Bình luận
             </CheckboxOption>
@@ -349,6 +252,17 @@ export default function AdminReport() {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center self-stretch">
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
