@@ -64,7 +64,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (userId) {
     return {
       isAuthenticated: true,
-      isAdmin: user?.role === ROLES.ADMIN,
+      isAdmin: [ROLES.ADMIN, ROLES.MOD].includes(user?.role || ""),
     };
   }
 

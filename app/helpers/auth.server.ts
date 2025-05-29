@@ -10,6 +10,7 @@ import {
   getUserId,
   getUserSession,
 } from "~/helpers/session.server";
+import { isAdmin } from "~/helpers/user";
 
 const generateSalt = () => {
   return crypto.randomBytes(16).toString("hex");
@@ -83,7 +84,7 @@ export async function login({
     request,
     userId: user.id,
     remember: true,
-    redirectUrl,
+    redirectUrl: isAdmin(user.role) ? "/admin/member" : redirectUrl,
   });
 
   if (!response) {

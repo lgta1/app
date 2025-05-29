@@ -16,11 +16,15 @@ export type UserType = {
   exp: number;
   gold: number;
   isBanned: boolean;
+  banExpiresAt?: Date;
+  banMessage?: string;
   isDeleted: boolean;
   isActive: boolean;
   likedManga: string[];
   createdAt: Date;
   updatedAt: Date;
+  storiesCount: number;
+  warningsCount: number;
 };
 
 const UserSchema = new Schema<UserType>(
@@ -37,9 +41,13 @@ const UserSchema = new Schema<UserType>(
     exp: { type: Number, default: 0 },
     gold: { type: Number, default: 0 },
     isBanned: { type: Boolean, default: false },
+    banExpiresAt: { type: Date },
+    banMessage: { type: String },
     isDeleted: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     likedManga: { type: [String], default: [] },
+    storiesCount: { type: Number, default: 0 },
+    warningsCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

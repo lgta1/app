@@ -20,6 +20,33 @@ export const LEVEL_THRESHOLDS = [
 export const MAX_LEVEL = 9;
 
 /**
+ * Tên các cấp độ tương ứng
+ */
+export const LEVEL_NAMES = [
+  "Tân Thủ", // Cấp 1
+  "Luyện Khí", // Cấp 2
+  "Trúc Cơ", // Cấp 3
+  "Kim Đan", // Cấp 4
+  "Nguyên Anh", // Cấp 5
+  "Hóa Thần", // Cấp 6
+  "Luyện Hư", // Cấp 7
+  "Hợp Thể", // Cấp 8
+  "Đại Thừa", // Cấp 9
+];
+
+/**
+ * Lấy tên cấp độ dựa trên level
+ * @param level - Cấp độ hiện tại
+ * @returns Tên cấp độ
+ */
+export function getLevelName(level: number): string {
+  if (level < 1 || level > MAX_LEVEL) {
+    return "Không xác định";
+  }
+  return LEVEL_NAMES[level - 1];
+}
+
+/**
  * Tính toán cấp độ dựa trên kinh nghiệm
  * @param exp - Số kinh nghiệm hiện tại của người dùng
  * @returns Cấp độ hiện tại (từ 1-9)

@@ -43,15 +43,15 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
 export const ADMIN_NAVIGATION_ITEMS: NavigationItem[] = [
   {
     label: "Thống kê",
-    href: "/admin/statistics",
+    href: "/admin/statistic",
   },
   {
     label: "Quản lý thành viên",
-    href: "/admin/members",
+    href: "/admin/member",
   },
   {
     label: "Quản lý truyện",
-    href: "/admin/stories",
+    href: "/admin/manga",
   },
   {
     label: "Waifu banner",
@@ -59,6 +59,6 @@ export const ADMIN_NAVIGATION_ITEMS: NavigationItem[] = [
   },
   {
     label: "Quản lý report",
-    href: "/admin/reports",
+    href: "/admin/report",
   },
 ];

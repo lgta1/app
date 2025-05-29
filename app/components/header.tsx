@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, NavLink } from "react-router";
 import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 
 import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
@@ -19,12 +19,16 @@ const getNavigationItems = (isMobile: boolean, isAdmin: boolean) => {
       if (item.isDropdown) {
         return (
           <div key={item.href} className="flex items-center justify-start gap-1">
-            <Link
+            <NavLink
               to={item.href}
-              className="text-txt-primary text-sm leading-normal font-semibold"
+              className={({ isActive }) =>
+                `text-sm leading-normal font-semibold ${
+                  isActive ? "text-lav-500" : "text-txt-primary"
+                }`
+              }
             >
               {item.label}
-            </Link>
+            </NavLink>
             <ChevronDown className="text-txt-primary h-3 w-3" />
           </div>
         );
@@ -34,24 +38,32 @@ const getNavigationItems = (isMobile: boolean, isAdmin: boolean) => {
         return (
           <div key={item.href} className="flex h-6 items-center justify-center">
             {item.icon}
-            <Link
+            <NavLink
               to={item.href}
-              className="text-txt-primary text-sm leading-normal font-semibold"
+              className={({ isActive }) =>
+                `text-sm leading-normal font-semibold ${
+                  isActive ? "text-lav-500" : "text-txt-primary"
+                }`
+              }
             >
               {item.label}
-            </Link>
+            </NavLink>
           </div>
         );
       }
 
       return (
-        <Link
+        <NavLink
           key={item.href}
           to={item.href}
-          className="text-txt-primary text-sm leading-normal font-semibold"
+          className={({ isActive }) =>
+            `text-sm leading-normal font-semibold ${
+              isActive ? "text-lav-500" : "text-txt-primary"
+            }`
+          }
         >
           {item.label}
-        </Link>
+        </NavLink>
       );
     });
 };

@@ -99,3 +99,68 @@ export const deleteUser = async (request: Request, userId: string) => {
     message: "Xóa người dùng thành công",
   };
 };
+
+export const banUser = async (
+  request: Request,
+  userId: string,
+  days: number,
+  message: string,
+) => {
+  const currentUserId = await getUserId(request);
+  if (!currentUserId) {
+    throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
+  }
+
+  const currentUser = await UserModel.findById(currentUserId);
+  if (!currentUser || ![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+    throw new BusinessError("Bạn không có quyền thực hiện hành động này");
+  }
+
+  if (!isValidObjectId(userId)) {
+    throw new BusinessError("ID người dùng không hợp lệ");
+  }
+
+  // Tính toán ngày hết hạn ban
+  const banExpiresAt = new Date();
+  banExpiresAt.setDate(banExpiresAt.getDate() + days);
+
+  await UserModel.findByIdAndUpdate(userId, {
+    $set: {
+      isBanned: true,
+      banExpiresAt,
+      banMessage: message,
+    },
+  });
+
+  return {
+    success: true,
+    message: "Khóa người dùng thành công",
+  };
+};
+
+export const rewardGoldUser = async (
+  request: Request,
+  userId: string,
+  amount: number,
+) => {
+  const currentUserId = await getUserId(request);
+  if (!currentUserId) {
+    throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
+  }
+
+  const currentUser = await UserModel.findById(currentUserId);
+  if (!currentUser || ![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+    throw new BusinessError("Bạn không có quyền thực hiện hành động này");
+  }
+
+  if (!isValidObjectId(userId)) {
+    throw new BusinessError("ID người dùng không hợp lệ");
+  }
+
+  await UserModel.findByIdAndUpdate(userId, { $inc: { gold: amount } });
+
+  return {
+    success: true,
+    message: "Thưởng thành công",
+  };
+};
