@@ -76,7 +76,13 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     <div className="container-ad mx-auto px-4 py-6">
       <DialogWarningAdultContent />
 
-      <TopBanner bannerItems={dailyLeaderboard as MangaType[]} />
+      <TopBanner
+        bannerItems={
+          dailyLeaderboard.length > 0
+            ? (dailyLeaderboard as MangaType[])
+            : (weeklyLeaderboard as MangaType[])
+        }
+      />
 
       <img className="pt-10" src="/images/home/vnht.svg" alt="" />
 

@@ -28,7 +28,7 @@ export function TopBanner({ bannerItems }: { bannerItems: MangaType[] }) {
       {/* Left Navigation Button */}
       <button
         onClick={() => scroll("left")}
-        className="group/button bg-bgc-layer1/60 hover:bg-bgc-layer1/80 absolute top-0 left-0 z-10 flex h-[338px] w-10 items-center justify-center rounded-l-lg opacity-0 transition-all duration-300 group-hover:opacity-100"
+        className="group/button bg-bgc-layer1/60 hover:bg-bgc-layer1/80 absolute top-0 left-0 z-10 flex h-full w-10 items-center justify-center rounded-l-lg opacity-0 transition-all duration-300 group-hover:opacity-100"
         aria-label="Scroll left"
       >
         <ChevronLeft
@@ -40,7 +40,7 @@ export function TopBanner({ bannerItems }: { bannerItems: MangaType[] }) {
       {/* Right Navigation Button */}
       <button
         onClick={() => scroll("right")}
-        className="group/button bg-bgc-layer1/60 hover:bg-bgc-layer1/80 absolute top-0 right-0 z-10 flex h-[338px] w-10 items-center justify-center rounded-r-lg opacity-0 transition-all duration-300 group-hover:opacity-100"
+        className="group/button bg-bgc-layer1/60 hover:bg-bgc-layer1/80 absolute top-0 right-0 z-10 flex h-full w-10 items-center justify-center rounded-r-lg opacity-0 transition-all duration-300 group-hover:opacity-100"
         aria-label="Scroll right"
       >
         <ChevronRight

@@ -2,7 +2,11 @@ import { ROLES } from "~/constants/user";
 import { UserModel } from "~/database/models/user.model";
 
 export const getTopUser = async () => {
-  return await UserModel.find({})
+  return await UserModel.find({
+    role: ROLES.USER,
+    isDeleted: false,
+    isBanned: false,
+  })
     .sort({ exp: -1 })
     .limit(10)
     .select("-password -salt")
@@ -17,7 +21,7 @@ export const getListUser = async (
   const skip = (page - 1) * limit;
   const query: any = {
     role: ROLES.USER,
-    isDeleted: { $ne: true },
+    isDeleted: false,
   };
 
   if (search && search.trim()) {
@@ -38,7 +42,7 @@ export const getListUser = async (
 export const getTotalUserCount = async (search?: string) => {
   const query: any = {
     role: ROLES.USER,
-    isDeleted: { $ne: true },
+    isDeleted: false,
   };
 
   if (search && search.trim()) {
@@ -54,7 +58,7 @@ export const getTotalUserCount = async (search?: string) => {
 export const getListModAndAdmin = async (search?: string) => {
   const query: any = {
     role: { $in: [ROLES.MOD, ROLES.ADMIN] },
-    isDeleted: { $ne: true },
+    isDeleted: false,
   };
 
   if (search && search.trim()) {

@@ -3,6 +3,7 @@ import { Bell, ChevronDown, CircleUserRound, Menu, Search } from "lucide-react";
 
 import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
 import type { UserType } from "~/database/models/user.model";
+import { getTitleImgPath } from "~/helpers/user";
 
 interface HeaderProps {
   isAuthenticated?: boolean;
@@ -38,7 +39,7 @@ const getNavigationItems = (isMobile: boolean, isAdmin: boolean) => {
       if (item.isSpecial) {
         return (
           <div key={item.href} className="flex h-6 items-center justify-center">
-            {item.icon}
+            <img src={item.icon || ""} alt={item.label} className="h-6" />
             <NavLink
               to={item.href}
               className={({ isActive }) =>
@@ -67,17 +68,6 @@ const getNavigationItems = (isMobile: boolean, isAdmin: boolean) => {
         </NavLink>
       );
     });
-};
-
-const getTitleImgPath = (user: UserType) => {
-  if (user.faction === 0) {
-    if (user.level <= 3) {
-      return `/images/title/0/${user.level}_${user.gender}.png`;
-    }
-    return `/images/title/0/${user.level}.png`;
-  } else if (user.faction === 1) {
-    return `/images/title/1/${user.level}.png`;
-  }
 };
 
 export function Header({

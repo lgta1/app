@@ -4,6 +4,7 @@ import {
   type ClientActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
+  useNavigate,
 } from "react-router";
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Check, ChevronDown } from "lucide-react";
@@ -34,7 +35,7 @@ interface LoaderData {
 
 const LIMIT_PER_PAGE = 10;
 
-export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
+export async function loader({ request }: LoaderFunctionArgs): Promise<Response> {
   const url = new URL(request.url);
   const sortBy = url.searchParams.get("sort") || "newest";
   const page = parseInt(url.searchParams.get("page") || "1", 10);
@@ -57,24 +58,24 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
       limit: LIMIT_PER_PAGE,
     });
 
-    return {
+    return Response.json({
       reports: result.reports,
       selectedTypes,
       sortBy,
       total: result.total,
       page: result.page,
       totalPages: result.totalPages,
-    };
+    });
   } catch (error) {
     console.error("Error loading reports:", error);
-    return {
+    return Response.json({
       reports: [],
       selectedTypes,
       sortBy,
       total: 0,
       page: 1,
       totalPages: 1,
-    };
+    });
   }
 }
 
@@ -95,11 +96,6 @@ export async function action({ request }: ActionFunctionArgs) {
       console.error("Error deleting report:", error);
       return { success: false, message: "Có lỗi xảy ra khi xóa báo cáo" };
     }
-  }
-
-  if (action === "view" && typeof reportId === "string") {
-    // Handle view logic here - redirect to detail page or show modal
-    return { success: true, message: "Xem báo cáo thành công" };
   }
 
   return { success: false, message: "Hành động không hợp lệ" };
@@ -142,6 +138,7 @@ export default function AdminReport() {
   const { reports, selectedTypes, total, page, totalPages } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const submit = useSubmit();
+  const navigate = useNavigate();
 
   const handleTypeToggle = (type: string) => {
     const params = new URLSearchParams(searchParams);
@@ -182,11 +179,8 @@ export default function AdminReport() {
     submit(formData, { method: "post" });
   };
 
-  const handleViewClick = (reportId: string) => {
-    const formData = new FormData();
-    formData.append("action", "view");
-    formData.append("reportId", reportId);
-    submit(formData, { method: "post" });
+  const handleViewClick = (mangaId: string) => {
+    navigate(`/admin/manga/${mangaId}`);
   };
 
   return (

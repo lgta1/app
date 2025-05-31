@@ -1,4 +1,5 @@
 import type { UserType } from "~/database/models/user.model";
+import { getTitleImgPath } from "~/helpers/user";
 
 export default function RatingItemUser({
   user,
@@ -23,9 +24,7 @@ export default function RatingItemUser({
           {user.name}
         </h3>
         <div className="flex items-center justify-between gap-4">
-          <div className="from-lav-600 to-lav-500 h-[29px] w-[107px] overflow-hidden rounded bg-gradient-to-r">
-            {/* User badge/faction indicator */}
-          </div>
+          {user && <img src={getTitleImgPath(user)} alt="Title" className="h-6 w-28" />}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 backdrop-blur-md">
               <div className="relative h-5 w-6">

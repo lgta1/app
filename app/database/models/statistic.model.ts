@@ -2,18 +2,22 @@ import { model, Schema } from "mongoose";
 
 export type StatisticType = {
   id: string;
-  viewNumber: number;
-  likeNumber: number;
-  commentNumber: number;
+  totalViews: number;
+  totalMembers: number;
+  totalManga: number;
+  totalComments: number;
+  totalLikes: number;
   createdAt: Date;
   updatedAt: Date;
 };
 
 const StatisticSchema = new Schema<StatisticType>(
   {
-    viewNumber: { type: Number, default: 0 },
-    likeNumber: { type: Number, default: 0 },
-    commentNumber: { type: Number, default: 0 },
+    totalViews: { type: Number, default: 0 },
+    totalMembers: { type: Number, default: 0 },
+    totalManga: { type: Number, default: 0 },
+    totalComments: { type: Number, default: 0 },
+    totalLikes: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

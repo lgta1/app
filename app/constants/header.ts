@@ -4,7 +4,7 @@ type NavigationItem = {
   mobile?: boolean;
   isDropdown?: boolean;
   isSpecial?: boolean;
-  icon?: React.ReactNode;
+  icon?: string;
 };
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
@@ -31,7 +31,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Triệu hồi Waifu",
     href: "/summon-waifu",
     isSpecial: true,
-    icon: <img src="/images/icons/waifu-icon.png" alt="Waifu" className="h-6" />,
+    icon: "/images/icons/waifu-icon.png",
     mobile: true,
   },
   {
@@ -43,7 +43,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
 export const ADMIN_NAVIGATION_ITEMS: NavigationItem[] = [
   {
     label: "Thống kê",
-    href: "/admin/statistic",
+    href: "/admin/statistic/manga",
   },
   {
     label: "Quản lý thành viên",
