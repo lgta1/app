@@ -1,7 +1,8 @@
+import { getUserId } from "@/services/session.svc";
+
 import type { Route } from "./+types/api.files.upload";
 
 import { ensureBucketExists } from "~/configs/minio.config";
-import { getUserId } from "~/helpers/session.server";
 import { uploadFile } from "~/utils/minio.utils";
 
 export async function action({ request }: Route.ActionArgs) {

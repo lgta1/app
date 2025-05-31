@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 
-import { type InteractionData, recordInteraction } from "~/helpers/interaction.server";
+import { type InteractionData, recordInteraction } from "@/services/interaction.svc";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

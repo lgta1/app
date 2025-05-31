@@ -2,7 +2,7 @@ import { isValidObjectId } from "mongoose";
 
 import { ROLES } from "~/constants/user";
 import { CommentModel } from "~/database/models/comment.model";
-import { sanitizeCommentContent, validateCommentContent } from "~/helpers/comment.server";
+import { sanitizeCommentContent, validateCommentContent } from "@/services/comment.svc";
 
 export const createComment = async (data: {
   content: string;

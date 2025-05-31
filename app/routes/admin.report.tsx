@@ -8,11 +8,12 @@ import {
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Check, ChevronDown } from "lucide-react";
 
+import { deleteReport, getReports } from "@/queries/report.query";
+
 import { Pagination } from "~/components/pagination";
 import { ReportCard } from "~/components/report.card";
 import { REPORT_TYPE } from "~/constants/report";
 import type { ReportType } from "~/database/models/report.model";
-import { deleteReport, getReports } from "~/queries/report.server";
 
 export const meta: MetaFunction = () => {
   return [

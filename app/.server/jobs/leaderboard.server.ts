@@ -1,6 +1,6 @@
 import cron from "node-cron";
 
-import { calculateLeaderboard } from "~/helpers/leaderboard.server";
+import { calculateLeaderboard } from "@/services/leaderboard.svc";
 
 /**
  * Khởi tạo các cron jobs để tự động tính toán leaderboard

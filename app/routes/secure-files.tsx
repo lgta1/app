@@ -1,7 +1,8 @@
+import { requireAdminLogin } from "@/services/auth.server";
+
 import type { Route } from "./+types/secure-files";
 
 import { FileManager } from "~/components/file-manager";
-import { requireAdminLogin } from "~/helpers/auth.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Require authentication

@@ -1,6 +1,7 @@
+import { requireLogin } from "@/services/auth.server";
+
 import type { Route } from "./+types/api.files.list";
 
-import { requireLogin } from "~/helpers/auth.server";
 import { listFiles } from "~/utils/minio.utils";
 
 export async function loader({ request }: Route.LoaderArgs) {

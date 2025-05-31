@@ -1,6 +1,7 @@
+import { getUserId } from "@/services/session.svc";
+
 import type { Route } from "./+types/api.files.download";
 
-import { getUserId } from "~/helpers/session.server";
 import { downloadFile, getFileInfo, getFileUrl } from "~/utils/minio.utils";
 
 export async function loader({ request }: Route.LoaderArgs) {

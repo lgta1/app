@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
 
+import { register } from "@/services/auth.server";
+import { getUserId } from "@/services/session.svc";
+
 import type { Route } from "./+types/register";
 
-import { register } from "~/helpers/auth.server";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors";
-import { getUserId } from "~/helpers/session.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Kiểm tra xem người dùng đã đăng nhập chưa

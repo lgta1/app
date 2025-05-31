@@ -1,11 +1,8 @@
 import type { ActionFunctionArgs } from "react-router";
 
-import { requireAdminLogin } from "~/helpers/auth.server";
-import {
-  calculateLeaderboard,
-  type LeaderboardPeriod,
-} from "~/helpers/leaderboard.server";
-import { calculateAllLeaderboards } from "~/jobs/leaderboard.server";
+import { calculateAllLeaderboards } from "@/jobs/leaderboard.server";
+import { requireAdminLogin } from "@/services/auth.server";
+import { calculateLeaderboard, type LeaderboardPeriod } from "@/services/leaderboard.svc";
 
 export async function loader({ request }: ActionFunctionArgs) {
   try {

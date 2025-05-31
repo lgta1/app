@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
 
+import { login } from "@/services/auth.server";
+import { getUserId } from "@/services/session.svc";
+
 import type { Route } from "./+types/login";
 
-import { login } from "~/helpers/auth.server";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors";
-import { getUserId } from "~/helpers/session.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Check if the user is already logged in

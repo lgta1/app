@@ -9,18 +9,15 @@ import {
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { ChevronDown, Gift, Search, Trash2, TriangleAlert } from "lucide-react";
 
+import { banUser, deleteUser, rewardGoldUser } from "@/mutations/user.mutation";
+import { getListModAndAdmin, getListUser, getTotalUserCount } from "@/queries/user.query";
+
 import { BanMemberDialog } from "~/components/ban-member-dialog";
 import { DeleteMemberDialog } from "~/components/delete-member-dialog";
 import { Pagination } from "~/components/pagination";
 import { RewardGoldDialog } from "~/components/reward-gold-dialog";
 import type { UserType } from "~/database/models/user.model";
 import { calculateLevel } from "~/helpers/user-level";
-import { banUser, deleteUser, rewardGoldUser } from "~/mutations/user.server";
-import {
-  getListModAndAdmin,
-  getListUser,
-  getTotalUserCount,
-} from "~/queries/user.server";
 
 export const meta: MetaFunction = () => {
   return [

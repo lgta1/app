@@ -1,5 +1,9 @@
 import * as Tabs from "@radix-ui/react-tabs";
 
+import { getLeaderboard } from "@/queries/leaderboad.query";
+import { getHotManga, getNewManga } from "@/queries/manga.query";
+import { getTopUser } from "@/queries/user.query";
+
 import type { Route } from "./+types/_index";
 
 import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
@@ -10,9 +14,6 @@ import RatingItemUser from "~/components/rating-item-user";
 import { TopBanner } from "~/components/top-banner";
 import type { MangaType } from "~/database/models/manga.model";
 import { useInfinityLoading } from "~/hooks/use-infinity-loading";
-import { getLeaderboard } from "~/queries/leaderboad.server";
-import { getHotManga, getNewManga } from "~/queries/manga.server";
-import { getTopUser } from "~/queries/user.server";
 
 export async function loader() {
   const [

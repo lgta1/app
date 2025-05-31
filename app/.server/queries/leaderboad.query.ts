@@ -1,7 +1,4 @@
-import {
-  getLeaderboardModel,
-  type LeaderboardPeriod,
-} from "~/helpers/leaderboard.server";
+import { getLeaderboardModel, type LeaderboardPeriod } from "@/services/leaderboard.svc";
 
 export const getLeaderboard = async (period: LeaderboardPeriod) => {
   const leaderboard = await getLeaderboardModel(period)

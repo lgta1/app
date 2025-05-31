@@ -9,7 +9,7 @@ import {
   destroySession,
   getUserId,
   getUserSession,
-} from "~/helpers/session.server";
+} from "@/services/session.svc";
 import { isAdmin } from "~/helpers/user";
 
 const generateSalt = () => {

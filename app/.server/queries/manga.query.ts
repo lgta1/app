@@ -1,8 +1,5 @@
 import { MangaModel } from "~/database/models/manga.model";
-import {
-  getLeaderboardModel,
-  type LeaderboardPeriod,
-} from "~/helpers/leaderboard.server";
+import { getLeaderboardModel, type LeaderboardPeriod } from "@/services/leaderboard.svc";
 
 export const getNewManga = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;

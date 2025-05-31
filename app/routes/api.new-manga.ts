@@ -1,6 +1,6 @@
-import type { Route } from "./+types/api.new-manga";
+import { getNewManga } from "@/queries/manga.query";
 
-import { getNewManga } from "~/queries/manga.server";
+import type { Route } from "./+types/api.new-manga";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);

@@ -2,7 +2,7 @@ import { ROLES } from "~/constants/user";
 import { MangaModel } from "~/database/models/manga.model";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors";
-import { getUserId } from "~/helpers/session.server";
+import { getUserId } from "@/services/session.svc";
 
 export const likeManga = async (request: Request, mangaId: string) => {
   const userId = await getUserId(request);

@@ -1,6 +1,7 @@
+import { getUserId } from "@/services/session.svc";
+
 import type { Route } from "./+types/api.files.delete";
 
-import { getUserId } from "~/helpers/session.server";
 import { deleteFile, deleteFiles } from "~/utils/minio.utils";
 
 export async function action({ request }: Route.ActionArgs) {

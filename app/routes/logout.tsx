@@ -1,8 +1,8 @@
 import type { MetaFunction } from "react-router";
 
-import type { Route } from "./+types/logout";
+import { logout } from "@/services/auth.server";
 
-import { logout } from "~/helpers/auth.server";
+import type { Route } from "./+types/logout";
 
 export const meta: MetaFunction = () => {
   return [

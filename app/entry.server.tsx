@@ -6,8 +6,9 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import { PassThrough } from "node:stream";
 
+import { initLeaderboardScheduler } from "@/jobs/leaderboard.server";
+
 import { initMongoDB } from "~/database/connection";
-import { initLeaderboardScheduler } from "~/jobs/leaderboard.server";
 
 export const streamTimeout = 5_000;
 

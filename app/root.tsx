@@ -7,6 +7,8 @@ import {
   useLoaderData,
 } from "react-router";
 
+import { getUserInfoFromSession } from "@/services/session.svc";
+
 import type { Route } from "./+types/root";
 
 import "./app.css";
@@ -15,7 +17,6 @@ import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundar
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
 import { ROLES } from "~/constants/user";
-import { getUserInfoFromSession } from "~/helpers/session.server";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
-import { BookOpen, Eye } from "lucide-react";
+import { BookOpen, Eye, Users } from "lucide-react";
 
 import RatingItem from "~/components/rating-item";
 import type { MangaType } from "~/database/models/manga.model";
@@ -107,7 +107,21 @@ export default function AdminStatistic() {
   return (
     <div className="mx-auto flex w-full max-w-[968px] flex-col items-center justify-center gap-6 p-4 md:p-6 lg:p-8">
       {/* Statistics Cards */}
-      <div className="flex w-full max-w-[478px] flex-col items-start justify-start gap-6 md:flex-row">
+      <div className="flex w-full flex-col items-center justify-center gap-6 md:flex-row">
+        <div className="bg-bgc-layer1 border-bd-default flex w-full items-start justify-between rounded-xl border p-3 md:w-56">
+          <div className="flex flex-col items-start justify-start gap-2">
+            <div className="text-txt-secondary font-sans text-xs leading-none font-medium">
+              Số thành viên
+            </div>
+            <div className="text-txt-primary font-sans text-xl leading-7 font-semibold">
+              {data.totalViews.toLocaleString()}
+            </div>
+          </div>
+          <div className="flex h-11 w-11 items-center justify-center opacity-60">
+            <Users className="text-txt-secondary h-10 w-10" />
+          </div>
+        </div>
+
         <div className="bg-bgc-layer1 border-bd-default flex w-full items-start justify-between rounded-xl border p-3 md:w-56">
           <div className="flex flex-col items-start justify-start gap-2">
             <div className="text-txt-secondary font-sans text-xs leading-none font-medium">
