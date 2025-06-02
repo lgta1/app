@@ -1,5 +1,7 @@
 import { model, Schema } from "mongoose";
 
+import { MANGA_STATUS } from "~/constants/manga";
+
 export type MangaType = {
   id: string;
   title: string;
@@ -7,7 +9,7 @@ export type MangaType = {
   poster: string;
   chapters: number;
   author: string;
-  status: string;
+  status: number;
   genres: string[];
   likeNumber: number;
   viewNumber: number;
@@ -22,7 +24,7 @@ const MangaSchema = new Schema<MangaType>(
     poster: { type: String, required: true },
     chapters: { type: Number, required: true },
     author: { type: String, required: true },
-    status: { type: String, required: true },
+    status: { type: Number, enum: MANGA_STATUS, default: MANGA_STATUS.PENDING },
     genres: { type: [String], required: true },
     likeNumber: { type: Number, default: 0 },
     viewNumber: { type: Number, default: 0 },

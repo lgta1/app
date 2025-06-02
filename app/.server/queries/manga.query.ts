@@ -3,7 +3,45 @@ import { getLeaderboardModel, type LeaderboardPeriod } from "@/services/leaderbo
 
 export const getNewManga = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
-  return await MangaModel.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
+  const mangas = await MangaModel.find({})
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+  return mangas.map((manga) => ({
+    ...manga,
+    id: manga._id.toString(),
+  }));
+};
+
+export const getTotalMangaCount = async (searchTerm?: string) => {
+  if (searchTerm) {
+    return await MangaModel.countDocuments({
+      $text: { $search: searchTerm },
+    });
+  }
+  return await MangaModel.countDocuments({});
+};
+
+export const searchMangaWithPagination = async (
+  searchTerm: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
+  const skip = (page - 1) * limit;
+  const mangas = await MangaModel.find(
+    { $text: { $search: searchTerm } },
+    { score: { $meta: "textScore" } },
+  )
+    .sort({ score: { $meta: "textScore" } })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  return mangas.map((manga) => ({
+    ...manga,
+    id: manga._id.toString(),
+  }));
 };
 
 export const getHotManga = async () => {
