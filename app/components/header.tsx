@@ -150,7 +150,7 @@ export function Header({
                 {/* Hiển thị khi chưa đăng nhập */}
                 <Link
                   to="/login"
-                  className="outline-lav-500 flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 outline outline-1 outline-offset-[-1px]"
+                  className="outline-lav-500 flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 outline outline-offset-[-1px]"
                 >
                   <span className="text-lav-500 text-center text-sm leading-tight font-medium">
                     Đăng nhập

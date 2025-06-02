@@ -55,7 +55,7 @@ export const ADMIN_NAVIGATION_ITEMS: NavigationItem[] = [
   },
   {
     label: "Waifu banner",
-    href: "/admin/waifu",
+    href: "/admin/wb",
   },
   {
     label: "Quản lý report",

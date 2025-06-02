@@ -1,6 +1,6 @@
 export const formatDistanceToNow = (date: Date) => {
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
+  const diff = now.getTime() - new Date(date).getTime();
   const diffInMinutes = Math.floor(diff / (1000 * 60));
   const diffInHours = Math.floor(diff / (1000 * 60 * 60));
   const diffInDays = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -39,4 +39,21 @@ export const formatTime = (date: Date): string => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+export const formatTimeRemaining = (targetDate: Date): string => {
+  const now = new Date();
+  const target = new Date(targetDate);
+  const diff = target.getTime() - now.getTime();
+
+  if (diff <= 0) {
+    return "0d 0h 0m 0s";
+  }
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  return `${days}d ${hours.toString().padStart(2, "0")}h ${minutes.toString().padStart(2, "0")}m ${seconds.toString().padStart(2, "0")}s`;
 };

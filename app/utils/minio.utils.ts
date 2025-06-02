@@ -1,8 +1,13 @@
 import { Readable } from "stream";
 import { v4 as uuidv4 } from "uuid";
 
-import { ENV } from "~/configs/env.config";
-import { ensureBucketExists, getMinioClient } from "~/configs/minio.config";
+import { ENV } from "@/configs/env.config";
+import {
+  ensureBucketExists,
+  ensurePublicBucketExists,
+  getMinioClient,
+} from "@/configs/minio.config";
+
 import type {
   AllowedFileFormat,
   DeleteOptions,
@@ -12,6 +17,20 @@ import type {
   UploadOptions,
   UploadResult,
 } from "~/types/minio.types";
+
+// Thêm interface mới cho public bucket options
+interface PublicBucketOptions {
+  bucket?: string;
+  isPublic?: boolean;
+}
+
+interface ExtendedDownloadOptions extends DownloadOptions {
+  isPublic?: boolean;
+}
+
+interface ExtendedListOptions extends ListObjectsOptions {
+  isPublic?: boolean;
+}
 
 /**
  * Lấy MIME type từ file extension
@@ -85,6 +104,63 @@ export const isValidFileFormat = (
 };
 
 /**
+ * Tạo public URL trực tiếp cho file trong public bucket
+ */
+export const getPublicFileUrl = (objectName: string, bucketName?: string): string => {
+  const bucket = bucketName || ENV.MINIO.DEFAULT_BUCKET;
+  const protocol = ENV.MINIO.USE_SSL ? "https" : "http";
+  const port =
+    ENV.MINIO.PORT !== 443 && ENV.MINIO.PORT !== 80 ? `:${ENV.MINIO.PORT}` : "";
+
+  return `${protocol}://${ENV.MINIO.ENDPOINT}${port}/${bucket}/${objectName}`;
+};
+
+/**
+ * Upload file lên public bucket
+ */
+export const uploadToPublicBucket = async (
+  file: Buffer | Readable | string,
+  fileName: string,
+  options: UploadOptions & { bucket?: string } = {},
+): Promise<UploadResult> => {
+  const bucket = options.bucket || ENV.MINIO.DEFAULT_BUCKET;
+
+  // Ensure public bucket exists
+  await ensurePublicBucketExists(bucket);
+
+  // Generate unique filename if requested
+  const objectName = options.generateUniqueFileName
+    ? generateUniqueFileName(fileName)
+    : fileName;
+
+  // Set content type
+  const contentType = options.contentType || getMimeTypeFromExtension(fileName);
+
+  const client = getMinioClient();
+
+  try {
+    const result = await client.putObject(bucket, objectName, file, undefined, {
+      "Content-Type": contentType,
+      ...options.metadata,
+    });
+
+    // Generate public URL (không cần presigned)
+    const url = getPublicFileUrl(objectName, bucket);
+
+    return {
+      bucket,
+      objectName,
+      etag: result.etag,
+      url,
+      versionId: result.versionId || undefined,
+    };
+  } catch (error) {
+    console.error("Error uploading to public bucket:", error);
+    throw new Error(`Failed to upload to public bucket: ${(error as Error).message}`);
+  }
+};
+
+/**
  * Upload file lên MinIO
  */
 export const uploadFile = async (
@@ -129,14 +205,21 @@ export const uploadFile = async (
 };
 
 /**
- * Lấy URL để download file
+ * Lấy URL để download file (hỗ trợ cả public và private bucket)
  */
 export const getFileUrl = async (
   objectName: string,
-  options: DownloadOptions = {},
+  options: ExtendedDownloadOptions = {},
 ): Promise<string> => {
-  const client = getMinioClient();
   const bucket = options.bucket || ENV.MINIO.DEFAULT_BUCKET;
+
+  // Nếu là public bucket, trả về direct URL
+  if (options.isPublic) {
+    return getPublicFileUrl(objectName, bucket);
+  }
+
+  // Nếu là private bucket, dùng presigned URL
+  const client = getMinioClient();
   const expires = options.expires || 7 * 24 * 60 * 60; // 7 days default
 
   try {
@@ -148,7 +231,7 @@ export const getFileUrl = async (
 };
 
 /**
- * Download file từ MinIO
+ * Download file từ MinIO (hoạt động cho cả public và private bucket)
  */
 export const downloadFile = async (
   objectName: string,
@@ -166,7 +249,7 @@ export const downloadFile = async (
 };
 
 /**
- * Xóa file từ MinIO
+ * Xóa file từ MinIO (hoạt động cho cả public và private bucket)
  */
 export const deleteFile = async (
   objectName: string,
@@ -184,7 +267,7 @@ export const deleteFile = async (
 };
 
 /**
- * Xóa nhiều files cùng lúc
+ * Xóa nhiều files cùng lúc (hoạt động cho cả public và private bucket)
  */
 export const deleteFiles = async (
   objectNames: string[],
@@ -202,18 +285,22 @@ export const deleteFiles = async (
 };
 
 /**
- * Lấy thông tin file
+ * Lấy thông tin file (hỗ trợ cả public và private bucket)
  */
 export const getFileInfo = async (
   objectName: string,
-  options: DownloadOptions = {},
+  options: ExtendedDownloadOptions = {},
 ): Promise<FileInfo> => {
   const client = getMinioClient();
   const bucket = options.bucket || ENV.MINIO.DEFAULT_BUCKET;
 
   try {
     const stat = await client.statObject(bucket, objectName);
-    const url = await getFileUrl(objectName, options);
+
+    // Lấy URL phù hợp với loại bucket
+    const url = options.isPublic
+      ? getPublicFileUrl(objectName, bucket)
+      : await getFileUrl(objectName, { ...options, isPublic: false });
 
     return {
       name: objectName,
@@ -232,10 +319,10 @@ export const getFileInfo = async (
 };
 
 /**
- * List objects trong bucket
+ * List objects trong bucket (hỗ trợ cả public và private bucket)
  */
 export const listFiles = async (
-  options: ListObjectsOptions = {},
+  options: ExtendedListOptions = {},
 ): Promise<FileInfo[]> => {
   const client = getMinioClient();
   const bucket = options.bucket || ENV.MINIO.DEFAULT_BUCKET;
@@ -247,7 +334,11 @@ export const listFiles = async (
     return new Promise((resolve, reject) => {
       stream.on("data", async (obj) => {
         try {
-          const url = await getFileUrl(obj.name!, { bucket });
+          // Lấy URL phù hợp với loại bucket
+          const url = options.isPublic
+            ? getPublicFileUrl(obj.name!, bucket)
+            : await getFileUrl(obj.name!, { bucket, isPublic: false });
+
           files.push({
             name: obj.name!,
             lastModified: obj.lastModified!,
@@ -271,11 +362,11 @@ export const listFiles = async (
 };
 
 /**
- * Kiểm tra file có tồn tại không
+ * Kiểm tra file có tồn tại không (hoạt động cho cả public và private bucket)
  */
 export const fileExists = async (
   objectName: string,
-  options: DeleteOptions = {},
+  options: PublicBucketOptions = {},
 ): Promise<boolean> => {
   const client = getMinioClient();
   const bucket = options.bucket || ENV.MINIO.DEFAULT_BUCKET;
@@ -289,7 +380,7 @@ export const fileExists = async (
 };
 
 /**
- * Copy file trong MinIO
+ * Copy file trong MinIO (hỗ trợ copy giữa public và private bucket)
  */
 export const copyFile = async (
   sourceObjectName: string,
@@ -298,6 +389,7 @@ export const copyFile = async (
     sourceBucket?: string;
     destinationBucket?: string;
     metadata?: Record<string, string>;
+    makeDestinationPublic?: boolean;
   } = {},
 ): Promise<void> => {
   const client = getMinioClient();
@@ -305,6 +397,13 @@ export const copyFile = async (
   const destinationBucket = options.destinationBucket || ENV.MINIO.DEFAULT_BUCKET;
 
   try {
+    // Ensure destination bucket exists
+    if (options.makeDestinationPublic) {
+      await ensurePublicBucketExists(destinationBucket);
+    } else {
+      await ensureBucketExists(destinationBucket);
+    }
+
     await client.copyObject(
       destinationBucket,
       destinationObjectName,
@@ -314,4 +413,34 @@ export const copyFile = async (
     console.error("Error copying file:", error);
     throw new Error(`Failed to copy file: ${(error as Error).message}`);
   }
+};
+
+// Helper functions cho public bucket
+export const getPublicFileInfo = (objectName: string, bucket?: string) => {
+  return getFileInfo(objectName, { bucket, isPublic: true });
+};
+
+export const listPublicFiles = (options: ListObjectsOptions = {}) => {
+  return listFiles({ ...options, isPublic: true });
+};
+
+export const deletePublicFile = (objectName: string, bucket?: string) => {
+  return deleteFile(objectName, { bucket });
+};
+
+export const deletePublicFiles = (objectNames: string[], bucket?: string) => {
+  return deleteFiles(objectNames, { bucket });
+};
+
+export const copyToPublicBucket = (
+  sourceObjectName: string,
+  destinationObjectName: string,
+  sourceBucket?: string,
+  destinationBucket?: string,
+) => {
+  return copyFile(sourceObjectName, destinationObjectName, {
+    sourceBucket,
+    destinationBucket,
+    makeDestinationPublic: true,
+  });
 };

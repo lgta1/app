@@ -9,7 +9,7 @@ export const ENV = {
     SECRET: process.env.SESSION_SECRET || "s3crets3crets3cret_must_be_changed",
   },
   MINIO: {
-    ENDPOINT: process.env.MINIO_ENDPOINT || "localhost",
+    ENDPOINT: process.env.MINIO_ENDPOINT || "172.188.218.21",
     PORT: Number(process.env.MINIO_PORT) || 9000,
     ACCESS_KEY: process.env.MINIO_ACCESS_KEY || "minioadmin",
     SECRET_KEY: process.env.MINIO_SECRET_KEY || "minioadmin",

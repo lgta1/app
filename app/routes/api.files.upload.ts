@@ -1,9 +1,9 @@
+import { ensurePublicBucketExists } from "@/configs/minio.config";
 import { getUserId } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.files.upload";
 
-import { ensureBucketExists } from "~/configs/minio.config";
-import { uploadFile } from "~/utils/minio.utils";
+import { uploadToPublicBucket } from "~/utils/minio.utils";
 
 export async function action({ request }: Route.ActionArgs) {
   try {
@@ -34,7 +34,7 @@ export async function action({ request }: Route.ActionArgs) {
     // Parse form data
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const bucket = (formData.get("bucket") as string) || "uploads";
+    const bucket = (formData.get("bucket") as string) || "public-uploads";
     const category = (formData.get("category") as string) || "general";
 
     // Validate file
@@ -66,10 +66,15 @@ export async function action({ request }: Route.ActionArgs) {
       "image/png",
       "image/gif",
       "image/webp",
+      "image/svg+xml",
       "application/pdf",
       "text/plain",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "video/mp4",
+      "video/webm",
+      "audio/mpeg",
+      "audio/wav",
     ];
 
     if (!allowedTypes.includes(file.type)) {
@@ -82,15 +87,15 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
 
-    // Ensure bucket exists
-    await ensureBucketExists(bucket);
+    // Ensure public bucket exists
+    await ensurePublicBucketExists(bucket);
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload with metadata including userId
-    const result = await uploadFile(buffer, file.name, {
+    // Upload to public bucket with metadata including userId
+    const result = await uploadToPublicBucket(buffer, file.name, {
       bucket,
       generateUniqueFileName: true,
       contentType: file.type,
@@ -108,13 +113,14 @@ export async function action({ request }: Route.ActionArgs) {
       success: true,
       data: {
         objectName: result.objectName,
-        url: result.url,
+        url: result.url, // Direct public URL
         bucket: result.bucket,
         size: file.size,
         type: file.type,
         originalName: file.name,
+        isPublic: true,
       },
-      message: "File uploaded successfully",
+      message: "File uploaded successfully to public bucket",
     });
   } catch (error) {
     console.error("Upload error:", error);

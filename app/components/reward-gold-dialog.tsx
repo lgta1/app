@@ -43,7 +43,7 @@ export function RewardGoldDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50" />
         <Dialog.Content className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 w-[500px] translate-x-[-50%] translate-y-[-50%] duration-200">
-          <div className="bg-bgc-layer1 outline-bd-default inline-flex w-[500px] flex-col items-start justify-start gap-10 rounded-2xl p-6 outline outline-1 outline-offset-[-1px]">
+          <div className="bg-bgc-layer1 outline-bd-default inline-flex w-[500px] flex-col items-start justify-start gap-10 rounded-2xl p-6 outline outline-offset-[-1px]">
             <div className="flex flex-col items-center justify-center gap-6 self-stretch">
               <div className="inline-flex h-14 w-14 items-center justify-start gap-3">
                 <div className="relative h-14 w-14 overflow-hidden">
@@ -65,7 +65,7 @@ export function RewardGoldDialog({
                     </div>
                   </div>
                   <div className="flex flex-col items-start justify-start self-stretch">
-                    <div className="bg-bgc-layer2 outline-bd-default inline-flex items-center justify-start gap-2.5 self-stretch rounded-xl px-3 py-2.5 outline outline-1 outline-offset-[-1px]">
+                    <div className="bg-bgc-layer2 outline-bd-default inline-flex items-center justify-start gap-2.5 self-stretch rounded-xl px-3 py-2.5 outline outline-offset-[-1px]">
                       <input
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
@@ -81,7 +81,7 @@ export function RewardGoldDialog({
                     Nội dung thông báo<span className="text-red-500">*</span>
                   </div>
                   <div className="flex flex-1 flex-col items-start justify-start self-stretch">
-                    <div className="bg-bgc-layer2 outline-bd-default inline-flex flex-1 items-start justify-start gap-2.5 self-stretch rounded-xl px-3 py-2.5 outline outline-1 outline-offset-[-1px]">
+                    <div className="bg-bgc-layer2 outline-bd-default inline-flex flex-1 items-start justify-start gap-2.5 self-stretch rounded-xl px-3 py-2.5 outline outline-offset-[-1px]">
                       <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
@@ -99,7 +99,7 @@ export function RewardGoldDialog({
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="outline-lav-500 hover:bg-lav-500/5 flex flex-1 items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-1 outline-offset-[-1px] transition-colors"
+                  className="outline-lav-500 hover:bg-lav-500/5 flex flex-1 items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
                 >
                   <div className="text-lav-500 justify-center text-center text-sm leading-tight font-semibold">
                     Đóng

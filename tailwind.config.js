@@ -39,6 +39,12 @@ export default {
         btn: {
           primary: "rgba(211, 115, 255, 1)", // Tím nhạt
         },
+        success: {
+          success: "#25EBAC", // Màu xanh success từ Figma
+        },
+        error: {
+          error: "#FF4444", // Màu đỏ error
+        },
       },
     },
   },

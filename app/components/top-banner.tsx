@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { ChevronLeft } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 
-import { BannerItem } from "./banner-item";
+import { TopBannerItem } from "./top-banner-item";
 
 import type { MangaType } from "~/database/models/manga.model";
 export function TopBanner({ bannerItems }: { bannerItems: MangaType[] }) {
@@ -57,7 +57,7 @@ export function TopBanner({ bannerItems }: { bannerItems: MangaType[] }) {
         }}
       >
         {bannerItems.map((manga) => (
-          <BannerItem key={manga.id} manga={manga} />
+          <TopBannerItem key={manga.id} manga={manga} />
         ))}
       </div>
     </div>

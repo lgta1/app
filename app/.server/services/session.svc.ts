@@ -1,6 +1,6 @@
 import { createCookieSessionStorage, redirect, type Session } from "react-router";
 
-import { ENV } from "~/configs/env.config";
+import { ENV } from "@/configs/env.config";
 import type { UserType } from "~/database/models/user.model";
 
 const USER_SESSION_KEY = "userId";

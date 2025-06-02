@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import mongooseLeanId from "mongoose-lean-id";
 
-import { ENV } from "~/configs/env.config";
+import { ENV } from "@/configs/env.config";
 
 const connectMongoDB = () => {
   console.info("Connecting to MongoDB...");

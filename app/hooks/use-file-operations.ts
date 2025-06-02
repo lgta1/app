@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { useFetcher, useSubmit } from "react-router";
 
@@ -26,14 +26,24 @@ export function useFileOperations() {
   const uploadFetcher = useFetcher();
   const deleteFetcher = useFetcher();
 
+  // Use refs to store callbacks
+  const uploadCallbacksRef = useRef<UploadFileOptions | null>(null);
+  const deleteCallbacksRef = useRef<DeleteFileOptions | null>(null);
+
   // Handle upload response
   useEffect(() => {
     if (uploadFetcher.data && uploadFetcher.state === "idle") {
       if (uploadFetcher.data.success) {
         toast.success(uploadFetcher.data.message || "Tải file lên thành công!");
+        // Execute success callback
+        uploadCallbacksRef.current?.onSuccess?.(uploadFetcher.data.data);
       } else {
         toast.error(uploadFetcher.data.error || "Có lỗi xảy ra khi tải file lên");
+        // Execute error callback
+        uploadCallbacksRef.current?.onError?.(uploadFetcher.data.error);
       }
+      // Clear callbacks after execution
+      uploadCallbacksRef.current = null;
     }
   }, [uploadFetcher.data, uploadFetcher.state]);
 
@@ -42,9 +52,15 @@ export function useFileOperations() {
     if (deleteFetcher.data && deleteFetcher.state === "idle") {
       if (deleteFetcher.data.success) {
         toast.success(deleteFetcher.data.message || "Xóa file thành công!");
+        // Execute success callback
+        deleteCallbacksRef.current?.onSuccess?.(deleteFetcher.data.data);
       } else {
         toast.error(deleteFetcher.data.error || "Có lỗi xảy ra khi xóa file");
+        // Execute error callback
+        deleteCallbacksRef.current?.onError?.(deleteFetcher.data.error);
       }
+      // Clear callbacks after execution
+      deleteCallbacksRef.current = null;
     }
   }, [deleteFetcher.data, deleteFetcher.state]);
 
@@ -61,9 +77,6 @@ export function useFileOperations() {
       if (options.category) {
         formData.append("category", options.category);
       }
-
-      // Show loading toast
-      toast.loading("Đang tải file lên...");
 
       submit(formData, {
         action: "/api/files/upload",
@@ -88,20 +101,14 @@ export function useFileOperations() {
         formData.append("category", options.category);
       }
 
-      // Show loading toast
-      toast.loading("Đang tải file lên...");
+      // Store callbacks before submitting
+      uploadCallbacksRef.current = options;
 
       uploadFetcher.submit(formData, {
         action: "/api/files/upload",
         method: "post",
         encType: "multipart/form-data",
       });
-
-      // Store callbacks for later use
-      if (options.onSuccess || options.onError) {
-        // We'll handle this in the useEffect
-        (uploadFetcher as any)._callbacks = options;
-      }
     },
     [uploadFetcher],
   );
@@ -116,18 +123,13 @@ export function useFileOperations() {
         formData.append("bucket", options.bucket);
       }
 
-      // Show loading toast
-      toast.loading("Đang xóa file...");
+      // Store callbacks before submitting
+      deleteCallbacksRef.current = options;
 
       deleteFetcher.submit(formData, {
         action: "/api/files/delete",
         method: "post",
       });
-
-      // Store callbacks for later use
-      if (options.onSuccess || options.onError) {
-        (deleteFetcher as any)._callbacks = options;
-      }
     },
     [deleteFetcher],
   );
@@ -142,53 +144,15 @@ export function useFileOperations() {
         formData.append("bucket", options.bucket);
       }
 
-      // Show loading toast
-      toast.loading(`Đang xóa ${objectNames.length} file(s)...`);
+      // Store callbacks before submitting
+      deleteCallbacksRef.current = options;
 
       deleteFetcher.submit(formData, {
         action: "/api/files/delete",
         method: "post",
       });
-
-      // Store callbacks for later use
-      if (options.onSuccess || options.onError) {
-        (deleteFetcher as any)._callbacks = options;
-      }
     },
     [deleteFetcher],
-  );
-
-  // Get download URL
-  const getDownloadUrl = useCallback(
-    async (objectName: string, bucket?: string, expires?: number) => {
-      try {
-        const searchParams = new URLSearchParams({
-          objectName,
-        });
-
-        if (bucket) {
-          searchParams.append("bucket", bucket);
-        }
-
-        if (expires) {
-          searchParams.append("expires", expires.toString());
-        }
-
-        const response = await fetch(`/api/files/download?${searchParams.toString()}`);
-        const result = await response.json();
-
-        if (result.success) {
-          return result.data.downloadUrl;
-        } else {
-          toast.error(result.error || "Không thể tạo link tải về");
-          throw new Error(result.error);
-        }
-      } catch (error) {
-        toast.error("Có lỗi xảy ra khi tạo link tải về");
-        throw error;
-      }
-    },
-    [],
   );
 
   // Direct download file
@@ -233,44 +197,68 @@ export function useFileOperations() {
     }
   }, []);
 
-  // Execute callbacks when fetcher completes
-  useEffect(() => {
-    if (uploadFetcher.data && uploadFetcher.state === "idle") {
-      const callbacks = (uploadFetcher as any)._callbacks;
-      if (callbacks) {
-        if (uploadFetcher.data.success) {
-          callbacks.onSuccess?.(uploadFetcher.data.data);
-        } else {
-          callbacks.onError?.(uploadFetcher.data.error);
-        }
-        // Clear callbacks
-        delete (uploadFetcher as any)._callbacks;
-      }
-    }
-  }, [uploadFetcher.data, uploadFetcher.state]);
+  // Upload multiple files
+  const uploadMultipleFiles = useCallback(
+    async (uploads: Array<{ file: File; options: UploadFileOptions }>) => {
+      try {
+        // Create upload promises for parallel execution
+        const uploadPromises = uploads.map(async ({ file, options }) => {
+          const formData = new FormData();
+          formData.append("file", file);
 
-  useEffect(() => {
-    if (deleteFetcher.data && deleteFetcher.state === "idle") {
-      const callbacks = (deleteFetcher as any)._callbacks;
-      if (callbacks) {
-        if (deleteFetcher.data.success) {
-          callbacks.onSuccess?.(deleteFetcher.data.data);
-        } else {
-          callbacks.onError?.(deleteFetcher.data.error);
-        }
-        // Clear callbacks
-        delete (deleteFetcher as any)._callbacks;
+          if (options.bucket) {
+            formData.append("bucket", options.bucket);
+          }
+
+          if (options.category) {
+            formData.append("category", options.category);
+          }
+
+          const response = await fetch("/api/files/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || "Upload failed");
+          }
+
+          // Execute individual success callback if provided
+          options.onSuccess?.(result.data);
+
+          return result.data;
+        });
+
+        // Wait for all uploads to complete
+        const results = await Promise.all(uploadPromises);
+
+        toast.success(`Upload ${results.length} file thành công!`);
+        return results;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Có lỗi xảy ra khi upload file";
+        toast.error(errorMessage);
+
+        // Execute error callbacks if provided
+        uploads.forEach(({ options }) => {
+          options.onError?.(errorMessage);
+        });
+
+        throw error;
       }
-    }
-  }, [deleteFetcher.data, deleteFetcher.state]);
+    },
+    [],
+  );
 
   return {
     uploadFile,
     uploadFileWithFetcher,
     deleteFile,
     deleteFiles,
-    getDownloadUrl,
     downloadFile,
+    uploadMultipleFiles,
     isUploading: uploadFetcher.state === "submitting",
     isDeleting: deleteFetcher.state === "submitting",
     isLoading: uploadFetcher.state === "loading" || deleteFetcher.state === "loading",

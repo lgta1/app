@@ -4,7 +4,7 @@ import { ClockIcon } from "lucide-react";
 import type { MangaType } from "~/database/models/manga.model";
 import { formatDistanceToNow } from "~/utils/date.utils";
 
-export function BannerItem({ manga }: { manga: MangaType }) {
+export function TopBannerItem({ manga }: { manga: MangaType }) {
   return (
     <Link key={manga.id} to={`/manga/${manga.id}`} className="flex-shrink-0">
       <div

@@ -2,7 +2,7 @@ import { getUserId } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.files.delete";
 
-import { deleteFile, deleteFiles } from "~/utils/minio.utils";
+import { deletePublicFile, deletePublicFiles } from "~/utils/minio.utils";
 
 export async function action({ request }: Route.ActionArgs) {
   try {
@@ -20,7 +20,7 @@ export async function action({ request }: Route.ActionArgs) {
     const formData = await request.formData();
     const objectName = formData.get("objectName") as string;
     const objectNames = formData.get("objectNames") as string;
-    const bucket = (formData.get("bucket") as string) || "uploads";
+    const bucket = (formData.get("bucket") as string) || "public-uploads";
 
     // Validate input
     if (!objectName && !objectNames) {
@@ -47,12 +47,12 @@ export async function action({ request }: Route.ActionArgs) {
     let deletedItems: string[] = [];
 
     if (objectName) {
-      // Delete single file
-      await deleteFile(objectName, { bucket });
+      // Delete single file from public bucket
+      await deletePublicFile(objectName, bucket);
       deletedCount = 1;
       deletedItems = [objectName];
     } else if (objectNames) {
-      // Delete multiple files
+      // Delete multiple files from public bucket
       const namesArray = JSON.parse(objectNames) as string[];
 
       if (!Array.isArray(namesArray) || namesArray.length === 0) {
@@ -76,7 +76,7 @@ export async function action({ request }: Route.ActionArgs) {
         );
       }
 
-      await deleteFiles(namesArray, { bucket });
+      await deletePublicFiles(namesArray, bucket);
       deletedCount = namesArray.length;
       deletedItems = namesArray;
     }
@@ -87,8 +87,9 @@ export async function action({ request }: Route.ActionArgs) {
         deletedCount,
         deletedItems,
         bucket,
+        isPublicBucket: true,
       },
-      message: `Successfully deleted ${deletedCount} file(s)`,
+      message: `Successfully deleted ${deletedCount} file(s) from public bucket`,
     });
   } catch (error) {
     console.error("Delete error:", error);
