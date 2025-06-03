@@ -1,0 +1,186 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFetcher } from "react-router";
+import * as Popover from "@radix-ui/react-popover";
+import { Search } from "lucide-react";
+
+import { SearchItem } from "./search-item";
+
+import type { MangaType } from "~/database/models/manga.model";
+
+interface SearchResponse {
+  manga: MangaType[];
+  hasMore: boolean;
+  nextPage: number;
+  total: number;
+}
+
+export function HeaderSearch() {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [results, setResults] = useState<MangaType[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetcher = useFetcher<SearchResponse>();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  const searchManga = useCallback(
+    (searchQuery: string, pageNum: number = 1) => {
+      if (!searchQuery.trim()) {
+        setResults([]);
+        setIsOpen(false);
+        setHasMore(false);
+        return;
+      }
+
+      setIsLoading(true);
+      fetcher.load(
+        `/api/manga/search?q=${encodeURIComponent(searchQuery)}&page=${pageNum}&limit=10`,
+      );
+    },
+    [fetcher],
+  );
+
+  useEffect(() => {
+    if (fetcher.data) {
+      const data = fetcher.data;
+
+      if (page === 1) {
+        setResults(data.manga);
+      } else {
+        setResults((prev) => [...prev, ...data.manga]);
+      }
+
+      setHasMore(data.hasMore);
+      setIsLoading(false);
+
+      if (data.manga.length > 0 || Boolean(query.trim())) {
+        setIsOpen(true);
+      } else {
+        setIsOpen(false);
+      }
+    }
+  }, [fetcher.data, page, query]);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      if (Boolean(query.trim())) {
+        setPage(1);
+        setResults([]);
+        setHasMore(false);
+        searchManga(query, 1);
+      } else {
+        setResults([]);
+        setIsOpen(false);
+        setHasMore(false);
+        setIsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [query]);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement || !hasMore || isLoading || !query.trim()) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+    const scrollThreshold = scrollHeight - clientHeight - 10;
+
+    if (scrollTop >= scrollThreshold) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      searchManga(query, nextPage);
+    }
+  }, [hasMore, isLoading, page, query, searchManga]);
+
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (scrollElement) {
+      scrollElement.addEventListener("scroll", handleScroll, { passive: true });
+      return () => scrollElement.removeEventListener("scroll", handleScroll);
+    }
+  }, [handleScroll]);
+
+  const shouldShowDropdown = Boolean(query.trim()) && (results.length > 0 || isLoading);
+
+  return (
+    <Popover.Root open={shouldShowDropdown && isOpen} onOpenChange={setIsOpen}>
+      <Popover.Trigger asChild>
+        <div className="bg-bgc-layer2 absolute left-1/2 flex w-80 -translate-x-1/2 transform items-center justify-start gap-2 rounded-xl px-3 py-1.5 md:w-96 lg:w-[384px]">
+          <Search className="text-txt-secondary h-5 w-5 flex-shrink-0" />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Tìm truyện"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => {
+              if (results.length > 0 && Boolean(query.trim())) {
+                setIsOpen(true);
+              }
+            }}
+            className="text-txt-secondary placeholder:text-txt-secondary focus:text-txt-primary flex-1 bg-transparent leading-normal font-medium outline-none focus:outline-none"
+          />
+        </div>
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          className="bg-bgc-layer1 border-bd-default data-[state=open]:data-[side=top]:animate-slideDownAndFade data-[state=open]:data-[side=right]:animate-slideLeftAndFade data-[state=open]:data-[side=bottom]:animate-slideUpAndFade data-[state=open]:data-[side=left]:animate-slideRightAndFade z-[99999] max-h-96 w-80 overflow-hidden rounded-xl border shadow-lg will-change-[transform,opacity] md:w-96 lg:w-[384px]"
+          sideOffset={8}
+          align="center"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <div
+            ref={scrollRef}
+            className="scrollbar-thin scrollbar-thumb-bd-default scrollbar-track-transparent max-h-96 overflow-y-auto"
+          >
+            {results.map((manga, index) => (
+              <SearchItem key={manga.id} manga={manga} isFirst={index === 0} />
+            ))}
+
+            {isLoading && (
+              <div className="flex items-center justify-center p-4">
+                <div className="border-txt-secondary h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"></div>
+              </div>
+            )}
+
+            {!hasMore && results.length > 0 && !isLoading && (
+              <div className="text-txt-secondary py-4 text-center text-sm">
+                Không còn kết quả
+              </div>
+            )}
+
+            {results.length === 0 && query.trim() && !isLoading && (
+              <div className="text-txt-secondary py-8 text-center">
+                Không tìm thấy truyện nào
+              </div>
+            )}
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}

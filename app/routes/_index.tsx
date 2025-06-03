@@ -67,7 +67,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     loadMore,
   } = useInfinityLoading<MangaType>({
     initialData: newManga,
-    apiUrl: "/api/new-manga",
+    apiUrl: "/api/manga/latest",
     limit: 16,
     autoLoad: false,
   });

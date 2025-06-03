@@ -1,5 +1,6 @@
 import { MangaModel } from "~/database/models/manga.model";
 import { getLeaderboardModel, type LeaderboardPeriod } from "@/services/leaderboard.svc";
+import { MANGA_STATUS } from "~/constants/manga";
 
 export const getNewManga = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
@@ -56,12 +57,19 @@ export const getMangaById = async (id: string) => {
   ).lean();
 };
 
-export const searchManga = async (keyword: string) => {
+export const searchMangaApprovedWithPagination = async (
+  keyword: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
+  const skip = (page - 1) * limit;
   return await MangaModel.find(
-    { $text: { $search: keyword } },
+    { $text: { $search: keyword }, status: MANGA_STATUS.APPROVED },
     { score: { $meta: "textScore" } },
   )
     .sort({ score: { $meta: "textScore" } })
+    .skip(skip)
+    .limit(limit)
     .lean();
 };
 

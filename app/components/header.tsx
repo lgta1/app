@@ -1,5 +1,8 @@
 import { Link, NavLink } from "react-router";
-import { Bell, ChevronDown, CircleUserRound, Menu, Search } from "lucide-react";
+import { Bell, ChevronDown, CircleUserRound, Menu } from "lucide-react";
+
+import { HeaderSearch } from "./header-search";
+import { MobileSearch } from "./mobile-search";
 
 import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
 import type { UserType } from "~/database/models/user.model";
@@ -112,12 +115,7 @@ export function Header({
           </div>
 
           {/* Thanh tìm kiếm */}
-          <div className="bg-bgc-layer2 absolute left-1/2 flex w-80 -translate-x-1/2 transform items-center justify-start gap-2 rounded-xl px-3 py-1.5">
-            <Search className="text-txt-secondary h-5 w-5" />
-            <span className="text-txt-secondary text-base leading-normal font-medium">
-              Tìm truyện
-            </span>
-          </div>
+          <HeaderSearch />
 
           {/* Phần đăng nhập/đăng ký hoặc người dùng */}
           <div className="flex items-center justify-start gap-4">
@@ -190,7 +188,7 @@ export function Header({
                 )}
               </div>
             )}
-            <Search className="text-txt-primary h-6 w-6" />
+            <MobileSearch />
             <Menu className="text-txt-primary h-7 w-7" />
           </div>
         </div>

@@ -187,7 +187,7 @@ export default function AdminManga() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-bgc-layer1 border-bd-default flex min-h-[596px] flex-col items-start justify-start gap-6 self-stretch rounded-xl border p-6 shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)]">
+      <div className="bg-bgc-layer1 border-bd-default mt-4 flex min-h-[596px] flex-col items-start justify-start gap-6 self-stretch rounded-xl border p-6 shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)]">
         {/* Search and Sort Controls */}
         <div className="flex flex-col items-start justify-between gap-4 self-stretch md:flex-row md:gap-0">
           <div className="bg-bgc-layer2 border-bd-default flex w-full items-center justify-start gap-2 rounded-xl border px-3 py-2 md:w-80">
