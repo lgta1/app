@@ -1,4 +1,4 @@
-import { getUserId } from "@/services/session.svc";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.files.delete";
 
@@ -6,8 +6,9 @@ import { deletePublicFile, deletePublicFiles } from "~/utils/minio.utils";
 
 export async function action({ request }: Route.ActionArgs) {
   try {
-    const userId = await getUserId(request);
-    if (!userId) {
+    const userInfo = await getUserInfoFromSession(request);
+
+    if (!userInfo) {
       return Response.json(
         {
           success: false,

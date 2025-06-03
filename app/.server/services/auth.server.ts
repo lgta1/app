@@ -1,15 +1,16 @@
 import { redirect } from "react-router";
 import crypto from "crypto";
 
-import { ROLES } from "~/constants/user";
-import { UserModel } from "~/database/models/user.model";
-import { BusinessError } from "~/helpers/errors";
 import {
   createUserSession,
   destroySession,
-  getUserId,
+  getUserInfoFromSession,
   getUserSession,
 } from "@/services/session.svc";
+
+import { ROLES } from "~/constants/user";
+import { UserModel, type UserType } from "~/database/models/user.model";
+import { BusinessError } from "~/helpers/errors";
 import { isAdmin } from "~/helpers/user";
 
 const generateSalt = () => {
@@ -23,29 +24,42 @@ const hashPassword = (password: string, salt: string) => {
 /**
  * Yêu cầu user phải đăng nhập, nếu không sẽ redirect về login
  */
-export async function requireLogin(request: Request): Promise<string> {
-  const userId = await getUserId(request);
+export async function requireLogin(request: Request): Promise<UserType> {
+  const userInfo = await getUserInfoFromSession(request);
 
-  if (!userId) {
+  if (!userInfo) {
     throw redirect("/login");
   }
 
-  return userId;
+  return userInfo;
 }
 
-export async function requireAdminLogin(request: Request): Promise<string> {
-  const userId = await getUserId(request);
+export async function requireAdminLogin(request: Request): Promise<UserType> {
+  const userInfo = await getUserInfoFromSession(request);
 
-  if (!userId) {
+  if (!userInfo) {
     throw redirect("/login");
   }
 
-  const user = await UserModel.findById(userId);
-  if (!user || user.role !== ROLES.ADMIN) {
+  if (userInfo.role !== ROLES.ADMIN) {
     throw redirect("/");
   }
 
-  return userId;
+  return userInfo;
+}
+
+export async function requireAdminOrModLogin(request: Request): Promise<UserType> {
+  const userInfo = await getUserInfoFromSession(request);
+
+  if (!userInfo) {
+    throw redirect("/login");
+  }
+
+  if (!isAdmin(userInfo.role)) {
+    throw redirect("/");
+  }
+
+  return userInfo;
 }
 
 export async function logout(request: Request) {

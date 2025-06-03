@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
 
 import { register } from "@/services/auth.server";
-import { getUserId } from "@/services/session.svc";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/register";
 
@@ -10,8 +10,9 @@ import { isBusinessError, returnBusinessError } from "~/helpers/errors";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Kiểm tra xem người dùng đã đăng nhập chưa
-  const userId = await getUserId(request);
-  if (userId) {
+  const userInfo = await getUserInfoFromSession(request);
+
+  if (userInfo) {
     return redirect("/");
   }
 }

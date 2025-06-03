@@ -1,8 +1,8 @@
 import { isValidObjectId } from "mongoose";
 
-import { ROLES } from "~/constants/user";
-import { CommentModel } from "~/database/models/comment.model";
 import { sanitizeCommentContent, validateCommentContent } from "@/services/comment.svc";
+
+import { CommentModel } from "~/database/models/comment.model";
 
 export const createComment = async (data: {
   content: string;
@@ -35,18 +35,7 @@ export const createComment = async (data: {
     .lean();
 };
 
-export const deleteComment = async (
-  commentId: string,
-  userRole: string,
-  requestUserId?: string,
-) => {
-  // Kiểm tra quyền xóa
-  const canDelete = userRole === ROLES.ADMIN || userRole === ROLES.MOD;
-
-  if (!canDelete) {
-    throw new Error("Bạn không có quyền xóa bình luận");
-  }
-
+export const deleteComment = async (commentId: string) => {
   const comment = await CommentModel.findById(commentId);
 
   if (!comment) {

@@ -4,12 +4,16 @@ import type { ActionFunctionArgs } from "react-router";
 import { useActionData, useFetcher, useNavigation } from "react-router";
 import { FileText, Image, Star, Upload, User, X } from "lucide-react";
 
+import { requireAdminOrModLogin } from "@/services/auth.server";
+
 import { createWaifu } from "~/.server/mutations/waifu.mutation";
 import { ButtonGroupForm } from "~/components/button-group-form";
 import { BusinessError } from "~/helpers/errors";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdminOrModLogin(request);
+
   try {
     const formData = await request.formData();
 

@@ -1,9 +1,10 @@
+import { getUserInfoFromSession } from "@/services/session.svc";
+
 import { ROLES } from "~/constants/user";
 import { BannerModel, type BannerType } from "~/database/models/banner.model";
-import { UserModel } from "~/database/models/user.model";
 import { WaifuModel } from "~/database/models/waifu.model";
 import { BusinessError } from "~/helpers/errors";
-import { getUserId, getUserInfoFromSession } from "@/services/session.svc";
+import { isAdmin } from "~/helpers/user";
 
 export type CreateBannerData = {
   title: string;
@@ -62,13 +63,12 @@ export const createBanner = async (request: Request, data: CreateBannerData) => 
 };
 
 export const updateBanner = async (request: Request, data: BannerType) => {
-  const userId = await getUserId(request);
-  if (!userId) {
+  const currentUser = await getUserInfoFromSession(request);
+  if (!currentUser) {
     throw new BusinessError("Bạn cần đăng nhập để cập nhật banner");
   }
 
-  const user = await UserModel.findById(userId);
-  if (user?.role !== ROLES.ADMIN) {
+  if (!isAdmin(currentUser.role)) {
     throw new BusinessError("Bạn không có quyền cập nhật banner");
   }
 
@@ -96,13 +96,12 @@ export const updateBanner = async (request: Request, data: BannerType) => {
 };
 
 export const deleteBanner = async (request: Request, bannerId: string) => {
-  const userId = await getUserId(request);
-  if (!userId) {
+  const currentUser = await getUserInfoFromSession(request);
+  if (!currentUser) {
     throw new BusinessError("Bạn cần đăng nhập để xóa banner");
   }
 
-  const user = await UserModel.findById(userId);
-  if (user?.role !== ROLES.ADMIN) {
+  if (!isAdmin(currentUser.role)) {
     throw new BusinessError("Bạn không có quyền xóa banner");
   }
 

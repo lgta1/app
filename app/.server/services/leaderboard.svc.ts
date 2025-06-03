@@ -1,4 +1,5 @@
 import { ENV } from "@/configs/env.config";
+
 import { InteractionModel } from "~/database/models/interaction.model";
 import {
   DailyLeaderboardModel,

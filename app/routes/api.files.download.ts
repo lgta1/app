@@ -1,4 +1,4 @@
-import { getUserId } from "@/services/session.svc";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.files.download";
 
@@ -7,8 +7,9 @@ import { downloadFile, getPublicFileInfo, getPublicFileUrl } from "~/utils/minio
 export async function loader({ request }: Route.LoaderArgs) {
   try {
     // Kiểm tra authentication - required user login
-    const userId = await getUserId(request);
-    if (!userId) {
+    const userInfo = await getUserInfoFromSession(request);
+
+    if (!userInfo) {
       return Response.json(
         {
           success: false,

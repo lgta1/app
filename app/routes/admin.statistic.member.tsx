@@ -1,4 +1,3 @@
-import type { LoaderFunctionArgs } from "react-router";
 import { NavLink, useLoaderData } from "react-router";
 import { BookOpen, Eye, Users } from "lucide-react";
 
@@ -15,7 +14,7 @@ interface StatisticData {
   topUser: UserType[];
 }
 
-export async function loader({ request }: LoaderFunctionArgs): Promise<Response> {
+export async function loader(): Promise<Response> {
   const [statistic, topUser] = await Promise.all([getStatistic(), getTopUser()]);
 
   return Response.json({

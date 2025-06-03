@@ -11,6 +11,7 @@ import { ChevronDown, Gift, Search, Trash2, TriangleAlert } from "lucide-react";
 
 import { banUser, deleteUser, rewardGoldUser } from "@/mutations/user.mutation";
 import { getListModAndAdmin, getListUser, getTotalUserCount } from "@/queries/user.query";
+import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { BanMemberDialog } from "~/components/ban-member-dialog";
 import { DeleteMemberDialog } from "~/components/delete-member-dialog";
@@ -36,6 +37,8 @@ interface LoaderData {
 }
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
+  await requireAdminOrModLogin(request);
+
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const searchTerm = url.searchParams.get("search") || "";
@@ -72,6 +75,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdminOrModLogin(request);
+
   const formData = await request.formData();
   const action = formData.get("action");
   const userId = formData.get("userId");

@@ -1,4 +1,3 @@
-import type { LoaderFunctionArgs } from "react-router";
 import { NavLink, useLoaderData } from "react-router";
 import * as Tabs from "@radix-ui/react-tabs";
 import { BookOpen, Eye, Users } from "lucide-react";
@@ -18,7 +17,7 @@ interface StatisticData {
   monthlyLeaderboard: MangaType[];
 }
 
-export async function loader({ request }: LoaderFunctionArgs): Promise<Response> {
+export async function loader(): Promise<Response> {
   // Lấy dữ liệu thống kê và leaderboard từ database
   const statistic = await getStatistic();
   const dailyLeaderboard = await getLeaderboard("daily");

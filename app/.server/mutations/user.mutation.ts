@@ -1,18 +1,19 @@
 import { isValidObjectId } from "mongoose";
 
+import { getUserInfoFromSession } from "@/services/session.svc";
+
 import { ROLES } from "~/constants/user";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors";
-import { getUserId } from "@/services/session.svc";
+import { isAdmin } from "~/helpers/user";
 
 export const promoteToAdmin = async (request: Request, userId: string) => {
-  const currentUserId = await getUserId(request);
-  if (!currentUserId) {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  const currentUser = await UserModel.findById(currentUserId);
-  if (!currentUser || currentUser.role !== ROLES.ADMIN) {
+  if (currentUserInfo.role !== ROLES.ADMIN) {
     throw new BusinessError("Bạn không có quyền thực hiện hành động này");
   }
 
@@ -30,13 +31,12 @@ export const promoteToAdmin = async (request: Request, userId: string) => {
 };
 
 export const promoteToMod = async (request: Request, userId: string) => {
-  const currentUserId = await getUserId(request);
-  if (!currentUserId) {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  const currentUser = await UserModel.findById(currentUserId);
-  if (!currentUser || currentUser.role !== ROLES.ADMIN) {
+  if (currentUserInfo.role !== ROLES.ADMIN) {
     throw new BusinessError("Bạn không có quyền thực hiện hành động này");
   }
 
@@ -54,13 +54,12 @@ export const promoteToMod = async (request: Request, userId: string) => {
 };
 
 export const demoteToUser = async (request: Request, userId: string) => {
-  const currentUserId = await getUserId(request);
-  if (!currentUserId) {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  const currentUser = await UserModel.findById(currentUserId);
-  if (!currentUser || ![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+  if (currentUserInfo.role !== ROLES.ADMIN) {
     throw new BusinessError("Bạn không có quyền thực hiện hành động này");
   }
 
@@ -78,13 +77,12 @@ export const demoteToUser = async (request: Request, userId: string) => {
 };
 
 export const deleteUser = async (request: Request, userId: string) => {
-  const currentUserId = await getUserId(request);
-  if (!currentUserId) {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  const currentUser = await UserModel.findById(currentUserId);
-  if (!currentUser || ![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+  if (!isAdmin(currentUserInfo.role)) {
     throw new BusinessError("Bạn không có quyền thực hiện hành động này");
   }
 
@@ -92,7 +90,10 @@ export const deleteUser = async (request: Request, userId: string) => {
     throw new BusinessError("ID người dùng không hợp lệ");
   }
 
-  await UserModel.findByIdAndUpdate(userId, { $set: { isDeleted: true } });
+  await UserModel.findOneAndUpdate(
+    { _id: userId, role: { $ne: ROLES.ADMIN } },
+    { $set: { isDeleted: true } },
+  );
 
   return {
     success: true,
@@ -106,13 +107,12 @@ export const banUser = async (
   days: number,
   message: string,
 ) => {
-  const currentUserId = await getUserId(request);
-  if (!currentUserId) {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  const currentUser = await UserModel.findById(currentUserId);
-  if (!currentUser || ![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+  if (!isAdmin(currentUserInfo.role)) {
     throw new BusinessError("Bạn không có quyền thực hiện hành động này");
   }
 
@@ -124,13 +124,16 @@ export const banUser = async (
   const banExpiresAt = new Date();
   banExpiresAt.setDate(banExpiresAt.getDate() + days);
 
-  await UserModel.findByIdAndUpdate(userId, {
-    $set: {
-      isBanned: true,
-      banExpiresAt,
-      banMessage: message,
+  await UserModel.findOneAndUpdate(
+    { _id: userId, role: { $ne: ROLES.ADMIN } },
+    {
+      $set: {
+        isBanned: true,
+        banExpiresAt,
+        banMessage: message,
+      },
     },
-  });
+  );
 
   return {
     success: true,
@@ -143,13 +146,12 @@ export const rewardGoldUser = async (
   userId: string,
   amount: number,
 ) => {
-  const currentUserId = await getUserId(request);
-  if (!currentUserId) {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  const currentUser = await UserModel.findById(currentUserId);
-  if (!currentUser || ![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+  if (!isAdmin(currentUserInfo.role)) {
     throw new BusinessError("Bạn không có quyền thực hiện hành động này");
   }
 

@@ -1,11 +1,13 @@
 import { useState } from "react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { NavLink, useFetcher, useLoaderData } from "react-router";
 import { Edit, Save, X } from "lucide-react";
 
+import { requireAdminOrModLogin } from "@/services/auth.server";
+
 import { PityModel } from "~/database/models/pity.model";
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader() {
   try {
     const pitySettings = await PityModel.find({}).sort({ level: 1 });
     return Response.json({ success: true, data: pitySettings });
@@ -19,6 +21,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdminOrModLogin(request);
+
   try {
     const formData = await request.formData();
     const pitySetting = {

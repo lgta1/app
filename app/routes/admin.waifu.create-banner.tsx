@@ -15,6 +15,7 @@ import {
 
 import { createBanner } from "@/mutations/banner.mutation";
 import { getAllWaifus } from "@/queries/waifu.query";
+import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { ButtonGroupForm } from "~/components/button-group-form";
 import { BusinessError } from "~/helpers/errors";
@@ -31,6 +32,8 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdminOrModLogin(request);
+
   try {
     const formData = await request.formData();
 

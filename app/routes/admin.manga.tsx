@@ -15,6 +15,7 @@ import {
   getTotalMangaCount,
   searchMangaWithPagination,
 } from "@/queries/manga.query";
+import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { Pagination } from "~/components/pagination";
 import { MANGA_STATUS } from "~/constants/manga";
@@ -35,6 +36,8 @@ interface LoaderData {
 }
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
+  await requireAdminOrModLogin(request);
+
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const searchTerm = url.searchParams.get("search") || "";
@@ -66,6 +69,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdminOrModLogin(request);
+
   const formData = await request.formData();
   const action = formData.get("action");
   const mangaId = formData.get("mangaId");

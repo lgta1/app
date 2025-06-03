@@ -1,18 +1,17 @@
-import { WaifuModel } from "~/database/models/waifu.model";
+import { getUserInfoFromSession } from "@/services/session.svc";
+
 import type { WaifuType } from "~/database/models/waifu.model";
+import { WaifuModel } from "~/database/models/waifu.model";
 import { BusinessError } from "~/helpers/errors";
-import { getUserId } from "@/services/session.svc";
-import { UserModel } from "~/database/models/user.model";
-import { ROLES } from "~/constants/user";
+import { isAdmin } from "~/helpers/user";
 
 export const createWaifu = async (request: Request, waifuData: Omit<WaifuType, "id">) => {
-  const currentUserId = await getUserId(request);
-  if (!currentUserId) {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  const currentUser = await UserModel.findById(currentUserId);
-  if (!currentUser || ![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+  if (!isAdmin(currentUserInfo.role)) {
     throw new BusinessError("Bạn không có quyền thực hiện hành động này");
   }
 

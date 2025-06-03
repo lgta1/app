@@ -10,6 +10,7 @@ import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Check, ChevronDown } from "lucide-react";
 
 import { deleteReport, getReports } from "@/queries/report.query";
+import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { Pagination } from "~/components/pagination";
 import { ReportCard } from "~/components/report.card";
@@ -36,6 +37,8 @@ interface LoaderData {
 const LIMIT_PER_PAGE = 10;
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<Response> {
+  await requireAdminOrModLogin(request);
+
   const url = new URL(request.url);
   const sortBy = url.searchParams.get("sort") || "newest";
   const page = parseInt(url.searchParams.get("page") || "1", 10);
@@ -80,6 +83,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<Response>
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdminOrModLogin(request);
+
   const formData = await request.formData();
   const action = formData.get("action");
   const reportId = formData.get("reportId");

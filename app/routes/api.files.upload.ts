@@ -1,5 +1,5 @@
 import { ensurePublicBucketExists } from "@/configs/minio.config";
-import { getUserId } from "@/services/session.svc";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.files.upload";
 
@@ -8,8 +8,9 @@ import { uploadToPublicBucket } from "~/utils/minio.utils";
 export async function action({ request }: Route.ActionArgs) {
   try {
     // Kiểm tra authentication - required user login
-    const userId = await getUserId(request);
-    if (!userId) {
+    const userInfo = await getUserInfoFromSession(request);
+
+    if (!userInfo) {
       return Response.json(
         {
           success: false,
