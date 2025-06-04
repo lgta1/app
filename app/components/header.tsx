@@ -136,7 +136,7 @@ export function Header({
                     <span className="text-txt-primary text-base font-medium">
                       {user?.name}
                     </span>
-                    {user && (
+                    {user && !isAdmin && (
                       <img src={getTitleImgPath(user)} alt="Title" className="h-6 w-28" />
                     )}
                     <ChevronDown className="text-txt-primary h-4 w-4" />

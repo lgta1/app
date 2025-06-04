@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
+import {
+  Form,
+  Link,
+  redirect,
+  useActionData,
+  useNavigation,
+  useSearchParams,
+} from "react-router";
 
 import { login } from "@/services/auth.server";
 import { getUserInfoFromSession } from "@/services/session.svc";
@@ -34,40 +41,50 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const [searchParams] = useSearchParams();
+  const registerSuccess = searchParams.get("registerSuccess") === "true";
 
   const isSubmitting = navigation.state === "submitting";
 
   return (
-    <div className="bg-gradient-radial to-bgc-layer1 min-h-screen w-full from-[#191758]">
+    <div className="bg-gradient-radial to-bgc-layer1 min-h-screen w-full from-[#191758] px-4">
       {/* Container chính */}
-      <div className="mx-auto mb-10 flex w-[558px] flex-col items-center gap-6 pt-[104px]">
+      <div className="mx-auto mb-10 flex w-full max-w-[402px] flex-col items-center gap-[46px] pt-[104px] md:max-w-[558px] md:gap-6 md:pt-[104px]">
         {/* Logo */}
         <img src="/images/logo.png" alt="Logo" className="h-[75px] w-[240px]" />
 
         {/* Banner */}
-        <div className="flex flex-col justify-center gap-[12px]">
+        <div className="flex w-full flex-col justify-center gap-[15px] md:gap-[12px]">
           <img
             src="/images/banners/topbanner-1.png"
             alt="Banner 1"
-            className="h-[69px] w-[558px]"
+            className="h-[53px] w-full md:h-[69px]"
           />
           <img
             src="/images/banners/topbanner-2.png"
             alt="Banner 2"
-            className="h-[69px] w-[558px]"
+            className="h-[53px] w-full md:h-[69px]"
           />
         </div>
 
         {/* Form đăng nhập */}
-        <div className="border-bd-default bg-bgc-layer1 flex max-h-[450px] min-h-[376px] w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4">
+        <div className="border-bd-default bg-bgc-layer1 flex h-[444px] w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4 md:max-h-[450px] md:min-h-[376px]">
           {/* Tiêu đề */}
           <div className="flex w-full flex-col gap-[11px]">
-            <h1 className="text-txt-primary text-3xl font-semibold">Đăng nhập</h1>
-            <div className="from-txt-secondary h-[1px] w-[370px] bg-gradient-to-r to-transparent"></div>
+            <h1 className="text-txt-primary text-center text-3xl leading-9 font-semibold md:text-left">
+              Đăng nhập
+            </h1>
+            <div className="from-txt-secondary h-[1px] w-full bg-gradient-to-r to-transparent md:w-[370px]"></div>
           </div>
 
           {/* Form */}
           <Form method="post" className="flex w-full flex-col gap-4">
+            {registerSuccess && (
+              <div className="rounded bg-green-500/10 p-2 text-sm font-medium text-green-500">
+                Chúc mừng bạn đã đăng ký tài khoản thành công
+              </div>
+            )}
+
             {actionData?.error && (
               <div className="rounded bg-red-500/10 p-2 text-sm font-medium text-red-500">
                 {actionData.error.message}
@@ -77,7 +94,10 @@ export default function Login() {
             {/* Email */}
             <div className="flex w-full flex-col">
               <div className="flex items-center gap-[10px] pb-3">
-                <label htmlFor="email" className="text-txt-primary text-xs font-semibold">
+                <label
+                  htmlFor="email"
+                  className="text-txt-primary text-xs leading-4 font-semibold"
+                >
                   Email
                 </label>
               </div>
@@ -87,7 +107,7 @@ export default function Login() {
                   id="email"
                   name="email"
                   placeholder="Nhập email của bạn"
-                  className="text-txt-secondary w-full bg-transparent text-base font-medium outline-none"
+                  className="text-txt-secondary w-full bg-transparent text-base leading-6 font-medium outline-none"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -100,7 +120,7 @@ export default function Login() {
               <div className="flex items-center gap-[10px] pb-3">
                 <label
                   htmlFor="password"
-                  className="text-txt-primary text-xs font-semibold"
+                  className="text-txt-primary text-xs leading-4 font-semibold"
                 >
                   Mật khẩu
                 </label>
@@ -111,7 +131,7 @@ export default function Login() {
                   id="password"
                   name="password"
                   placeholder="Nhập mật khẩu của bạn"
-                  className="text-txt-secondary w-full bg-transparent text-base font-medium outline-none"
+                  className="text-txt-secondary w-full bg-transparent text-base leading-6 font-medium outline-none"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -120,11 +140,11 @@ export default function Login() {
             </div>
 
             {/* Link đăng ký */}
-            <div className="flex items-center gap-2">
-              <span className="text-txt-secondary text-sm font-medium">
+            <div className="flex items-center justify-start gap-2">
+              <span className="text-txt-secondary text-sm leading-5 font-medium">
                 Chưa có tài khoản?
               </span>
-              <Link to="/dang-ky" className="text-lav-500 text-sm font-medium">
+              <Link to="/dang-ky" className="text-lav-500 text-sm leading-5 font-medium">
                 Đăng ký ngay
               </Link>
             </div>
@@ -133,7 +153,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="to-lav-500 w-full rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-3 text-sm font-semibold text-black shadow-[0px_4px_8.9px_rgba(196,69,255,0.25)] disabled:opacity-70"
+              className="to-lav-500 h-11 w-full rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-3 text-sm leading-5 font-semibold text-black shadow-[0px_4px_8.9px_rgba(196,69,255,0.25)] disabled:opacity-70"
             >
               {isSubmitting ? "Đang xử lý..." : "Đăng nhập"}
             </button>

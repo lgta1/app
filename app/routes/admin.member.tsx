@@ -13,10 +13,10 @@ import { banUser, deleteUser, rewardGoldUser } from "@/mutations/user.mutation";
 import { getListModAndAdmin, getListUser, getTotalUserCount } from "@/queries/user.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
-import { BanMemberDialog } from "~/components/ban-member-dialog";
-import { DeleteMemberDialog } from "~/components/delete-member-dialog";
+import { BanMemberDialog } from "~/components/dialog-ban-member";
+import { DeleteMemberDialog } from "~/components/dialog-delete-member";
+import { RewardGoldDialog } from "~/components/dialog-reward-gold";
 import { Pagination } from "~/components/pagination";
-import { RewardGoldDialog } from "~/components/reward-gold-dialog";
 import type { UserType } from "~/database/models/user.model";
 import { calculateLevel } from "~/helpers/user-level";
 

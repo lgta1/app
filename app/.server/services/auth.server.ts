@@ -114,6 +114,8 @@ export async function register({ request }: { request: Request }) {
   const email = formData.get("email")?.toString() ?? "";
   const password = formData.get("password")?.toString() ?? "";
   const confirmPassword = formData.get("confirmPassword")?.toString() ?? "";
+  const faction = Number(formData.get("faction")?.toString() ?? "-1");
+  const gender = Number(formData.get("gender")?.toString() ?? "-1");
 
   if (password !== confirmPassword) {
     throw new BusinessError("Mật khẩu không khớp");
@@ -124,6 +126,14 @@ export async function register({ request }: { request: Request }) {
     throw new BusinessError("Tài khoản đã tồn tại");
   }
 
+  if (faction === -1) {
+    throw new BusinessError("Vui lòng chọn phe phái");
+  }
+
+  if (gender === -1) {
+    throw new BusinessError("Vui lòng chọn giới tính");
+  }
+
   const salt = generateSalt();
   const hashedPassword = hashPassword(password, salt);
 
@@ -132,7 +142,9 @@ export async function register({ request }: { request: Request }) {
     email,
     password: hashedPassword,
     salt,
+    faction,
+    gender,
   });
 
-  return redirect("/login");
+  return redirect("/login?registerSuccess=true");
 }

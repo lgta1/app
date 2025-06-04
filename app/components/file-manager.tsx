@@ -259,7 +259,7 @@ export function FileManager({
             <button
               onClick={handleBulkDelete}
               disabled={isDeleting}
-              className="rounded-lg bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
+              className="rounded-lg bg-red-500 px-4 py-2 hover:bg-red-600 disabled:opacity-50"
             >
               Xóa đã chọn ({selectedFiles.length})
             </button>
@@ -268,7 +268,7 @@ export function FileManager({
           <button
             onClick={loadFiles}
             disabled={listFetcher.state === "loading"}
-            className="rounded-lg bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 disabled:opacity-50"
+            className="rounded-lg bg-gray-500 px-4 py-2 hover:bg-gray-600 disabled:opacity-50"
           >
             {listFetcher.state === "loading" ? "Đang tải..." : "Tải lại"}
           </button>
@@ -305,7 +305,7 @@ export function FileManager({
               <div className="flex space-x-2">
                 <button
                   onClick={() => handleFileDownload(file.name)}
-                  className="rounded bg-blue-500 px-3 py-1 text-white hover:bg-blue-600"
+                  className="rounded bg-blue-500 px-3 py-1 hover:bg-blue-600"
                 >
                   Tải về
                 </button>
@@ -313,7 +313,7 @@ export function FileManager({
                 <button
                   onClick={() => handleFileDelete(file.name)}
                   disabled={isDeleting}
-                  className="rounded bg-red-500 px-3 py-1 text-white hover:bg-red-600 disabled:opacity-50"
+                  className="rounded bg-red-500 px-3 py-1 hover:bg-red-600 disabled:opacity-50"
                 >
                   Xóa
                 </button>

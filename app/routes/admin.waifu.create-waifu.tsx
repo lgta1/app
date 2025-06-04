@@ -247,7 +247,7 @@ export default function AdminCreateWaifu() {
                       <button
                         type="button"
                         onClick={clearImage}
-                        className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 focus:outline-none"
+                        className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 focus:outline-none"
                       >
                         <X className="h-4 w-4" strokeWidth={4} color="white" />
                       </button>

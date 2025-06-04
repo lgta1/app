@@ -103,7 +103,7 @@ export async function action({ request }: Route.ActionArgs) {
       metadata: {
         "original-name": file.name,
         "upload-date": new Date().toISOString(),
-        "uploaded-by": userId,
+        "uploaded-by": userInfo.id,
         category: category,
         size: file.size.toString(),
         "user-agent": request.headers.get("user-agent") || "unknown",

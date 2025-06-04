@@ -16,7 +16,7 @@ import "./app.css";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
-import { ROLES } from "~/constants/user";
+import { isAdmin } from "~/helpers/user";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -63,7 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (user) {
     return {
       isAuthenticated: true,
-      isAdmin: [ROLES.ADMIN, ROLES.MOD].includes(user?.role || ""),
+      isAdmin: isAdmin(user.role),
       user,
     };
   }

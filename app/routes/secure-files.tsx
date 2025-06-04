@@ -31,8 +31,8 @@ export default function SecureFiles() {
         </div>
 
         <FileManager
-          bucket="uploads"
-          category="user-files"
+          bucket="banner-images"
+          category="banner"
           allowMultiple={true}
           maxFileSize={10}
           allowedTypes={[
