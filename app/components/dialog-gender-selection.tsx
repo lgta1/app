@@ -73,7 +73,8 @@ export function GenderSelectionDialog({
                 <span>!</span>
               </div>
               <p className="text-center text-sm font-medium md:text-base">
-                Hãy chọn giới tính cho nhân vật của bạn
+                Số phận đang chờ đợi bạn đặt những bước chân đầu tiên vào vùng đất khoái
+                lạc. Bạn cảm nhận được dòng chảy sức mạnh nào đang trỗi dậy trong mình?
               </p>
             </div>
 
