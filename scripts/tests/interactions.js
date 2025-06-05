@@ -1,19 +1,16 @@
+db.interactions.remove({});
+
 const mangaIds = [
-  "682fe957c1ebec05f922eaf4",
-  "682fe957c1ebec05f922eaf5",
-  "682fe957c1ebec05f922eaf6",
-  "682fe957c1ebec05f922eaf7",
-  "682fe957c1ebec05f922eaf8",
-  "682fe957c1ebec05f922eaf9",
-  "682fe957c1ebec05f922eafa",
-  "682fe957c1ebec05f922eafb",
-  "682fe957c1ebec05f922eafc",
-  "682fe957c1ebec05f922eafd",
-  "682fe957c1ebec05f922eafe",
-  "682fe957c1ebec05f922eaff",
-  "682fe957c1ebec05f922eb00",
-  "682fe957c1ebec05f922eb01",
-  "682fe957c1ebec05f922eb02",
+  "68407b3fead989219fcfeee8",
+  "68407b3fead989219fcfeee9",
+  "68407b3fead989219fcfeeea",
+  "68407b3fead989219fcfeeeb",
+  "68407b3fead989219fcfeeec",
+  "68407b3fead989219fcfeeed",
+  "68407b3fead989219fcfeeee",
+  "68407b3fead989219fcfeeef",
+  "68407b3fead989219fcfeef0",
+  "68407b3fead989219fcfef19",
 ];
 
 const userIds = [

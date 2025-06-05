@@ -16,13 +16,20 @@ export const getNewManga = async (page: number = 1, limit: number = 10) => {
   }));
 };
 
-export const getTotalMangaCount = async (searchTerm?: string) => {
+export const getTotalMangaCount = async ({
+  searchTerm,
+  query = {},
+}: {
+  searchTerm?: string;
+  query?: Record<string, any>;
+}) => {
   if (searchTerm) {
     return await MangaModel.countDocuments({
       $text: { $search: searchTerm },
+      ...query,
     });
   }
-  return await MangaModel.countDocuments({});
+  return await MangaModel.countDocuments(query);
 };
 
 export const searchMangaWithPagination = async (
@@ -58,17 +65,32 @@ export const getMangaById = async (id: string) => {
   ).lean();
 };
 
-export const searchMangaApprovedWithPagination = async (
-  keyword: string,
-  page: number = 1,
-  limit: number = 10,
-) => {
+export const searchMangaApprovedWithPagination = async ({
+  keyword,
+  page,
+  limit,
+  query = {},
+}: {
+  keyword?: string;
+  page: number;
+  limit: number;
+  query?: Record<string, any>;
+}) => {
   const skip = (page - 1) * limit;
-  return await MangaModel.find(
-    { $text: { $search: keyword }, status: MANGA_STATUS.APPROVED },
-    { score: { $meta: "textScore" } },
-  )
-    .sort({ score: { $meta: "textScore" } })
+
+  if (keyword) {
+    return await MangaModel.find(
+      { $text: { $search: keyword }, status: MANGA_STATUS.APPROVED, ...query },
+      { score: { $meta: "textScore" } },
+    )
+      .sort({ score: { $meta: "textScore" } })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+  }
+
+  return await MangaModel.find(query)
+    .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .lean();

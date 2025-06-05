@@ -1,10 +1,12 @@
 import { Link, NavLink } from "react-router";
 import { Bell, ChevronDown, CircleUserRound, Menu } from "lucide-react";
 
+import { HeaderGenres } from "./header-genres";
 import { HeaderSearch } from "./header-search";
 import { MobileSearch } from "./mobile-search";
 
 import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
+import type { GenresType } from "~/database/models/genres.model";
 import type { UserType } from "~/database/models/user.model";
 import { getTitleImgPath } from "~/helpers/user";
 
@@ -13,30 +15,21 @@ interface HeaderProps {
   isAdmin?: boolean;
   user?: UserType;
   notificationCount?: number;
+  genres?: GenresType[];
 }
 
-const getNavigationItems = (isMobile: boolean, isAdmin: boolean) => {
+const getNavigationItems = (
+  isMobile: boolean,
+  isAdmin: boolean,
+  genres?: GenresType[],
+) => {
   const navigationItems = isAdmin ? ADMIN_NAVIGATION_ITEMS : NAVIGATION_ITEMS;
 
   return navigationItems
     .filter((nav) => (isMobile && nav.mobile) || (!isMobile && nav))
     .map((item) => {
-      if (item.isDropdown) {
-        return (
-          <div key={item.href} className="flex items-center justify-start gap-1">
-            <NavLink
-              to={item.href}
-              className={({ isActive }) =>
-                `text-sm leading-normal font-semibold ${
-                  isActive ? "text-lav-500" : "text-txt-primary"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-            <ChevronDown className="text-txt-primary h-3 w-3" />
-          </div>
-        );
+      if (item.href === "/genres") {
+        return <HeaderGenres key={item.href} genres={genres || []} />;
       }
 
       if (item.isSpecial) {
@@ -78,6 +71,7 @@ export function Header({
   user,
   notificationCount = 0,
   isAdmin = false,
+  genres = [],
 }: HeaderProps) {
   return (
     <header className="flex w-full flex-col">
@@ -196,12 +190,12 @@ export function Header({
 
       {/* Navigation links - chỉ hiển thị ở desktop */}
       <nav className="hidden items-center justify-center gap-8 self-stretch overflow-hidden bg-[rgba(9,16,26,0.34)] px-8 py-3 md:inline-flex">
-        {getNavigationItems(false, isAdmin)}
+        {getNavigationItems(false, isAdmin, genres)}
       </nav>
 
       {/* Mobile Navigation Menu - Hiển thị menu trên mobile */}
       <nav className="flex w-full flex-row items-center justify-center gap-8 bg-[rgba(9,16,26,0.34)] px-8 py-3 md:hidden">
-        {getNavigationItems(true, isAdmin)}
+        {getNavigationItems(true, isAdmin, genres)}
       </nav>
     </header>
   );

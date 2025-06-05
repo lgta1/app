@@ -79,8 +79,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       <TopBanner
         bannerItems={
           dailyLeaderboard.length > 0
-            ? (dailyLeaderboard as MangaType[])
-            : (weeklyLeaderboard as MangaType[])
+            ? (dailyLeaderboard as MangaType[]).filter((manga) => !!manga)
+            : (weeklyLeaderboard as MangaType[]).filter((manga) => !!manga)
         }
       />
 
@@ -157,23 +157,29 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
                   {/* Ranking Lists */}
                   <Tabs.Content value="weekly" className="space-y-0 pb-4">
-                    {weeklyLeaderboard.map((manga, index) => (
-                      <RatingItem
-                        key={(manga as MangaType).id}
-                        manga={manga as MangaType}
-                        index={index + 1}
-                      />
-                    ))}
+                    {weeklyLeaderboard.map(
+                      (manga, index) =>
+                        manga && (
+                          <RatingItem
+                            key={(manga as MangaType).id}
+                            manga={manga as MangaType}
+                            index={index + 1}
+                          />
+                        ),
+                    )}
                   </Tabs.Content>
 
                   <Tabs.Content value="monthly" className="space-y-0 pb-4">
-                    {monthlyLeaderboard.map((manga, index) => (
-                      <RatingItem
-                        key={(manga as MangaType).id}
-                        manga={manga as MangaType}
-                        index={index + 1}
-                      />
-                    ))}
+                    {monthlyLeaderboard.map(
+                      (manga, index) =>
+                        manga && (
+                          <RatingItem
+                            key={(manga as MangaType).id}
+                            manga={manga as MangaType}
+                            index={index + 1}
+                          />
+                        ),
+                    )}
                   </Tabs.Content>
                 </Tabs.Root>
               </div>

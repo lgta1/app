@@ -49,12 +49,12 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
   if (searchTerm) {
     [mangas, totalMangas] = await Promise.all([
       searchMangaWithPagination(searchTerm, page, limit),
-      getTotalMangaCount(searchTerm),
+      getTotalMangaCount({ searchTerm }),
     ]);
   } else {
     [mangas, totalMangas] = await Promise.all([
       getNewManga(page, limit),
-      getTotalMangaCount(),
+      getTotalMangaCount({}),
     ]);
   }
 

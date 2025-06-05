@@ -128,7 +128,7 @@ export function HeaderSearch() {
   return (
     <Popover.Root open={shouldShowDropdown && isOpen} onOpenChange={setIsOpen}>
       <Popover.Trigger asChild>
-        <div className="bg-bgc-layer2 absolute left-1/2 flex w-80 -translate-x-1/2 transform items-center justify-start gap-2 rounded-xl px-3 py-1.5 md:w-96 lg:w-[384px]">
+        <div className="bg-bgc-layer2 absolute left-1/2 flex w-60 -translate-x-1/2 transform items-center justify-start gap-2 rounded-xl px-3 py-1.5 lg:w-96">
           <Search className="text-txt-secondary h-5 w-5 flex-shrink-0" />
           <input
             ref={inputRef}

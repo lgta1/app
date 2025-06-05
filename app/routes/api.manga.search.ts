@@ -5,6 +5,8 @@ import {
 
 import type { Route } from "./+types/api.manga.search";
 
+import { MANGA_STATUS } from "~/constants/manga";
+
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const keyword = url.searchParams.get("q") || "";
@@ -21,8 +23,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   const [manga, total] = await Promise.all([
-    searchMangaApprovedWithPagination(keyword, page, limit),
-    getTotalMangaCount(keyword),
+    searchMangaApprovedWithPagination({ keyword, page, limit }),
+    getTotalMangaCount({ searchTerm: keyword, query: { status: MANGA_STATUS.APPROVED } }),
   ]);
 
   return {

@@ -37,7 +37,7 @@ const UserSchema = new Schema<UserType>(
     gender: { type: Number, enum: GENDERS, default: GENDERS.OTHER },
     avatar: { type: String },
     role: { type: String, enum: ROLES, default: ROLES.USER },
-    level: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
     exp: { type: Number, default: 0 },
     gold: { type: Number, default: 0 },
     isBanned: { type: Boolean, default: false },

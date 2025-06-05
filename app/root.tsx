@@ -13,6 +13,7 @@ import type { Route } from "./+types/root";
 
 import "./app.css";
 
+import { getAllGenres } from "~/.server/queries/genres.query";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
@@ -59,27 +60,35 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUserInfoFromSession(request);
+  const genres = await getAllGenres();
 
   if (user) {
     return {
       isAuthenticated: true,
       isAdmin: isAdmin(user.role),
       user,
+      genres,
     };
   }
 
   return {
     isAuthenticated: false,
     isAdmin: false,
+    genres,
   };
 }
 
 export default function App() {
-  const { isAuthenticated, isAdmin, user } = useLoaderData<typeof loader>();
+  const { isAuthenticated, isAdmin, user, genres } = useLoaderData<typeof loader>();
 
   return (
     <>
-      <Header isAuthenticated={isAuthenticated} isAdmin={isAdmin} user={user} />
+      <Header
+        isAuthenticated={isAuthenticated}
+        isAdmin={isAdmin}
+        user={user}
+        genres={genres}
+      />
       <Outlet />
       <Footer />
     </>
