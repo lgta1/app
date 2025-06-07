@@ -36,8 +36,6 @@ interface LoaderData {
 }
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
-  await requireAdminOrModLogin(request);
-
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const searchTerm = url.searchParams.get("search") || "";

@@ -3,7 +3,7 @@ import { useFetcher } from "react-router";
 import * as Popover from "@radix-ui/react-popover";
 import { Search, X } from "lucide-react";
 
-import { SearchItem } from "./search-item";
+import { SearchItem } from "./header-search-item";
 
 import type { MangaType } from "~/database/models/manga.model";
 

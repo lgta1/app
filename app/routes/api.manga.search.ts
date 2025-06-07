@@ -30,7 +30,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     manga: manga.map((item) => ({
       ...item,
-      id: item._id.toString(),
+      id: item?._id.toString(),
     })),
     hasMore: manga.length === limit,
     nextPage: page + 1,

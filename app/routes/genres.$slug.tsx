@@ -75,7 +75,7 @@ export default function Genres() {
       </div>
 
       {/* Manga list */}
-      <div className="xs:grid-cols-3 grid grid-cols-2 gap-4 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {manga.map((item) => (
           <div key={item.id} className="w-full">
             <MangaCard manga={item} />

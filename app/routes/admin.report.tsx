@@ -37,8 +37,6 @@ interface LoaderData {
 const LIMIT_PER_PAGE = 10;
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<Response> {
-  await requireAdminOrModLogin(request);
-
   const url = new URL(request.url);
   const sortBy = url.searchParams.get("sort") || "newest";
   const page = parseInt(url.searchParams.get("page") || "1", 10);

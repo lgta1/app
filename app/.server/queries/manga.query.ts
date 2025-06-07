@@ -1,3 +1,5 @@
+import { isValidObjectId } from "mongoose";
+
 import { getLeaderboardModel, type LeaderboardPeriod } from "@/services/leaderboard.svc";
 
 import { MANGA_STATUS } from "~/constants/manga";
@@ -79,7 +81,7 @@ export const searchMangaApprovedWithPagination = async ({
   const skip = (page - 1) * limit;
 
   if (keyword) {
-    return await MangaModel.find(
+    const mangas = await MangaModel.find(
       { $text: { $search: keyword }, status: MANGA_STATUS.APPROVED, ...query },
       { score: { $meta: "textScore" } },
     )
@@ -87,6 +89,12 @@ export const searchMangaApprovedWithPagination = async ({
       .skip(skip)
       .limit(limit)
       .lean();
+
+    if (mangas.length === 0 && isValidObjectId(keyword)) {
+      return [await MangaModel.findById(keyword).lean()];
+    }
+
+    return mangas;
   }
 
   return await MangaModel.find(query)

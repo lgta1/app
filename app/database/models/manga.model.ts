@@ -13,6 +13,7 @@ export type MangaType = {
   genres: string[];
   likeNumber: number;
   viewNumber: number;
+  revenue: number;
   createdAt: Date;
   updatedAt: Date;
 };
