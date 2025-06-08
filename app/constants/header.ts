@@ -44,21 +44,26 @@ export const ADMIN_NAVIGATION_ITEMS: NavigationItem[] = [
   {
     label: "Thống kê",
     href: "/admin/statistic",
+    mobile: true,
   },
   {
     label: "Quản lý thành viên",
     href: "/admin/member",
+    mobile: true,
   },
   {
     label: "Quản lý truyện",
     href: "/admin/manga",
+    mobile: true,
   },
   {
     label: "Waifu banner",
     href: "/admin/waifu",
+    mobile: true,
   },
   {
     label: "Quản lý report",
     href: "/admin/report",
+    mobile: true,
   },
 ];

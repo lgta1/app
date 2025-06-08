@@ -1,17 +1,16 @@
 import { Link, NavLink } from "react-router";
-import { Bell, ChevronDown, CircleUserRound, Menu } from "lucide-react";
 
 import { HeaderGenres } from "./header-genres";
 import { HeaderSearch } from "./header-search";
+import { MobileMenuPublic } from "./mobile-menu-public";
 import { MobileSearch } from "./mobile-search";
+import { UserMenu } from "./user-menu";
 
 import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
 import type { GenresType } from "~/database/models/genres.model";
 import type { UserType } from "~/database/models/user.model";
-import { getTitleImgPath } from "~/helpers/user";
 
 interface HeaderProps {
-  isAuthenticated?: boolean;
   isAdmin?: boolean;
   user?: UserType;
   notificationCount?: number;
@@ -67,7 +66,6 @@ const getNavigationItems = (
 };
 
 export function Header({
-  isAuthenticated = false,
   user,
   notificationCount = 0,
   isAdmin = false,
@@ -112,53 +110,34 @@ export function Header({
           <HeaderSearch />
 
           {/* Phần đăng nhập/đăng ký hoặc người dùng */}
-          <div className="flex items-center justify-start gap-4">
-            {isAuthenticated ? (
-              <>
-                {/* Hiển thị khi đã đăng nhập */}
-                <div className="relative">
-                  <Bell className="text-txt-primary h-6 w-6" />
-                  {notificationCount > 0 && (
-                    <div className="text-txt-primary absolute top-[-5px] right-[-5px] rounded-lg bg-[#E03F46] px-1 py-[2px] text-[8px] font-semibold">
-                      {notificationCount}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <CircleUserRound className="h-7 w-7" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-txt-primary text-base font-medium">
-                      {user?.name}
-                    </span>
-                    {user && !isAdmin && (
-                      <img src={getTitleImgPath(user)} alt="Title" className="h-6 w-28" />
-                    )}
-                    <ChevronDown className="text-txt-primary h-4 w-4" />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Hiển thị khi chưa đăng nhập */}
-                <Link
-                  to="/login"
-                  className="outline-lav-500 flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 outline outline-offset-[-1px]"
-                >
-                  <span className="text-lav-500 text-center text-sm leading-tight font-medium">
-                    Đăng nhập
-                  </span>
-                </Link>
-                <Link
-                  to="/register"
-                  className="flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_9px_rgba(196,69,255,0.25)]"
-                >
-                  <span className="text-center text-sm leading-tight font-semibold text-black">
-                    Đăng ký
-                  </span>
-                </Link>
-              </>
-            )}
-          </div>
+          {user ? (
+            <UserMenu
+              user={user}
+              notificationCount={notificationCount}
+              isAdmin={isAdmin}
+              isMobile={false}
+            />
+          ) : (
+            <div className="flex items-center justify-start gap-4">
+              {/* Hiển thị khi chưa đăng nhập */}
+              <Link
+                to="/login"
+                className="outline-lav-500 flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 outline outline-offset-[-1px]"
+              >
+                <span className="text-lav-500 text-center text-sm leading-tight font-medium">
+                  Đăng nhập
+                </span>
+              </Link>
+              <Link
+                to="/register"
+                className="flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_9px_rgba(196,69,255,0.25)]"
+              >
+                <span className="text-center text-sm leading-tight font-semibold text-black">
+                  Đăng ký
+                </span>
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Mobile view - ẩn trên desktop */}
@@ -172,18 +151,17 @@ export function Header({
           </Link>
 
           <div className="flex items-center gap-4">
-            {isAuthenticated && (
-              <div className="relative">
-                <Bell className="text-txt-primary h-6 w-6" />
-                {notificationCount > 0 && (
-                  <div className="text-txt-primary absolute top-[-5px] right-[-5px] rounded-lg bg-[#E03F46] px-1 py-[2px] text-[8px] font-semibold">
-                    {notificationCount}
-                  </div>
-                )}
-              </div>
-            )}
             <MobileSearch />
-            <Menu className="text-txt-primary h-7 w-7" />
+            {user ? (
+              <UserMenu
+                user={user}
+                notificationCount={notificationCount}
+                isAdmin={isAdmin}
+                isMobile={true}
+              />
+            ) : (
+              <MobileMenuPublic />
+            )}
           </div>
         </div>
       </div>
@@ -194,7 +172,7 @@ export function Header({
       </nav>
 
       {/* Mobile Navigation Menu - Hiển thị menu trên mobile */}
-      <nav className="flex w-full flex-row items-center justify-center gap-8 bg-[rgba(9,16,26,0.34)] px-8 py-3 md:hidden">
+      <nav className="flex w-full flex-row flex-wrap items-center justify-center gap-8 bg-[rgba(9,16,26,0.34)] px-8 py-3 md:hidden">
         {getNavigationItems(true, isAdmin, genres)}
       </nav>
     </header>

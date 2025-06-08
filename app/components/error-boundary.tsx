@@ -12,7 +12,7 @@ export function ErrorBoundary() {
             {error.status} {error.statusText || "Đã xảy ra lỗi không mong muốn"}
           </h1>
           <Link to="/">
-            <button className="to-btn-primary rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
+            <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
               Về trang chủ
             </button>
           </Link>
@@ -35,7 +35,7 @@ export function ErrorBoundary() {
         </p>
         {devDetails && <p className="text-txt-secondary mb-6">{devDetails}</p>}
         <Link to="/">
-          <button className="to-btn-primary rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
+          <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
             Về trang chủ
           </button>
         </Link>

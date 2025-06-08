@@ -64,7 +64,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   if (user) {
     return {
-      isAuthenticated: true,
       isAdmin: isAdmin(user.role),
       user,
       genres,
@@ -72,23 +71,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   return {
-    isAuthenticated: false,
     isAdmin: false,
     genres,
   };
 }
 
 export default function App() {
-  const { isAuthenticated, isAdmin, user, genres } = useLoaderData<typeof loader>();
+  const { isAdmin, user, genres } = useLoaderData<typeof loader>();
 
   return (
     <>
-      <Header
-        isAuthenticated={isAuthenticated}
-        isAdmin={isAdmin}
-        user={user}
-        genres={genres}
-      />
+      <Header isAdmin={isAdmin} user={user} genres={genres} />
       <Outlet />
       <Footer />
     </>

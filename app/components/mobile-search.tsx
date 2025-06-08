@@ -162,7 +162,7 @@ export function MobileSearch() {
         <Popover.Root open={shouldShowDropdown && isOpen} onOpenChange={setIsOpen}>
           <div className="fixed inset-0 z-50 bg-[rgba(9,16,26,0.95)] backdrop-blur-sm">
             {/* Header với search input */}
-            <div className="flex w-full items-center gap-3 p-4">
+            <div className="flex w-full items-center gap-3 p-2.5">
               <Popover.Trigger asChild>
                 <div className="bg-bgc-layer2 flex flex-1 items-center justify-start gap-2 rounded-xl px-3 py-1.5">
                   <Search className="text-txt-secondary h-5 w-5 flex-shrink-0" />
