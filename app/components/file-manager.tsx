@@ -200,7 +200,7 @@ export function FileManager({
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6">
-      <Toaster position="top-right" />
+      <Toaster position="bottom-right" />
 
       {/* Upload Area */}
       <div

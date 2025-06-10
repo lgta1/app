@@ -1,3 +1,4 @@
+import { Toaster } from "react-hot-toast";
 import * as Tabs from "@radix-ui/react-tabs";
 
 import { getChapterByMangaId } from "@/queries/chapter.query";
@@ -80,6 +81,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="container-ad mx-auto px-4 py-6">
+      <Toaster position="bottom-right" />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
         {/* Section chi tiết truyện */}
         <section className="md:mt-8">

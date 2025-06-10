@@ -5,6 +5,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { CommentModel } from "~/database/models/comment.model";
 import { UserLikeCommentModel } from "~/database/models/user-like-comment.model";
+import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
 
 export const createComment = async (data: {
@@ -15,11 +16,11 @@ export const createComment = async (data: {
   const { content, mangaId, userId } = data;
 
   if (!validateCommentContent(content)) {
-    throw new Error("Nội dung bình luận không hợp lệ (1-1000 ký tự)");
+    throw new BusinessError("Nội dung bình luận không hợp lệ (1-1000 ký tự)");
   }
 
   if (!isValidObjectId(mangaId) || !isValidObjectId(userId)) {
-    throw new Error("ID không hợp lệ");
+    throw new BusinessError("ID không hợp lệ");
   }
 
   const sanitizedContent = sanitizeCommentContent(content);
@@ -42,17 +43,17 @@ export const deleteComment = async (commentId: string, request: Request) => {
   const user = await getUserInfoFromSession(request);
 
   if (!isAdmin(user?.role ?? "")) {
-    throw new Error("Bạn không có quyền xóa bình luận");
+    throw new BusinessError("Bạn không có quyền xóa bình luận");
   }
 
   if (!isValidObjectId(commentId)) {
-    throw new Error("ID không hợp lệ");
+    throw new BusinessError("ID không hợp lệ");
   }
 
   const comment = await CommentModel.findById(commentId);
 
   if (!comment) {
-    throw new Error("Không tìm thấy bình luận");
+    throw new BusinessError("Không tìm thấy bình luận");
   }
 
   // Xóa cứng khỏi database
@@ -62,10 +63,19 @@ export const deleteComment = async (commentId: string, request: Request) => {
 };
 
 export const likeComment = async (commentId: string, userId: string) => {
+  if (!isValidObjectId(commentId) || !isValidObjectId(userId)) {
+    throw new BusinessError("ID không hợp lệ");
+  }
+
+  const comment = await CommentModel.findById(commentId);
+  if (!comment) {
+    throw new BusinessError("Không tìm thấy bình luận");
+  }
+
   const userLikeComment = await UserLikeCommentModel.findOne({ commentId, userId });
 
   if (userLikeComment) {
-    throw new Error("Bạn đã thích bình luận này");
+    throw new BusinessError("Bạn đã thích bình luận này");
   }
 
   const newUserLikeComment = new UserLikeCommentModel({ commentId, userId });

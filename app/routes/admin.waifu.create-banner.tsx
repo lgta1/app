@@ -180,7 +180,7 @@ export default function AdminCreateBanner() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1020px] flex-col items-center justify-center gap-6 p-4 md:p-6 lg:p-8">
-      <Toaster />
+      <Toaster position="bottom-right" />
 
       <div className="text-txt-primary w-full text-center text-2xl leading-10 font-semibold uppercase md:text-4xl">
         Thêm banner mới

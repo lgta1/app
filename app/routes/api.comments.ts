@@ -1,4 +1,4 @@
-import { createComment, deleteComment } from "@/mutations/comment.mutation";
+import { createComment, deleteComment, likeComment } from "@/mutations/comment.mutation";
 import { getCommentsByMangaId } from "@/queries/comment.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
@@ -56,27 +56,40 @@ export async function action({ request }: Route.ActionArgs) {
       });
     }
 
-    // Xử lý POST request (tạo comment)
+    // Xử lý POST request
     const formData = await request.formData();
-    const content = formData.get("content") as string;
-    const mangaId = formData.get("mangaId") as string;
     const intent = formData.get("intent") as string;
 
-    if (intent !== "create-comment") {
-      return Response.json({ error: "Intent không hợp lệ" }, { status: 400 });
+    if (intent === "create-comment") {
+      const content = formData.get("content") as string;
+      const mangaId = formData.get("mangaId") as string;
+
+      if (!content || !mangaId) {
+        return Response.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 });
+      }
+
+      const comment = await createComment({
+        content,
+        mangaId,
+        userId: user.id,
+      });
+
+      return Response.json({ success: true, comment });
     }
 
-    if (!content || !mangaId) {
-      return Response.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 });
+    if (intent === "like-comment") {
+      const commentId = formData.get("commentId") as string;
+
+      if (!commentId) {
+        return Response.json({ error: "commentId là bắt buộc" }, { status: 400 });
+      }
+
+      const result = await likeComment(commentId, user.id);
+
+      return Response.json(result);
     }
 
-    const comment = await createComment({
-      content,
-      mangaId,
-      userId: user.id,
-    });
-
-    return Response.json({ success: true, comment });
+    return Response.json({ error: "Intent không hợp lệ" }, { status: 400 });
   } catch (error) {
     if (isBusinessError(error)) {
       return returnBusinessError(error);

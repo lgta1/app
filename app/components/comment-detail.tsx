@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import { useFetcher } from "react-router";
 import {
   CircleUserRound,
@@ -86,6 +87,7 @@ export default function CommentDetail({
 
   const createCommentFetcher = useFetcher();
   const deleteCommentFetcher = useFetcher();
+  const likeCommentFetcher = useFetcher();
   const reportFetcher = useFetcher();
 
   // Cập nhật danh sách comment khi có comment mới được tạo
@@ -112,6 +114,17 @@ export default function CommentDetail({
       // Có thể thêm toast notification ở đây
     }
   }, [reportFetcher.data]);
+
+  // Xử lý khi like comment thành công
+  useEffect(() => {
+    if (likeCommentFetcher.data && likeCommentFetcher.data.success) {
+      // Reload comments để cập nhật số like
+      handleReload();
+    }
+    if (likeCommentFetcher.data && likeCommentFetcher.data.error) {
+      toast.error(likeCommentFetcher.data.error.message);
+    }
+  }, [likeCommentFetcher.data]);
 
   const handleSubmitComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +214,21 @@ export default function CommentDetail({
 
   const handleCloseReportDialog = () => {
     setReportDialog({ isOpen: false, comment: null });
+  };
+
+  const handleLikeComment = (commentId: string) => {
+    if (!isLoggedIn) return;
+
+    likeCommentFetcher.submit(
+      {
+        commentId,
+        intent: "like-comment",
+      },
+      {
+        method: "POST",
+        action: `/api/comments`,
+      },
+    );
   };
 
   return (
@@ -365,12 +393,19 @@ export default function CommentDetail({
 
                     {/* Comment Actions */}
                     <div className="flex flex-wrap items-center justify-start gap-6">
-                      <div className="flex items-center justify-start gap-1.5">
+                      <button
+                        onClick={() => handleLikeComment(comment.id)}
+                        disabled={
+                          !isLoggedIn || likeCommentFetcher.state === "submitting"
+                        }
+                        className="flex cursor-pointer items-center justify-start gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={isLoggedIn ? "Thích bình luận" : "Đăng nhập để thích"}
+                      >
                         <ThumbsUp className="text-txt-focus h-4 w-5" />
                         <div className="text-txt-focus font-sans text-base leading-normal font-medium">
                           {comment.likeNumber || 0}
                         </div>
-                      </div>
+                      </button>
                       <button
                         onClick={() => handleReply(comment)}
                         disabled={!isLoggedIn}
