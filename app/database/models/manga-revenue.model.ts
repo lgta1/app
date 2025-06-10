@@ -1,6 +1,7 @@
 import { model, Schema } from "mongoose";
 
 export type MangaRevenueType = {
+  id: string;
   mangaId: string;
   revenue: number;
   period: "daily" | "weekly" | "monthly";

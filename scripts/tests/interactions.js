@@ -76,7 +76,7 @@ async function insertInteractions() {
 
     console.log("\n📊 Thống kê interactions:");
     stats.forEach((stat) => {
-      console.log(`  - ${stat._id}: ${stat.count}`);
+      console.log(`  - ${stat.id}: ${stat.count}`);
     });
   } catch (error) {
     console.error("❌ Lỗi:", error);

@@ -30,7 +30,7 @@ export default function RatingItem({
         </h3>
         <div className="flex items-center justify-between">
           <div className="bg-bgc-layer-semi-purple rounded-full px-2 py-1.5 backdrop-blur-md">
-            <span className="text-lav-500 line-clamp-1 text-xs font-medium">
+            <span className="text-txt-focus line-clamp-1 text-xs font-medium">
               Chapter {manga.chapters}
             </span>
           </div>
@@ -38,13 +38,13 @@ export default function RatingItem({
             <div className="flex items-center gap-1.5 backdrop-blur-md">
               <Eye className="text-txt-primary h-3 w-3" />
               <span className="text-txt-primary text-xs font-medium">
-                {manga.viewNumber}
+                {manga.viewNumber.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center gap-1.5 backdrop-blur-md">
               <Heart className="text-txt-primary h-3 w-3" />
               <span className="text-txt-primary text-xs font-medium">
-                {manga.likeNumber}
+                {manga.likeNumber.toLocaleString()}
               </span>
             </div>
           </div>

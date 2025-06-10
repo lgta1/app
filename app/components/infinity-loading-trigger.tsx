@@ -16,7 +16,7 @@ export function InfinityLoadingTrigger({
   if (!hasMore) {
     return (
       <div className="mt-6 py-8 text-center">
-        <p className="text-txt-secondary text-sm">Đã hiển thị tất cả truyện</p>
+        <p className="text-txt-secondary text-sm">Đã hiển thị tất cả</p>
       </div>
     );
   }
@@ -37,7 +37,7 @@ export function InfinityLoadingTrigger({
               className="flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-6 py-3 shadow-[0px_4px_9px_rgba(196,69,255,0.25)] transition-all hover:shadow-[0px_6px_12px_rgba(196,69,255,0.35)]"
             >
               <span className="text-center text-sm leading-tight font-semibold text-black">
-                Tải thêm truyện
+                Tải thêm
               </span>
             </button>
           )}

@@ -9,7 +9,7 @@ import type { Route } from "./+types/register";
 
 import { FactionSelectionDialog } from "~/components/dialog-faction-selection";
 import { GenderSelectionDialog } from "~/components/dialog-gender-selection";
-import { isBusinessError, returnBusinessError } from "~/helpers/errors";
+import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Kiểm tra xem người dùng đã đăng nhập chưa
@@ -232,7 +232,7 @@ export default function Register() {
                 </span>
                 <Link
                   to="/dang-nhap"
-                  className="text-lav-500 text-sm leading-5 font-medium"
+                  className="text-txt-focus text-sm leading-5 font-medium"
                 >
                   Đăng nhập ngay
                 </Link>

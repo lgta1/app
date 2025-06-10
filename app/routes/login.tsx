@@ -13,7 +13,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/login";
 
-import { isBusinessError, returnBusinessError } from "~/helpers/errors";
+import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Check if the user is already logged in
@@ -144,7 +144,10 @@ export default function Login() {
               <span className="text-txt-secondary text-sm leading-5 font-medium">
                 Chưa có tài khoản?
               </span>
-              <Link to="/dang-ky" className="text-lav-500 text-sm leading-5 font-medium">
+              <Link
+                to="/dang-ky"
+                className="text-txt-focus text-sm leading-5 font-medium"
+              >
                 Đăng ký ngay
               </Link>
             </div>

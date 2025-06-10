@@ -63,7 +63,7 @@ export default function DialogWarningAdultContent({
                 onClick={handleExit}
                 className="border-lav-500 hover:bg-bgc-layer-semi-purple flex h-11 flex-1 items-center justify-center gap-2.5 rounded-xl border-2 px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors"
               >
-                <span className="text-lav-500 text-center font-sans text-sm leading-tight font-semibold">
+                <span className="text-txt-focus text-center font-sans text-sm leading-tight font-semibold">
                   Thoát
                 </span>
               </button>

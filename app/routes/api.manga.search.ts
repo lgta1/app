@@ -28,10 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   ]);
 
   return {
-    manga: manga.map((item) => ({
-      ...item,
-      id: item?._id.toString(),
-    })),
+    manga,
     hasMore: manga.length === limit,
     nextPage: page + 1,
     total,

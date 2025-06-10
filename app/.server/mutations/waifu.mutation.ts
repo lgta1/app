@@ -2,8 +2,8 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { WaifuType } from "~/database/models/waifu.model";
 import { WaifuModel } from "~/database/models/waifu.model";
-import { BusinessError } from "~/helpers/errors";
-import { isAdmin } from "~/helpers/user";
+import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 
 export const createWaifu = async (request: Request, waifuData: Omit<WaifuType, "id">) => {
   const currentUserInfo = await getUserInfoFromSession(request);

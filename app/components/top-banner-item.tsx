@@ -26,7 +26,7 @@ export function TopBannerItem({ manga }: { manga: MangaType }) {
             </h2>
             <div className="flex items-center justify-between">
               <div className="bg-bgc-layer-semi-purple flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md">
-                <span className="text-lav-500 line-clamp-1 text-[10px] font-medium">
+                <span className="text-txt-focus line-clamp-1 text-[10px] font-medium">
                   Chương {manga.chapters}
                 </span>
               </div>

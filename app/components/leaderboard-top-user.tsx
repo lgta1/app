@@ -1,5 +1,5 @@
 import type { UserType } from "~/database/models/user.model";
-import { getTitleImgPath } from "~/helpers/user";
+import { getTitleImgPath } from "~/helpers/user.helper";
 
 interface LeaderboardTopUserProps {
   user: UserType;

@@ -18,7 +18,7 @@ import { getAllWaifus } from "@/queries/waifu.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { ButtonGroupForm } from "~/components/button-group-form";
-import { BusinessError } from "~/helpers/errors";
+import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
 export async function loader() {
@@ -246,7 +246,7 @@ export default function AdminCreateBanner() {
                       name="bannerType"
                       checked={!isRateUp}
                       onChange={() => setIsRateUp(false)}
-                      className="accent-lav-500 text-lav-500 focus:ring-lav-500 checked:bg-lav-500 checked:border-lav-500 h-4 w-4"
+                      className="accent-lav-500 text-txt-focus focus:ring-lav-500 checked:bg-lav-500 checked:border-lav-500 h-4 w-4"
                     />
                     <span className="text-txt-primary text-base leading-normal font-medium">
                       Banner thường
@@ -258,7 +258,7 @@ export default function AdminCreateBanner() {
                       name="bannerType"
                       checked={isRateUp}
                       onChange={() => setIsRateUp(true)}
-                      className="accent-lav-500 text-lav-500 focus:ring-lav-500 checked:bg-lav-500 checked:border-lav-500 h-4 w-4"
+                      className="accent-lav-500 text-txt-focus focus:ring-lav-500 checked:bg-lav-500 checked:border-lav-500 h-4 w-4"
                     />
                     <span className="text-txt-primary text-base leading-normal font-medium">
                       Banner rate up

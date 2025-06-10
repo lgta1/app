@@ -46,7 +46,7 @@ export async function getReports({
 
     // Thực hiện query với lean() để có id thay vì _id
     const [reports, total] = await Promise.all([
-      ReportModel.find(filter).sort(sort).skip(skip).limit(limit).lean({ id: true }),
+      ReportModel.find(filter).sort(sort).skip(skip).limit(limit).lean(),
       ReportModel.countDocuments(filter),
     ]);
 
@@ -61,15 +61,5 @@ export async function getReports({
   } catch (error) {
     console.error("Error fetching reports:", error);
     throw new Error("Không thể lấy dữ liệu báo cáo");
-  }
-}
-
-export async function deleteReport(reportId: string): Promise<boolean> {
-  try {
-    const result = await ReportModel.findByIdAndDelete(reportId);
-    return !!result;
-  } catch (error) {
-    console.error("Error deleting report:", error);
-    throw new Error("Không thể xóa báo cáo");
   }
 }

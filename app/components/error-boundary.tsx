@@ -27,11 +27,9 @@ export function ErrorBoundary() {
   return (
     <div className="bg-gradient-radial mx-auto flex min-h-screen max-w-xl items-center justify-center from-[#191758] to-[#09101A]">
       <div className="bg-bgc-layer1 border-bd-default rounded-xl border p-8 text-center">
-        <h1 className="text-txt-primary mb-4 text-2xl font-bold">
-          Đã xảy ra lỗi không mong muốn
-        </h1>
+        <h1 className="text-txt-primary mb-4 text-2xl font-bold">Opps!</h1>
         <p className="text-txt-secondary mb-6">
-          Vui lòng thử lại sau hoặc liên hệ hỗ trợ nếu lỗi tiếp tục xảy ra.
+          Có vẻ bạn đang đi lạc đường, liên hệ với chúng tôi nếu nghĩ đây là lỗi ^^
         </p>
         {devDetails && <p className="text-txt-secondary mb-6">{devDetails}</p>}
         <Link to="/">

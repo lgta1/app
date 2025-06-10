@@ -3,8 +3,8 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import { ROLES } from "~/constants/user";
 import { BannerModel, type BannerType } from "~/database/models/banner.model";
 import { WaifuModel } from "~/database/models/waifu.model";
-import { BusinessError } from "~/helpers/errors";
-import { isAdmin } from "~/helpers/user";
+import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 
 export type CreateBannerData = {
   title: string;
@@ -32,17 +32,7 @@ export const createBanner = async (request: Request, data: CreateBannerData) => 
   }
 
   // Lấy thông tin waifu từ IDs
-  const waifus = await WaifuModel.find({ _id: { $in: data.waifuIds } }).lean();
-
-  // Tạo waifuList với thông tin đầy đủ
-  const waifuList = waifus.map((waifu) => ({
-    id: waifu._id.toString(),
-    name: waifu.name,
-    image: waifu.image,
-    stars: waifu.stars,
-    expBuff: waifu.expBuff,
-    goldBuff: waifu.goldBuff,
-  }));
+  const waifuList = await WaifuModel.find({ _id: { $in: data.waifuIds } }).lean();
 
   const banner = await BannerModel.create({
     title: data.title,

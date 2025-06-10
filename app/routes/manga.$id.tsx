@@ -1,45 +1,60 @@
 import * as Tabs from "@radix-ui/react-tabs";
 
+import { getChapterByMangaId } from "@/queries/chapter.query";
 import { getLeaderboard } from "@/queries/leaderboad.query";
-import { getNewManga } from "@/queries/manga.query";
+import { getMangaById, getRelatedManga } from "@/queries/manga.query";
 import { getRevenuesByPeriod } from "@/queries/manga-revenue.query";
 import { getTopUser } from "@/queries/user.query";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
-import type { Route } from "./+types/_index";
+import type { Route } from "./+types/manga.$id";
 
-import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
-import { InfinityLoadingTrigger } from "~/components/infinity-loading-trigger";
-import { MangaCard } from "~/components/manga-card";
+import CommentDetail from "~/components/comment-detail";
+import { MangaDetail } from "~/components/manga-detail";
 import RatingItem from "~/components/rating-item";
 import RatingItemUser from "~/components/rating-item-user";
-import { TopBanner } from "~/components/top-banner";
+import RelatedManga from "~/components/related-manga";
 import type { MangaType } from "~/database/models/manga.model";
-import { useInfinityLoading } from "~/hooks/use-infinity-loading";
+import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 
-export async function loader() {
+export async function loader({ params, request }: Route.LoaderArgs) {
+  const { id } = params;
+
+  const manga = await getMangaById(id);
+
+  if (!manga) {
+    throw new BusinessError("Không tìm thấy truyện");
+  }
+
   const [
-    revenuesByPeriod,
-    newManga,
+    chapters,
+    relatedManga,
+    hotManga,
     topUser,
-    dailyLeaderboard,
     weeklyLeaderboard,
     monthlyLeaderboard,
+    currentUser,
   ] = await Promise.all([
+    getChapterByMangaId(manga.id),
+    getRelatedManga(manga.genres),
     getRevenuesByPeriod("monthly"),
-    getNewManga(1, 16),
     getTopUser(),
-    getLeaderboard("daily"),
     getLeaderboard("weekly"),
     getLeaderboard("monthly"),
+    getUserInfoFromSession(request),
   ]);
 
   return {
-    revenuesByPeriod,
-    newManga,
+    manga,
+    chapters,
+    relatedManga,
+    hotManga,
     topUser,
-    dailyLeaderboard,
     weeklyLeaderboard,
     monthlyLeaderboard,
+    isLoggedIn: !!currentUser,
+    isAdmin: isAdmin(currentUser?.role ?? ""),
   };
 }
 
@@ -52,72 +67,29 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Index({ loaderData }: Route.ComponentProps) {
   const {
-    revenuesByPeriod,
-    newManga,
+    manga,
+    chapters,
+    relatedManga,
+    hotManga,
     topUser,
-    dailyLeaderboard,
     weeklyLeaderboard,
     monthlyLeaderboard,
+    isLoggedIn,
+    isAdmin: userIsAdmin,
   } = loaderData;
-
-  const {
-    data: mangaList,
-    isLoading,
-    hasMore,
-    loadingRef,
-    loadMore,
-  } = useInfinityLoading<MangaType>({
-    initialData: newManga,
-    apiUrl: "/api/manga/latest",
-    limit: 16,
-    autoLoad: false,
-  });
 
   return (
     <div className="container-ad mx-auto px-4 py-6">
-      <DialogWarningAdultContent />
-
-      <TopBanner
-        bannerItems={
-          dailyLeaderboard.length > 0
-            ? (dailyLeaderboard as MangaType[]).filter((manga) => !!manga)
-            : (weeklyLeaderboard as MangaType[]).filter((manga) => !!manga)
-        }
-      />
-
-      <img className="pt-10" src="/images/home/vnht.svg" alt="" />
-
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
-        {/* Section truyện mới cập nhật */}
-        <section className="mt-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative h-[15px] w-[15px]">
-                <img
-                  src="/images/home/star-icon-1.svg"
-                  alt=""
-                  className="absolute top-0 left-[4.62px] h-4"
-                />
-              </div>
-              <h2 className="text-txt-primary text-xl font-semibold uppercase">
-                truyện mới cập nhật
-              </h2>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4 2xl:grid-cols-5">
-            {mangaList?.map((manga) => <MangaCard key={manga.id} manga={manga} />)}
-          </div>
-
-          {/* Loading indicator và trigger cho infinity scroll */}
-          <div ref={loadingRef}>
-            <InfinityLoadingTrigger
-              isAutoLoad={false}
-              isLoading={isLoading}
-              hasMore={hasMore}
-              onLoadMore={loadMore}
-            />
-          </div>
+        {/* Section chi tiết truyện */}
+        <section className="md:mt-8">
+          <MangaDetail manga={manga} chapters={chapters} />
+          <CommentDetail
+            mangaId={manga.id}
+            isLoggedIn={isLoggedIn}
+            isAdmin={userIsAdmin}
+          />
+          <RelatedManga mangaList={relatedManga} />
         </section>
 
         {/* Section bảng xếp hạng */}
@@ -202,7 +174,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               </div>
 
               <div className="bg-bgc-layer1 border-bd-default space-y-0 overflow-hidden rounded-2xl border p-0 py-4">
-                {revenuesByPeriod.map((manga, index) => (
+                {hotManga.map((manga, index) => (
                   <RatingItem key={manga.id} manga={manga} index={index + 1} />
                 ))}
               </div>

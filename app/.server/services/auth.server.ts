@@ -10,8 +10,8 @@ import {
 
 import { ROLES } from "~/constants/user";
 import { UserModel, type UserType } from "~/database/models/user.model";
-import { BusinessError } from "~/helpers/errors";
-import { isAdmin } from "~/helpers/user";
+import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 
 const generateSalt = () => {
   return crypto.randomBytes(16).toString("hex");

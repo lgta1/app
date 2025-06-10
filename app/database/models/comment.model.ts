@@ -1,10 +1,11 @@
-import { model, Schema, Types } from "mongoose";
+import { model, Schema } from "mongoose";
 
 export type CommentType = {
   id: string;
   content: string;
-  mangaId: Types.ObjectId;
-  userId: Types.ObjectId;
+  mangaId: string;
+  userId: string;
+  likeNumber: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -12,8 +13,9 @@ export type CommentType = {
 const CommentSchema = new Schema<CommentType>(
   {
     content: { type: String, required: true, trim: true },
-    mangaId: { type: Schema.Types.ObjectId, ref: "Manga", required: true },
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    mangaId: { type: String, ref: "Manga", required: true },
+    userId: { type: String, ref: "User", required: true },
+    likeNumber: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

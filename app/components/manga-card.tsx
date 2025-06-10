@@ -15,13 +15,13 @@ export function MangaCard({ manga }: { manga: MangaType }) {
           <div className="flex items-center gap-1.5 py-1.5">
             <EyeIcon className="h-3 w-3" />
             <span className="text-txt-primary text-[10px] leading-none font-medium">
-              {viewNumber}
+              {viewNumber.toLocaleString()}
             </span>
           </div>
           <div className="flex items-center gap-1.5 py-1.5">
             <HeartIcon className="h-3 w-3" />
             <span className="text-txt-primary text-[10px] leading-none font-medium">
-              {likeNumber}
+              {likeNumber.toLocaleString()}
             </span>
           </div>
         </div>
@@ -34,7 +34,7 @@ export function MangaCard({ manga }: { manga: MangaType }) {
         </div>
         <div className="flex items-center justify-between">
           <div className="bg-bgc-layer-semi-purple flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-sm">
-            <span className="text-lav-500 line-clamp-1 text-[10px] leading-none font-medium">
+            <span className="text-txt-focus line-clamp-1 text-[10px] leading-none font-medium">
               Chương {chapters}
             </span>
           </div>

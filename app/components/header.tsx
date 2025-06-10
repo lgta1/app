@@ -39,7 +39,7 @@ const getNavigationItems = (
               to={item.href}
               className={({ isActive }) =>
                 `text-sm leading-normal font-semibold ${
-                  isActive ? "text-lav-500" : "text-txt-primary"
+                  isActive ? "text-txt-focus" : "text-txt-primary"
                 }`
               }
             >
@@ -55,7 +55,7 @@ const getNavigationItems = (
           to={item.href}
           className={({ isActive }) =>
             `text-sm leading-normal font-semibold ${
-              isActive ? "text-lav-500" : "text-txt-primary"
+              isActive ? "text-txt-focus" : "text-txt-primary"
             }`
           }
         >
@@ -124,7 +124,7 @@ export function Header({
                 to="/login"
                 className="outline-lav-500 flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 outline outline-offset-[-1px]"
               >
-                <span className="text-lav-500 text-center text-sm leading-tight font-medium">
+                <span className="text-txt-focus text-center text-sm leading-tight font-medium">
                   Đăng nhập
                 </span>
               </Link>

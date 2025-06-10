@@ -5,7 +5,7 @@ import { Edit, Save, X } from "lucide-react";
 
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
-import { PityModel } from "~/database/models/pity.model";
+import { PityModel, type PityType } from "~/database/models/pity.model";
 
 export async function loader() {
   try {
@@ -87,28 +87,15 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 }
 
-type PityData = {
-  _id: string;
-  level: number;
-  label: string;
-  star1: number;
-  star2: number;
-  star3: number;
-  star4: number;
-  star5: number;
-  total: number;
-  isActive: boolean;
-};
-
 export default function AdminWaifuPity() {
   const loaderData = useLoaderData<{
     success: boolean;
-    data: PityData[];
+    data: PityType[];
     error?: string;
   }>();
   const fetcher = useFetcher();
   const [editingRow, setEditingRow] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Partial<PityData>>({});
+  const [editData, setEditData] = useState<Partial<PityType>>({});
 
   const tabs = [
     { key: "banner" as const, label: "Quản lý banner" },
@@ -118,8 +105,8 @@ export default function AdminWaifuPity() {
 
   const pityData = loaderData?.success ? loaderData.data : [];
 
-  const handleEdit = (row: PityData) => {
-    setEditingRow(row._id);
+  const handleEdit = (row: PityType) => {
+    setEditingRow(row.id);
     setEditData({
       star1: row.star1,
       star2: row.star2,
@@ -149,7 +136,7 @@ export default function AdminWaifuPity() {
     setEditData({});
   };
 
-  const handleInputChange = (field: keyof PityData, value: string) => {
+  const handleInputChange = (field: keyof PityType, value: string) => {
     setEditData((prev) => ({
       ...prev,
       [field]: parseFloat(value) || 0,
@@ -225,7 +212,7 @@ export default function AdminWaifuPity() {
 
           {/* Rows */}
           {pityData.map((row) => (
-            <div key={row._id} className="border-bd-default flex border-b">
+            <div key={row.id} className="border-bd-default flex border-b">
               <div className="border-bd-default flex flex-1 items-center gap-2.5 border-r px-3 py-2">
                 <div className="text-txt-secondary text-base leading-normal font-medium">
                   {row.label}
@@ -234,7 +221,7 @@ export default function AdminWaifuPity() {
 
               {/* Star 1 */}
               <div className="border-bd-default flex flex-1 items-center gap-2.5 border-r px-3 py-2">
-                {editingRow === row._id ? (
+                {editingRow === row.id ? (
                   <input
                     type="number"
                     step="0.001"
@@ -251,7 +238,7 @@ export default function AdminWaifuPity() {
 
               {/* Star 2 */}
               <div className="border-bd-default flex flex-1 items-center gap-2.5 border-r px-3 py-2">
-                {editingRow === row._id ? (
+                {editingRow === row.id ? (
                   <input
                     type="number"
                     step="0.001"
@@ -268,7 +255,7 @@ export default function AdminWaifuPity() {
 
               {/* Star 3 */}
               <div className="border-bd-default flex flex-1 items-center gap-2.5 border-r px-3 py-2">
-                {editingRow === row._id ? (
+                {editingRow === row.id ? (
                   <input
                     type="number"
                     step="0.001"
@@ -285,7 +272,7 @@ export default function AdminWaifuPity() {
 
               {/* Star 4 */}
               <div className="border-bd-default flex flex-1 items-center gap-2.5 border-r px-3 py-2">
-                {editingRow === row._id ? (
+                {editingRow === row.id ? (
                   <input
                     type="number"
                     step="0.001"
@@ -302,7 +289,7 @@ export default function AdminWaifuPity() {
 
               {/* Star 5 */}
               <div className="border-bd-default flex flex-1 items-center gap-2.5 border-r px-3 py-2">
-                {editingRow === row._id ? (
+                {editingRow === row.id ? (
                   <input
                     type="number"
                     step="0.001"
@@ -321,23 +308,23 @@ export default function AdminWaifuPity() {
               <div className="border-bd-default flex flex-1 items-center gap-2.5 border-r px-3 py-2">
                 <div
                   className={`text-base leading-normal font-medium ${
-                    editingRow === row._id
+                    editingRow === row.id
                       ? Math.abs(calculateTotal() - 100) > 0.01
                         ? "text-error-error"
                         : "text-success-success"
                       : "text-txt-secondary"
                   }`}
                 >
-                  {editingRow === row._id ? calculateTotal().toFixed(3) : row.total}
+                  {editingRow === row.id ? calculateTotal().toFixed(3) : row.total}
                 </div>
               </div>
 
               {/* Actions */}
               <div className="flex flex-1 items-center justify-center gap-2.5 px-3 py-2">
-                {editingRow === row._id ? (
+                {editingRow === row.id ? (
                   <>
                     <button
-                      onClick={() => handleSave(row._id)}
+                      onClick={() => handleSave(row.id)}
                       disabled={Math.abs(calculateTotal() - 100) > 0.01}
                       className="text-success-success hover:text-success-success/80 cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >

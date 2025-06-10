@@ -40,10 +40,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
   return Response.json({
     genre,
-    manga: manga.map((item) => ({
-      ...item,
-      id: item._id.toString(),
-    })),
+    manga,
     currentPage: page,
     totalPages,
   });

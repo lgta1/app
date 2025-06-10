@@ -8,7 +8,7 @@ import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { createWaifu } from "~/.server/mutations/waifu.mutation";
 import { ButtonGroupForm } from "~/components/button-group-form";
-import { BusinessError } from "~/helpers/errors";
+import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
 export async function action({ request }: ActionFunctionArgs) {

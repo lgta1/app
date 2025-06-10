@@ -9,7 +9,8 @@ import {
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Check, ChevronDown } from "lucide-react";
 
-import { deleteReport, getReports } from "@/queries/report.query";
+import { deleteReport } from "@/mutations/report.mutation";
+import { getReports } from "@/queries/report.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { Pagination } from "~/components/pagination";
@@ -176,6 +177,9 @@ export default function AdminReport() {
   };
 
   const handleDeleteClick = (reportId: string) => {
+    const confirmed = window.confirm("Bạn có chắc chắn muốn xóa báo cáo này?");
+    if (!confirmed) return;
+
     const formData = new FormData();
     formData.append("action", "delete");
     formData.append("reportId", reportId);

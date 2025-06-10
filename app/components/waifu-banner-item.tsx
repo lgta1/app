@@ -1,7 +1,7 @@
 import { Edit3, Trash2 } from "lucide-react";
 
 import { type BannerType } from "~/database/models/banner.model";
-import { getBannerStatus } from "~/helpers/banner";
+import { getBannerStatus } from "~/helpers/banner.helper";
 import { formatDate, formatTimeRemaining } from "~/utils/date.utils";
 
 interface WaifuBannerItemProps {

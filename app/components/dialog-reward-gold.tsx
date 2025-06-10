@@ -101,7 +101,7 @@ export function RewardGoldDialog({
                   onClick={handleClose}
                   className="outline-lav-500 hover:bg-lav-500/5 flex flex-1 items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
                 >
-                  <div className="text-lav-500 justify-center text-center text-sm leading-tight font-semibold">
+                  <div className="text-txt-focus justify-center text-center text-sm leading-tight font-semibold">
                     Đóng
                   </div>
                 </button>

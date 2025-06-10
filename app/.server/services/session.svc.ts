@@ -35,6 +35,7 @@ export async function getUserInfoFromSession(
 
 export const setUserDataToSession = (session: Session, user: UserType) => {
   session.set(USER_INFO_SESSION_KEY, {
+    id: user.id,
     name: user.name,
     email: user.email,
     faction: user.faction,

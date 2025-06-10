@@ -17,7 +17,7 @@ import { getAllGenres } from "~/.server/queries/genres.query";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
-import { isAdmin } from "~/helpers/user";
+import { isAdmin } from "~/helpers/user.helper";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },

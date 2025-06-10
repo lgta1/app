@@ -8,30 +8,23 @@ export const getCommentsByMangaId = async (
   const skip = (page - 1) * limit;
 
   const comments = await CommentModel.find({ mangaId })
-    .populate("userId", "name avatar")
+    .populate("userId", "name avatar gender level faction")
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(limit)
+    .limit(limit + 1)
     .lean();
 
-  const total = await CommentModel.countDocuments({ mangaId });
+  const hasMore = comments.length > limit;
 
   return {
-    comments,
-    pagination: {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      hasNextPage: page * limit < total,
-      hasPrevPage: page > 1,
-    },
+    data: comments.slice(0, limit),
+    hasMore,
   };
 };
 
 export const getCommentById = async (commentId: string) => {
   return await CommentModel.findById(commentId)
-    .populate("userId", "name avatar role")
+    .populate("userId", "name avatar gender level faction")
     .populate("mangaId", "title")
     .lean();
 };

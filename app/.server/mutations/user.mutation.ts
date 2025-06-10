@@ -4,8 +4,8 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { ROLES } from "~/constants/user";
 import { UserModel } from "~/database/models/user.model";
-import { BusinessError } from "~/helpers/errors";
-import { isAdmin } from "~/helpers/user";
+import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 
 export const promoteToAdmin = async (request: Request, userId: string) => {
   const currentUserInfo = await getUserInfoFromSession(request);

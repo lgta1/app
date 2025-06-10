@@ -18,7 +18,7 @@ import { DeleteMemberDialog } from "~/components/dialog-delete-member";
 import { RewardGoldDialog } from "~/components/dialog-reward-gold";
 import { Pagination } from "~/components/pagination";
 import type { UserType } from "~/database/models/user.model";
-import { calculateLevel } from "~/helpers/user-level";
+import { calculateLevel } from "~/helpers/user-level.helper";
 
 export const meta: MetaFunction = () => {
   return [

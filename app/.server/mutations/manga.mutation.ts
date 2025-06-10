@@ -2,8 +2,8 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { MangaModel } from "~/database/models/manga.model";
 import { UserModel } from "~/database/models/user.model";
-import { BusinessError } from "~/helpers/errors";
-import { isAdmin } from "~/helpers/user";
+import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 
 export const likeManga = async (request: Request, mangaId: string) => {
   const userInfo = await getUserInfoFromSession(request);

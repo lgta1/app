@@ -27,7 +27,7 @@ export function ButtonGroupForm({
         onClick={onCancel}
         className="outline-lav-500 hover:bg-lav-500/5 flex min-w-32 cursor-pointer items-center justify-center gap-2.5 rounded-xl px-6 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
       >
-        <span className="text-lav-500 text-center text-sm leading-tight font-semibold">
+        <span className="text-txt-focus text-center text-sm leading-tight font-semibold">
           {cancelText}
         </span>
       </button>

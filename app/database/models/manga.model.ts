@@ -13,6 +13,8 @@ export type MangaType = {
   genres: string[];
   likeNumber: number;
   viewNumber: number;
+  translationTeam: string;
+  followNumber: number;
   revenue: number;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +31,8 @@ const MangaSchema = new Schema<MangaType>(
     genres: { type: [String], required: true },
     likeNumber: { type: Number, default: 0 },
     viewNumber: { type: Number, default: 0 },
+    translationTeam: { type: String, required: true },
+    followNumber: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

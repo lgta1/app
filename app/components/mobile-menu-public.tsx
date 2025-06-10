@@ -35,7 +35,7 @@ export function MobileMenuPublic({ className = "" }: MobileMenuProps) {
                 to="/login"
                 className="border-lav-500 flex flex-1 items-center justify-center rounded-xl border-1 px-3 py-2"
               >
-                <span className="text-lav-500 text-sm font-semibold">Đăng nhập</span>
+                <span className="text-txt-focus text-sm font-semibold">Đăng nhập</span>
               </Link>
             </Popover.Close>
 
