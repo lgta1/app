@@ -55,7 +55,7 @@ export function UserMenu({
               sideOffset={8}
               align="end"
             >
-              <UserDropdownMenu user={user} onClose={handleClose} />
+              <UserDropdownMenu />
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
@@ -94,7 +94,7 @@ export function UserMenu({
             sideOffset={8}
             align="end"
           >
-            <UserDropdownMenu user={user} onClose={handleClose} />
+            <UserDropdownMenu />
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>

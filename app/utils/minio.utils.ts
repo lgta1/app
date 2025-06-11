@@ -8,6 +8,7 @@ import {
   getMinioClient,
 } from "@/configs/minio.config";
 
+import { BusinessError } from "~/helpers/errors.helper";
 import type {
   AllowedFileFormat,
   DeleteOptions,
@@ -156,7 +157,9 @@ export const uploadToPublicBucket = async (
     };
   } catch (error) {
     console.error("Error uploading to public bucket:", error);
-    throw new Error(`Failed to upload to public bucket: ${(error as Error).message}`);
+    throw new BusinessError(
+      `Failed to upload to public bucket: ${(error as Error).message}`,
+    );
   }
 };
 
@@ -200,7 +203,7 @@ export const uploadFile = async (
     };
   } catch (error) {
     console.error("Error uploading file:", error);
-    throw new Error(`Failed to upload file: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to upload file: ${(error as Error).message}`);
   }
 };
 
@@ -226,7 +229,7 @@ export const getFileUrl = async (
     return await client.presignedGetObject(bucket, objectName, expires);
   } catch (error) {
     console.error("Error generating file URL:", error);
-    throw new Error(`Failed to generate file URL: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to generate file URL: ${(error as Error).message}`);
   }
 };
 
@@ -244,7 +247,7 @@ export const downloadFile = async (
     return await client.getObject(bucket, objectName);
   } catch (error) {
     console.error("Error downloading file:", error);
-    throw new Error(`Failed to download file: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to download file: ${(error as Error).message}`);
   }
 };
 
@@ -262,7 +265,7 @@ export const deleteFile = async (
     await client.removeObject(bucket, objectName);
   } catch (error) {
     console.error("Error deleting file:", error);
-    throw new Error(`Failed to delete file: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to delete file: ${(error as Error).message}`);
   }
 };
 
@@ -280,7 +283,7 @@ export const deleteFiles = async (
     await client.removeObjects(bucket, objectNames);
   } catch (error) {
     console.error("Error deleting files:", error);
-    throw new Error(`Failed to delete files: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to delete files: ${(error as Error).message}`);
   }
 };
 
@@ -314,7 +317,7 @@ export const getFileInfo = async (
     };
   } catch (error) {
     console.error("Error getting file info:", error);
-    throw new Error(`Failed to get file info: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to get file info: ${(error as Error).message}`);
   }
 };
 
@@ -357,7 +360,7 @@ export const listFiles = async (
     });
   } catch (error) {
     console.error("Error listing files:", error);
-    throw new Error(`Failed to list files: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to list files: ${(error as Error).message}`);
   }
 };
 
@@ -411,7 +414,7 @@ export const copyFile = async (
     );
   } catch (error) {
     console.error("Error copying file:", error);
-    throw new Error(`Failed to copy file: ${(error as Error).message}`);
+    throw new BusinessError(`Failed to copy file: ${(error as Error).message}`);
   }
 };
 

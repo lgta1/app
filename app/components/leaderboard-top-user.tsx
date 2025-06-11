@@ -3,7 +3,6 @@ import { getTitleImgPath } from "~/helpers/user.helper";
 
 interface LeaderboardTopUserProps {
   user: UserType;
-  rank: number;
   gradientStyle: string;
   borderColor: string;
   shadowColor: string;
@@ -11,7 +10,6 @@ interface LeaderboardTopUserProps {
 
 export function LeaderboardTopUser({
   user,
-  rank,
   gradientStyle,
   borderColor,
   shadowColor,

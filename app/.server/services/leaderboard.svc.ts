@@ -6,6 +6,7 @@ import {
   MonthlyLeaderboardModel,
   WeeklyLeaderboardModel,
 } from "~/database/models/leaderboard.model";
+import { BusinessError } from "~/helpers/errors.helper";
 
 export type LeaderboardPeriod = "daily" | "weekly" | "monthly";
 
@@ -32,7 +33,7 @@ const getStartDate = (period: LeaderboardPeriod): Date => {
       return new Date(now.getFullYear(), now.getMonth(), 1);
 
     default:
-      throw new Error(`Invalid period: ${period}`);
+      throw new BusinessError(`Invalid period: ${period}`);
   }
 };
 
@@ -48,7 +49,7 @@ export const getLeaderboardModel = (period: LeaderboardPeriod) => {
     case "monthly":
       return MonthlyLeaderboardModel;
     default:
-      throw new Error(`Invalid period: ${period}`);
+      throw new BusinessError(`Invalid period: ${period}`);
   }
 };
 

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { useFetcher, useSubmit } from "react-router";
 
+import { BusinessError } from "~/helpers/errors.helper";
+
 interface UploadFileOptions {
   bucket?: string;
   category?: string;
@@ -222,7 +224,7 @@ export function useFileOperations() {
           const result = await response.json();
 
           if (!response.ok || !result.success) {
-            throw new Error(result.error || "Upload failed");
+            throw new BusinessError(result.error || "Upload failed");
           }
 
           // Execute individual success callback if provided

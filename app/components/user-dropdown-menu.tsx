@@ -2,14 +2,7 @@ import { useState } from "react";
 import { NavLink } from "react-router";
 import { Power } from "lucide-react";
 
-import type { UserType } from "~/database/models/user.model";
-
-interface UserDropdownMenuProps {
-  user: UserType;
-  onClose: () => void;
-}
-
-export function UserDropdownMenu({ user, onClose }: UserDropdownMenuProps) {
+export function UserDropdownMenu() {
   const [showTitle, setShowTitle] = useState(true);
 
   const handleToggleTitle = () => {

@@ -1,4 +1,5 @@
 import { ReportModel, type ReportType } from "~/database/models/report.model";
+import { BusinessError } from "~/helpers/errors.helper";
 
 export interface GetReportsParams {
   reportTypes?: string[];
@@ -60,6 +61,6 @@ export async function getReports({
     };
   } catch (error) {
     console.error("Error fetching reports:", error);
-    throw new Error("Không thể lấy dữ liệu báo cáo");
+    throw new BusinessError("Không thể lấy dữ liệu báo cáo");
   }
 }

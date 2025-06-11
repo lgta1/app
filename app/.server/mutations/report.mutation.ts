@@ -1,4 +1,5 @@
 import { ReportModel, type ReportType } from "~/database/models/report.model";
+import { BusinessError } from "~/helpers/errors.helper";
 
 export interface CreateReportParams {
   reporterName: string;
@@ -24,7 +25,7 @@ export async function createReport(params: CreateReportParams): Promise<ReportTy
     return savedReport.toJSON();
   } catch (error) {
     console.error("Error creating report:", error);
-    throw new Error("Không thể tạo báo cáo");
+    throw new BusinessError("Không thể tạo báo cáo");
   }
 }
 
@@ -34,7 +35,7 @@ export async function deleteReport(reportId: string): Promise<boolean> {
     return !!result;
   } catch (error) {
     console.error("Error deleting report:", error);
-    throw new Error("Không thể xóa báo cáo");
+    throw new BusinessError("Không thể xóa báo cáo");
   }
 }
 

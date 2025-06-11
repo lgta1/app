@@ -2,6 +2,7 @@ import {
   MangaRevenueModel,
   type MangaRevenueType,
 } from "~/database/models/manga-revenue.model";
+import { BusinessError } from "~/helpers/errors.helper";
 
 /**
  * Xóa tất cả dữ liệu revenue theo period
@@ -19,7 +20,7 @@ export async function deleteAllRevenuesByPeriod(period: "daily" | "weekly" | "mo
  * @returns Dữ liệu đã được thêm
  */
 export async function bulkInsertRevenues(
-  revenueData: Omit<MangaRevenueType, "createdAt" | "updatedAt">[],
+  revenueData: Omit<MangaRevenueType, "createdAt" | "updatedAt" | "id">[],
 ) {
   return await MangaRevenueModel.insertMany(revenueData);
 }
@@ -55,6 +56,8 @@ export async function uploadMangaRevenues(
     };
   } catch (error) {
     console.error("Error uploading manga revenues:", error);
-    throw new Error(`Failed to upload manga revenues: ${(error as Error).message}`);
+    throw new BusinessError(
+      `Failed to upload manga revenues: ${(error as Error).message}`,
+    );
   }
 }
