@@ -15,7 +15,7 @@ export function UserDropdownMenu() {
     <div className="w-full px-6 md:px-0">
       {/* Đăng truyện */}
       <NavLink
-        to="/create-story"
+        to="/manga/create"
         className="border-bd-default hover:bg-bgc-layer2 flex cursor-pointer items-center justify-start gap-2 border-b p-3 transition-colors md:border-b-0"
       >
         <span className="text-txt-primary justify-center text-center text-base leading-normal font-medium">

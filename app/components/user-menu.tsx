@@ -22,10 +22,6 @@ export function UserMenu({
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleClose = () => {
-    setIsOpen(false);
-  };
-
   if (isMobile) {
     return (
       <div className="flex items-center gap-4">

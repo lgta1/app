@@ -13,7 +13,7 @@ type ChapterDetailProps = {
 };
 
 export function ChapterDetail({ chapter }: ChapterDetailProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [_, setSearchParams] = useSearchParams();
 
   return (
     <>

@@ -82,15 +82,18 @@ export function meta({ data }: Route.MetaArgs) {
 const statuses = {
   [CHAPTER_STATUS.PENDING]: {
     label: "Chờ duyệt",
-    color: "yellow-300",
+    text: "text-yellow-300",
+    bg: "bg-yellow-300/10",
   },
   [CHAPTER_STATUS.REJECTED]: {
     label: "Bị trả về",
-    color: "rose-500",
+    text: "text-rose-500",
+    bg: "bg-rose-500/10",
   },
   [CHAPTER_STATUS.APPROVED]: {
     label: "Đã duyệt",
-    color: "teal-400",
+    text: "text-teal-400",
+    bg: "bg-teal-400/10",
   },
 };
 
@@ -273,7 +276,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               <Link
                 to={`/manga/chapter/${id}?chapterNumber=${chapter.chapterNumber}`}
                 key={chapter.id}
-                className="bg-bgc-layer2 border-bd-default hover:bg-bgc-layer2/80 flex cursor-pointer flex-col items-start gap-4 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between"
+                className="bg-bgc-layer2 border-bd-default hover:bg-bgc-layer2/80 flex cursor-pointer flex-row items-center justify-between gap-4 rounded-xl border p-3 transition-colors"
               >
                 {/* Layout cho mobile và desktop */}
                 <div className="flex w-full items-center justify-between sm:justify-start sm:gap-4">
@@ -295,10 +298,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
                       <div className="flex items-center gap-3 lg:gap-5">
                         <div
-                          className={`inline-flex items-center justify-center gap-2.5 rounded-[32px] bg-${statuses[chapter?.status || 0]?.color}/10 px-2 py-1 backdrop-blur-[3.40px]`}
+                          className={`inline-flex items-center justify-center gap-2.5 rounded-[32px] ${statuses[chapter?.status || 0]?.bg} px-2 py-1 backdrop-blur-[3.40px]`}
                         >
                           <div
-                            className={`text-${statuses[chapter?.status || 0]?.color} justify-center text-xs leading-none font-medium`}
+                            className={`${statuses[chapter?.status || 0]?.text} justify-center text-xs leading-none font-medium`}
                           >
                             {statuses[chapter?.status || 0]?.label}
                           </div>

@@ -7,13 +7,13 @@ import {
   useLoaderData,
 } from "react-router";
 
+import { getAllGenres } from "@/queries/genres.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/root";
 
 import "./app.css";
 
-import { getAllGenres } from "@/queries/genres.query";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";

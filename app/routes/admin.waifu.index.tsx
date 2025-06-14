@@ -3,6 +3,7 @@ import { Link, type MetaFunction, NavLink, useLoaderData } from "react-router";
 import { Plus } from "lucide-react";
 
 import { getAllWaifus } from "@/queries/waifu.query";
+
 import { WaifuItem } from "~/components/waifu-item";
 
 export const meta: MetaFunction = () => {

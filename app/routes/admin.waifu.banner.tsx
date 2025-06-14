@@ -51,7 +51,7 @@ export default function AdminWaifuBanner() {
       totalBanners: number;
     };
   }>();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [_, setSearchParams] = useSearchParams();
 
   const handlePageChange = (page: number) => {
     setSearchParams((prev) => {

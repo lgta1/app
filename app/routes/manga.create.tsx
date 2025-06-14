@@ -208,7 +208,7 @@ export default function CreateStory() {
     return (
       <div className="flex flex-col gap-4">
         <h3 className={`${titleColor} font-sans text-base font-semibold`}>{title}</h3>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {genreList.map((genre: GenresType) => (
             <div key={genre.slug} className="flex items-center gap-2 py-1">
               <label className="flex cursor-pointer items-center gap-2">
@@ -329,9 +329,9 @@ export default function CreateStory() {
                 Ảnh bìa
               </label>
             </div>
-            <div className="flex w-full flex-col items-start gap-9 sm:w-[680px] sm:flex-row">
+            <div className="flex w-full flex-row items-start gap-4 sm:w-[680px] sm:gap-9">
               {/* Upload area */}
-              <div className="h-64 w-44">
+              <div className="min-h-64 min-w-44">
                 <ImageUploader
                   onFileSelect={handleFileSelect}
                   onClear={clearPosterImage}
@@ -343,7 +343,7 @@ export default function CreateStory() {
               </div>
 
               {/* Upload info */}
-              <div className="flex h-64 flex-col justify-center gap-4">
+              <div className="flex h-64 flex-col justify-center gap-4 p-4">
                 <p className="text-txt-secondary font-sans text-base font-medium">
                   1. Ảnh có tỷ lệ 3:4
                 </p>

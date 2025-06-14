@@ -117,7 +117,7 @@ export default function EditChapter() {
   const [previewImages, setPreviewImages] = useState<PreviewImage[]>([]);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
-  const [originalThumbnail, setOriginalThumbnail] = useState<string>("");
+  const [_, setOriginalThumbnail] = useState<string>("");
   const [thumbnailCleared, setThumbnailCleared] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);

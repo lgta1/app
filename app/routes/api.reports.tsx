@@ -2,6 +2,7 @@ import { type ActionFunctionArgs } from "react-router";
 
 import { createReport } from "@/mutations/report.mutation";
 import { requireLogin } from "@/services/auth.server";
+
 import { REPORT_TYPE } from "~/constants/report";
 
 export async function action({ request }: ActionFunctionArgs) {
