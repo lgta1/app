@@ -6,7 +6,7 @@ import { FileText, Image, Star, Upload, User, X } from "lucide-react";
 
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
-import { createWaifu } from "~/.server/mutations/waifu.mutation";
+import { createWaifu } from "@/mutations/waifu.mutation";
 import { ButtonGroupForm } from "~/components/button-group-form";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";

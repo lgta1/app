@@ -6,7 +6,7 @@ export default function RatingItemRevenue({
   manga,
   index,
 }: {
-  manga: MangaType;
+  manga: MangaType & { revenue: number };
   index: number;
 }) {
   const color =

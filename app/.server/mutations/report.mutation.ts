@@ -38,16 +38,3 @@ export async function deleteReport(reportId: string): Promise<boolean> {
     throw new BusinessError("Không thể xóa báo cáo");
   }
 }
-
-export async function getReportByTargetId(
-  targetId: string,
-  reportType: string,
-): Promise<ReportType | null> {
-  try {
-    const report = await ReportModel.findOne({ targetId, reportType }).lean();
-    return report;
-  } catch (error) {
-    console.error("Error getting report:", error);
-    return null;
-  }
-}

@@ -9,39 +9,28 @@ interface PaginationProps {
 export function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
   const pages = [];
 
-  // Always show first page
-  pages.push(1);
+  // Calculate the range of pages to show (current ± 2)
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, currentPage + 2);
 
-  // Show current page and surrounding pages
-  if (currentPage > 3) {
+  if (startPage > 1) {
     pages.push("...");
   }
 
-  for (
-    let i = Math.max(2, currentPage - 1);
-    i <= Math.min(totalPages - 1, currentPage + 1);
-    i++
-  ) {
-    if (!pages.includes(i)) {
-      pages.push(i);
-    }
-  }
-
-  // Show dots before last page if needed
-  if (currentPage < totalPages - 2) {
+  if (endPage < totalPages) {
     pages.push("...");
   }
 
-  // Always show last page if more than 1 page
-  if (totalPages > 1 && !pages.includes(totalPages)) {
-    pages.push(totalPages);
+  // Add pages in the range
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i);
   }
 
   return (
     <div className="bg-bgc-layer1 border-bd-default inline-flex items-center justify-start rounded-lg border">
       <div
         className="hover:bg-bgc-layer2 inline-flex w-8 cursor-pointer flex-col items-center justify-center rounded-lg p-1.5"
-        onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
+        onClick={() => currentPage > 1 && onPageChange(1)}
       >
         <ChevronLeft className="text-txt-secondary h-4 w-4" />
       </div>
@@ -75,7 +64,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
 
       <div
         className="hover:bg-bgc-layer2 inline-flex w-8 cursor-pointer flex-col items-center justify-center rounded-lg p-1.5"
-        onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
+        onClick={() => currentPage < totalPages && onPageChange(totalPages)}
       >
         <ChevronRight className="text-txt-secondary h-4 w-4" />
       </div>

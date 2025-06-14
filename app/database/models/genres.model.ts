@@ -6,6 +6,7 @@ export type GenresType = {
   id: string;
   name: string;
   slug: string;
+  description: string;
   category: string;
   createdAt: Date;
   updatedAt: Date;
@@ -15,6 +16,7 @@ const GenresSchema = new Schema<GenresType>(
   {
     name: { type: String, required: true },
     slug: { type: String, required: true },
+    description: { type: String, required: true },
     category: { type: String, required: true, enum: GENRE_CATEGORY },
   },
   { timestamps: true },

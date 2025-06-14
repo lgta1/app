@@ -12,6 +12,7 @@ interface MangaDetailProps {
 
 export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   const {
+    id,
     title,
     poster,
     author,
@@ -25,7 +26,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
 
   // Mock data cho demo (sẽ được thay thế bằng dữ liệu thực)
   const rating = 5.0;
-  const reviewCount = 8;
+  const reviewCount = Math.floor(Math.random() * 100);
 
   return (
     <div className="w-full">
@@ -90,7 +91,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
 
             <div className="text-txt-secondary w-28 text-base font-medium">Lượt xem:</div>
             <div className="text-txt-primary text-base font-medium">
-              {viewNumber.toLocaleString()}
+              {viewNumber?.toLocaleString()}
             </div>
 
             <div className="text-txt-secondary w-28 text-base font-medium">
@@ -168,7 +169,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
         <div className="flex max-h-[304px] flex-col gap-2 overflow-y-scroll rounded-lg md:max-h-[400px] lg:max-h-[492px]">
           {chapters.map((chapter) => (
             <NavLink
-              to={`/manga/chapter/${chapter.id}`}
+              to={`/manga/chapter/${id}?chapterNumber=${chapter.chapterNumber}`}
               key={chapter.id}
               className="bg-bgc-layer2 border-bd-default hover:bg-bgc-layer2/80 flex cursor-pointer flex-col items-start gap-4 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between"
             >
@@ -195,7 +196,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
                       <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
                         <Eye className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
                         <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                          {chapter.viewNumber.toLocaleString()}
+                          {chapter.viewNumber?.toLocaleString()}
                         </span>
                       </div>
 
@@ -203,7 +204,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
                       <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
                         <Heart className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
                         <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                          {chapter.likeNumber.toLocaleString()}
+                          {chapter.likeNumber?.toLocaleString()}
                         </span>
                       </div>
 
@@ -211,7 +212,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
                       <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
                         <MessageCircle className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
                         <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                          {chapter.commentNumber.toLocaleString()}
+                          {chapter.commentNumber?.toLocaleString()}
                         </span>
                       </div>
                     </div>

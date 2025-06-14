@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { NavLink } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaFunction, NavLink, useLoaderData } from "react-router";
 import * as Tabs from "@radix-ui/react-tabs";
 
 import { getRevenuesByPeriod } from "@/queries/manga-revenue.query";
@@ -8,6 +7,16 @@ import { getRevenuesByPeriod } from "@/queries/manga-revenue.query";
 import LeaderboardTopManga from "~/components/leaderboard-top-manga";
 import RatingItemRevenue from "~/components/rating-item-revenue";
 import type { MangaType } from "~/database/models/manga.model";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Bảng xếp hạng doanh thu | WuxiaWorld" },
+    {
+      name: "description",
+      content: "Xem bảng xếp hạng truyện theo doanh thu tại WuxiaWorld",
+    },
+  ];
+};
 
 export async function loader() {
   const [dailyLeaderboard, weeklyLeaderboard, monthlyLeaderboard] = await Promise.all([

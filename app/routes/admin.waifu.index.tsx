@@ -1,9 +1,16 @@
 import { useState } from "react";
-import { Link, NavLink, useLoaderData } from "react-router";
+import { Link, type MetaFunction, NavLink, useLoaderData } from "react-router";
 import { Plus } from "lucide-react";
 
-import { getAllWaifus } from "~/.server/queries/waifu.query";
+import { getAllWaifus } from "@/queries/waifu.query";
 import { WaifuItem } from "~/components/waifu-item";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Quản lý Waifu | Admin" },
+    { name: "description", content: "Trang quản lý danh sách Waifu trong hệ thống" },
+  ];
+};
 
 export async function loader() {
   const waifus = await getAllWaifus();

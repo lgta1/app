@@ -1,5 +1,6 @@
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   useLoaderData,
   useSearchParams,
 } from "react-router-dom";
@@ -7,12 +8,31 @@ import {
 import {
   getTotalMangaCount,
   searchMangaApprovedWithPagination,
-} from "~/.server/queries/manga.query";
+} from "@/queries/manga.query";
+
 import { MangaCard } from "~/components/manga-card";
 import { Pagination } from "~/components/pagination";
 import { MANGA_STATUS } from "~/constants/manga";
 import { GenresModel, type GenresType } from "~/database/models/genres.model";
 import type { MangaType } from "~/database/models/manga.model";
+
+export const meta: MetaFunction = ({ data }: any) => {
+  if (!data?.genre) {
+    return [
+      { title: "Thể loại truyện | WuxiaWorld" },
+      { name: "description", content: "Khám phá các thể loại truyện tại WuxiaWorld" },
+    ];
+  }
+
+  return [
+    { title: `${data.genre.name} | WuxiaWorld` },
+    {
+      name: "description",
+      content:
+        data.genre.description || `Khám phá thể loại ${data.genre.name} tại WuxiaWorld`,
+    },
+  ];
+};
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const { slug } = params;
@@ -69,6 +89,9 @@ export default function Genres() {
           {genre?.name}
         </h1>
         <div className="h-1.5 w-20 bg-fuchsia-400" />
+        <p className="text-txt-primary text-sm leading-tight font-normal">
+          {genre?.description}
+        </p>
       </div>
 
       {/* Manga list */}

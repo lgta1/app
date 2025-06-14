@@ -1,10 +1,21 @@
-import { NavLink, useLoaderData } from "react-router";
+import { type MetaFunction, useLoaderData } from "react-router";
+import { NavLink } from "react-router";
 
 import { getTopUser } from "@/queries/user.query";
 
 import { LeaderboardTopUser } from "~/components/leaderboard-top-user";
 import RatingItemUser from "~/components/rating-item-user";
 import type { UserType } from "~/database/models/user.model";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Bảng xếp hạng thành viên | WuxiaWorld" },
+    {
+      name: "description",
+      content: "Xem bảng xếp hạng thành viên xuất sắc nhất tại WuxiaWorld",
+    },
+  ];
+};
 
 export async function loader() {
   const topUsers = await getTopUser();

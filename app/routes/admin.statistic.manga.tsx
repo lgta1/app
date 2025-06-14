@@ -1,4 +1,4 @@
-import { NavLink, useLoaderData } from "react-router";
+import { type MetaFunction, NavLink, useLoaderData } from "react-router";
 import * as Tabs from "@radix-ui/react-tabs";
 import { BookOpen, Eye, Users } from "lucide-react";
 
@@ -16,6 +16,13 @@ interface StatisticData {
   weeklyLeaderboard: MangaType[];
   monthlyLeaderboard: MangaType[];
 }
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Thống kê Truyện | Admin" },
+    { name: "description", content: "Trang thống kê dữ liệu truyện trong hệ thống" },
+  ];
+};
 
 export async function loader(): Promise<Response> {
   // Lấy dữ liệu thống kê và leaderboard từ database

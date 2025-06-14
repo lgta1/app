@@ -1,21 +1,35 @@
-import { isRouteErrorResponse, Link, useRouteError } from "react-router";
+import { isRouteErrorResponse, Link, useNavigate, useRouteError } from "react-router";
 
 export function ErrorBoundary() {
   const error = useRouteError();
   let devDetails = "";
+  const navigate = useNavigate();
 
   if (isRouteErrorResponse(error)) {
     return (
       <div className="bg-gradient-radial flex min-h-screen items-center justify-center from-[#191758] to-[#09101A]">
         <div className="bg-bgc-layer1 border-bd-default rounded-xl border p-8 text-center">
           <h1 className="text-txt-primary mb-4 text-2xl font-bold">
-            {error.status} {error.statusText || "Đã xảy ra lỗi không mong muốn"}
+            Có vẻ bạn đang đi lạc đường, liên hệ với chúng tôi nếu nghĩ đây là lỗi ^^
           </h1>
-          <Link to="/">
-            <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
-              Về trang chủ
+          {import.meta.env.DEV && (
+            <p className="text-txt-secondary mb-6">
+              {error.status} {error.statusText}
+            </p>
+          )}
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="to-btn-primary border-lav-500 text-txt-focus cursor-pointer rounded-xl border px-6 py-3 text-sm font-semibold"
+            >
+              Về trang trước
             </button>
-          </Link>
+            <Link to="/">
+              <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
+                Về trang chủ
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -32,11 +46,19 @@ export function ErrorBoundary() {
           Có vẻ bạn đang đi lạc đường, liên hệ với chúng tôi nếu nghĩ đây là lỗi ^^
         </p>
         {devDetails && <p className="text-txt-secondary mb-6">{devDetails}</p>}
-        <Link to="/">
-          <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
-            Về trang chủ
+        <div className="flex justify-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="to-btn-primary border-lav-500 text-txt-focus cursor-pointer rounded-xl border px-6 py-3 text-sm font-semibold"
+          >
+            Về trang trước
           </button>
-        </Link>
+          <Link to="/">
+            <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
+              Về trang chủ
+            </button>
+          </Link>
+        </div>
       </div>
     </div>
   );

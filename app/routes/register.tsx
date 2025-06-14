@@ -1,6 +1,13 @@
 import { useState } from "react";
 import React from "react";
-import { Link, redirect, useActionData, useNavigation, useSubmit } from "react-router";
+import {
+  Link,
+  type MetaFunction,
+  redirect,
+  useActionData,
+  useNavigation,
+  useSubmit,
+} from "react-router";
 
 import { register } from "@/services/auth.server";
 import { getUserInfoFromSession } from "@/services/session.svc";
@@ -10,6 +17,16 @@ import type { Route } from "./+types/register";
 import { FactionSelectionDialog } from "~/components/dialog-faction-selection";
 import { GenderSelectionDialog } from "~/components/dialog-gender-selection";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Đăng ký | WuxiaWorld" },
+    {
+      name: "description",
+      content: "Tạo tài khoản WuxiaWorld để tham gia cộng đồng đọc truyện",
+    },
+  ];
+};
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Kiểm tra xem người dùng đã đăng nhập chưa

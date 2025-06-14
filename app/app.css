@@ -43,13 +43,6 @@ body {
 }
 
 /* CSS utilities */
-.line-clamp-1 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-}
-
 /* Container để chừa không gian cho quảng cáo 2 bên */
 .container-ad {
   width: 100%;
@@ -87,6 +80,12 @@ body {
   .container-ad {
     max-width: 1320px;
   }
+}
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
 .line-clamp-2 {

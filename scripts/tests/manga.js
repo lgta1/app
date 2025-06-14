@@ -193,7 +193,7 @@ const mangaEntries = [];
 for (let i = 1; i <= 50; i++) {
   const manga = {
     title: generateVietnameseTitle(),
-    description: `This is a detailed description for manga number ${i}. It contains information about the plot, characters, and setting of the story.`,
+    description: `This is a detailed description for manga number ${i}. It contains information about the plot, characters, and setting of the manga.`,
     poster: `https://www.figma.com/file/GuSZqdyY03lwGRXGPBSI89/image/aff3025439b372163c1b109106a767fc633d068c`,
     chapters: getRandomNumber(1, 1000),
     author: `Author ${i}`,

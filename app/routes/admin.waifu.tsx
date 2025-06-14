@@ -1,4 +1,16 @@
-import { type LoaderFunctionArgs, Outlet, redirect } from "react-router";
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  Outlet,
+  redirect,
+} from "react-router";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Quản lý Waifu | Admin" },
+    { name: "description", content: "Trang quản lý hệ thống Waifu" },
+  ];
+};
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);

@@ -13,7 +13,7 @@ import type { Route } from "./+types/root";
 
 import "./app.css";
 
-import { getAllGenres } from "~/.server/queries/genres.query";
+import { getAllGenres } from "@/queries/genres.query";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";

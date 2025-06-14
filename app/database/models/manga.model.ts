@@ -11,11 +11,12 @@ export type MangaType = {
   author: string;
   status: number;
   genres: string[];
-  likeNumber: number;
-  viewNumber: number;
+  likeNumber?: number;
+  viewNumber?: number;
+  followNumber?: number;
   translationTeam: string;
-  followNumber: number;
-  revenue: number;
+  ownerId: string;
+  keywords?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -25,14 +26,16 @@ const MangaSchema = new Schema<MangaType>(
     title: { type: String, required: true },
     description: { type: String, required: true },
     poster: { type: String, required: true },
-    chapters: { type: Number, required: true },
+    chapters: { type: Number, default: 0 },
     author: { type: String, required: true },
     status: { type: Number, enum: MANGA_STATUS, default: MANGA_STATUS.PENDING },
     genres: { type: [String], required: true },
     likeNumber: { type: Number, default: 0 },
     viewNumber: { type: Number, default: 0 },
-    translationTeam: { type: String, required: true },
     followNumber: { type: Number, default: 0 },
+    translationTeam: { type: String, required: true },
+    ownerId: { type: String, required: true },
+    keywords: { type: String },
   },
   { timestamps: true },
 );

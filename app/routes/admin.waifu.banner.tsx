@@ -1,10 +1,24 @@
-import { Link, NavLink, useLoaderData, useSearchParams } from "react-router";
+import {
+  Link,
+  type MetaFunction,
+  NavLink,
+  useLoaderData,
+  useSearchParams,
+} from "react-router";
 import { Plus } from "lucide-react";
 
-import { countBanners, getAllBanners } from "~/.server/queries/banner.query";
+import { countBanners, getAllBanners } from "@/queries/banner.query";
+
 import { Pagination } from "~/components/pagination";
 import { WaifuBannerItem } from "~/components/waifu-banner-item";
 import type { BannerType } from "~/database/models/banner.model";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Quản lý Banner | Admin" },
+    { name: "description", content: "Trang quản lý banner hiển thị trong hệ thống" },
+  ];
+};
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);

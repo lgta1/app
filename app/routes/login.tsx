@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Form,
   Link,
+  type MetaFunction,
   redirect,
   useActionData,
   useNavigation,
@@ -14,6 +15,16 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import type { Route } from "./+types/login";
 
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Đăng nhập | WuxiaWorld" },
+    {
+      name: "description",
+      content: "Đăng nhập vào tài khoản WuxiaWorld để trải nghiệm đầy đủ",
+    },
+  ];
+};
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Check if the user is already logged in

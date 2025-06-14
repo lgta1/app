@@ -187,7 +187,7 @@ export default function AdminReport() {
   };
 
   const handleViewClick = (mangaId: string) => {
-    navigate(`/admin/manga/${mangaId}`);
+    navigate(`/manga/${mangaId}`);
   };
 
   return (

@@ -20,7 +20,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   },
   {
     label: "Đăng truyện",
-    href: "/create-story",
+    href: "/manga/create",
   },
   {
     label: "Xếp hạng",

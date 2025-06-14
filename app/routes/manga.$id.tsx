@@ -1,7 +1,7 @@
 import { Toaster } from "react-hot-toast";
 import * as Tabs from "@radix-ui/react-tabs";
 
-import { getChapterByMangaId } from "@/queries/chapter.query";
+import { getChaptersByMangaId } from "@/queries/chapter.query";
 import { getLeaderboard } from "@/queries/leaderboad.query";
 import { getMangaById, getRelatedManga } from "@/queries/manga.query";
 import { getRevenuesByPeriod } from "@/queries/manga-revenue.query";
@@ -37,7 +37,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     monthlyLeaderboard,
     currentUser,
   ] = await Promise.all([
-    getChapterByMangaId(manga.id),
+    getChaptersByMangaId(manga.id),
     getRelatedManga(manga.genres),
     getRevenuesByPeriod("monthly"),
     getTopUser(),
@@ -59,10 +59,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 }
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ data }: Route.MetaArgs) {
+  if (!data?.manga) {
+    return [
+      { title: "Không tìm thấy truyện | WuxiaWorld" },
+      { name: "description", content: "Trang truyện không tồn tại" },
+    ];
+  }
+
   return [
-    { title: "WuxiaWorld - Đọc truyện online" },
-    { name: "description", content: "WuxiaWorld - Nền tảng đọc truyện online" },
+    { title: `${data.manga.title} | WuxiaWorld` },
+    {
+      name: "description",
+      content: data.manga.description || `Đọc truyện ${data.manga.title} tại WuxiaWorld`,
+    },
   ];
 }
 

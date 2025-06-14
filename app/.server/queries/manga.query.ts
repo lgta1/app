@@ -90,3 +90,7 @@ export const getRelatedManga = async (genres: string[], limit: number = 10) => {
     .limit(limit)
     .lean();
 };
+
+export const getMangaByIdAndOwner = async (id: string, ownerId: string) => {
+  return await MangaModel.findOne({ _id: id, ownerId }).lean();
+};
