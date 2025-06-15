@@ -28,7 +28,7 @@ const MangaSchema = new Schema<MangaType>(
     poster: { type: String, required: true },
     chapters: { type: Number, default: 0 },
     author: { type: String, required: true },
-    status: { type: Number, enum: MANGA_STATUS, default: MANGA_STATUS.PENDING },
+    status: { type: Number, enum: MANGA_STATUS, default: MANGA_STATUS.CREATING },
     genres: { type: [String], required: true },
     likeNumber: { type: Number, default: 0 },
     viewNumber: { type: Number, default: 0 },

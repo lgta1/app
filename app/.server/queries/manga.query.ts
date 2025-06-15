@@ -5,6 +5,15 @@ import { MangaModel } from "~/database/models/manga.model";
 
 export const getNewManga = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
+  return await MangaModel.find({ status: MANGA_STATUS.APPROVED })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+};
+
+export const getAllMangaAdmin = async (page: number = 1, limit: number = 10) => {
+  const skip = (page - 1) * limit;
   return await MangaModel.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
 };
 

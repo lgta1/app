@@ -17,13 +17,13 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
     pages.push("...");
   }
 
-  if (endPage < totalPages) {
-    pages.push("...");
-  }
-
   // Add pages in the range
   for (let i = startPage; i <= endPage; i++) {
     pages.push(i);
+  }
+
+  if (endPage < totalPages) {
+    pages.push("...");
   }
 
   return (

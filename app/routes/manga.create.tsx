@@ -78,8 +78,8 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 const STATUS_OPTIONS = [
-  { value: MANGA_STATUS.PENDING, label: "Đang cập nhật" },
-  { value: MANGA_STATUS.WAITING, label: "Chờ duyệt" },
+  { value: MANGA_STATUS.CREATING, label: "Đang tạo" },
+  { value: MANGA_STATUS.PENDING, label: "Chờ duyệt" },
 ];
 
 interface FormData {
@@ -100,7 +100,7 @@ export default function CreateStory() {
     description: "",
     author: "",
     keywords: "",
-    status: MANGA_STATUS.PENDING,
+    status: MANGA_STATUS.CREATING,
     genres: [],
     poster: null,
   });

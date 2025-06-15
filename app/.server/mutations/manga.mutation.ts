@@ -73,7 +73,7 @@ export const createManga = async (
   request: Request,
   manga: Omit<MangaType, "id" | "createdAt" | "updatedAt" | "chapters">,
 ) => {
-  if (![MANGA_STATUS.WAITING, MANGA_STATUS.PENDING].includes(manga.status)) {
+  if (![MANGA_STATUS.CREATING, MANGA_STATUS.PENDING].includes(manga.status)) {
     throw new BusinessError("Truyện không được tạo với trạng thái này");
   }
 

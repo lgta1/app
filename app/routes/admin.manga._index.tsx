@@ -11,7 +11,7 @@ import { ChevronDown, Search, Trash2 } from "lucide-react";
 
 import { deleteManga } from "@/mutations/manga.mutation";
 import {
-  getNewManga,
+  getAllMangaAdmin,
   getTotalMangaCount,
   searchMangaWithPagination,
 } from "@/queries/manga.query";
@@ -51,7 +51,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
     ]);
   } else {
     [mangas, totalMangas] = await Promise.all([
-      getNewManga(page, limit),
+      getAllMangaAdmin(page, limit),
       getTotalMangaCount({}),
     ]);
   }
@@ -125,8 +125,10 @@ const getStatusText = (status: number) => {
       return "Đã duyệt";
     case MANGA_STATUS.REJECTED:
       return "Từ chối";
+    case MANGA_STATUS.CREATING:
+      return "Đang tạo";
     default:
-      return "Đã duyệt";
+      return "Không xác định";
   }
 };
 

@@ -1,6 +1,12 @@
+import { useEffect, useState } from "react";
+import { toast, Toaster } from "react-hot-toast";
 import { useSearchParams } from "react-router";
+import { useFetcher } from "react-router";
 import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
 
+import ReportDialog from "./dialog-report";
+
+import { REPORT_TYPE } from "~/constants/report";
 import type { ChapterType } from "~/database/models/chapter.model";
 import { formatDate, formatTime } from "~/utils/date.utils";
 
@@ -14,9 +20,43 @@ type ChapterDetailProps = {
 
 export function ChapterDetail({ chapter }: ChapterDetailProps) {
   const [_, setSearchParams] = useSearchParams();
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const fetcher = useFetcher();
+
+  // Handle API response
+  useEffect(() => {
+    if (fetcher.data) {
+      const response = fetcher.data as {
+        success: boolean;
+        message?: string;
+        error?: string;
+      };
+      if (response.success) {
+        toast.success(response.message || "Báo cáo đã được gửi thành công!");
+      } else {
+        toast.error(response.error || "Có lỗi xảy ra khi gửi báo cáo");
+      }
+    }
+  }, [fetcher.data]);
+
+  const handleReportSubmit = (content: string) => {
+    const formData = new FormData();
+    formData.append("intent", "create-report");
+    formData.append("reason", content);
+    formData.append("targetId", chapter.mangaId);
+    formData.append("targetName", chapter.title);
+    formData.append("reportType", REPORT_TYPE.MANGA);
+    formData.append("mangaId", chapter.mangaId);
+
+    fetcher.submit(formData, {
+      method: "POST",
+      action: "/api/reports",
+    });
+  };
 
   return (
     <>
+      <Toaster position="bottom-right" />
       <div className="bg-bgc-layer1 border-bd-default mx-auto flex w-full max-w-[1080px] flex-col gap-4 rounded-xl border p-4 sm:p-6">
         {/* Header Section */}
         <div className="flex flex-col gap-2">
@@ -39,7 +79,10 @@ export function ChapterDetail({ chapter }: ChapterDetailProps) {
           <div className="text-txt-secondary font-sans text-base leading-normal font-medium">
             Nếu không Nếu bạn không đọc được truyện/chương lỗi, hãy ấn nút Báo Lỗi
           </div>
-          <button className="border-lav-500 hover:bg-bgc-layer-semi-purple flex items-center justify-center gap-2.5 rounded-xl border px-4 py-3 transition-colors">
+          <button
+            className="border-lav-500 hover:bg-bgc-layer-semi-purple flex cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 transition-colors"
+            onClick={() => setIsReportDialogOpen(true)}
+          >
             <span className="text-txt-focus font-sans text-sm leading-tight font-medium">
               Báo lỗi
             </span>
@@ -120,6 +163,13 @@ export function ChapterDetail({ chapter }: ChapterDetailProps) {
           />
         ))}
       </div>
+
+      {/* Report Dialog */}
+      <ReportDialog
+        isOpen={isReportDialogOpen}
+        onClose={() => setIsReportDialogOpen(false)}
+        onSubmit={handleReportSubmit}
+      />
     </>
   );
 }

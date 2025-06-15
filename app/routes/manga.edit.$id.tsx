@@ -101,8 +101,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 const STATUS_OPTIONS = [
-  { value: MANGA_STATUS.PENDING, label: "Đang cập nhật" },
-  { value: MANGA_STATUS.WAITING, label: "Chờ duyệt" },
+  { value: MANGA_STATUS.CREATING, label: "Đang tạo" },
+  { value: MANGA_STATUS.PENDING, label: "Chờ duyệt" },
 ];
 
 interface FormData {

@@ -75,7 +75,6 @@ export default function LeaderboardMember() {
             <div className="relative m-8">
               <LeaderboardTopUser
                 user={top3Users[1]}
-                rank={2}
                 gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(234.16,_234.16,_234.16,_0.30)_0%,_rgba(42.91,_42.79,_42.08,_0.30)_69%)]"
                 borderColor="outline-gray-400"
                 shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(163,175,186,0.22)]"
@@ -95,7 +94,6 @@ export default function LeaderboardMember() {
             <div className="relative m-8">
               <LeaderboardTopUser
                 user={top3Users[0]}
-                rank={1}
                 gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_224.67,_51.49,_0.30)_0%,_rgba(34.33,_30.05,_5.61,_0.30)_69%)]"
                 borderColor="outline-yellow-300"
                 shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
@@ -115,7 +113,6 @@ export default function LeaderboardMember() {
             <div className="relative m-8">
               <LeaderboardTopUser
                 user={top3Users[2]}
-                rank={3}
                 gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_112.54,_51.49,_0.30)_0%,_rgba(34.33,_12.31,_5.61,_0.30)_69%)]"
                 borderColor="outline-red-400"
                 shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
@@ -139,7 +136,6 @@ export default function LeaderboardMember() {
             <div className="relative m-8">
               <LeaderboardTopUser
                 user={top3Users[0]}
-                rank={1}
                 gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_224.67,_51.49,_0.30)_0%,_rgba(34.33,_30.05,_5.61,_0.30)_69%)]"
                 borderColor="outline-yellow-300"
                 shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
@@ -159,7 +155,6 @@ export default function LeaderboardMember() {
             <div className="relative m-8">
               <LeaderboardTopUser
                 user={top3Users[1]}
-                rank={2}
                 gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(234.16,_234.16,_234.16,_0.30)_0%,_rgba(42.91,_42.79,_42.08,_0.30)_69%)]"
                 borderColor="outline-gray-400"
                 shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(163,175,186,0.22)]"
@@ -179,7 +174,6 @@ export default function LeaderboardMember() {
             <div className="relative m-8">
               <LeaderboardTopUser
                 user={top3Users[2]}
-                rank={3}
                 gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_112.54,_51.49,_0.30)_0%,_rgba(34.33,_12.31,_5.61,_0.30)_69%)]"
                 borderColor="outline-red-400"
                 shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
