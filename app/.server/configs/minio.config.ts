@@ -61,9 +61,9 @@ export const makePublicBucket = async (bucketName: string): Promise<void> => {
     const policy = createPublicReadPolicy(bucketName);
 
     await client.setBucketPolicy(bucketName, JSON.stringify(policy));
-    console.log(`Bucket '${bucketName}' policy set to public read`);
+    console.log(`Bucket '${bucketName}' đã được thiết lập policy public read`);
   } catch (error) {
-    console.error(`Error setting public policy for bucket '${bucketName}':`, error);
+    console.error(`Lỗi khi thiết lập public policy cho bucket '${bucketName}':`, error);
     throw error;
   }
 };
@@ -81,7 +81,7 @@ export const ensureBucketExists = async (
 
     if (!exists) {
       await client.makeBucket(bucketName);
-      console.log(`Bucket '${bucketName}' created successfully`);
+      console.log(`Bucket '${bucketName}' đã được tạo thành công`);
 
       // Thiết lập public policy nếu được yêu cầu
       if (isPublic) {
@@ -92,7 +92,7 @@ export const ensureBucketExists = async (
       await makePublicBucket(bucketName);
     }
   } catch (error) {
-    console.error(`Error ensuring bucket '${bucketName}' exists:`, error);
+    console.error(`Lỗi khi đảm bảo bucket '${bucketName}' tồn tại:`, error);
     throw error;
   }
 };

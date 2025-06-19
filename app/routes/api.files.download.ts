@@ -28,7 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return Response.json(
         {
           success: false,
-          error: "objectName parameter is required",
+          error: "Tham số objectName là bắt buộc",
         },
         { status: 400 },
       );
@@ -80,7 +80,7 @@ export async function loader({ request }: Route.LoaderArgs) {
             url: fileInfo.url, // Also direct public URL
           },
         },
-        message: "Public download URL generated successfully",
+        message: "Tạo URL tải xuống công khai thành công",
       });
     }
   } catch (error) {
@@ -94,7 +94,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     return Response.json(
       {
         success: false,
-        error: "Download failed",
+        error: "Tải xuống thất bại",
         details: (error as Error).message,
       },
       { status: 500 },

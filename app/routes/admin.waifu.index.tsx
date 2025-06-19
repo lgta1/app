@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { Link, type MetaFunction, NavLink, useLoaderData } from "react-router";
+import {
+  type ActionFunctionArgs,
+  Link,
+  type MetaFunction,
+  NavLink,
+  useLoaderData,
+  useSubmit,
+} from "react-router";
 import { Plus } from "lucide-react";
 
+import { deleteWaifu } from "@/mutations/waifu.mutation";
 import { getAllWaifus } from "@/queries/waifu.query";
 
 import { WaifuItem } from "~/components/waifu-item";
+import { BusinessError } from "~/helpers/errors.helper";
 
 export const meta: MetaFunction = () => {
   return [
@@ -18,11 +27,33 @@ export async function loader() {
   return { waifus };
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  try {
+    const formData = await request.formData();
+    const waifuId = formData.get("waifuId");
+    if (!waifuId) {
+      return { error: "ID waifu là bắt buộc" };
+    }
+    const action = formData.get("action");
+
+    if (action === "delete") {
+      await deleteWaifu(request, waifuId as string);
+      return { success: true, message: "Xóa waifu thành công" };
+    }
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      return { error: error.message };
+    }
+    return { error: "Có lỗi xảy ra, vui lòng thử lại sau" };
+  }
+}
+
 type WaifuCategory = "5star" | "4star" | "3star" | "other";
 
 export default function AdminWaifuIndex() {
   const { waifus } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState<WaifuCategory>("5star");
+  const submit = useSubmit();
 
   const tabs = [
     { key: "banner" as const, label: "Quản lý banner" },
@@ -57,7 +88,9 @@ export default function AdminWaifuIndex() {
   };
 
   const handleDelete = (id: string) => {
-    console.log("Delete waifu:", id);
+    if (confirm("Bạn có chắc chắn muốn xóa waifu này không?")) {
+      submit({ waifuId: id, action: "delete" }, { method: "post" });
+    }
   };
 
   // Chia waifu thành các hàng, mỗi hàng 3 item

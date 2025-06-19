@@ -56,32 +56,26 @@ export default function LeaderboardIndex() {
         <NavLink
           to="/leaderboard/manga"
           className={({ isActive }) =>
-            `${isActive ? "bg-btn-primary" : "bg-bgc-layer-semi-neutral"} flex items-center justify-center gap-1.5 rounded-[32px] px-3 py-1.5 backdrop-blur-[3.4px]`
+            `${isActive ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
           }
         >
-          <span className="text-txt-inverse text-xs leading-normal font-medium sm:text-base">
-            Top Truyện tranh
-          </span>
+          Top Truyện tranh
         </NavLink>
         <NavLink
           to="/leaderboard/revenue"
           className={({ isActive }) =>
-            `${isActive ? "bg-btn-primary" : "bg-bgc-layer-semi-neutral"} flex items-center justify-center gap-1.5 rounded-[32px] px-3 py-1.5 backdrop-blur-[3.4px]`
+            `${isActive ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
           }
         >
-          <span className="text-txt-primary text-xs leading-normal font-medium sm:text-base">
-            Top Doanh thu
-          </span>
+          Top Doanh thu
         </NavLink>
         <NavLink
           to="/leaderboard/member"
           className={({ isActive }) =>
-            `${isActive ? "bg-btn-primary" : "bg-bgc-layer-semi-neutral"} flex items-center justify-center gap-1.5 rounded-[32px] px-3 py-1.5 backdrop-blur-[3.4px]`
+            `${isActive ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
           }
         >
-          <span className="text-txt-primary text-xs leading-normal font-medium sm:text-base">
-            Top Thành viên
-          </span>
+          Top Thành viên
         </NavLink>
       </div>
 
@@ -124,7 +118,7 @@ export default function LeaderboardIndex() {
 
           {/* Ranking Lists */}
           <Tabs.Content value="monthly" className="space-y-0 pb-4">
-            {(monthlyLeaderboard as MangaType[])
+            {monthlyLeaderboard
               ?.filter((manga) => !!manga)
               .map((manga, index) => (
                 <RatingItemRevenue key={manga.id} manga={manga} index={index + 1} />
@@ -132,7 +126,7 @@ export default function LeaderboardIndex() {
           </Tabs.Content>
 
           <Tabs.Content value="weekly" className="space-y-0 pb-4">
-            {(weeklyLeaderboard as MangaType[])
+            {weeklyLeaderboard
               ?.filter((manga) => !!manga)
               .map((manga, index) => (
                 <RatingItemRevenue key={manga.id} manga={manga} index={index + 1} />
@@ -140,7 +134,7 @@ export default function LeaderboardIndex() {
           </Tabs.Content>
 
           <Tabs.Content value="daily" className="space-y-0 pb-4">
-            {(dailyLeaderboard as MangaType[])
+            {dailyLeaderboard
               ?.filter((manga) => !!manga)
               .map((manga, index) => (
                 <RatingItemRevenue key={manga.id} manga={manga} index={index + 1} />

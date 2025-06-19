@@ -30,6 +30,7 @@
     "node-cron": "^4.0.7",
     "pm2": "^6.0.6",
     "react": "^19.1.0",
+    "react-device-detect": "^2.2.3",
     "react-dom": "^19.1.0",
     "react-hot-toast": "^2.5.2",
     "react-router": "^7.5.3",

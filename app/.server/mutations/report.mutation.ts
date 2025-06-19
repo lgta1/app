@@ -24,7 +24,6 @@ export async function createReport(params: CreateReportParams): Promise<ReportTy
     const savedReport = await newReport.save();
     return savedReport.toJSON();
   } catch (error) {
-    console.error("Error creating report:", error);
     throw new BusinessError("Không thể tạo báo cáo");
   }
 }

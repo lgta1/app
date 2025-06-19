@@ -76,7 +76,7 @@ export const updateBanner = async (request: Request, data: BannerType) => {
     data.id,
     { $set: data },
     { new: true },
-  );
+  ).lean();
 
   return {
     success: true,

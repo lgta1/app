@@ -1,0 +1,138 @@
+import { useEffect, useState } from "react";
+import { CircleArrowOutUpRight, SkipForward } from "lucide-react";
+
+import { SummonCard } from "./summon-card";
+
+interface SummonItem {
+  type: "waifu";
+  itemStar: number;
+  item: {
+    image: string;
+  };
+}
+
+interface SummonResultOverlayProps {
+  isVisible: boolean;
+  results: SummonItem[];
+  onClose: () => void;
+}
+
+export function SummonResultOverlay({
+  isVisible,
+  results,
+  onClose,
+}: SummonResultOverlayProps) {
+  const [revealedCards, setRevealedCards] = useState<Set<number>>(new Set());
+  const [forceRevealAll, setForceRevealAll] = useState(false);
+
+  // Reset state when new results are shown
+  useEffect(() => {
+    if (isVisible && results.length > 0) {
+      setRevealedCards(new Set());
+      setForceRevealAll(false);
+    }
+  }, [isVisible, results]);
+
+  if (!isVisible || results.length === 0) {
+    return null;
+  }
+
+  const handleCardReveal = (index: number) => {
+    setRevealedCards((prev) => new Set([...prev, index]));
+  };
+
+  const handleRevealAll = () => {
+    setForceRevealAll(true);
+    // Reset after a delay to allow for next usage
+    setTimeout(() => {
+      setForceRevealAll(false);
+    }, 1000);
+  };
+
+  const allCardsRevealed = revealedCards.size === results.length;
+
+  const renderResults = () => {
+    if (results.length === 1) {
+      return (
+        <div className="relative z-10 flex flex-col items-center">
+          <SummonCard
+            item={results[0]}
+            index={0}
+            size="large"
+            isRevealed={revealedCards.has(0)}
+            onReveal={handleCardReveal}
+            forceReveal={forceRevealAll}
+          />
+        </div>
+      );
+    }
+
+    const firstRow = results.slice(0, 5);
+    const secondRow = results.slice(5, 10);
+
+    return (
+      <div className="relative z-10 flex w-full max-w-7xl flex-col items-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+        {/* First row */}
+        <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+          {firstRow.map((item, index) => (
+            <SummonCard
+              key={index}
+              item={item}
+              index={index}
+              size="medium"
+              isRevealed={revealedCards.has(index)}
+              onReveal={handleCardReveal}
+              forceReveal={forceRevealAll}
+            />
+          ))}
+        </div>
+
+        {/* Second row */}
+        <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+          {secondRow.map((item, index) => (
+            <SummonCard
+              key={index + 5}
+              item={item}
+              index={index + 5}
+              size="medium"
+              isRevealed={revealedCards.has(index + 5)}
+              onReveal={handleCardReveal}
+              forceReveal={forceRevealAll}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+      {/* Background with radial gradient overlay */}
+      <div className="absolute inset-0 from-transparent via-black/50 to-black" />
+
+      {/* Action buttons */}
+      <div className="absolute top-2 right-2 z-10 flex gap-3 lg:top-4 lg:right-4">
+        {!allCardsRevealed && (
+          <button
+            onClick={handleRevealAll}
+            className="to-lav-500 flex cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-3 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
+          >
+            <SkipForward className="h-5 w-5" />
+          </button>
+        )}
+
+        {allCardsRevealed && (
+          <button
+            onClick={onClose}
+            className="to-lav-500 flex cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-3 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
+          >
+            <CircleArrowOutUpRight className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Results grid */}
+      {renderResults()}
+    </div>
+  );
+}

@@ -19,8 +19,8 @@ export type UserType = {
   banExpiresAt?: Date;
   banMessage?: string;
   isDeleted: boolean;
-  isActive: boolean;
   likedManga: string[];
+  summonCount: number;
   createdAt: Date;
   updatedAt: Date;
   storiesCount: number;
@@ -44,10 +44,10 @@ const UserSchema = new Schema<UserType>(
     banExpiresAt: { type: Date },
     banMessage: { type: String },
     isDeleted: { type: Boolean, default: false },
-    isActive: { type: Boolean, default: true },
     likedManga: { type: [String], default: [] },
     storiesCount: { type: Number, default: 0 },
     warningsCount: { type: Number, default: 0 },
+    summonCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

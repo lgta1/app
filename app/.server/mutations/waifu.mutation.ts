@@ -53,3 +53,21 @@ export const createWaifu = async (request: Request, waifuData: Omit<WaifuType, "
     data: newWaifu,
   };
 };
+
+export const deleteWaifu = async (request: Request, waifuId: string) => {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
+    throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
+  }
+
+  if (!isAdmin(currentUserInfo.role)) {
+    throw new BusinessError("Bạn không có quyền thực hiện hành động này");
+  }
+
+  await WaifuModel.findOneAndDelete({ _id: waifuId });
+
+  return {
+    success: true,
+    message: "Xóa waifu thành công",
+  };
+};

@@ -224,7 +224,7 @@ export function useFileOperations() {
           const result = await response.json();
 
           if (!response.ok || !result.success) {
-            throw new BusinessError(result.error || "Upload failed");
+            throw new BusinessError(result.error || "Tải file lên thất bại");
           }
 
           // Execute individual success callback if provided

@@ -28,7 +28,7 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json(
         {
           success: false,
-          error: "Either objectName or objectNames must be provided",
+          error: "Phải cung cấp objectName hoặc objectNames",
         },
         { status: 400 },
       );
@@ -38,7 +38,7 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json(
         {
           success: false,
-          error: "Cannot provide both objectName and objectNames",
+          error: "Không thể cung cấp cả objectName và objectNames",
         },
         { status: 400 },
       );
@@ -60,7 +60,7 @@ export async function action({ request }: Route.ActionArgs) {
         return Response.json(
           {
             success: false,
-            error: "objectNames must be a non-empty array",
+            error: "objectNames phải là một mảng không rỗng",
           },
           { status: 400 },
         );
@@ -71,7 +71,7 @@ export async function action({ request }: Route.ActionArgs) {
         return Response.json(
           {
             success: false,
-            error: "Cannot delete more than 100 files at once",
+            error: "Không thể xóa hơn 100 file cùng lúc",
           },
           { status: 400 },
         );
@@ -90,7 +90,7 @@ export async function action({ request }: Route.ActionArgs) {
         bucket,
         isPublicBucket: true,
       },
-      message: `Successfully deleted ${deletedCount} file(s) from public bucket`,
+      message: `Đã xóa thành công ${deletedCount} file từ public bucket`,
     });
   } catch (error) {
     console.error("Delete error:", error);
@@ -103,7 +103,7 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json(
       {
         success: false,
-        error: "Delete failed",
+        error: "Xóa file thất bại",
         details: (error as Error).message,
       },
       { status: 500 },

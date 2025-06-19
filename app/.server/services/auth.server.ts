@@ -83,7 +83,11 @@ export async function login({
   const password = formData.get("password")?.toString() ?? "";
 
   // Check the user's credentials
-  const user = await UserModel.findOne({ email: email.toLowerCase() }).lean();
+  const user = await UserModel.findOne({
+    email: email.toLowerCase(),
+    isDeleted: false,
+    isBanned: false,
+  }).lean();
   if (!user) {
     throw new BusinessError("Tài khoản hoặc mật khẩu không chính xác");
   }

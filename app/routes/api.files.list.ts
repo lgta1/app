@@ -29,7 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         ...file,
         isPublic: true, // Indicate these are public URLs
       })),
-      message: "Public files retrieved successfully",
+      message: "Lấy danh sách file công khai thành công",
       meta: {
         bucket,
         prefix,
@@ -49,7 +49,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     return Response.json(
       {
         success: false,
-        error: "Failed to list files",
+        error: "Lấy danh sách file thất bại",
         details: (error as Error).message,
       },
       { status: 500 },

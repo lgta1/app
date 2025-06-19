@@ -26,7 +26,7 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json(
         {
           success: false,
-          error: "Content-Type must be multipart/form-data",
+          error: "Content-Type phải là multipart/form-data",
         },
         { status: 400 },
       );
@@ -43,7 +43,7 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json(
         {
           success: false,
-          error: "No file provided",
+          error: "Không có file được cung cấp",
         },
         { status: 400 },
       );
@@ -55,7 +55,7 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json(
         {
           success: false,
-          error: `File too large. Max size: ${maxSize / 1024 / 1024}MB`,
+          error: `File quá lớn. Kích thước tối đa: ${maxSize / 1024 / 1024}MB`,
         },
         { status: 400 },
       );
@@ -82,7 +82,7 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json(
         {
           success: false,
-          error: "File type not allowed",
+          error: "Loại file không được phép",
         },
         { status: 400 },
       );
@@ -121,7 +121,7 @@ export async function action({ request }: Route.ActionArgs) {
         originalName: file.name,
         isPublic: true,
       },
-      message: "File uploaded successfully to public bucket",
+      message: "Tải file lên public bucket thành công",
     });
   } catch (error) {
     console.error("Upload error:", error);
@@ -134,7 +134,7 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json(
       {
         success: false,
-        error: "Upload failed",
+        error: "Tải file lên thất bại",
         details: (error as Error).message,
       },
       { status: 500 },

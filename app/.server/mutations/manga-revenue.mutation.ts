@@ -57,7 +57,7 @@ export async function uploadMangaRevenues(
   } catch (error) {
     console.error("Error uploading manga revenues:", error);
     throw new BusinessError(
-      `Failed to upload manga revenues: ${(error as Error).message}`,
+      `Tải lên dữ liệu doanh thu manga thất bại: ${(error as Error).message}`,
     );
   }
 }

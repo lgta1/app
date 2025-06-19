@@ -69,7 +69,6 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<Response>
       totalPages: result.totalPages,
     });
   } catch (error) {
-    console.error("Error loading reports:", error);
     return Response.json({
       reports: [],
       selectedTypes,

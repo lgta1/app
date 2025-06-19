@@ -29,7 +29,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   },
   {
     label: "Triệu hồi Waifu",
-    href: "/summon-waifu",
+    href: "/waifu/summon",
     isSpecial: true,
     icon: "/images/icons/waifu-icon.png",
     mobile: true,

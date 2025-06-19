@@ -18,7 +18,6 @@ import { DeleteMemberDialog } from "~/components/dialog-delete-member";
 import { RewardGoldDialog } from "~/components/dialog-reward-gold";
 import { Pagination } from "~/components/pagination";
 import type { UserType } from "~/database/models/user.model";
-import { calculateLevel } from "~/helpers/user-level.helper";
 
 export const meta: MetaFunction = () => {
   return [
@@ -436,11 +435,7 @@ export default function AdminMember() {
 
           {/* Table Rows */}
           {displayData.map((user, index) => {
-            const userLevel = calculateLevel(user.exp);
-            // const levelName = getLevelName(userLevel);
-            const levelName = userLevel;
-            const status: "active" | "disabled" =
-              user.isBanned || !user.isActive ? "disabled" : "active";
+            const status: "active" | "disabled" = user.isBanned ? "disabled" : "active";
             const globalIndex =
               activeTab === "members" ? (currentPage - 1) * 10 + index + 1 : index + 1;
 
@@ -467,7 +462,7 @@ export default function AdminMember() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="text-txt-primary font-sans text-xs font-medium">
-                      {levelName}
+                      {user.level}
                     </div>
                     <div className="text-txt-primary font-sans text-sm font-semibold">
                       {user.storiesCount || 0} truyện | {user.warningsCount || 0} cảnh cáo
@@ -501,7 +496,7 @@ export default function AdminMember() {
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">
                   <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
-                    {levelName}
+                    {user.level}
                   </div>
                 </div>
                 <div className="hidden w-36 items-center justify-start gap-2.5 p-3 lg:flex">

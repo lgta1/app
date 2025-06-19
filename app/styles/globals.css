@@ -1,0 +1,5 @@
+html,
+body {
+  color: #ffffff;
+  @apply bg-[radial-gradient(ellipse_at_top_center,_#191758_0%,_#09101A_40%,_#09101A_100%)];
+}

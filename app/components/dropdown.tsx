@@ -40,7 +40,7 @@ export function Dropdown({
     };
   }, []);
 
-  const handleSelect = (optionValue: string) => {
+  const handleSelect = (optionValue: string | number) => {
     onSelect(optionValue);
     setIsOpen(false);
   };

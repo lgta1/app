@@ -15,13 +15,13 @@ export function MangaCard({ manga }: { manga: MangaType }) {
           <div className="flex items-center gap-1.5 py-1.5">
             <EyeIcon className="h-3 w-3" />
             <span className="text-txt-primary text-[10px] leading-none font-medium">
-              {viewNumber.toLocaleString()}
+              {viewNumber?.toLocaleString()}
             </span>
           </div>
           <div className="flex items-center gap-1.5 py-1.5">
             <HeartIcon className="h-3 w-3" />
             <span className="text-txt-primary text-[10px] leading-none font-medium">
-              {likeNumber.toLocaleString()}
+              {likeNumber?.toLocaleString()}
             </span>
           </div>
         </div>

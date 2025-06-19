@@ -6,10 +6,14 @@ import { Edit, Save, X } from "lucide-react";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { PityModel, type PityType } from "~/database/models/pity.model";
+import { PityCumulativeModel } from "~/database/models/pity-cumulative.model";
+import { toCumulativeRates } from "~/helpers/pity.helper";
+
+const TOLERANCE = 0.0000001;
 
 export async function loader() {
   try {
-    const pitySettings = await PityModel.find({}).sort({ level: 1 });
+    const pitySettings = await PityModel.find({}).sort({ level: 1 }).lean();
     return Response.json({ success: true, data: pitySettings });
   } catch (error) {
     console.error("Error fetching pity settings:", error);
@@ -44,9 +48,8 @@ export async function action({ request }: ActionFunctionArgs) {
       pitySetting.star3 +
       pitySetting.star4 +
       pitySetting.star5;
-    const tolerance = 0.01; // Allow small floating point differences
 
-    if (Math.abs(calculatedTotal - 100) > tolerance) {
+    if (Math.abs(calculatedTotal - 100) > TOLERANCE) {
       return Response.json(
         {
           success: false,
@@ -68,7 +71,15 @@ export async function action({ request }: ActionFunctionArgs) {
         updatedAt: new Date(),
       },
       { new: true },
-    );
+    ).lean();
+
+    await PityCumulativeModel.findOneAndUpdate(
+      { level: pitySetting.level },
+      {
+        rates: toCumulativeRates(pitySetting as PityType),
+      },
+      { new: true, upsert: true },
+    ).lean();
 
     if (!updatedPity) {
       return Response.json(
@@ -116,7 +127,7 @@ export default function AdminWaifuPity() {
     });
   };
 
-  const handleSave = (id: string) => {
+  const handleSave = (id: string, level: number) => {
     const formData = new FormData();
     formData.append("id", id);
     formData.append("star1", editData.star1?.toString() || "0");
@@ -124,6 +135,7 @@ export default function AdminWaifuPity() {
     formData.append("star3", editData.star3?.toString() || "0");
     formData.append("star4", editData.star4?.toString() || "0");
     formData.append("star5", editData.star5?.toString() || "0");
+    formData.append("level", level.toString());
 
     fetcher.submit(formData, { method: "post" });
 
@@ -309,7 +321,7 @@ export default function AdminWaifuPity() {
                 <div
                   className={`text-base leading-normal font-medium ${
                     editingRow === row.id
-                      ? Math.abs(calculateTotal() - 100) > 0.01
+                      ? Math.abs(calculateTotal() - 100) > TOLERANCE
                         ? "text-error-error"
                         : "text-success-success"
                       : "text-txt-secondary"
@@ -324,8 +336,8 @@ export default function AdminWaifuPity() {
                 {editingRow === row.id ? (
                   <>
                     <button
-                      onClick={() => handleSave(row.id)}
-                      disabled={Math.abs(calculateTotal() - 100) > 0.01}
+                      onClick={() => handleSave(row.id, row.level)}
+                      disabled={Math.abs(calculateTotal() - 100) > TOLERANCE}
                       className="text-success-success hover:text-success-success/80 cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Save size={20} />
