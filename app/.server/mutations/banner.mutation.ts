@@ -1,7 +1,6 @@
 import { getUserInfoFromSession } from "@/services/session.svc";
 
-import { ROLES } from "~/constants/user";
-import { BannerModel, type BannerType } from "~/database/models/banner.model";
+import { BannerModel } from "~/database/models/banner.model";
 import { WaifuModel } from "~/database/models/waifu.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
@@ -22,7 +21,7 @@ export const createBanner = async (request: Request, data: CreateBannerData) => 
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  if (![ROLES.ADMIN, ROLES.MOD].includes(currentUser.role)) {
+  if (!isAdmin(currentUser.role)) {
     throw new BusinessError("Bạn không có quyền tạo banner");
   }
 
@@ -52,7 +51,18 @@ export const createBanner = async (request: Request, data: CreateBannerData) => 
   };
 };
 
-export const updateBanner = async (request: Request, data: BannerType) => {
+export type UpdateBannerData = {
+  id: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  imageUrl: string;
+  mobileImageUrl: string;
+  waifuIds: string[];
+  isRateUp: boolean;
+};
+
+export const updateBanner = async (request: Request, data: UpdateBannerData) => {
   const currentUser = await getUserInfoFromSession(request);
   if (!currentUser) {
     throw new BusinessError("Bạn cần đăng nhập để cập nhật banner");
@@ -72,9 +82,22 @@ export const updateBanner = async (request: Request, data: BannerType) => {
     throw new BusinessError("Ngày bắt đầu phải nhỏ hơn ngày kết thúc");
   }
 
+  // Lấy thông tin waifu từ IDs
+  const waifuList = await WaifuModel.find({ _id: { $in: data.waifuIds } }).lean();
+
   const updatedBanner = await BannerModel.findByIdAndUpdate(
     data.id,
-    { $set: data },
+    {
+      $set: {
+        title: data.title,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        imageUrl: data.imageUrl,
+        mobileImageUrl: data.mobileImageUrl,
+        waifuList,
+        isRateUp: data.isRateUp,
+      },
+    },
     { new: true },
   ).lean();
 
@@ -110,11 +133,9 @@ export const deleteBanner = async (request: Request, bannerId: string) => {
 };
 
 export const incrementBannerRolls = async (bannerId: string, count: number = 1) => {
-  const banner = await BannerModel.findByIdAndUpdate(
-    bannerId,
-    { $inc: { totalRolls: count } },
-    { new: true },
-  );
+  const banner = await BannerModel.findByIdAndUpdate(bannerId, {
+    $inc: { totalRolls: count },
+  });
 
   if (!banner) {
     throw new BusinessError("Banner không tồn tại");

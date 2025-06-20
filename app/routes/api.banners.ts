@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 
-import { getAllOpenedBanners } from "~/.server/queries/banner.query";
+import { getAllOpenedBanners } from "@/queries/banner.query";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

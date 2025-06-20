@@ -11,7 +11,7 @@ export function SummonDesktopButtons({ isRateUp, onSummon }: SummonButtonsProps)
       {/* Single Summon Button */}
       <button
         onClick={() => onSummon("single")}
-        className="bg-bgc-layer1 hover:bg-bgc-layer2 flex flex-1 items-center justify-center gap-2.5 rounded-[32px] border border-white px-5 py-3 transition-colors"
+        className="bg-bgc-layer1 hover:bg-bgc-layer2 flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-[32px] border border-white px-5 py-3 transition-colors"
       >
         <div className="text-txt-primary justify-center font-sans text-base leading-normal font-bold">
           TRIỆU HỒI
@@ -27,7 +27,7 @@ export function SummonDesktopButtons({ isRateUp, onSummon }: SummonButtonsProps)
       {/* Multi Summon Button */}
       <button
         onClick={() => onSummon("multi")}
-        className="flex flex-1 items-center justify-center gap-2.5 rounded-[32px] bg-white px-5 py-3 transition-colors hover:bg-gray-100"
+        className="flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-[32px] bg-white px-5 py-3 transition-colors hover:bg-gray-100"
       >
         <div className="text-bgc-layer1 justify-center font-sans text-base leading-normal font-bold">
           TRIỆU HỒI X10
@@ -51,7 +51,7 @@ export function SummonMobileButtons({ isRateUp, onSummon }: SummonButtonsProps) 
       {/* Single Summon Button */}
       <button
         onClick={() => onSummon("single")}
-        className="bg-bgc-layer1 hover:bg-bgc-layer2 flex flex-1 items-center justify-center gap-2.5 rounded-[32px] border border-white px-3 py-2 transition-colors"
+        className="bg-bgc-layer1 hover:bg-bgc-layer2 flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-[32px] border border-white px-3 py-2 transition-colors"
       >
         <div className="text-txt-primary flex flex-col justify-center font-sans text-sm leading-6 font-bold">
           TRIỆU HỒI
@@ -67,7 +67,7 @@ export function SummonMobileButtons({ isRateUp, onSummon }: SummonButtonsProps) 
       {/* Multi Summon Button */}
       <button
         onClick={() => onSummon("multi")}
-        className="flex flex-1 items-center justify-center gap-2.5 rounded-[32px] bg-white px-3 py-2 transition-colors hover:bg-gray-100"
+        className="flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-[32px] bg-white px-3 py-2 transition-colors hover:bg-gray-100"
       >
         <div className="text-txt-inverse flex flex-col justify-center font-sans text-sm leading-6 font-bold">
           TRIỆU HỒI X10

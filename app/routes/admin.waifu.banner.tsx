@@ -1,12 +1,16 @@
+import { toast, Toaster } from "react-hot-toast";
 import {
+  type ClientActionFunctionArgs,
   Link,
   type MetaFunction,
   NavLink,
   useLoaderData,
   useSearchParams,
+  useSubmit,
 } from "react-router";
 import { Plus } from "lucide-react";
 
+import { deleteBanner } from "@/mutations/banner.mutation";
 import { countBanners, getAllBanners } from "@/queries/banner.query";
 
 import { Pagination } from "~/components/pagination";
@@ -42,6 +46,28 @@ export async function loader({ request }: { request: Request }) {
   });
 }
 
+export async function action({ request }: { request: Request }) {
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+  const bannerId = formData.get("bannerId");
+
+  if (intent === "delete") {
+    const result = await deleteBanner(request, bannerId as string);
+    return result;
+  }
+
+  return Response.json({ message: "Thao tác không hợp lệ" }, { status: 400 });
+}
+
+export async function clientAction({ serverAction }: ClientActionFunctionArgs) {
+  const actionData = await serverAction<typeof action>();
+  if (actionData.success) {
+    toast.success(actionData.message);
+  } else {
+    toast.error(actionData.message);
+  }
+}
+
 export default function AdminWaifuBanner() {
   const { banners, pagination } = useLoaderData<{
     banners: BannerType[];
@@ -52,6 +78,7 @@ export default function AdminWaifuBanner() {
     };
   }>();
   const [_, setSearchParams] = useSearchParams();
+  const submit = useSubmit();
 
   const handlePageChange = (page: number) => {
     setSearchParams((prev) => {
@@ -59,6 +86,18 @@ export default function AdminWaifuBanner() {
       newParams.set("page", page.toString());
       return newParams;
     });
+  };
+
+  const handleDeleteBanner = (bannerId: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa banner này không?")) {
+      const formData = new FormData();
+      formData.append("bannerId", bannerId);
+      formData.append("intent", "delete");
+
+      submit(formData, {
+        method: "POST",
+      });
+    }
   };
 
   const tabs = [
@@ -69,6 +108,8 @@ export default function AdminWaifuBanner() {
 
   return (
     <div className="mx-auto flex w-full max-w-[968px] flex-col items-center justify-center gap-6 p-4 md:p-6 lg:p-8">
+      <Toaster position="bottom-right" />
+
       {/* Tab Selection and Title */}
       <div className="flex w-full flex-col items-center justify-start gap-6">
         <div className="flex flex-wrap items-center justify-center gap-4">
@@ -110,7 +151,11 @@ export default function AdminWaifuBanner() {
           {/* Banner Items */}
           {banners.length > 0 ? (
             banners.map((banner, index) => (
-              <WaifuBannerItem key={banner.id || `banner-${index}`} banner={banner} />
+              <WaifuBannerItem
+                key={banner.id || `banner-${index}`}
+                banner={banner}
+                onDeleteBanner={() => handleDeleteBanner(banner.id)}
+              />
             ))
           ) : (
             <div className="text-txt-secondary py-8 text-center">Chưa có banner nào</div>

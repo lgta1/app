@@ -11,9 +11,10 @@ import {
   useSubmit,
 } from "react-router";
 
+import { incrementBannerRolls } from "@/mutations/banner.mutation";
+import { requireLogin } from "@/services/auth.server";
 import { multiSummon, summon } from "@/services/summon.svc";
 
-import { requireLogin } from "~/.server/services/auth.server";
 import { SummonHistoryDialog } from "~/components/dialog-summon-history";
 import { WaifuGuideDialog } from "~/components/dialog-waifu-guide";
 import { WaifuListDialog } from "~/components/dialog-waifu-list";
@@ -70,7 +71,7 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
 
     const banner = openedBanners.find((banner) => banner.id === id);
 
-    return { navItems, banner, openedBanners, user: userResult.data };
+    return { navItems, banner, user: userResult.data };
   } catch (error) {
     console.error("Error loading banners:", error);
     throw redirect("/");
@@ -119,7 +120,9 @@ export async function action({ request }: ActionFunctionArgs) {
         { $inc: { gold: -goldCost } },
         { new: true },
       );
+
       if (!goldReduce) throw new BusinessError("Không đủ vàng");
+      await incrementBannerRolls(bannerId);
 
       const result = await summon(user, banner, cum);
       return {
@@ -137,6 +140,7 @@ export async function action({ request }: ActionFunctionArgs) {
         { new: true },
       );
       if (!goldReduce) throw new BusinessError("Không đủ vàng");
+      await incrementBannerRolls(bannerId, 10);
 
       const result = await multiSummon(user, banner, cum, 10);
       return {

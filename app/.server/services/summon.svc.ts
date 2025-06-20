@@ -1,3 +1,5 @@
+import { checkWaifuToUpdate } from "@/mutations/user-waifu-leaderboard";
+
 import { GIFT_MILESTONES } from "~/constants/summon";
 import { type BannerType } from "~/database/models/banner.model";
 import { type PityCumulativeType } from "~/database/models/pity-cumulative.model";
@@ -60,10 +62,8 @@ export const summon = async (
 
     const { newExp, newLevel } = updateUserExp(user, expValue);
 
-    await UserModel.updateOne(
-      { _id: user.id },
-      { $set: { exp: newExp, level: newLevel } },
-    );
+    await UserModel.updateOne({ _id: user.id }, { $set: { exp: newExp } });
+    // temp console.log("🚀 ~ level: newLevel:", level: newLevel)
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
 
@@ -98,6 +98,8 @@ export const summon = async (
   }
 
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");
+
+  await checkWaifuToUpdate(user.id, waifu.id);
 
   await UserWaifuModel.create({
     bannerId: banner.id,

@@ -1,16 +1,5 @@
 import { UserWaifuModel } from "~/database/models/user-waifu";
 
-export const getUserWaifuByUserId = async (userId: string) => {
-  return await UserWaifuModel.find({ userId }).sort({ createdAt: -1 }).lean();
-};
-
-export const getUserWaifuByUserIdAndBannerId = async (
-  userId: string,
-  bannerId: string,
-) => {
-  return await UserWaifuModel.find({ userId, bannerId }).sort({ createdAt: -1 }).lean();
-};
-
 export const getSummonHistoryWithPagination = async (
   userId: string,
   bannerId: string,

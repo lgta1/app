@@ -1,3 +1,4 @@
+import { NavLink } from "react-router-dom";
 import { Edit3, Trash2 } from "lucide-react";
 
 import { type BannerType } from "~/database/models/banner.model";
@@ -6,9 +7,10 @@ import { formatDate, formatTimeRemaining } from "~/utils/date.utils";
 
 interface WaifuBannerItemProps {
   banner: BannerType;
+  onDeleteBanner: () => void;
 }
 
-export function WaifuBannerItem({ banner }: WaifuBannerItemProps) {
+export function WaifuBannerItem({ banner, onDeleteBanner }: WaifuBannerItemProps) {
   // Calculate status from dates
   const status = getBannerStatus(new Date(banner.startDate), new Date(banner.endDate));
 
@@ -82,12 +84,17 @@ export function WaifuBannerItem({ banner }: WaifuBannerItemProps) {
 
       {!isEnded && (
         <div className="flex items-center justify-start gap-2">
-          <button className="hover:bg-bgc-layer-semi-neutral flex cursor-pointer items-center justify-center rounded-xl p-3 transition-colors">
+          <button
+            onClick={onDeleteBanner}
+            className="hover:bg-bgc-layer-semi-neutral flex cursor-pointer items-center justify-center rounded-xl p-3 transition-colors"
+          >
             <Trash2 className="h-5 w-5 text-red-500" />
           </button>
-          <button className="hover:bg-bgc-layer-semi-neutral flex cursor-pointer items-center justify-center rounded-xl p-3 transition-colors">
-            <Edit3 className="h-5 w-5 text-green-400" />
-          </button>
+          <NavLink to={`/admin/waifu/edit-banner/${banner.id}`}>
+            <button className="hover:bg-bgc-layer-semi-neutral flex cursor-pointer items-center justify-center rounded-xl p-3 transition-colors">
+              <Edit3 className="h-5 w-5 text-green-400" />
+            </button>
+          </NavLink>
         </div>
       )}
     </div>

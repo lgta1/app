@@ -13,8 +13,8 @@ import { ArrowLeft, BookOpen, FileText, Image, Upload, X } from "lucide-react";
 
 import type { Route } from "./+types/manga.chapter.edit.$mangaId";
 
-import { createChapter, updateChapter } from "~/.server/mutations/chapter.mutation";
-import { getChaptersByMangaIdAndNumber } from "~/.server/queries/chapter.query";
+import { createChapter, updateChapter } from "@/mutations/chapter.mutation";
+import { getChaptersByMangaIdAndNumber } from "@/queries/chapter.query";
 import { ChapterDetail } from "~/components/chapter-detail";
 import { ImageUploader } from "~/components/image-uploader";
 import { BusinessError } from "~/helpers/errors.helper";
