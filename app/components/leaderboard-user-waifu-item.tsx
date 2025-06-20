@@ -1,3 +1,5 @@
+import { isMobile } from "react-device-detect";
+
 import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard";
 import { getTitleImgPath } from "~/helpers/user.helper";
 
@@ -13,6 +15,9 @@ export default function LeaderboardUserWaifuItem({
     (index === 2 && "text-[#5BD8FA] text-2xl") ||
     (index === 3 && "text-[#FF7158] text-2xl") ||
     "text-txt-primary text-base";
+
+  const waifuList = leaderboard.waifuCollection.sort((a, b) => b.stars - a.stars);
+  const topWaifu = isMobile ? waifuList.slice(0, 3) : waifuList.slice(0, 6);
 
   return (
     <div className="border-bd-default inline-flex flex-col items-start justify-start self-stretch overflow-hidden rounded-xl border">
@@ -81,6 +86,20 @@ export default function LeaderboardUserWaifuItem({
           </div>
         </div>
       </div>
+
+      {/* Waifu List */}
+      {[1, 2, 3].includes(index) && (
+        <div className="border-bd-default flex items-center justify-center gap-4 border-t p-4">
+          {topWaifu.map((waifu) => (
+            <img
+              key={waifu.name}
+              src={waifu.image}
+              alt={waifu.name}
+              className="aspect-2/3 w-[100px] rounded-lg"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

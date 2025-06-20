@@ -6,7 +6,11 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
   const totalCount = await UserWaifuLeaderboardModel.countDocuments();
   const totalPages = Math.ceil(totalCount / limit);
 
-  const userWaifusLeaderboard = await UserWaifuLeaderboardModel.find()
+  // Tính toán xem có user nào trong top 3 không
+  const startRank = skip + 1;
+  const includeWaifuCollection = startRank <= 3;
+
+  const query = UserWaifuLeaderboardModel.find()
     .sort({
       totalWaifu5Stars: -1,
       totalWaifu4Stars: -1,
@@ -14,9 +18,14 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
       totalWaifu: -1,
     })
     .skip(skip)
-    .limit(limit)
-    .select("-waifuCollection")
-    .lean();
+    .limit(limit);
+
+  // Chỉ exclude waifuCollection nếu không có user nào trong top 3
+  if (!includeWaifuCollection) {
+    query.select("-waifuCollection");
+  }
+
+  const userWaifusLeaderboard = await query.lean();
 
   return {
     data: userWaifusLeaderboard,
