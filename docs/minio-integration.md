@@ -1,6 +1,6 @@
 # 🔒 MinIO Integration cho React Router V7
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Cài đặt MinIO Server
 

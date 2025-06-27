@@ -15,6 +15,7 @@ interface SummonCardProps {
   isRevealed?: boolean;
   onReveal?: (index: number) => void;
   forceReveal?: boolean;
+  dropDelay?: number;
 }
 
 export function SummonCard({
@@ -24,10 +25,22 @@ export function SummonCard({
   isRevealed = false,
   onReveal,
   forceReveal = false,
+  dropDelay = 0,
 }: SummonCardProps) {
   const [isFlipping, setIsFlipping] = useState(false);
   const [localIsRevealed, setLocalIsRevealed] = useState(isRevealed);
   const [isHovering, setIsHovering] = useState(false);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  // Trigger drop animation with delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldAnimate(true);
+    }, dropDelay);
+
+    return () => clearTimeout(timer);
+  }, [dropDelay]);
+
   // Update local state when external state changes
   useEffect(() => {
     if (forceReveal && !localIsRevealed) {
@@ -64,7 +77,15 @@ export function SummonCard({
 
   return (
     <div
-      className={`relative cursor-pointer ${sizeClasses[size]} ${isHovering && !localIsRevealed && !isFlipping ? "animate-card-hover" : "animate-card-idle"}`}
+      className={`relative cursor-pointer ${sizeClasses[size]} ${
+        shouldAnimate ? "animate-card-drop" : "opacity-0"
+      } ${
+        shouldAnimate && isHovering && !localIsRevealed && !isFlipping
+          ? "animate-card-hover"
+          : shouldAnimate && !localIsRevealed && !isFlipping
+            ? "animate-card-idle"
+            : ""
+      }`}
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}

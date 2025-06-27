@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserView, isMobile, MobileView } from "react-device-detect";
+import { BrowserView, MobileView } from "react-device-detect";
 import { Toaster } from "react-hot-toast";
 import {
   type ActionFunctionArgs,
@@ -165,7 +165,7 @@ export default function WaifuSummon() {
   const [isGuideDialogOpen, setIsGuideDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [isWaifuListDialogOpen, setIsWaifuListDialogOpen] = useState(false);
-  const [isRotationWarningOpen, setIsRotationWarningOpen] = useState(false);
+
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [showSummonResult, setShowSummonResult] = useState(false);
   const navigate = useNavigate();
@@ -222,34 +222,6 @@ export default function WaifuSummon() {
     setIsVideoPlaying(false);
     setSummonResult([]);
   };
-
-  const handleRotationWarningClose = () => {
-    setIsRotationWarningOpen(false);
-  };
-
-  const handleContinuePortrait = () => {
-    setIsRotationWarningOpen(false);
-  };
-
-  useEffect(() => {
-    const checkOrientation = () => {
-      if (isMobile) {
-        if (window.innerHeight > window.innerWidth) {
-          setIsRotationWarningOpen(true);
-        } else {
-          setIsRotationWarningOpen(false);
-        }
-      }
-    };
-
-    checkOrientation();
-
-    window.addEventListener("resize", checkOrientation);
-
-    return () => {
-      window.removeEventListener("resize", checkOrientation);
-    };
-  }, []);
 
   return (
     <div className="relative w-full">
@@ -319,12 +291,7 @@ export default function WaifuSummon() {
       />
 
       {/* Device Rotation Warning Dialog */}
-      <DeviceRotationWarningDialog
-        open={isRotationWarningOpen}
-        onOpenChange={setIsRotationWarningOpen}
-        onRotated={handleRotationWarningClose}
-        onContinuePortrait={handleContinuePortrait}
-      />
+      <DeviceRotationWarningDialog />
 
       {/* Summon Result Overlay */}
       <SummonResultOverlay

@@ -1,6 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Info } from "lucide-react";
 
+import { LoadingSpinner } from "~/components/loading-spinner";
 import { Pagination } from "~/components/pagination";
 import { GIFT_MILESTONES } from "~/constants/summon";
 import type { UserWaifuType } from "~/database/models/user-waifu";
@@ -172,7 +173,7 @@ export function SummonHistoryDialog({
               {isLoading && (
                 <div className="py-8 text-center">
                   <div className="text-txt-secondary font-sans text-base leading-6 font-medium">
-                    Đang tải...
+                    <LoadingSpinner />
                   </div>
                 </div>
               )}

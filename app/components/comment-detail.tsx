@@ -94,6 +94,11 @@ export default function CommentDetail({
   useEffect(() => {
     if (createCommentFetcher.data && createCommentFetcher.data.success) {
       addNewComment(createCommentFetcher.data.comment);
+
+      // Hiển thị toast exp reward nếu có
+      if (createCommentFetcher.data.expReward) {
+        toast.success(createCommentFetcher.data.expReward.message);
+      }
     }
   }, [createCommentFetcher.data, addNewComment]);
 

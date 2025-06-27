@@ -75,6 +75,7 @@ export default function ChapterReader() {
           hasPrevious: Boolean(chapter.hasPrevious),
           hasNext: Boolean(chapter.hasNext),
         }}
+        isEnableClaimReward={true}
       />
     </div>
   );

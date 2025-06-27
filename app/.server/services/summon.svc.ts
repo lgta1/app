@@ -63,7 +63,7 @@ export const summon = async (
     const { newExp, newLevel } = updateUserExp(user, expValue);
 
     await UserModel.updateOne({ _id: user.id }, { $set: { exp: newExp } });
-    // temp console.log("🚀 ~ level: newLevel:", level: newLevel)
+    // do update level and exp later 🚀
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
 

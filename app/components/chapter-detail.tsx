@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "react-hot-toast";
 import { useSearchParams } from "react-router";
 import { useFetcher } from "react-router";
@@ -16,14 +16,142 @@ type ChapterDetailProps = {
     hasPrevious: boolean;
     hasNext: boolean;
   };
+  isEnableClaimReward?: boolean;
 };
 
-export function ChapterDetail({ chapter }: ChapterDetailProps) {
+export function ChapterDetail({
+  chapter,
+  isEnableClaimReward: isEnableClaimGold = false,
+}: ChapterDetailProps) {
   const [_, setSearchParams] = useSearchParams();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
-  const fetcher = useFetcher();
+  const [hasClaimedThisChapter, setHasClaimedThisChapter] = useState(false);
 
-  // Handle API response
+  // New states for reading completion tracking
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  const [hasCompletedReading, setHasCompletedReading] = useState(false);
+  const [readingStartTime, setReadingStartTime] = useState<number | null>(null);
+
+  const fetcher = useFetcher();
+  const rewardFetcher = useFetcher();
+  const expFetcher = useFetcher();
+  const readingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const lastImageRef = useRef<HTMLImageElement | null>(null);
+  const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset states khi chuyển chapter
+  useEffect(() => {
+    setLoadedImages(new Set());
+    setHasCompletedReading(false);
+    setReadingStartTime(Date.now());
+    startTimeRef.current = Date.now();
+    setHasClaimedThisChapter(false);
+
+    // Clear any existing timeouts
+    if (completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+    }
+
+    const time = 60000 * (1 + Math.floor(Math.random() * 5));
+
+    readingTimerRef.current = setTimeout(() => {
+      // Tự động claim reward sau 1 phút nếu chưa claim
+      if (!hasClaimedThisChapter && isEnableClaimGold) {
+        const formData = new FormData();
+        formData.append("intent", "claim-reading-reward");
+
+        rewardFetcher.submit(formData, {
+          method: "POST",
+          action: "/api/reading-reward",
+        });
+      }
+    }, time); // random time between 1 and 5 minutes
+
+    return () => {
+      if (readingTimerRef.current) {
+        clearTimeout(readingTimerRef.current);
+      }
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+      }
+    };
+  }, [chapter.id]); // Reset khi chuyển chapter
+
+  // Track image loading
+  const handleImageLoad = (url: string) => {
+    setLoadedImages((prev) => new Set([...prev, url]));
+  };
+
+  // Check if all images are loaded
+  const allImagesLoaded = loadedImages.size === chapter.contentUrls.length;
+
+  // Setup Intersection Observer for last image
+  useEffect(() => {
+    if (!lastImageRef.current || !allImagesLoaded) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            // User has viewed the last image with at least 50% visibility
+            handleReadingCompletion();
+          }
+        });
+      },
+      {
+        threshold: 0.5, // Trigger when 50% of the last image is visible
+        rootMargin: "0px 0px -10% 0px", // Add some margin from bottom
+      },
+    );
+
+    observer.observe(lastImageRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [allImagesLoaded, hasCompletedReading]);
+
+  const handleReadingCompletion = () => {
+    if (hasCompletedReading || !readingStartTime) return;
+
+    const now = Date.now();
+    const readingDuration = now - readingStartTime;
+    const minimumReadingTime = 60000; // Minimum 1 minute
+
+    // Đảm bảo user đã đọc ít nhất 1 phút
+    if (readingDuration < minimumReadingTime) {
+      // Delay để đợi đủ thời gian đọc tối thiểu
+      const remainingTime = minimumReadingTime - readingDuration;
+      completionTimeoutRef.current = setTimeout(() => {
+        submitReadingExp();
+      }, remainingTime);
+    } else {
+      // Delay thêm 2-3 giây để đảm bảo user thực sự đọc xong
+      completionTimeoutRef.current = setTimeout(
+        () => {
+          submitReadingExp();
+        },
+        2000 + Math.random() * 1000,
+      );
+    }
+  };
+
+  const submitReadingExp = () => {
+    if (hasCompletedReading) return;
+
+    setHasCompletedReading(true);
+
+    const formData = new FormData();
+    formData.append("intent", "claim-reading-exp");
+
+    expFetcher.submit(formData, {
+      method: "POST",
+      action: "/api/reading-exp",
+    });
+  };
+
+  // Handle API response cho report
   useEffect(() => {
     if (fetcher.data) {
       const response = fetcher.data as {
@@ -38,6 +166,58 @@ export function ChapterDetail({ chapter }: ChapterDetailProps) {
       }
     }
   }, [fetcher.data]);
+
+  // Handle API response cho reading reward
+  useEffect(() => {
+    if (rewardFetcher.data) {
+      const response = rewardFetcher.data as {
+        success: boolean;
+        message?: string;
+        error?: string;
+        goldAmount?: number;
+        remainingClaims?: number;
+      };
+
+      if (response.success) {
+        toast.success(response.message || "Nhận vàng thành công!");
+        setHasClaimedThisChapter(true);
+      } else {
+        // Chỉ hiển thị toast error cho các lỗi không phải "không trúng"
+        if (response.error && !response.error.includes("Chúc bạn may mắn lần sau")) {
+          toast.error(response.error);
+        }
+        setHasClaimedThisChapter(true); // Đánh dấu đã thử claim rồi
+      }
+    }
+  }, [rewardFetcher.data]);
+
+  // Handle API response cho reading exp
+  useEffect(() => {
+    if (expFetcher.data) {
+      const response = expFetcher.data as {
+        success: boolean;
+        message?: string;
+        error?: string;
+        expGained?: number;
+        totalExp?: number;
+        chaptersRead?: number;
+        remainingExp?: number;
+      };
+
+      if (response.success) {
+        toast.success(response.message || "Nhận exp thành công!");
+      } else {
+        // Chỉ hiển thị error nếu không phải lỗi rate limit hoặc đã đủ exp
+        if (
+          response.error &&
+          !response.error.includes("Vui lòng chờ") &&
+          !response.error.includes("đã nhận đủ")
+        ) {
+          toast.error(response.error);
+        }
+      }
+    }
+  }, [expFetcher.data]);
 
   const handleReportSubmit = (content: string) => {
     const formData = new FormData();
@@ -152,16 +332,27 @@ export function ChapterDetail({ chapter }: ChapterDetailProps) {
           </button>
         </div>
       </div>
+
       {/* Content Section */}
       <div className="my-6 flex flex-col items-center justify-center sm:my-8">
-        {chapter.contentUrls.map((url) => (
-          <img
-            src={url}
-            alt="Chapter Content"
-            key={url}
-            className="w-full max-w-[1080px]"
-          />
-        ))}
+        {chapter.contentUrls.map((url, index) => {
+          const isLastImage = index === chapter.contentUrls.length - 1;
+          return (
+            <img
+              ref={isLastImage ? lastImageRef : undefined}
+              src={url}
+              alt={`Chapter Content ${index + 1}`}
+              key={url}
+              className="w-full max-w-[1080px]"
+              onLoad={() => handleImageLoad(url)}
+              onError={() => {
+                console.error(`Failed to load image: ${url}`);
+                // Still mark as "loaded" to prevent blocking completion
+                handleImageLoad(url);
+              }}
+            />
+          );
+        })}
       </div>
 
       {/* Report Dialog */}

@@ -4,6 +4,8 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.comments";
 
+import { CommentExpModel } from "~/database/models/comment-exp.model";
+import { UserModel } from "~/database/models/user.model";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -23,6 +25,87 @@ export async function loader({ request }: Route.LoaderArgs) {
   } catch (error) {
     console.error("Error fetching comments:", error);
     return Response.json({ error: "Có lỗi xảy ra khi tải bình luận" }, { status: 500 });
+  }
+}
+
+// Helper function để claim exp từ comment
+async function claimCommentExp(userId: string) {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60000);
+
+    // Check if user can claim exp (rate limiting + daily limit)
+    const currentExp = await CommentExpModel.findOne({
+      userId,
+      date: today,
+      $and: [
+        { totalExp: { $lt: 50 } },
+        {
+          $or: [{ updatedAt: { $lt: oneMinuteAgo } }, { updatedAt: { $exists: false } }],
+        },
+      ],
+    });
+
+    // If no valid record found, check if it's due to rate limit or daily limit
+    if (!currentExp) {
+      const existingRecord = await CommentExpModel.findOne({ userId, date: today });
+      if (existingRecord) {
+        if (existingRecord.totalExp >= 50) {
+          return { success: false, reason: "daily_limit" };
+        } else {
+          return { success: false, reason: "rate_limit" };
+        }
+      }
+    }
+
+    const currentCommentsPosted = currentExp?.commentsPosted || 0;
+    const currentTotalExp = currentExp?.totalExp || 0;
+
+    if (currentTotalExp >= 50) {
+      return { success: false, reason: "daily_limit" };
+    }
+
+    // Calculate exp to gain
+    let expToGain = currentCommentsPosted < 5 ? 5 : 1;
+    const maxPossibleExp = 50 - currentTotalExp;
+    expToGain = Math.min(expToGain, maxPossibleExp);
+
+    if (expToGain <= 0) {
+      return { success: false, reason: "daily_limit" };
+    }
+
+    // Atomic update
+    const updatedExp = await CommentExpModel.findOneAndUpdate(
+      { userId, date: today },
+      {
+        $inc: {
+          commentsPosted: 1,
+          totalExp: expToGain,
+        },
+      },
+      { upsert: true, new: true },
+    );
+
+    // Update user exp
+    await UserModel.findByIdAndUpdate(userId, {
+      $inc: { exp: expToGain },
+    });
+
+    const isFirstFiveComments = updatedExp.commentsPosted <= 5;
+
+    return {
+      success: true,
+      expGained: expToGain,
+      totalExp: updatedExp.totalExp,
+      commentsPosted: updatedExp.commentsPosted,
+      remainingExp: Math.max(0, 50 - updatedExp.totalExp),
+      isFirstFiveComments,
+      message: `Bạn nhận được ${expToGain} exp từ bình luận! (${isFirstFiveComments ? "5 comment đầu" : "comment thường"})`,
+    };
+  } catch (error) {
+    console.error("Error claiming comment exp:", error);
+    return { success: false, reason: "error" };
   }
 }
 
@@ -68,13 +151,29 @@ export async function action({ request }: Route.ActionArgs) {
         return Response.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 });
       }
 
+      // Create comment
       const comment = await createComment({
         content,
         mangaId,
         userId: user.id,
       });
 
-      return Response.json({ success: true, comment });
+      // Try to claim exp from comment (non-blocking)
+      const expResult = await claimCommentExp(user.id);
+
+      // Return response with both comment and exp info
+      return Response.json({
+        success: true,
+        comment,
+        expReward: expResult.success
+          ? {
+              expGained: expResult.expGained,
+              message: expResult.message,
+              totalExp: expResult.totalExp,
+              remainingExp: expResult.remainingExp,
+            }
+          : null,
+      });
     }
 
     if (intent === "like-comment") {

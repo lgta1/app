@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { redirect, useLoaderData } from "react-router";
 
 import { getAllOpenedBanners } from "@/queries/banner.query";
 
 import { LeaderboardTopUserWaifu } from "~/components/leaderboard-top-user-waifu";
 import LeaderboardUserWaifuItem from "~/components/leaderboard-user-waifu-item";
+import { LoadingSpinner } from "~/components/loading-spinner";
 import { Pagination } from "~/components/pagination";
 import { SummonNavigationBar } from "~/components/summon-navigation-bar";
 import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard";
@@ -38,6 +40,7 @@ export async function loader() {
 
 export default function WaifuSummon() {
   const { navItems } = useLoaderData<typeof loader>();
+  const [top3Users, setTop3Users] = useState<UserWaifuLeaderboardType[]>([]);
 
   const {
     data: leaderboardData,
@@ -51,7 +54,11 @@ export default function WaifuSummon() {
     limit: 5,
   });
 
-  const top3Users = leaderboardData.slice(0, 3);
+  useEffect(() => {
+    if (currentPage === 1 && leaderboardData.length > 0) {
+      setTop3Users(leaderboardData.slice(0, 3));
+    }
+  }, [currentPage, leaderboardData]);
 
   return (
     <div className="relative w-full">
@@ -191,7 +198,7 @@ export default function WaifuSummon() {
         {isLoading && (
           <div className="py-8 text-center">
             <div className="text-txt-secondary font-sans text-base leading-6 font-medium">
-              Đang tải...
+              <LoadingSpinner />
             </div>
           </div>
         )}
@@ -218,14 +225,14 @@ export default function WaifuSummon() {
             <LeaderboardUserWaifuItem
               key={leaderboard.id}
               leaderboard={leaderboard}
-              index={index + 1}
+              index={(currentPage - 1) * 5 + index + 1}
             />
           ))}
       </div>
 
       {/* Pagination */}
       {!isLoading && !error && totalPages > 1 && (
-        <div className="mt-6 flex flex-col items-center justify-center">
+        <div className="mt-6 mb-8 flex flex-col items-center justify-center">
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}

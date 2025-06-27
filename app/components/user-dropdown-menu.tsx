@@ -29,7 +29,7 @@ export function UserDropdownMenu() {
         className="border-bd-default hover:bg-bgc-layer2 flex cursor-pointer items-center justify-start gap-2 border-b p-3 transition-colors md:border-b-0"
       >
         <span className="text-txt-primary justify-center text-center text-base leading-normal font-medium">
-          Sửa hồ sơ
+          Trang cá nhân
         </span>
       </NavLink>
 

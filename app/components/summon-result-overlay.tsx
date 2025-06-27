@@ -83,6 +83,7 @@ export function SummonResultOverlay({
               isRevealed={revealedCards.has(index)}
               onReveal={handleCardReveal}
               forceReveal={forceRevealAll}
+              dropDelay={index * 150}
             />
           ))}
         </div>
@@ -98,6 +99,7 @@ export function SummonResultOverlay({
               isRevealed={revealedCards.has(index + 5)}
               onReveal={handleCardReveal}
               forceReveal={forceRevealAll}
+              dropDelay={(index + 5) * 150}
             />
           ))}
         </div>

@@ -1,21 +1,53 @@
+import { useEffect, useState } from "react";
+import { isMobile } from "react-device-detect";
 import * as Dialog from "@radix-ui/react-dialog";
 import { RotateCw } from "lucide-react";
 
-interface DeviceRotationWarningDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onRotated: () => void;
-  onContinuePortrait: () => void;
-}
+export function DeviceRotationWarningDialog() {
+  const [isOpen, setIsOpen] = useState(false);
 
-export function DeviceRotationWarningDialog({
-  open,
-  onOpenChange,
-  onRotated,
-  onContinuePortrait,
-}: DeviceRotationWarningDialogProps) {
+  const [hasShownWarning, setHasShownWarning] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("hasShownRotationWarning") === "true";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      if (isMobile && !hasShownWarning) {
+        if (window.innerHeight > window.innerWidth) {
+          setIsOpen(true);
+        } else {
+          setIsOpen(false);
+        }
+      } else {
+        setIsOpen(false);
+      }
+    };
+
+    checkOrientation();
+    window.addEventListener("resize", checkOrientation);
+
+    return () => {
+      window.removeEventListener("resize", checkOrientation);
+    };
+  }, [hasShownWarning]);
+
+  const handleRotated = () => {
+    setIsOpen(false);
+    localStorage.setItem("hasShownRotationWarning", "true");
+    setHasShownWarning(true);
+  };
+
+  const handleContinuePortrait = () => {
+    setIsOpen(false);
+    localStorage.setItem("hasShownRotationWarning", "true");
+    setHasShownWarning(true);
+  };
+
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50" />
         <Dialog.Content className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 max-h-[90vh] w-[90vw] max-w-[400px] translate-x-[-50%] translate-y-[-50%] overflow-y-auto duration-200">
@@ -43,7 +75,7 @@ export function DeviceRotationWarningDialog({
             <div className="flex w-full flex-col items-center justify-center gap-4">
               <button
                 type="button"
-                onClick={onRotated}
+                onClick={handleRotated}
                 className="flex w-full flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-fuchsia-400 hover:to-fuchsia-500"
               >
                 <div className="justify-center text-center text-sm leading-tight font-semibold text-black">
@@ -53,7 +85,7 @@ export function DeviceRotationWarningDialog({
 
               <button
                 type="button"
-                onClick={onContinuePortrait}
+                onClick={handleContinuePortrait}
                 className="outline-lav-500 hover:bg-lav-500/5 flex w-full flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
               >
                 <div className="text-txt-focus justify-center text-center text-sm leading-tight font-semibold">
