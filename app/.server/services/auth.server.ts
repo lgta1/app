@@ -13,11 +13,11 @@ import { UserModel, type UserType } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
 
-const generateSalt = () => {
+export const generateSalt = () => {
   return crypto.randomBytes(16).toString("hex");
 };
 
-const hashPassword = (password: string, salt: string) => {
+export const hashPassword = (password: string, salt: string) => {
   return crypto.pbkdf2Sync(password, salt, 10000, 64, "sha512").toString("hex");
 };
 

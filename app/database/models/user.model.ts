@@ -25,6 +25,7 @@ export type UserType = {
   updatedAt: Date;
   storiesCount: number;
   warningsCount: number;
+  bio: string;
 };
 
 const UserSchema = new Schema<UserType>(
@@ -48,6 +49,7 @@ const UserSchema = new Schema<UserType>(
     storiesCount: { type: Number, default: 0 },
     warningsCount: { type: Number, default: 0 },
     summonCount: { type: Number, default: 0 },
+    bio: { type: String, default: "" },
   },
   { timestamps: true },
 );

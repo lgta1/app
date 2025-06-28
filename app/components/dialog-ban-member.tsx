@@ -57,7 +57,7 @@ export function BanMemberDialog({
                 <div className="justify-start self-stretch text-center">
                   <span className="text-txt-secondary text-base leading-normal font-medium">
                     Vô hiệu hóa{" "}
-                    <span className="text-txt-primary font-semibold">{member.name}</span>
+                    <span className="text-txt-primary font-semibold">{member.email}</span>
                   </span>
                 </div>
                 <div className="flex flex-col items-start justify-start gap-1.5 self-stretch">

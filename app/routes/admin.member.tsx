@@ -14,8 +14,8 @@ import { getListModAndAdmin, getListUser, getTotalUserCount } from "@/queries/us
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { BanMemberDialog } from "~/components/dialog-ban-member";
-import { DeleteMemberDialog } from "~/components/dialog-delete-member";
 import { RewardGoldDialog } from "~/components/dialog-reward-gold";
+import { WarningActionDialog } from "~/components/dialog-warning-action";
 import { Pagination } from "~/components/pagination";
 import type { UserType } from "~/database/models/user.model";
 
@@ -538,10 +538,12 @@ export default function AdminMember() {
       </div>
 
       {/* Delete Member Dialog */}
-      <DeleteMemberDialog
-        member={deleteDialog.member}
+      <WarningActionDialog
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog((prev) => ({ ...prev, open }))}
+        title="Xóa thành viên?"
+        message={`Hành động này sẽ không thể hoàn tác. Bạn có muốn tiếp tục xóa ${deleteDialog.member?.email}?`}
+        confirmText="Xóa thành viên"
         onConfirm={handleDeleteConfirm}
       />
 

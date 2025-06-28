@@ -1,23 +1,25 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
-import type { UserType } from "~/database/models/user.model";
-
-interface DeleteMemberDialogProps {
-  member: UserType | null;
+interface WarningActionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  title: string;
+  message: React.ReactNode;
+  cancelText?: string;
+  confirmText?: string;
   onConfirm: () => void;
 }
 
-export function DeleteMemberDialog({
-  member,
+export function WarningActionDialog({
   open,
   onOpenChange,
+  title,
+  message,
+  cancelText = "Đóng",
+  confirmText = "Đồng ý",
   onConfirm,
-}: DeleteMemberDialogProps) {
-  if (!member) return null;
-
+}: WarningActionDialogProps) {
   const handleConfirm = () => {
     onConfirm();
     onOpenChange(false);
@@ -37,18 +39,10 @@ export function DeleteMemberDialog({
               </div>
               <div className="flex flex-col items-start justify-start gap-3 self-stretch">
                 <div className="text-txt-primary justify-start self-stretch text-center text-2xl leading-loose font-semibold">
-                  Xóa thành viên?
+                  {title}
                 </div>
-                <div className="justify-start self-stretch text-center">
-                  <span className="text-txt-secondary text-base leading-normal font-medium">
-                    Hành động này sẽ{" "}
-                  </span>
-                  <span className="text-txt-primary text-base leading-normal font-medium">
-                    không thể hoàn tác
-                  </span>
-                  <span className="text-txt-secondary text-base leading-normal font-medium">
-                    . Bạn có muốn tiếp tục?
-                  </span>
+                <div className="text-txt-secondary justify-start self-stretch text-center text-base leading-normal font-medium">
+                  {message}
                 </div>
               </div>
             </div>
@@ -59,7 +53,7 @@ export function DeleteMemberDialog({
                   className="outline-lav-500 hover:bg-lav-500/5 flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
                 >
                   <div className="text-txt-focus justify-center text-center text-sm leading-tight font-semibold">
-                    Đóng
+                    {cancelText}
                   </div>
                 </button>
               </Dialog.Close>
@@ -69,7 +63,7 @@ export function DeleteMemberDialog({
                 className="flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-fuchsia-400 hover:to-fuchsia-500"
               >
                 <div className="justify-center text-center text-sm leading-tight font-semibold text-black">
-                  Xóa thành viên
+                  {confirmText}
                 </div>
               </button>
             </div>

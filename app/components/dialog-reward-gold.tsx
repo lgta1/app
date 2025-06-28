@@ -56,7 +56,7 @@ export function RewardGoldDialog({
                 </div>
                 <div className="text-txt-secondary self-stretch text-center text-sm leading-tight font-medium">
                   Thưởng dấm ngọc cho thành viên{" "}
-                  <span className="text-txt-primary font-semibold">{member.name}</span>
+                  <span className="text-txt-primary font-semibold">{member.email}</span>
                 </div>
                 <div className="flex flex-col items-start justify-start gap-1.5 self-stretch">
                   <div className="inline-flex items-center justify-start gap-1.5">

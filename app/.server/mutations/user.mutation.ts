@@ -3,7 +3,7 @@ import { isValidObjectId } from "mongoose";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { ROLES } from "~/constants/user";
-import { UserModel } from "~/database/models/user.model";
+import { UserModel, type UserType } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
 
@@ -164,5 +164,27 @@ export const rewardGoldUser = async (
   return {
     success: true,
     message: "Thưởng thành công",
+  };
+};
+
+export const updateUserProfile = async (
+  request: Request,
+  userId: string,
+  data: Partial<UserType>,
+) => {
+  const currentUserInfo = await getUserInfoFromSession(request);
+  if (!currentUserInfo) {
+    throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
+  }
+
+  if (!isValidObjectId(userId)) {
+    throw new BusinessError("ID người dùng không hợp lệ");
+  }
+
+  await UserModel.findByIdAndUpdate(userId, { $set: data });
+
+  return {
+    success: true,
+    message: "Cập nhật thành công",
   };
 };

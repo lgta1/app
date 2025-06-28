@@ -226,7 +226,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             {/* Icon trang trí */}
             <div className="relative h-[15px] w-[15px]">
               <img
-                src="/images/home/star-icon-1.svg"
+                src="/images/icons/multi-star.svg"
                 alt=""
                 className="absolute top-0 left-[4.62px] h-4"
               />
@@ -251,7 +251,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             {/* Icons trang trí */}
             <div className="relative h-[15px] w-[15px]">
               <img
-                src="/images/home/star-icon-1.svg"
+                src="/images/icons/multi-star.svg"
                 alt=""
                 className="absolute top-0 left-[4.62px] h-4"
               />
