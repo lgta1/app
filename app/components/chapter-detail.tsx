@@ -144,6 +144,7 @@ export function ChapterDetail({
 
     const formData = new FormData();
     formData.append("intent", "claim-reading-exp");
+    formData.append("chapterId", chapter.id);
 
     expFetcher.submit(formData, {
       method: "POST",

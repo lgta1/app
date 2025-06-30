@@ -8,7 +8,7 @@ import LeaderboardUserWaifuItem from "~/components/leaderboard-user-waifu-item";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { Pagination } from "~/components/pagination";
 import { SummonNavigationBar } from "~/components/summon-navigation-bar";
-import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard";
+import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { usePagination } from "~/hooks/use-pagination";
 
 export async function loader() {

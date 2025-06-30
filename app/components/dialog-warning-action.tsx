@@ -9,6 +9,7 @@ interface WarningActionDialogProps {
   cancelText?: string;
   confirmText?: string;
   onConfirm: () => void;
+  reverseAction?: boolean;
 }
 
 export function WarningActionDialog({
@@ -19,6 +20,7 @@ export function WarningActionDialog({
   cancelText = "Đóng",
   confirmText = "Đồng ý",
   onConfirm,
+  reverseAction = false,
 }: WarningActionDialogProps) {
   const handleConfirm = () => {
     onConfirm();
@@ -47,25 +49,51 @@ export function WarningActionDialog({
               </div>
             </div>
             <div className="inline-flex items-start justify-start gap-3 self-stretch">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className="outline-lav-500 hover:bg-lav-500/5 flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
-                >
-                  <div className="text-txt-focus justify-center text-center text-sm leading-tight font-semibold">
-                    {cancelText}
-                  </div>
-                </button>
-              </Dialog.Close>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-fuchsia-400 hover:to-fuchsia-500"
-              >
-                <div className="justify-center text-center text-sm leading-tight font-semibold text-black">
-                  {confirmText}
-                </div>
-              </button>
+              {reverseAction ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleConfirm}
+                    className="outline-lav-500 hover:bg-lav-500/5 flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
+                  >
+                    <div className="text-txt-focus justify-center text-center text-sm leading-tight font-semibold">
+                      {confirmText}
+                    </div>
+                  </button>
+                  <Dialog.Close asChild>
+                    <button
+                      type="button"
+                      className="flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-fuchsia-400 hover:to-fuchsia-500"
+                    >
+                      <div className="justify-center text-center text-sm leading-tight font-semibold text-black">
+                        {cancelText}
+                      </div>
+                    </button>
+                  </Dialog.Close>
+                </>
+              ) : (
+                <>
+                  <Dialog.Close asChild>
+                    <button
+                      type="button"
+                      className="outline-lav-500 hover:bg-lav-500/5 flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] outline outline-offset-[-1px] transition-colors"
+                    >
+                      <div className="text-txt-focus justify-center text-center text-sm leading-tight font-semibold">
+                        {cancelText}
+                      </div>
+                    </button>
+                  </Dialog.Close>
+                  <button
+                    type="button"
+                    onClick={handleConfirm}
+                    className="flex flex-1 cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-fuchsia-400 hover:to-fuchsia-500"
+                  >
+                    <div className="justify-center text-center text-sm leading-tight font-semibold text-black">
+                      {confirmText}
+                    </div>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </Dialog.Content>

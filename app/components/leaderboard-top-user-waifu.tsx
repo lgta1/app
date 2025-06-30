@@ -1,4 +1,4 @@
-import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard";
+import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
 
 interface LeaderboardTopUserWaifuProps {

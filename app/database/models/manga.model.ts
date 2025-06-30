@@ -40,4 +40,6 @@ const MangaSchema = new Schema<MangaType>(
   { timestamps: true },
 );
 
+MangaSchema.index({ title: "text" });
+
 export const MangaModel = model("Manga", MangaSchema);

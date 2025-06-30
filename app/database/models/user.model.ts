@@ -23,7 +23,7 @@ export type UserType = {
   summonCount: number;
   createdAt: Date;
   updatedAt: Date;
-  storiesCount: number;
+  mangasCount: number;
   warningsCount: number;
   bio: string;
 };
@@ -46,12 +46,15 @@ const UserSchema = new Schema<UserType>(
     banMessage: { type: String },
     isDeleted: { type: Boolean, default: false },
     likedManga: { type: [String], default: [] },
-    storiesCount: { type: Number, default: 0 },
+    mangasCount: { type: Number, default: 0 },
     warningsCount: { type: Number, default: 0 },
     summonCount: { type: Number, default: 0 },
     bio: { type: String, default: "" },
   },
   { timestamps: true },
 );
+
+UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ createdAt: -1 });
 
 export const UserModel = model("User", UserSchema);

@@ -1,6 +1,6 @@
 import { UserModel } from "~/database/models/user.model";
 import { UserWaifuModel } from "~/database/models/user-waifu";
-import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard";
+import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
 import { WaifuModel } from "~/database/models/waifu.model";
 
 export const checkWaifuToUpdate = async (userId: string, waifuId: string) => {

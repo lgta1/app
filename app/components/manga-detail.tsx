@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { NavLink } from "react-router";
-import { Eye, Heart, MessageCircle, Star } from "lucide-react";
+import { Eye, Heart, MessageCircle, Star, StarOff } from "lucide-react";
 
 import type { ChapterType } from "~/database/models/chapter.model";
 import type { MangaType } from "~/database/models/manga.model";
@@ -24,9 +26,65 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     translationTeam,
   } = manga;
 
+  // State để track trạng thái follow
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followCount, setFollowCount] = useState(followNumber || 0);
+  const [isLoadingFollow, setIsLoadingFollow] = useState(false);
+
   // Mock data cho demo (sẽ được thay thế bằng dữ liệu thực)
   const rating = 5.0;
   const reviewCount = Math.floor(Math.random() * 100);
+
+  // Fetch trạng thái follow khi component mount
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      try {
+        const response = await fetch(`/api/manga-follow?mangaId=${id}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          setIsFollowing(data.isFollowing);
+        }
+      } catch (error) {
+        console.error("Error checking follow status:", error);
+      }
+    };
+
+    checkFollowStatus();
+  }, [id]);
+
+  // Handle follow/unfollow
+  const handleFollowToggle = async () => {
+    if (isLoadingFollow) return;
+
+    setIsLoadingFollow(true);
+
+    const formData = new FormData();
+    formData.append("intent", isFollowing ? "unfollow" : "follow");
+    formData.append("mangaId", id);
+
+    try {
+      const response = await fetch("/api/manga-follow", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setIsFollowing(data.isFollowing);
+        setFollowCount((prev) => prev + (data.isFollowing ? 1 : -1));
+        toast.success(data.message);
+      } else {
+        toast.error(data.error || "Có lỗi xảy ra");
+      }
+    } catch (error) {
+      console.error("Error toggling follow:", error);
+      toast.error("Có lỗi xảy ra khi xử lý yêu cầu");
+    } finally {
+      setIsLoadingFollow(false);
+    }
+  };
 
   return (
     <div className="w-full">
@@ -98,25 +156,41 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
               Lượt theo dõi:
             </div>
             <div className="text-txt-primary text-base font-medium">
-              {followNumber?.toLocaleString()}
+              {followCount?.toLocaleString()}
             </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-4 md:justify-start">
             {/* Nút Yêu thích */}
-            <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 hidden min-w-32 items-center gap-1.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors md:flex">
+            <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors">
               <Heart className="h-5 w-5" />
               <span className="text-sm font-semibold">Yêu thích</span>
             </button>
 
+            {/* Nút Theo dõi  */}
+            <button
+              onClick={handleFollowToggle}
+              disabled={isLoadingFollow}
+              className={`border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors ${isLoadingFollow ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              {isFollowing ? (
+                <StarOff className="h-5 w-5" />
+              ) : (
+                <Star className="h-5 w-5" />
+              )}
+              <span className="text-sm font-semibold">
+                {isFollowing ? "Bỏ theo dõi" : "Theo dõi"}
+              </span>
+            </button>
+
             {/* Nút Đọc từ đầu */}
-            <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 min-w-32 rounded-xl border px-4 py-3 transition-colors">
+            <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer justify-center rounded-xl border px-4 py-3 transition-colors">
               <span className="text-sm font-medium">Đọc từ đầu</span>
             </button>
 
             {/* Nút Đọc Chap mới */}
-            <button className="min-w-32 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105">
+            <button className="flex min-w-32 cursor-pointer justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105">
               <span className="text-sm font-semibold">Đọc Chap mới</span>
             </button>
           </div>

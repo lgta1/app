@@ -1,122 +1,59 @@
 import { type LoaderFunctionArgs, NavLink } from "react-router";
 import { useLoaderData } from "react-router";
-import {
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  Edit3,
-  Eye,
-  Heart,
-  Trash2,
-} from "lucide-react";
+import { Edit3, Eye } from "lucide-react";
 
-interface User {
-  id: string;
-  name: string;
-  avatar: string;
-  registrationDate: string;
-  level: number;
-  experience: number;
-  maxExperience: number;
-  damNgocCount: number;
-  chaptersRead: number;
-  waifuCount: number;
-  mangasPosted: number;
-  mangasFollowing: number;
-  bio: string;
-  waifuCollection: string[];
-  followingMangas: {
-    id: string;
-    title: string;
-    cover: string;
-    chapter: string;
-    views: number;
-    likes: number;
-  }[];
-}
+import { requireLogin } from "@/services/auth.server";
 
-// Mock data - replace with actual data fetching
+import { ProfileMangaManagement } from "~/components/profile-manga-management";
+import { ProfileRecentComment } from "~/components/profile-recent-comment";
+import { UserModel, type UserType } from "~/database/models/user.model";
+import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
+import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
+import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
+import { getTitleImgPath } from "~/helpers/user.helper";
+import { getMaxExp } from "~/helpers/user-level.helper";
+import { formatDate } from "~/utils/date.utils";
+
 export async function loader({ request }: LoaderFunctionArgs) {
-  // TODO: Fetch actual user data from database
-  const user = {
-    id: "1",
-    name: "Nguyễn Văn A",
-    avatar: "https://placehold.co/102x102",
-    registrationDate: "02/03/2025",
-    level: 7,
-    experience: 500,
-    maxExperience: 1000,
-    damNgocCount: 1000,
-    chaptersRead: 1000,
-    waifuCount: 10,
-    mangasPosted: 10,
-    mangasFollowing: 10,
-    bio: "Trang web của chúng tôi chỉ cung cấp dịch vụ đọc truyện tranh online với mục đích giải trí và chia sẻ nội dung.",
-    waifuCollection: [
-      "https://placehold.co/141x211",
-      "https://placehold.co/141x211",
-      "https://placehold.co/141x213",
-      "https://placehold.co/141x213",
-      "https://placehold.co/141x213",
-      "https://placehold.co/141x213",
-    ],
-    followingMangas: [
-      {
-        id: "1",
-        title: "Đã Chăm Rồi Thì Hãy Chịu Trách Nhiệm Đi!",
-        cover: "https://placehold.co/34x34",
-        chapter: "Chapter 12",
-        views: 1000,
-        likes: 1000,
-      },
-      {
-        id: "2",
-        title: "Hành trình mùa xuân xanh",
-        cover: "https://placehold.co/34x34",
-        chapter: "Chapter 12",
-        views: 1000,
-        likes: 1000,
-      },
-      {
-        id: "3",
-        title: "Bạn gái nội địa",
-        cover: "https://placehold.co/34x34",
-        chapter: "Chapter 12",
-        views: 1000,
-        likes: 1000,
-      },
-      {
-        id: "4",
-        title: "Chào buổi sáng Call",
-        cover: "https://placehold.co/34x34",
-        chapter: "Chapter 12",
-        views: 1000,
-        likes: 1000,
-      },
-      {
-        id: "5",
-        title: "Ngón tay ma thuật khơi dậy nhịp đập trái tim",
-        cover: "https://placehold.co/34x34",
-        chapter: "Chapter 12",
-        views: 1000,
-        likes: 1000,
-      },
-      {
-        id: "6",
-        title: "Giam Giữ Em Trong Mật Ngọt",
-        cover: "https://placehold.co/34x34",
-        chapter: "Chapter 12",
-        views: 1000,
-        likes: 1000,
-      },
-    ],
-  };
+  const userSession = await requireLogin(request);
+  const userData = await UserModel.findById(userSession.id)
+    .select("name avatar createdAt level exp gold bio exp mangasCount faction gender")
+    .lean();
 
-  return { user };
+  const maxExp = userData?.level === 9 ? "Tối đa" : getMaxExp(userData?.level || 1);
+
+  const chaptersRead = await UserReadChapterModel.countDocuments({
+    userId: userSession.id,
+  });
+
+  const mangasFollowing = await UserFollowMangaModel.countDocuments({
+    userId: userSession.id,
+  });
+
+  const userWaifuLeaderboard = await UserWaifuLeaderboardModel.findOne({
+    userId: userSession.id,
+  }).select("waifuCollection totalWaifu");
+
+  const waifuCollection =
+    userWaifuLeaderboard?.waifuCollection
+      .sort((a, b) => b.stars - a.stars)
+      .slice(0, 6)
+      .map((waifu) => waifu.image) || [];
+
+  const waifuCount = userWaifuLeaderboard?.totalWaifu || 0;
+
+  return {
+    ...userData,
+    waifuCollection,
+    waifuCount,
+    chaptersRead,
+    mangasFollowing,
+    maxExp,
+  };
 }
 
 export default function Profile() {
-  const { user } = useLoaderData<typeof loader>();
+  const user = useLoaderData<typeof loader>();
 
   return (
     <div className="mx-auto flex w-full max-w-[968px] flex-col items-center gap-6 p-4 lg:py-8">
@@ -138,12 +75,12 @@ export default function Profile() {
                 </h1>
                 <img
                   className="h-6 w-20 lg:h-8 lg:w-28"
-                  src="https://placehold.co/116x32"
+                  src={getTitleImgPath(user as UserType)}
                   alt="User Badge"
                 />
               </div>
               <p className="text-txt-secondary text-xs font-medium">
-                Ngày đăng ký: {user.registrationDate}
+                Ngày đăng ký: {formatDate(user.createdAt || new Date())}
               </p>
             </div>
 
@@ -160,13 +97,15 @@ export default function Profile() {
                     Kinh nghiệm
                   </span>
                   <span className="text-txt-primary text-xs font-medium">
-                    {user.experience}/{user.maxExperience}
+                    {user.exp}/{user.maxExp}
                   </span>
                 </div>
                 <div className="bg-bgc-layer2 h-2 overflow-hidden rounded">
                   <div
                     className="via-lav-500 h-2 rounded bg-gradient-to-r from-[#3D1351] to-[#E8B5FF]"
-                    style={{ width: `${(user.experience / user.maxExperience) * 100}%` }}
+                    style={{
+                      width: `${((user.exp || 0) / (user.maxExp as any)) * 100}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -202,7 +141,7 @@ export default function Profile() {
                   alt="Dâm Ngọc"
                 />
                 <div className="text-txt-primary text-base font-semibold">
-                  {user.damNgocCount.toLocaleString()}
+                  {user.gold?.toLocaleString()}
                 </div>
               </div>
               <div className="text-txt-secondary text-xs font-medium">Dâm Ngọc</div>
@@ -211,13 +150,13 @@ export default function Profile() {
           <div className="flex">
             <div className="flex flex-1 flex-col items-center">
               <div className="text-txt-primary text-base font-semibold">
-                {user.chaptersRead.toLocaleString()}
+                {user.chaptersRead.toLocaleString() || 0}
               </div>
               <div className="text-txt-secondary text-xs font-medium">Chap đã đọc</div>
             </div>
             <div className="flex flex-1 flex-col items-center">
               <div className="text-txt-primary text-base font-semibold">
-                {user.waifuCount}
+                {user.waifuCount || 0}
               </div>
               <div className="text-txt-secondary text-xs font-medium">Số Waifu</div>
             </div>
@@ -225,13 +164,13 @@ export default function Profile() {
           <div className="flex">
             <div className="flex flex-1 flex-col items-center">
               <div className="text-txt-primary text-base font-semibold">
-                {user.mangasPosted}
+                {user.mangasCount || 0}
               </div>
               <div className="text-txt-secondary text-xs font-medium">Truyện đã đăng</div>
             </div>
             <div className="flex flex-1 flex-col items-center">
               <div className="text-txt-primary text-base font-semibold">
-                {user.mangasFollowing}
+                {user.mangasFollowing || 0}
               </div>
               <div className="text-txt-secondary text-xs font-medium">
                 Truyện theo dõi
@@ -271,11 +210,11 @@ export default function Profile() {
             <span className="text-txt-focus text-sm font-semibold">Xem tất cả</span>
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 lg:gap-6">
+        <div className="flex gap-4 overflow-x-scroll md:overflow-x-hidden lg:gap-6">
           {user.waifuCollection.map((image: string, index: number) => (
             <img
               key={index}
-              className="h-40 w-full rounded-lg object-cover sm:h-48 lg:h-52"
+              className="aspect-2/3 h-40 w-full rounded-lg object-cover sm:h-48 lg:h-50"
               src={image}
               alt={`Waifu ${index + 1}`}
             />
@@ -283,106 +222,9 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Manga Management Section */}
-      <div className="flex w-full flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <BookOpen className="text-lav-500 h-5 w-5" />
-          <h2 className="text-xl font-semibold text-white uppercase">quản lý truyện</h2>
-        </div>
+      <ProfileMangaManagement />
 
-        <div className="flex flex-col gap-4">
-          {/* Sub Navigation */}
-          <div className="border-bd-default flex border-b">
-            <button className="border-lav-500 flex items-center gap-2.5 border-b p-3">
-              <span className="text-base font-semibold text-white">Truyện theo dõi</span>
-            </button>
-            <button className="flex items-center gap-2.5 p-3">
-              <span className="text-txt-secondary text-base font-medium">
-                Đã đọc gần đây
-              </span>
-            </button>
-            <button className="flex items-center gap-2.5 p-3">
-              <span className="text-txt-secondary text-base font-medium">
-                Truyện đã đăng
-              </span>
-            </button>
-          </div>
-
-          {/* Manga List */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="text-txt-secondary text-sm font-medium">
-              Tổng cộng: {user.followingMangas.length}
-            </div>
-
-            <div className="flex w-full flex-col gap-2">
-              {user.followingMangas.map((manga: User["followingMangas"][0]) => (
-                <div
-                  key={manga.id}
-                  className="bg-bgc-layer1 border-bd-default flex w-full items-center justify-between rounded-xl border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      className="h-8 w-8 rounded object-cover"
-                      src={manga.cover}
-                      alt={manga.title}
-                    />
-                    <div className="flex flex-1 flex-col gap-0.5">
-                      <h3 className="text-txt-primary line-clamp-1 text-sm leading-tight font-medium">
-                        {manga.title}
-                      </h3>
-                      <div className="flex flex-wrap items-start gap-2">
-                        <span className="text-txt-focus text-xs font-medium">
-                          {manga.chapter}
-                        </span>
-                        <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
-                          <Eye className="text-txt-secondary h-3 w-3" />
-                          <span className="text-txt-secondary text-xs font-medium">
-                            {manga.views.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
-                          <Heart className="text-txt-secondary h-3 w-3" />
-                          <span className="text-txt-secondary text-xs font-medium">
-                            {manga.likes.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <Trash2 className="text-txt-secondary hover:text-error-error h-5 w-5 cursor-pointer" />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            <div className="bg-bgc-layer1 border-bd-default flex items-center rounded-lg border">
-              <button className="flex w-8 flex-col items-center justify-center rounded-lg p-1.5">
-                <ChevronLeft className="text-txt-secondary h-4 w-4" />
-              </button>
-              <button className="bg-btn-primary flex w-8 flex-col items-center justify-center rounded-lg p-1.5">
-                <span className="text-txt-inverse text-sm font-semibold">1</span>
-              </button>
-              <button className="flex w-8 flex-col items-center justify-center rounded-lg p-1.5">
-                <span className="text-txt-primary text-sm font-semibold">2</span>
-              </button>
-              <button className="flex w-8 flex-col items-center justify-center rounded-lg p-1.5">
-                <span className="text-txt-primary text-sm font-semibold">3</span>
-              </button>
-              <button className="flex w-8 flex-col items-center justify-center rounded-lg p-1.5">
-                <span className="text-txt-primary text-sm font-semibold">...</span>
-              </button>
-              <button className="flex w-8 flex-col items-center justify-center rounded-lg p-1.5">
-                <span className="text-txt-primary text-sm font-semibold">10</span>
-              </button>
-              <button className="flex w-8 flex-col items-center justify-center rounded-lg p-1.5">
-                <ChevronRight className="text-txt-secondary h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProfileRecentComment />
     </div>
   );
 }

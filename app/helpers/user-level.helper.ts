@@ -80,3 +80,7 @@ export function updateUserExp(
     didLevelUp: newLevel > oldLevel,
   };
 }
+
+export const getMaxExp = (level: number) => {
+  return LEVEL_THRESHOLDS[level];
+};

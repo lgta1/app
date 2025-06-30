@@ -465,7 +465,7 @@ export default function AdminMember() {
                       {user.level}
                     </div>
                     <div className="text-txt-primary font-sans text-sm font-semibold">
-                      {user.storiesCount || 0} truyện | {user.warningsCount || 0} cảnh cáo
+                      {user.mangasCount || 0} truyện | {user.warningsCount || 0} cảnh cáo
                     </div>
                   </div>
                   <div className="flex justify-end">
@@ -501,7 +501,7 @@ export default function AdminMember() {
                 </div>
                 <div className="hidden w-36 items-center justify-start gap-2.5 p-3 lg:flex">
                   <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
-                    {user.storiesCount || 0}
+                    {user.mangasCount || 0}
                   </div>
                 </div>
                 <div className="hidden w-24 items-center justify-start gap-2.5 p-3 lg:flex">

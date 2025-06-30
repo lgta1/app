@@ -28,3 +28,30 @@ export const getCommentById = async (commentId: string) => {
     .populate("mangaId", "title")
     .lean();
 };
+
+export const getCommentsByUserId = async (
+  userId: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
+  const skip = (page - 1) * limit;
+
+  // Get total count for pagination
+  const totalCount = await CommentModel.countDocuments({ userId });
+  const totalPages = Math.ceil(totalCount / limit);
+
+  // Get comments with pagination
+  const comments = await CommentModel.find({ userId })
+    .populate("mangaId", "title poster")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  return {
+    data: comments,
+    totalPages,
+    currentPage: page,
+    totalCount,
+  };
+};

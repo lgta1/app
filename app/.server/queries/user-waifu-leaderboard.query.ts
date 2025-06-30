@@ -1,4 +1,4 @@
-import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard";
+import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
 
 export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;

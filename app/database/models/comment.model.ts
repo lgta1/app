@@ -22,5 +22,6 @@ const CommentSchema = new Schema<CommentType>(
 
 // Index để tối ưu hóa query theo mangaId và thời gian tạo
 CommentSchema.index({ mangaId: 1, createdAt: -1 });
+CommentSchema.index({ userId: 1, createdAt: -1 });
 
 export const CommentModel = model("Comment", CommentSchema);

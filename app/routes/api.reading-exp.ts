@@ -4,6 +4,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { ReadingExpModel } from "~/database/models/reading-exp.model";
 import { UserModel } from "~/database/models/user.model";
+import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -19,6 +20,14 @@ export async function action({ request }: ActionFunctionArgs) {
     const intent = formData.get("intent");
 
     if (intent === "claim-reading-exp") {
+      const chapterId = formData.get("chapterId");
+      if (!chapterId) {
+        return Response.json(
+          { success: false, error: "Vui lòng cung cấp chapterId" },
+          { status: 400 },
+        );
+      }
+
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
       const now = new Date();
       const oneMinuteAgo = new Date(now.getTime() - 60000); // 1 phút trước
@@ -48,6 +57,12 @@ export async function action({ request }: ActionFunctionArgs) {
           new: false, // Trả về document cũ để check
           upsert: false, // Không tạo mới nếu không tìm thấy
         },
+      );
+
+      await UserReadChapterModel.findOneAndUpdate(
+        { userId: user.id, chapterId },
+        { updatedAt: now },
+        { upsert: true },
       );
 
       // Nếu không tìm thấy record phù hợp = bị rate limit hoặc đã đủ 100 exp
