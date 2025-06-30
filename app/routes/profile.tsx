@@ -180,22 +180,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex w-full flex-wrap items-center gap-4">
-        <button className="bg-btn-primary flex items-center justify-center gap-1.5 rounded-[32px] px-3 py-1.5 backdrop-blur-[3.40px]">
-          <span className="text-txt-inverse text-base font-medium">Tổng quan</span>
-        </button>
-        <button className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1.5 rounded-[32px] px-3 py-1.5 backdrop-blur-[3.40px]">
-          <span className="text-txt-primary text-base font-medium">Túi đồ</span>
-        </button>
-        <button className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1.5 rounded-[32px] px-3 py-1.5 backdrop-blur-[3.40px]">
-          <span className="text-txt-primary text-base font-medium">Quản lý truyện</span>
-        </button>
-        <button className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1.5 rounded-[32px] px-3 py-1.5 backdrop-blur-[3.40px]">
-          <span className="text-txt-primary text-base font-medium">Bình luận</span>
-        </button>
-      </div>
-
       {/* Waifu Collection Section */}
       <div className="flex w-full flex-col gap-6">
         <div className="flex items-center justify-between">

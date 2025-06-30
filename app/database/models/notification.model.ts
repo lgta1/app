@@ -5,14 +5,18 @@ export type NotificationType = {
   createdAt: Date;
   updatedAt: Date;
   userId: string;
-  message: string;
+  title: string;
+  subtitle: string;
+  imgUrl: string;
   isRead: boolean;
 };
 
 const NotificationSchema = new Schema<NotificationType>(
   {
     userId: { type: String, required: true },
-    message: { type: String, required: true },
+    title: { type: String, required: true },
+    subtitle: { type: String, required: true },
+    imgUrl: { type: String, required: true },
     isRead: { type: Boolean, default: false },
   },
   { timestamps: true },

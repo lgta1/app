@@ -13,7 +13,6 @@ import type { UserType } from "~/database/models/user.model";
 interface HeaderProps {
   isAdmin?: boolean;
   user?: UserType;
-  notificationCount?: number;
   genres?: GenresType[];
 }
 
@@ -65,12 +64,7 @@ const getNavigationItems = (
     });
 };
 
-export function Header({
-  user,
-  notificationCount = 0,
-  isAdmin = false,
-  genres = [],
-}: HeaderProps) {
+export function Header({ user, isAdmin = false, genres = [] }: HeaderProps) {
   return (
     <header className="flex w-full flex-col">
       {/* Banner thông báo */}
@@ -111,12 +105,7 @@ export function Header({
 
           {/* Phần đăng nhập/đăng ký hoặc người dùng */}
           {user ? (
-            <UserMenu
-              user={user}
-              notificationCount={notificationCount}
-              isAdmin={isAdmin}
-              isMobile={false}
-            />
+            <UserMenu user={user} isAdmin={isAdmin} isMobile={false} />
           ) : (
             <div className="flex items-center justify-start gap-4">
               {/* Hiển thị khi chưa đăng nhập */}
@@ -153,12 +142,7 @@ export function Header({
           <div className="flex items-center gap-4">
             <MobileSearch />
             {user ? (
-              <UserMenu
-                user={user}
-                notificationCount={notificationCount}
-                isAdmin={isAdmin}
-                isMobile={true}
-              />
+              <UserMenu user={user} isAdmin={isAdmin} isMobile={true} />
             ) : (
               <MobileMenuPublic />
             )}

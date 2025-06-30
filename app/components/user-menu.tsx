@@ -1,7 +1,8 @@
 import { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
-import { Bell, ChevronDown, CircleUserRound, Menu, X } from "lucide-react";
+import { ChevronDown, CircleUserRound, Menu, X } from "lucide-react";
 
+import { NotificationBell } from "./notification-bell";
 import { UserDropdownMenu } from "./user-dropdown-menu";
 
 import type { UserType } from "~/database/models/user.model";
@@ -9,35 +10,22 @@ import { getTitleImgPath } from "~/helpers/user.helper";
 
 interface UserMenuProps {
   user: UserType;
-  notificationCount?: number;
   isAdmin?: boolean;
   isMobile?: boolean;
 }
 
-export function UserMenu({
-  user,
-  notificationCount = 0,
-  isAdmin = false,
-  isMobile = false,
-}: UserMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function UserMenu({ user, isAdmin = false, isMobile = false }: UserMenuProps) {
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   if (isMobile) {
     return (
       <div className="flex items-center gap-4">
-        <div className="relative">
-          <Bell className="text-txt-primary h-6 w-6" />
-          {notificationCount > 0 && (
-            <div className="text-txt-primary absolute top-[-5px] right-[-5px] rounded-lg bg-[#E03F46] px-1 py-[2px] text-[8px] font-semibold">
-              {notificationCount}
-            </div>
-          )}
-        </div>
+        <NotificationBell />
 
-        <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
+        <Popover.Root open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>
           <Popover.Trigger asChild>
             <button>
-              {isOpen ? (
+              {isUserMenuOpen ? (
                 <X className="text-txt-primary h-7 w-7" />
               ) : (
                 <Menu className="text-txt-primary h-7 w-7" />
@@ -61,16 +49,9 @@ export function UserMenu({
 
   return (
     <div className="flex items-center justify-start gap-4">
-      <div className="relative">
-        <Bell className="text-txt-primary h-6 w-6" />
-        {notificationCount > 0 && (
-          <div className="text-txt-primary absolute top-[-5px] right-[-5px] rounded-lg bg-[#E03F46] px-1 py-[2px] text-[8px] font-semibold">
-            {notificationCount}
-          </div>
-        )}
-      </div>
+      <NotificationBell />
 
-      <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
+      <Popover.Root open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>
         <Popover.Trigger asChild>
           <div className="flex cursor-pointer items-center gap-2">
             <CircleUserRound className="h-7 w-7" />
