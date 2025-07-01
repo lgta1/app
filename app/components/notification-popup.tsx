@@ -1,6 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { RefreshCw, X } from "lucide-react";
 
+import { LoadingSpinner } from "~/components/loading-spinner";
 import type { NotificationType } from "~/database/models/notification.model";
 import { formatDistanceToNow } from "~/utils/date.utils";
 
@@ -57,7 +58,9 @@ export function NotificationPopup({
           {/* Notification List */}
           <div className="flex flex-col overflow-hidden">
             {isLoading ? (
-              <div className="text-txt-secondary p-4 text-center">Đang tải...</div>
+              <div className="flex justify-center py-4">
+                <LoadingSpinner />
+              </div>
             ) : notifications.length === 0 ? (
               <div className="text-txt-secondary p-4 text-center">
                 Không có thông báo nào

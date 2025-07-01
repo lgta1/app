@@ -13,9 +13,12 @@ export type UserWaifuLeaderboardType = {
   totalWaifu4Stars: number;
   totalWaifu5Stars: number;
   waifuCollection: {
+    waifuId: string;
     name: string;
     image: string;
     stars: number;
+    expBuff: number;
+    goldBuff: number;
   }[];
   createdAt: Date;
   updatedAt: Date;
@@ -36,9 +39,12 @@ const UserWaifuLeaderboardSchema = new Schema<UserWaifuLeaderboardType>(
     waifuCollection: {
       type: [
         {
+          waifuId: { type: String },
           name: { type: String },
           image: { type: String },
           stars: { type: Number },
+          expBuff: { type: Number },
+          goldBuff: { type: Number },
         },
       ],
       default: [],

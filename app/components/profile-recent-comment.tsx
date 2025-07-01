@@ -3,6 +3,7 @@ import { MessageCircle } from "lucide-react";
 
 import { Pagination } from "./pagination";
 
+import { LoadingSpinner } from "~/components/loading-spinner";
 import { usePagination } from "~/hooks/use-pagination";
 import { formatDistanceToNow } from "~/utils/date.utils";
 
@@ -71,14 +72,14 @@ export function ProfileRecentComment({ className }: ProfileRecentCommentProps) {
 
           {/* Loading state */}
           {isLoading && (
-            <div className="text-txt-secondary self-stretch p-8 text-center">
-              Đang tải...
+            <div className="flex justify-center py-8">
+              <LoadingSpinner />
             </div>
           )}
 
           {/* Empty state */}
           {!isLoading && comments.length === 0 && (
-            <div className="text-txt-secondary self-stretch p-8 text-center">
+            <div className="text-txt-secondary self-stretch py-8">
               Bạn chưa có bình luận nào
             </div>
           )}

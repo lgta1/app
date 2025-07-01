@@ -9,3 +9,8 @@ export const GENDERS = {
   MALE: 1,
   OTHER: 2,
 };
+
+export const DAILY_REWARD = {
+  GOLD_AMOUNT: 200,
+  DAYS_IN_WEEK: 7,
+} as const;

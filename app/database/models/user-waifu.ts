@@ -2,9 +2,9 @@ import { model, Schema } from "mongoose";
 
 export type UserWaifuType = {
   id: string;
-  bannerId: string;
   userId: string;
   waifuId: string;
+  bannerId: string;
   waifuName: string;
   waifuStars: number;
   createdAt: Date;
@@ -13,13 +13,15 @@ export type UserWaifuType = {
 
 const UserWaifuSchema = new Schema<UserWaifuType>(
   {
-    bannerId: { type: String, required: true },
     userId: { type: String, required: true },
     waifuId: { type: String, required: true },
+    bannerId: { type: String, required: true },
     waifuName: { type: String, required: true },
     waifuStars: { type: Number, required: true },
   },
   { timestamps: true },
 );
+
+UserWaifuSchema.index({ userId: 1, waifuId: 1, bannerId: 1 });
 
 export const UserWaifuModel = model("UserWaifu", UserWaifuSchema);

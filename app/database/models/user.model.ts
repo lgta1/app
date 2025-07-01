@@ -26,6 +26,7 @@ export type UserType = {
   mangasCount: number;
   warningsCount: number;
   bio: string;
+  currentWaifu: string;
 };
 
 const UserSchema = new Schema<UserType>(
@@ -50,6 +51,7 @@ const UserSchema = new Schema<UserType>(
     warningsCount: { type: Number, default: 0 },
     summonCount: { type: Number, default: 0 },
     bio: { type: String, default: "" },
+    currentWaifu: { type: String, ref: "Waifu", default: null },
   },
   { timestamps: true },
 );

@@ -7,7 +7,7 @@ export const checkWaifuToUpdate = async (userId: string, waifuId: string) => {
   const userHasWaifu = await UserWaifuModel.findOne({ userId, waifuId });
   if (!userHasWaifu) {
     const user = await UserModel.findById(userId);
-    const waifu = await WaifuModel.findById(waifuId);
+    const waifu = await WaifuModel.findById(waifuId).lean();
     await UserWaifuLeaderboardModel.findOneAndUpdate(
       {
         userId,
@@ -15,9 +15,12 @@ export const checkWaifuToUpdate = async (userId: string, waifuId: string) => {
       {
         $push: {
           waifuCollection: {
+            waifuId: waifu?.id,
             name: waifu?.name,
             image: waifu?.image,
             stars: waifu?.stars,
+            expBuff: waifu?.expBuff,
+            goldBuff: waifu?.goldBuff,
           },
         },
         $inc: {

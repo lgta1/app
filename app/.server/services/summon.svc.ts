@@ -10,20 +10,10 @@ import { BusinessError } from "~/helpers/errors.helper";
 import { updateUserExp } from "~/helpers/user-level.helper";
 
 const RATE_UP_PERCENT = 55;
-const EXP_VALUE_1_STAR = [5, 10];
-const EXP_VALUE_2_STAR = [10, 20];
 
 const getExpValue = (star: number) => {
-  if (star === 1)
-    return (
-      Math.floor(Math.random() * (EXP_VALUE_1_STAR[1] - EXP_VALUE_1_STAR[0] + 1)) +
-      EXP_VALUE_1_STAR[0]
-    );
-  if (star === 2)
-    return (
-      Math.floor(Math.random() * (EXP_VALUE_2_STAR[1] - EXP_VALUE_2_STAR[0] + 1)) +
-      EXP_VALUE_2_STAR[0]
-    );
+  if (star === 1) return 5;
+  if (star === 2) return 10;
   return 0;
 };
 
@@ -60,10 +50,16 @@ export const summon = async (
   if (itemStar < 3) {
     const expValue = getExpValue(itemStar);
 
-    const { newExp, newLevel } = updateUserExp(user, expValue);
+    const userFull = await UserModel.findOneAndUpdate(
+      { _id: user.id },
+      { $inc: { exp: expValue } },
+    ).lean();
 
-    await UserModel.updateOne({ _id: user.id }, { $set: { exp: newExp } });
-    // do update level and exp later 🚀
+    const { newLevel } = updateUserExp(userFull as UserType, expValue);
+
+    if (userFull?.level && newLevel > userFull?.level) {
+      await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+    }
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
 
