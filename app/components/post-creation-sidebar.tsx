@@ -24,7 +24,7 @@ export function PostCreationSidebar({
 }: PostCreationSidebarProps) {
   return (
     <div
-      className={`flex h-auto w-full max-w-[264px] flex-col items-start justify-start gap-4 p-4 pt-0 sm:max-w-full md:max-w-[264px] lg:max-w-[264px] ${className}`}
+      className={`flex h-auto w-full flex-col items-start justify-start gap-4 pt-0 sm:max-w-[264px] ${className}`}
     >
       {/* Create Post Button */}
       <Link
@@ -38,17 +38,17 @@ export function PostCreationSidebar({
       </Link>
 
       {/* Trending Section */}
-      <div className="flex w-full flex-col items-start justify-start gap-4">
-        <div className="text-txt-secondary font-sans text-base leading-normal font-semibold sm:text-sm md:text-base">
+      <div className="flex w-full items-start justify-start gap-4 sm:flex-col">
+        <div className="text-txt-secondary font-sans text-sm leading-normal font-semibold whitespace-nowrap sm:text-base">
           THỊNH HÀNH
         </div>
 
         {/* Trending Tags */}
-        <div className="flex w-full flex-col items-start justify-start gap-4">
+        <div className="flex w-full items-start justify-start gap-4 sm:flex-col">
           {trendingTags.map((tag) => (
             <button
               key={tag.id}
-              className="text-txt-primary hover:text-lav-500 cursor-pointer font-sans text-base leading-normal font-medium transition-colors duration-200 sm:text-sm md:text-base"
+              className="text-txt-primary hover:text-lav-500 cursor-pointer font-sans text-sm leading-normal font-medium transition-colors duration-200 sm:text-base"
             >
               {tag.name}
             </button>

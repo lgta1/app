@@ -95,8 +95,8 @@ export default function PostDetail() {
   return (
     <div className="flex">
       <Toaster position="bottom-right" />
-      <div className="mx-auto flex min-h-screen px-4 py-4 sm:py-6 lg:py-8 lg:pt-16">
-        <PostCreationSidebar />
+      <div className="mx-auto flex min-h-screen gap-4 px-4 py-4 sm:py-6 lg:py-8 lg:pt-16">
+        <PostCreationSidebar className="hidden sm:flex" />
 
         <div className="max-w-4xl">
           <div className="relative w-full">
@@ -146,9 +146,9 @@ export default function PostDetail() {
             {/* Image Section */}
             {post.images && post.images.length > 0 && (
               <div className="mt-6">
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col flex-wrap gap-4 sm:flex-row">
                   {post.images.map((image, index) => (
-                    <div key={index} className="w-[48%] max-w-[48%]">
+                    <div key={index} className="w-full sm:w-[48%] sm:max-w-[48%]">
                       <img
                         className="h-auto w-full rounded-lg"
                         src={image || "https://placehold.co/478x481"}

@@ -55,7 +55,7 @@ export default function Posts() {
 
   return (
     <div className="flex">
-      <div className="mx-auto flex min-h-screen px-4 py-4 sm:py-6 lg:py-8 lg:pt-16">
+      <div className="mx-auto flex min-h-screen flex-col gap-4 px-4 py-4 sm:flex-row sm:py-6 lg:py-8 lg:pt-16">
         <PostCreationSidebar />
         <div className="flex max-w-[1114px] flex-col gap-6">
           {/* Header with Search and Sort */}
