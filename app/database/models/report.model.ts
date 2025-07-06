@@ -10,6 +10,7 @@ export type ReportType = {
   reportType: string;
   targetId: Schema.Types.ObjectId;
   mangaId?: Schema.Types.ObjectId;
+  postId?: Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -22,6 +23,7 @@ const ReportSchema = new Schema<ReportType>(
     reportType: { type: String, required: true, enum: REPORT_TYPE },
     targetId: { type: Schema.Types.ObjectId, required: true },
     mangaId: { type: Schema.Types.ObjectId },
+    postId: { type: Schema.Types.ObjectId },
   },
   { timestamps: true },
 );

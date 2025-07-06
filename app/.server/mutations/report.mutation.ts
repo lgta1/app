@@ -8,18 +8,28 @@ export interface CreateReportParams {
   reportType: string;
   targetId: string;
   mangaId?: string;
+  postId?: string;
 }
 
 export async function createReport(params: CreateReportParams): Promise<ReportType> {
   try {
-    const newReport = new ReportModel({
+    const reportData: any = {
       reporterName: params.reporterName,
       targetName: params.targetName,
       reason: params.reason,
       reportType: params.reportType,
       targetId: params.targetId,
-      mangaId: params.mangaId,
-    });
+    };
+
+    if (params.mangaId) {
+      reportData.mangaId = params.mangaId;
+    }
+
+    if (params.postId) {
+      reportData.postId = params.postId;
+    }
+
+    const newReport = new ReportModel(reportData);
 
     const savedReport = await newReport.save();
     return savedReport.toJSON();

@@ -17,12 +17,18 @@ export function ErrorBoundary() {
               {error.status} {error.statusText}
             </p>
           )}
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col justify-center gap-4 sm:flex-row">
             <button
               onClick={() => navigate(-1)}
               className="to-btn-primary border-lav-500 text-txt-focus cursor-pointer rounded-xl border px-6 py-3 text-sm font-semibold"
             >
               Về trang trước
+            </button>
+            <button
+              onClick={() => navigate(0)}
+              className="to-btn-primary border-lav-500 text-txt-focus cursor-pointer rounded-xl border px-6 py-3 text-sm font-semibold"
+            >
+              Tải lại trang
             </button>
             <Link to="/">
               <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">
@@ -46,12 +52,18 @@ export function ErrorBoundary() {
           Có vẻ bạn đang đi lạc đường, liên hệ với chúng tôi nếu nghĩ đây là lỗi ^^
         </p>
         {devDetails && <p className="text-txt-secondary mb-6">{devDetails}</p>}
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-col justify-center gap-4 sm:flex-row">
           <button
             onClick={() => navigate(-1)}
             className="to-btn-primary border-lav-500 text-txt-focus cursor-pointer rounded-xl border px-6 py-3 text-sm font-semibold"
           >
             Về trang trước
+          </button>
+          <button
+            onClick={() => navigate(0)}
+            className="to-btn-primary border-lav-500 text-txt-focus cursor-pointer rounded-xl border px-6 py-3 text-sm font-semibold"
+          >
+            Tải lại trang
           </button>
           <Link to="/">
             <button className="to-btn-primary cursor-pointer rounded-xl bg-gradient-to-b from-[#DD94FF] px-6 py-3 text-sm font-semibold text-black">

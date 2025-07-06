@@ -10,26 +10,48 @@ import { isAdmin } from "~/helpers/user.helper";
 
 export const createComment = async (data: {
   content: string;
-  mangaId: string;
+  mangaId?: string;
+  postId?: string;
   userId: string;
 }) => {
-  const { content, mangaId, userId } = data;
+  const { content, mangaId, postId, userId } = data;
 
   if (!validateCommentContent(content)) {
     throw new BusinessError("Nội dung bình luận không hợp lệ (1-1000 ký tự)");
   }
 
-  if (!isValidObjectId(mangaId) || !isValidObjectId(userId)) {
+  if (!mangaId && !postId) {
+    throw new BusinessError("Cần có mangaId hoặc postId");
+  }
+
+  if (mangaId && postId) {
+    throw new BusinessError("Không thể có cả mangaId và postId");
+  }
+
+  if (
+    (mangaId && !isValidObjectId(mangaId)) ||
+    (postId && !isValidObjectId(postId)) ||
+    !isValidObjectId(userId)
+  ) {
     throw new BusinessError("ID không hợp lệ");
   }
 
   const sanitizedContent = sanitizeCommentContent(content);
 
-  const comment = new CommentModel({
+  const commentData: any = {
     content: sanitizedContent,
-    mangaId,
     userId,
-  });
+  };
+
+  if (mangaId) {
+    commentData.mangaId = mangaId;
+  }
+
+  if (postId) {
+    commentData.postId = postId;
+  }
+
+  const comment = new CommentModel(commentData);
 
   await comment.save();
 
@@ -42,21 +64,23 @@ export const createComment = async (data: {
 export const deleteComment = async (commentId: string, request: Request) => {
   const user = await getUserInfoFromSession(request);
 
-  if (!isAdmin(user?.role ?? "")) {
+  if (!user) {
+    throw new BusinessError("Vui lòng đăng nhập");
+  }
+
+  if (!isAdmin(user.role)) {
     throw new BusinessError("Bạn không có quyền xóa bình luận");
   }
 
   if (!isValidObjectId(commentId)) {
-    throw new BusinessError("ID không hợp lệ");
+    throw new BusinessError("ID bình luận không hợp lệ");
   }
 
   const comment = await CommentModel.findById(commentId);
-
   if (!comment) {
     throw new BusinessError("Không tìm thấy bình luận");
   }
 
-  // Xóa cứng khỏi database
   await CommentModel.findByIdAndDelete(commentId);
 
   return { success: true, message: "Xóa bình luận thành công" };
@@ -75,13 +99,34 @@ export const likeComment = async (commentId: string, userId: string) => {
   const userLikeComment = await UserLikeCommentModel.findOne({ commentId, userId });
 
   if (userLikeComment) {
-    throw new BusinessError("Bạn đã thích bình luận này");
+    // Unlike comment
+    await UserLikeCommentModel.findByIdAndDelete(userLikeComment._id);
+    await CommentModel.findByIdAndUpdate(commentId, { $inc: { likeNumber: -1 } });
+
+    const newLikeCount = Math.max(0, (comment.likeNumber || 0) - 1);
+
+    return {
+      success: true,
+      message: "Bỏ thích bình luận thành công",
+      commentId,
+      newLikeCount,
+      isLiked: false,
+    };
   }
 
+  // Like comment
   const newUserLikeComment = new UserLikeCommentModel({ commentId, userId });
   await newUserLikeComment.save();
 
   await CommentModel.findByIdAndUpdate(commentId, { $inc: { likeNumber: 1 } });
 
-  return { success: true, message: "Thích bình luận thành công" };
+  const newLikeCount = (comment.likeNumber || 0) + 1;
+
+  return {
+    success: true,
+    message: "Thích bình luận thành công",
+    commentId,
+    newLikeCount,
+    isLiked: true,
+  };
 };

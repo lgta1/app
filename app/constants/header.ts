@@ -36,7 +36,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   },
   {
     label: "Diễn đàn",
-    href: "/forum",
+    href: "/posts",
   },
 ];
 

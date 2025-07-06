@@ -26,6 +26,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const targetName = formData.get("targetName") as string;
       const reportType = formData.get("reportType") as string;
       const mangaId = formData.get("mangaId") as string;
+      const postId = formData.get("postId") as string;
 
       if (!reason?.trim()) {
         return Response.json(
@@ -55,6 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
         reportType,
         targetId,
         mangaId: mangaId || undefined,
+        postId: postId || undefined,
       });
 
       return Response.json({
@@ -64,17 +66,11 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    return Response.json(
-      { success: false, error: "Intent không hợp lệ" },
-      { status: 400 },
-    );
+    return Response.json({ success: false, error: "Invalid intent" }, { status: 400 });
   } catch (error) {
-    console.error("Error in reports API:", error);
+    console.error("Error creating report:", error);
     return Response.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Có lỗi xảy ra",
-      },
+      { success: false, error: "Có lỗi xảy ra khi tạo báo cáo" },
       { status: 500 },
     );
   }

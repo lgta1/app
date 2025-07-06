@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { useFetcher } from "react-router";
 import {
   CircleUserRound,
   Flag,
@@ -13,23 +12,38 @@ import {
 } from "lucide-react";
 
 import ReportDialog from "./dialog-report";
-import { InfinityLoadingTrigger } from "./infinity-loading-trigger";
+import { Pagination } from "./pagination";
 
+import { LoadingSpinner } from "~/components/loading-spinner";
 import { REPORT_TYPE } from "~/constants/report";
 import type { CommentType } from "~/database/models/comment.model";
 import type { UserType } from "~/database/models/user.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
-import { usePaginatedLoading } from "~/hooks/use-paginated-loading";
 import { formatDistanceToNow } from "~/utils/date.utils";
 
 interface CommentDetailProps {
-  mangaId: string;
+  mangaId?: string;
+  postId?: string;
   isLoggedIn: boolean;
   isAdmin?: boolean;
 }
 
 interface CommentTypeWithUser extends Omit<CommentType, "userId"> {
   userId: UserType;
+}
+
+interface PaginationState {
+  currentPage: number;
+  totalPages: number;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface LoadingStates {
+  creating: boolean;
+  deleting: string | null;
+  liking: string | null;
+  reporting: boolean;
 }
 
 // Helper function to format comment content with reply highlighting
@@ -54,6 +68,7 @@ const formatCommentContent = (content: string) => {
 
 export default function CommentDetail({
   mangaId,
+  postId,
   isLoggedIn,
   isAdmin = false,
 }: CommentDetailProps) {
@@ -66,95 +81,286 @@ export default function CommentDetail({
     isOpen: false,
     comment: null,
   });
-
-  const {
-    allData: allComments,
-    hasMore,
-    isLoadingMore,
-    isReloading,
-    isInitialLoading,
-    handleLoadMore,
-    handleReload,
-    addNewItem: addNewComment,
-    // updateItem: updateComment,
-    removeItem,
-  } = usePaginatedLoading<CommentTypeWithUser>({
-    endpoint: "/api/comments",
-    initialData: [],
-    limit: 5,
-    queryParams: { mangaId },
+  const [comments, setComments] = useState<CommentTypeWithUser[]>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    totalPages: 1,
+    isLoading: false,
+    error: null,
+  });
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    creating: false,
+    deleting: null,
+    liking: null,
+    reporting: false,
   });
 
-  const createCommentFetcher = useFetcher();
-  const deleteCommentFetcher = useFetcher();
-  const likeCommentFetcher = useFetcher();
-  const reportFetcher = useFetcher();
+  // Validate props
+  if (!mangaId && !postId) {
+    throw new Error("Either mangaId or postId must be provided");
+  }
 
-  // Cập nhật danh sách comment khi có comment mới được tạo
-  useEffect(() => {
-    if (createCommentFetcher.data && createCommentFetcher.data.success) {
-      addNewComment(createCommentFetcher.data.comment);
+  if (mangaId && postId) {
+    throw new Error("Cannot provide both mangaId and postId");
+  }
 
-      // Hiển thị toast exp reward nếu có
-      if (createCommentFetcher.data.expReward) {
-        toast.success(createCommentFetcher.data.expReward.message);
+  // Load comments function
+  const loadComments = useCallback(
+    async (page: number = 1) => {
+      setPagination((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      try {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: "5",
+        });
+
+        if (mangaId) {
+          params.append("mangaId", mangaId);
+        }
+        if (postId) {
+          params.append("postId", postId);
+        }
+
+        const response = await fetch(`/api/comments?${params}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setComments(data.data || []);
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: data.currentPage || page,
+            totalPages: data.totalPages || 1,
+            isLoading: false,
+          }));
+        } else {
+          setPagination((prev) => ({
+            ...prev,
+            error: data.error || "Có lỗi xảy ra",
+            isLoading: false,
+          }));
+        }
+      } catch (error) {
+        setPagination((prev) => ({
+          ...prev,
+          error: "Không thể tải bình luận",
+          isLoading: false,
+        }));
       }
-    }
-  }, [createCommentFetcher.data, addNewComment]);
+    },
+    [mangaId, postId],
+  );
 
-  // Xử lý khi xóa comment thành công
+  // Load initial comments
   useEffect(() => {
-    if (deleteCommentFetcher.data && deleteCommentFetcher.data.success) {
-      const deletedCommentId = deleteCommentFetcher.data.commentId;
-      if (deletedCommentId) {
-        removeItem((comment) => comment.id === deletedCommentId);
+    loadComments();
+  }, [loadComments]);
+
+  // Create comment function
+  const handleSubmitComment = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+
+      if (!commentContent.trim() || !isLoggedIn) {
+        return;
       }
-    }
-  }, [deleteCommentFetcher.data, removeItem]);
 
-  // Xử lý khi gửi report thành công
-  useEffect(() => {
-    if (reportFetcher.data && reportFetcher.data.success) {
-      setReportDialog({ isOpen: false, comment: null });
-      // Có thể thêm toast notification ở đây
-    }
-  }, [reportFetcher.data]);
+      setLoadingStates((prev) => ({ ...prev, creating: true }));
 
-  // Xử lý khi like comment thành công
-  useEffect(() => {
-    if (likeCommentFetcher.data && likeCommentFetcher.data.success) {
-      // Reload comments để cập nhật số like
-      handleReload();
-    }
-    if (likeCommentFetcher.data && likeCommentFetcher.data.error) {
-      toast.error(likeCommentFetcher.data.error.message);
-    }
-  }, [likeCommentFetcher.data]);
+      try {
+        const formData = new FormData();
+        formData.append("content", commentContent);
+        formData.append("intent", "create-comment");
 
-  const handleSubmitComment = (e: React.FormEvent) => {
-    e.preventDefault();
+        if (mangaId) {
+          formData.append("mangaId", mangaId);
+        }
+        if (postId) {
+          formData.append("postId", postId);
+        }
 
-    if (!commentContent.trim() || !isLoggedIn) {
-      return;
-    }
+        const response = await fetch("/api/comments", {
+          method: "POST",
+          body: formData,
+        });
 
-    createCommentFetcher.submit(
-      {
-        content: commentContent,
-        mangaId,
-        intent: "create-comment",
-      },
-      {
-        method: "POST",
-        action: `/api/comments`,
-      },
-    );
+        const data = await response.json();
 
-    setCommentContent("");
-    setReplyTo(null);
-  };
+        if (data.success) {
+          // Optimistic update: reload only first page to show new comment
+          if (pagination.currentPage === 1) {
+            await loadComments(1);
+          } else {
+            // If not on first page, go to first page to show new comment
+            await loadComments(1);
+          }
 
-  const handleReply = (comment: any) => {
+          setCommentContent("");
+          setReplyTo(null);
+
+          if (data.expReward) {
+            toast.success(data.expReward.message);
+          }
+        } else {
+          toast.error(data.error || "Không thể tạo bình luận");
+        }
+      } catch (error) {
+        toast.error("Có lỗi xảy ra khi tạo bình luận");
+      } finally {
+        setLoadingStates((prev) => ({ ...prev, creating: false }));
+      }
+    },
+    [commentContent, isLoggedIn, mangaId, postId, pagination.currentPage, loadComments],
+  );
+
+  // Delete comment function
+  const handleDeleteComment = useCallback(
+    async (commentId: string) => {
+      if (!isAdmin) return;
+
+      const confirmed = window.confirm("Bạn có chắc chắn muốn xóa bình luận này?");
+      if (!confirmed) return;
+
+      setLoadingStates((prev) => ({ ...prev, deleting: commentId }));
+
+      try {
+        const formData = new FormData();
+        formData.append("commentId", commentId);
+        formData.append("intent", "delete-comment");
+
+        const response = await fetch("/api/comments", {
+          method: "DELETE",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Optimistic update: remove comment from local state
+          setComments((prev) => prev.filter((comment) => comment.id !== commentId));
+          toast.success(data.message);
+        } else {
+          toast.error(data.error || "Không thể xóa bình luận");
+        }
+      } catch (error) {
+        toast.error("Có lỗi xảy ra khi xóa bình luận");
+      } finally {
+        setLoadingStates((prev) => ({ ...prev, deleting: null }));
+      }
+    },
+    [isAdmin],
+  );
+
+  // Like comment function
+  const handleLikeComment = useCallback(
+    async (commentId: string) => {
+      if (!isLoggedIn) return;
+
+      setLoadingStates((prev) => ({ ...prev, liking: commentId }));
+
+      try {
+        const formData = new FormData();
+        formData.append("commentId", commentId);
+        formData.append("intent", "like-comment");
+
+        const response = await fetch("/api/comments", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Update with actual like count from server
+          setComments((prev) =>
+            prev.map((comment) => {
+              if (comment.id === commentId) {
+                return { ...comment, likeNumber: data.newLikeCount };
+              }
+              return comment;
+            }),
+          );
+          toast.success(data.message);
+        } else {
+          // Revert optimistic update on error
+          setComments((prev) =>
+            prev.map((comment) => {
+              if (comment.id === commentId) {
+                return {
+                  ...comment,
+                  likeNumber: Math.max(0, (comment.likeNumber || 0) - 1),
+                };
+              }
+              return comment;
+            }),
+          );
+          toast.error(data.error || "Không thể thích bình luận");
+        }
+      } catch (error) {
+        // Revert optimistic update on error
+        setComments((prev) =>
+          prev.map((comment) => {
+            if (comment.id === commentId) {
+              return {
+                ...comment,
+                likeNumber: Math.max(0, (comment.likeNumber || 0) - 1),
+              };
+            }
+            return comment;
+          }),
+        );
+        toast.error("Có lỗi xảy ra khi thích bình luận");
+      } finally {
+        setLoadingStates((prev) => ({ ...prev, liking: null }));
+      }
+    },
+    [isLoggedIn],
+  );
+
+  // Report comment function
+  const handleSubmitReport = useCallback(
+    async (reason: string) => {
+      setLoadingStates((prev) => ({ ...prev, reporting: true }));
+
+      try {
+        const formData = new FormData();
+        formData.append("intent", "create-report");
+        formData.append("reason", reason);
+        formData.append("targetId", reportDialog.comment?.id || "");
+        formData.append("targetName", reportDialog.comment?.userId.name || "");
+        formData.append("reportType", REPORT_TYPE.COMMENT);
+
+        if (mangaId) {
+          formData.append("mangaId", mangaId);
+        }
+        if (postId) {
+          formData.append("postId", postId);
+        }
+
+        const response = await fetch("/api/reports", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setReportDialog({ isOpen: false, comment: null });
+          toast.success("Báo cáo đã được gửi thành công");
+        } else {
+          toast.error(data.error || "Không thể gửi báo cáo");
+        }
+      } catch (error) {
+        toast.error("Có lỗi xảy ra khi gửi báo cáo");
+      } finally {
+        setLoadingStates((prev) => ({ ...prev, reporting: false }));
+      }
+    },
+    [reportDialog.comment, mangaId, postId],
+  );
+
+  // Helper functions
+  const handleReply = useCallback((comment: CommentTypeWithUser) => {
     const replyText = `Trả lời ${comment.userId?.name}: `;
     setCommentContent(replyText);
     setReplyTo({ id: comment.id, name: comment.userId?.name });
@@ -163,78 +369,35 @@ export default function CommentDetail({
     const textarea = document.querySelector("textarea");
     if (textarea) {
       textarea.focus();
-      // Set cursor position at the end
       textarea.setSelectionRange(replyText.length, replyText.length);
     }
-  };
+  }, []);
 
-  const handleCancelReply = () => {
+  const handleCancelReply = useCallback(() => {
     setReplyTo(null);
     setCommentContent("");
-  };
+  }, []);
 
-  const handleDeleteComment = (commentId: string) => {
-    if (!isAdmin) return;
+  const handleReportComment = useCallback(
+    (comment: CommentTypeWithUser) => {
+      if (!isLoggedIn) return;
+      setReportDialog({ isOpen: true, comment });
+    },
+    [isLoggedIn],
+  );
 
-    const confirmed = window.confirm("Bạn có chắc chắn muốn xóa bình luận này?");
-    if (!confirmed) return;
-
-    deleteCommentFetcher.submit(
-      {
-        commentId,
-        intent: "delete-comment",
-      },
-      {
-        method: "DELETE",
-        action: `/api/comments`,
-      },
-    );
-  };
-
-  const handleReportComment = (comment: CommentTypeWithUser) => {
-    if (!isLoggedIn) return;
-
-    setReportDialog({
-      isOpen: true,
-      comment,
-    });
-  };
-
-  const handleSubmitReport = (reason: string) => {
-    reportFetcher.submit(
-      {
-        intent: "create-report",
-        reason,
-        targetId: reportDialog.comment?.id || "",
-        targetName: reportDialog.comment?.userId.name || "",
-        reportType: REPORT_TYPE.COMMENT,
-        mangaId,
-      },
-      {
-        method: "POST",
-        action: "/api/reports",
-      },
-    );
-  };
-
-  const handleCloseReportDialog = () => {
+  const handleCloseReportDialog = useCallback(() => {
     setReportDialog({ isOpen: false, comment: null });
-  };
+  }, []);
 
-  const handleLikeComment = (commentId: string) => {
-    if (!isLoggedIn) return;
-
-    likeCommentFetcher.submit(
-      {
-        commentId,
-        intent: "like-comment",
-      },
-      {
-        method: "POST",
-        action: `/api/comments`,
-      },
-    );
-  };
+  const goToPage = useCallback(
+    (page: number) => {
+      if (page >= 1 && page <= pagination.totalPages && page !== pagination.currentPage) {
+        loadComments(page);
+      }
+    },
+    [pagination.totalPages, pagination.currentPage, loadComments],
+  );
 
   return (
     <div className="mt-8 flex flex-col items-start justify-start gap-6 self-stretch">
@@ -255,13 +418,15 @@ export default function CommentDetail({
 
         {/* Reload Button */}
         <button
-          onClick={handleReload}
-          disabled={isReloading}
+          onClick={() => loadComments(pagination.currentPage)}
+          disabled={pagination.isLoading}
           className="text-txt-focus border-lav-500 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           title="Tải lại bình luận mới nhất"
         >
-          <RotateCcw className={`h-4 w-4 ${isReloading ? "animate-spin" : ""}`} />
-          {isReloading ? "Đang tải..." : "Tải lại"}
+          <RotateCcw
+            className={`h-4 w-4 ${pagination.isLoading ? "animate-spin" : ""}`}
+          />
+          {pagination.isLoading ? "Đang tải..." : "Tải lại"}
         </button>
       </div>
 
@@ -300,13 +465,11 @@ export default function CommentDetail({
                 </div>
                 <button
                   type="submit"
-                  disabled={
-                    !commentContent.trim() || createCommentFetcher.state === "submitting"
-                  }
+                  disabled={!commentContent.trim() || loadingStates.creating}
                   className="bg-btn-primary text-txt-primary hover:bg-btn-primary/80 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
-                  {createCommentFetcher.state === "submitting" ? "Đang gửi..." : "Gửi"}
+                  {loadingStates.creating ? "Đang gửi..." : "Gửi"}
                 </button>
               </div>
             </div>
@@ -323,12 +486,16 @@ export default function CommentDetail({
         <div className="flex flex-col items-center justify-start gap-6 self-stretch">
           {/* Comments List */}
           <div className="flex flex-col items-start justify-start gap-6 self-stretch">
-            {isInitialLoading ? (
-              <div className="text-txt-secondary py-8 text-center font-sans text-sm">
-                Đang tải bình luận...
+            {pagination.isLoading ? (
+              <div className="flex w-full justify-center py-4">
+                <LoadingSpinner />
               </div>
-            ) : allComments.length > 0 ? (
-              allComments.map((comment: CommentTypeWithUser) => (
+            ) : pagination.error ? (
+              <div className="py-8 text-center font-sans text-sm text-red-500">
+                {pagination.error}
+              </div>
+            ) : comments.length > 0 ? (
+              comments.map((comment: CommentTypeWithUser) => (
                 <div
                   key={comment.id}
                   className="flex items-start justify-start gap-4 self-stretch"
@@ -364,9 +531,7 @@ export default function CommentDetail({
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleReportComment(comment)}
-                              disabled={
-                                !isLoggedIn || reportFetcher.state === "submitting"
-                              }
+                              disabled={!isLoggedIn || loadingStates.reporting}
                               className="relative h-4 flex-shrink-0 cursor-pointer overflow-hidden transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                               title={
                                 isLoggedIn ? "Báo cáo bình luận" : "Đăng nhập để báo cáo"
@@ -377,7 +542,7 @@ export default function CommentDetail({
                             {isAdmin && (
                               <button
                                 onClick={() => handleDeleteComment(comment.id)}
-                                disabled={deleteCommentFetcher.state === "submitting"}
+                                disabled={loadingStates.deleting === comment.id}
                                 className="relative h-4 flex-shrink-0 overflow-hidden text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 title="Xóa bình luận"
                               >
@@ -400,9 +565,7 @@ export default function CommentDetail({
                     <div className="flex flex-wrap items-center justify-start gap-6">
                       <button
                         onClick={() => handleLikeComment(comment.id)}
-                        disabled={
-                          !isLoggedIn || likeCommentFetcher.state === "submitting"
-                        }
+                        disabled={!isLoggedIn || loadingStates.liking === comment.id}
                         className="flex cursor-pointer items-center justify-start gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
                         title={isLoggedIn ? "Thích bình luận" : "Đăng nhập để thích"}
                       >
@@ -435,13 +598,16 @@ export default function CommentDetail({
             )}
           </div>
 
-          {/* Infinity Loading Trigger */}
-          <InfinityLoadingTrigger
-            isAutoLoad={false}
-            isLoading={isLoadingMore}
-            hasMore={hasMore}
-            onLoadMore={handleLoadMore}
-          />
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex justify-center">
+              <Pagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                onPageChange={goToPage}
+              />
+            </div>
+          )}
         </div>
       </div>
 

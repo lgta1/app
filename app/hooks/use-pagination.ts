@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 
 interface UsePaginationProps {
@@ -21,11 +21,12 @@ export function usePagination<T>({
   queryParams = {},
 }: UsePaginationProps) {
   const [data, setData] = useState<T[]>([]);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fetcher = useFetcher<PaginationApiResponse<T>>();
+  const queryParamsRef = useRef<string>("");
 
   const buildUrl = useCallback(
     (page: number) => {
@@ -46,23 +47,23 @@ export function usePagination<T>({
 
   const loadPage = useCallback(
     (page: number) => {
-      if (isLoading || page === currentPage) return;
+      if (isLoading) return;
 
       setIsLoading(true);
       setError(null);
       fetcher.load(buildUrl(page));
     },
-    [isLoading, currentPage, buildUrl, fetcher],
+    [isLoading, buildUrl, fetcher],
   );
 
   const goToPage = useCallback(
     (page: number) => {
-      if (page >= 1 && page <= totalPages) {
+      if (page >= 1 && page <= totalPages && page !== currentPage) {
         setCurrentPage(page);
         loadPage(page);
       }
     },
-    [totalPages, loadPage],
+    [totalPages, loadPage, currentPage],
   );
 
   const nextPage = useCallback(() => {
@@ -103,10 +104,29 @@ export function usePagination<T>({
     }
   }, [fetcher.state]);
 
+  // Check if queryParams changed and reload from page 1
   useEffect(() => {
-    loadPage(1);
-    setCurrentPage(1);
-  }, []);
+    const currentQueryParams = JSON.stringify(queryParams);
+    if (queryParamsRef.current !== currentQueryParams) {
+      queryParamsRef.current = currentQueryParams;
+      setCurrentPage(1);
+
+      // Load page 1 with new params
+      setIsLoading(true);
+      setError(null);
+      const url = new URL(apiUrl, window.location.origin);
+      url.searchParams.set("page", "1");
+      url.searchParams.set("limit", limit.toString());
+
+      Object.entries(queryParams).forEach(([key, value]) => {
+        if (value) {
+          url.searchParams.set(key, value);
+        }
+      });
+
+      fetcher.load(url.pathname + url.search);
+    }
+  }, [apiUrl, limit, queryParams, fetcher]);
 
   return {
     data,
