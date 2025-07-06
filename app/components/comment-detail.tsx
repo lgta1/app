@@ -4,6 +4,7 @@ import {
   CircleUserRound,
   Flag,
   MessageCircle,
+  MessagesSquare,
   RotateCcw,
   Send,
   ThumbsUp,
@@ -30,6 +31,9 @@ interface CommentDetailProps {
 
 interface CommentTypeWithUser extends Omit<CommentType, "userId"> {
   userId: UserType;
+  parentId?: string;
+  replies?: CommentTypeWithUser[];
+  replyCount?: number;
 }
 
 interface PaginationState {
@@ -44,6 +48,11 @@ interface LoadingStates {
   deleting: string | null;
   liking: string | null;
   reporting: boolean;
+  loadingReplies: string | null; // ID của comment đang load replies
+}
+
+interface ReplyVisibilityState {
+  [commentId: string]: boolean; // Track visibility của replies cho từng comment
 }
 
 // Helper function to format comment content with reply highlighting
@@ -93,7 +102,9 @@ export default function CommentDetail({
     deleting: null,
     liking: null,
     reporting: false,
+    loadingReplies: null,
   });
+  const [replyVisibility, setReplyVisibility] = useState<ReplyVisibilityState>({});
 
   // Validate props
   if (!mangaId && !postId) {
@@ -179,6 +190,11 @@ export default function CommentDetail({
           formData.append("postId", postId);
         }
 
+        // Thêm parentId nếu đang reply
+        if (replyTo) {
+          formData.append("parentId", replyTo.id);
+        }
+
         const response = await fetch("/api/comments", {
           method: "POST",
           body: formData,
@@ -187,12 +203,16 @@ export default function CommentDetail({
         const data = await response.json();
 
         if (data.success) {
-          // Optimistic update: reload only first page to show new comment
-          if (pagination.currentPage === 1) {
-            await loadComments(1);
+          // Nếu đang reply, reload replies của parent comment
+          if (replyTo) {
+            await loadReplies(replyTo.id);
           } else {
-            // If not on first page, go to first page to show new comment
-            await loadComments(1);
+            // Nếu là comment mới, reload page đầu tiên
+            if (pagination.currentPage === 1) {
+              await loadComments(1);
+            } else {
+              await loadComments(1);
+            }
           }
 
           setCommentContent("");
@@ -210,7 +230,15 @@ export default function CommentDetail({
         setLoadingStates((prev) => ({ ...prev, creating: false }));
       }
     },
-    [commentContent, isLoggedIn, mangaId, postId, pagination.currentPage, loadComments],
+    [
+      commentContent,
+      isLoggedIn,
+      mangaId,
+      postId,
+      pagination.currentPage,
+      loadComments,
+      replyTo,
+    ],
   );
 
   // Delete comment function
@@ -237,7 +265,25 @@ export default function CommentDetail({
 
         if (data.success) {
           // Optimistic update: remove comment from local state
-          setComments((prev) => prev.filter((comment) => comment.id !== commentId));
+          setComments(
+            (prev) =>
+              prev
+                .map((comment) => {
+                  // Nếu là parent comment, xóa toàn bộ
+                  if (comment.id === commentId) {
+                    return null;
+                  }
+                  // Nếu là reply comment, chỉ xóa khỏi replies
+                  if (comment.replies) {
+                    const updatedReplies = comment.replies.filter(
+                      (reply) => reply.id !== commentId,
+                    );
+                    return { ...comment, replies: updatedReplies };
+                  }
+                  return comment;
+                })
+                .filter(Boolean) as CommentTypeWithUser[],
+          );
           toast.success(data.message);
         } else {
           toast.error(data.error || "Không thể xóa bình luận");
@@ -274,8 +320,19 @@ export default function CommentDetail({
           // Update with actual like count from server
           setComments((prev) =>
             prev.map((comment) => {
+              // Kiểm tra nếu là parent comment
               if (comment.id === commentId) {
                 return { ...comment, likeNumber: data.newLikeCount };
+              }
+              // Kiểm tra nếu là reply comment
+              if (comment.replies) {
+                const updatedReplies = comment.replies.map((reply) => {
+                  if (reply.id === commentId) {
+                    return { ...reply, likeNumber: data.newLikeCount };
+                  }
+                  return reply;
+                });
+                return { ...comment, replies: updatedReplies };
               }
               return comment;
             }),
@@ -285,11 +342,25 @@ export default function CommentDetail({
           // Revert optimistic update on error
           setComments((prev) =>
             prev.map((comment) => {
+              // Kiểm tra nếu là parent comment
               if (comment.id === commentId) {
                 return {
                   ...comment,
                   likeNumber: Math.max(0, (comment.likeNumber || 0) - 1),
                 };
+              }
+              // Kiểm tra nếu là reply comment
+              if (comment.replies) {
+                const updatedReplies = comment.replies.map((reply) => {
+                  if (reply.id === commentId) {
+                    return {
+                      ...reply,
+                      likeNumber: Math.max(0, (reply.likeNumber || 0) - 1),
+                    };
+                  }
+                  return reply;
+                });
+                return { ...comment, replies: updatedReplies };
               }
               return comment;
             }),
@@ -300,11 +371,25 @@ export default function CommentDetail({
         // Revert optimistic update on error
         setComments((prev) =>
           prev.map((comment) => {
+            // Kiểm tra nếu là parent comment
             if (comment.id === commentId) {
               return {
                 ...comment,
                 likeNumber: Math.max(0, (comment.likeNumber || 0) - 1),
               };
+            }
+            // Kiểm tra nếu là reply comment
+            if (comment.replies) {
+              const updatedReplies = comment.replies.map((reply) => {
+                if (reply.id === commentId) {
+                  return {
+                    ...reply,
+                    likeNumber: Math.max(0, (reply.likeNumber || 0) - 1),
+                  };
+                }
+                return reply;
+              });
+              return { ...comment, replies: updatedReplies };
             }
             return comment;
           }),
@@ -363,7 +448,9 @@ export default function CommentDetail({
   const handleReply = useCallback((comment: CommentTypeWithUser) => {
     const replyText = `Trả lời ${comment.userId?.name}: `;
     setCommentContent(replyText);
-    setReplyTo({ id: comment.id, name: comment.userId?.name });
+    // Nếu reply comment cấp 2, parentId vẫn là comment gốc
+    const parentId = comment.parentId || comment.id;
+    setReplyTo({ id: parentId, name: comment.userId?.name });
 
     // Focus on textarea
     const textarea = document.querySelector("textarea");
@@ -397,6 +484,157 @@ export default function CommentDetail({
       }
     },
     [pagination.totalPages, pagination.currentPage, loadComments],
+  );
+
+  // Function để load replies cho một comment
+  const loadReplies = useCallback(async (commentId: string) => {
+    setLoadingStates((prev) => ({ ...prev, loadingReplies: commentId }));
+
+    try {
+      const params = new URLSearchParams({
+        parentId: commentId,
+      });
+
+      const response = await fetch(`/api/comments?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        // Update comment với replies
+        setComments((prev) =>
+          prev.map((comment) => {
+            if (comment.id === commentId) {
+              return { ...comment, replies: data.data || [] };
+            }
+            return comment;
+          }),
+        );
+
+        // Show replies
+        setReplyVisibility((prev) => ({ ...prev, [commentId]: true }));
+      } else {
+        toast.error(data.error || "Không thể tải phản hồi");
+      }
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi tải phản hồi");
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, loadingReplies: null }));
+    }
+  }, []);
+
+  // Function để toggle visibility của replies
+  const toggleReplies = useCallback(
+    (commentId: string) => {
+      const comment = comments.find((c) => c.id === commentId);
+      if (!comment) return;
+
+      const isCurrentlyVisible = replyVisibility[commentId];
+
+      if (isCurrentlyVisible) {
+        // Hide replies
+        setReplyVisibility((prev) => ({ ...prev, [commentId]: false }));
+      } else {
+        // Show replies - load if not already loaded
+        if (!comment.replies) {
+          loadReplies(commentId);
+        } else {
+          setReplyVisibility((prev) => ({ ...prev, [commentId]: true }));
+        }
+      }
+    },
+    [comments, replyVisibility, loadReplies],
+  );
+
+  // Component để render reply comment
+  const ReplyComment = ({ reply }: { reply: CommentTypeWithUser }) => (
+    <div className="flex items-start justify-start gap-4 self-stretch pl-12">
+      {/* Avatar */}
+      {reply.userId?.avatar ? (
+        <img
+          className="mt-1.5 h-8 w-8 flex-shrink-0 rounded-full"
+          src={reply.userId?.avatar}
+          alt={`${reply.userId?.name} avatar`}
+        />
+      ) : (
+        <CircleUserRound className="mt-1.5 h-8 w-8 flex-shrink-0" />
+      )}
+
+      {/* Comment Content */}
+      <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-2">
+        {/* Comment Card */}
+        <div className="bg-bgc-layer1 border-bd-default flex flex-col items-start justify-start self-stretch overflow-hidden rounded-lg border">
+          {/* Comment Header */}
+          <div className="bg-bgc-layer2 border-bd-default flex flex-col items-start justify-start gap-1.5 self-stretch overflow-hidden border-b p-3">
+            <div className="flex items-center justify-between self-stretch">
+              <div className="flex items-center justify-start gap-2">
+                <div className="text-txt-primary font-sans text-sm leading-tight font-medium">
+                  {reply.userId?.name}
+                </div>
+                <img
+                  className="h-7"
+                  src={getTitleImgPath(reply.userId)}
+                  alt="User badge"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleReportComment(reply)}
+                  disabled={!isLoggedIn || loadingStates.reporting}
+                  className="relative h-4 flex-shrink-0 cursor-pointer overflow-hidden transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  title={isLoggedIn ? "Báo cáo bình luận" : "Đăng nhập để báo cáo"}
+                >
+                  <Flag className="text-txt-secondary h-full" />
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteComment(reply.id)}
+                    disabled={loadingStates.deleting === reply.id}
+                    className="relative h-4 flex-shrink-0 overflow-hidden text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Xóa bình luận"
+                  >
+                    <Trash2 className="h-full" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Comment Body */}
+          <div className="flex items-center justify-center gap-2.5 self-stretch p-3">
+            <div className="text-txt-primary flex-1 font-sans text-sm leading-tight font-medium">
+              {formatCommentContent(reply.content)}
+            </div>
+          </div>
+        </div>
+
+        {/* Comment Actions */}
+        <div className="flex flex-wrap items-center justify-start gap-6">
+          <button
+            onClick={() => handleLikeComment(reply.id)}
+            disabled={!isLoggedIn || loadingStates.liking === reply.id}
+            className="flex cursor-pointer items-center justify-start gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+            title={isLoggedIn ? "Thích bình luận" : "Đăng nhập để thích"}
+          >
+            <ThumbsUp className="text-txt-focus h-4 w-5" />
+            <div className="text-txt-focus font-sans text-base leading-normal font-medium">
+              {reply.likeNumber || 0}
+            </div>
+          </button>
+          <button
+            onClick={() => handleReply(reply)}
+            disabled={!isLoggedIn}
+            className="flex cursor-pointer items-center justify-start gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <MessageCircle className="text-txt-focus h-5 w-5" />
+            <div className="text-txt-focus font-sans text-base leading-normal font-medium">
+              Trả lời
+            </div>
+          </button>
+          <div className="text-txt-secondary font-sans text-base leading-normal font-medium">
+            {formatDistanceToNow(reply.createdAt)}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   return (
@@ -584,10 +822,42 @@ export default function CommentDetail({
                           Trả lời
                         </div>
                       </button>
+
+                      {/* Button để toggle replies - chỉ hiển thị khi có replies */}
+                      {comment.replyCount && comment.replyCount > 0 && (
+                        <button
+                          onClick={() => toggleReplies(comment.id)}
+                          disabled={loadingStates.loadingReplies === comment.id}
+                          className="text-txt-focus hover:text-txt-primary flex cursor-pointer items-center justify-start gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Xem phản hồi"
+                        >
+                          <MessagesSquare className="h-5 w-5" />
+                          <div className="font-sans text-base leading-normal font-medium">
+                            {loadingStates.loadingReplies === comment.id
+                              ? "Đang tải..."
+                              : replyVisibility[comment.id]
+                                ? "Ẩn phản hồi"
+                                : comment.replies
+                                  ? `Xem ${comment.replies.length} phản hồi`
+                                  : `Xem ${comment.replyCount} phản hồi`}
+                          </div>
+                        </button>
+                      )}
+
                       <div className="text-txt-secondary font-sans text-base leading-normal font-medium">
                         {formatDistanceToNow(comment.createdAt)}
                       </div>
                     </div>
+
+                    {/* Replies Section */}
+                    {replyVisibility[comment.id] && comment.replies && (
+                      <div className="mt-4 flex flex-col gap-4 self-stretch">
+                        {comment.replies.map((reply) => (
+                          // eslint-disable-next-line react/prop-types
+                          <ReplyComment key={reply.id} reply={reply} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))

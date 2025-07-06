@@ -13,8 +13,9 @@ export const createComment = async (data: {
   mangaId?: string;
   postId?: string;
   userId: string;
+  parentId?: string; // Thêm parentId để hỗ trợ nested comments
 }) => {
-  const { content, mangaId, postId, userId } = data;
+  const { content, mangaId, postId, userId, parentId } = data;
 
   if (!validateCommentContent(content)) {
     throw new BusinessError("Nội dung bình luận không hợp lệ (1-1000 ký tự)");
@@ -31,6 +32,7 @@ export const createComment = async (data: {
   if (
     (mangaId && !isValidObjectId(mangaId)) ||
     (postId && !isValidObjectId(postId)) ||
+    (parentId && !isValidObjectId(parentId)) ||
     !isValidObjectId(userId)
   ) {
     throw new BusinessError("ID không hợp lệ");
@@ -42,6 +44,30 @@ export const createComment = async (data: {
     content: sanitizedContent,
     userId,
   };
+
+  // Nếu có parentId, validate parentComment và xử lý logic nested
+  if (parentId) {
+    const parentComment = await CommentModel.findById(parentId);
+    if (!parentComment) {
+      throw new BusinessError("Không tìm thấy bình luận cha");
+    }
+
+    // Chỉ cho phép tối đa 2 cấp: nếu parent đã có parentId thì không cho reply thêm
+    if (parentComment.parentId) {
+      throw new BusinessError("Chỉ hỗ trợ tối đa 2 cấp bình luận");
+    }
+
+    // Thêm parentId vào commentData
+    commentData.parentId = parentId;
+
+    // Inherit mangaId/postId từ parent comment nếu không được provide
+    if (parentComment.mangaId && !mangaId) {
+      commentData.mangaId = parentComment.mangaId;
+    }
+    if (parentComment.postId && !postId) {
+      commentData.postId = parentComment.postId;
+    }
+  }
 
   if (mangaId) {
     commentData.mangaId = mangaId;

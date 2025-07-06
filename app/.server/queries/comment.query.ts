@@ -16,14 +16,14 @@ export const getComments = async (
     throw new Error("Cannot provide both mangaId and postId");
   }
 
-  const filter = mangaId ? { mangaId } : { postId };
+  const filter = mangaId ? { mangaId, parentId: null } : { postId, parentId: null }; // Chỉ lấy parent comments
   const skip = (page - 1) * limit;
 
-  // Get total count for pagination
+  // Get total count for pagination (chỉ đếm parent comments)
   const totalCount = await CommentModel.countDocuments(filter);
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Get comments with pagination
+  // Get parent comments with pagination
   const comments = await CommentModel.find(filter)
     .populate("userId", "name avatar gender level faction")
     .sort({ createdAt: -1 })
@@ -31,12 +31,52 @@ export const getComments = async (
     .limit(limit)
     .lean();
 
+  // Thêm thông tin về số lượng replies cho mỗi comment
+  const commentsWithReplyCounts = await Promise.all(
+    comments.map(async (comment) => {
+      const replyCount = await CommentModel.countDocuments({ parentId: comment._id });
+      return {
+        ...comment,
+        replyCount, // Thêm field replyCount
+      };
+    }),
+  );
+
   return {
-    data: comments,
+    data: commentsWithReplyCounts,
     totalPages,
     currentPage: page,
     totalCount,
   };
+};
+
+// Function để lấy replies cho một parent comment cụ thể
+export const getReplies = async (parentId: string) => {
+  const replies = await CommentModel.find({ parentId })
+    .populate("userId", "name avatar gender level faction")
+    .sort({ createdAt: 1 }) // Sort theo thời gian tạo tăng dần cho replies
+    .lean();
+
+  return replies;
+};
+
+// Function để lấy comment với replies (dùng khi cần load cả parent và replies)
+export const getCommentWithReplies = async (commentId: string) => {
+  const comment = await CommentModel.findById(commentId)
+    .populate("userId", "name avatar gender level faction")
+    .lean();
+
+  if (!comment) {
+    return null;
+  }
+
+  // Nếu là parent comment, lấy replies
+  if (!comment.parentId) {
+    const replies = await getReplies(commentId);
+    return { ...comment, replies };
+  }
+
+  return comment;
 };
 
 export const getCommentById = async (commentId: string) => {

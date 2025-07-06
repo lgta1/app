@@ -6,6 +6,7 @@ export type CommentType = {
   mangaId?: string;
   postId?: string;
   userId: string;
+  parentId?: string;
   likeNumber: number;
   createdAt: Date;
   updatedAt: Date;
@@ -17,6 +18,7 @@ const CommentSchema = new Schema<CommentType>(
     mangaId: { type: String, ref: "Manga", required: false },
     postId: { type: String, ref: "Post", required: false },
     userId: { type: String, ref: "User", required: true },
+    parentId: { type: String, ref: "Comment", required: false },
     likeNumber: { type: Number, default: 0 },
   },
   { timestamps: true },
@@ -36,5 +38,9 @@ CommentSchema.pre("save", function () {
 CommentSchema.index({ mangaId: 1, createdAt: -1 });
 CommentSchema.index({ postId: 1, createdAt: -1 });
 CommentSchema.index({ userId: 1, createdAt: -1 });
+// Thêm index cho parentId để tối ưu hóa query nested comments
+CommentSchema.index({ parentId: 1, createdAt: 1 }); // Sort theo thời gian tạo tăng dần cho replies
+CommentSchema.index({ mangaId: 1, parentId: 1 }); // Query parent comments theo mangaId
+CommentSchema.index({ postId: 1, parentId: 1 }); // Query parent comments theo postId
 
 export const CommentModel = model("Comment", CommentSchema);

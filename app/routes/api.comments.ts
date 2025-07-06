@@ -1,5 +1,5 @@
 import { createComment, deleteComment, likeComment } from "@/mutations/comment.mutation";
-import { getComments } from "@/queries/comment.query";
+import { getComments, getReplies } from "@/queries/comment.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.comments";
@@ -13,8 +13,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     const url = new URL(request.url);
     const mangaId = url.searchParams.get("mangaId");
     const postId = url.searchParams.get("postId");
+    const parentId = url.searchParams.get("parentId");
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "5");
+
+    if (parentId) {
+      const replies = await getReplies(parentId);
+      return Response.json({
+        data: replies,
+        success: true,
+      });
+    }
 
     if (!mangaId && !postId) {
       return Response.json(
@@ -171,6 +180,7 @@ export async function action({ request }: Route.ActionArgs) {
       const content = formData.get("content") as string;
       const mangaId = formData.get("mangaId") as string;
       const postId = formData.get("postId") as string;
+      const parentId = formData.get("parentId") as string;
 
       if (!content) {
         return Response.json(
@@ -179,9 +189,10 @@ export async function action({ request }: Route.ActionArgs) {
         );
       }
 
-      if (!mangaId && !postId) {
+      // Nếu không có parentId, cần có mangaId hoặc postId
+      if (!parentId && !mangaId && !postId) {
         return Response.json(
-          { error: "mangaId hoặc postId là bắt buộc" },
+          { error: "mangaId, postId hoặc parentId là bắt buộc" },
           { status: 400 },
         );
       }
@@ -198,6 +209,7 @@ export async function action({ request }: Route.ActionArgs) {
         content,
         mangaId: mangaId || undefined,
         postId: postId || undefined,
+        parentId: parentId || undefined,
         userId: user.id,
       });
 
