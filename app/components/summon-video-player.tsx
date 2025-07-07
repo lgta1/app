@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isMobile } from "react-device-detect";
+import { SkipForward } from "lucide-react";
 
 interface SummonVideoPlayerProps {
   isPlaying: boolean;
@@ -9,6 +10,7 @@ interface SummonVideoPlayerProps {
 export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerProps) {
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasVideoEnded, setHasVideoEnded] = useState(false);
 
   // Ngăn chặn scroll khi video đang phát
   useEffect(() => {
@@ -28,6 +30,7 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
   useEffect(() => {
     if (isPlaying && videoRef) {
       setIsLoading(true);
+      setHasVideoEnded(false);
       videoRef.currentTime = 0;
       videoRef
         .play()
@@ -39,15 +42,39 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
     }
   }, [isPlaying, videoRef]);
 
+  const handleSkipVideo = () => {
+    if (videoRef) {
+      // Seek video đến cuối
+      videoRef.currentTime = videoRef.duration - 0.1; // Trừ 0.1s để trigger onEnded
+    }
+  };
+
+  const handleVideoEnded = () => {
+    setHasVideoEnded(true);
+    onVideoEnd();
+  };
+
   if (!isPlaying) return null;
 
   return (
     <div className="fixed inset-0 z-10 flex touch-none items-center justify-center bg-black">
+      {/* Skip button - chỉ hiện khi video chưa ended */}
+      {!hasVideoEnded && (
+        <div className="absolute top-2 right-2 z-10 lg:top-4 lg:right-4">
+          <button
+            onClick={handleSkipVideo}
+            className="to-lav-500 flex cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-3 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
+          >
+            <SkipForward className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
       <video
         ref={setVideoRef}
         className="h-full w-full object-cover"
         src={isMobile ? "/videos/summon.webm" : "/videos/summon.mp4"}
-        onEnded={onVideoEnd}
+        onEnded={handleVideoEnded}
         onLoadStart={() => setIsLoading(true)}
         onCanPlay={() => setIsLoading(false)}
         playsInline
