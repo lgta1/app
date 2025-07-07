@@ -12,6 +12,12 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
   const [isLoading, setIsLoading] = useState(true);
   const [hasVideoEnded, setHasVideoEnded] = useState(false);
 
+  useEffect(() => {
+    if (isPlaying) {
+      setHasVideoEnded(false);
+    }
+  }, [isPlaying]);
+
   // Ngăn chặn scroll khi video đang phát
   useEffect(() => {
     if (isPlaying) {
@@ -30,7 +36,6 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
   useEffect(() => {
     if (isPlaying && videoRef) {
       setIsLoading(true);
-      setHasVideoEnded(false);
       videoRef.currentTime = 0;
       videoRef
         .play()
@@ -70,18 +75,27 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
         </div>
       )}
 
-      <video
-        ref={setVideoRef}
-        className="h-full w-full object-cover"
-        src={isMobile ? "/videos/summon.webm" : "/videos/summon.mp4"}
-        onEnded={handleVideoEnded}
-        onLoadStart={() => setIsLoading(true)}
-        onCanPlay={() => setIsLoading(false)}
-        playsInline
-        muted={false}
-        autoPlay
-        preload="auto"
-      />
+      {/* Hiển thị video hoặc background image */}
+      {hasVideoEnded ? (
+        <img
+          src="/videos/background.png"
+          alt="Background"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <video
+          ref={setVideoRef}
+          className="h-full w-full object-cover"
+          src={isMobile ? "/videos/summon.webm" : "/videos/summon.mp4"}
+          onEnded={handleVideoEnded}
+          onLoadStart={() => setIsLoading(true)}
+          onCanPlay={() => setIsLoading(false)}
+          playsInline
+          muted={false}
+          autoPlay
+          preload="auto"
+        />
+      )}
 
       {/* Loading spinner */}
       {isLoading && (
