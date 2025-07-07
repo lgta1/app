@@ -14,6 +14,8 @@ export type MangaType = {
   likeNumber?: number;
   viewNumber?: number;
   followNumber?: number;
+  ratingAverage?: number;
+  ratingCount?: number;
   translationTeam: string;
   ownerId: string;
   keywords?: string;
@@ -33,6 +35,8 @@ const MangaSchema = new Schema<MangaType>(
     likeNumber: { type: Number, default: 0 },
     viewNumber: { type: Number, default: 0 },
     followNumber: { type: Number, default: 0 },
+    ratingAverage: { type: Number, default: 0 },
+    ratingCount: { type: Number, default: 0 },
     translationTeam: { type: String, required: true },
     ownerId: { type: String, required: true },
     keywords: { type: String },

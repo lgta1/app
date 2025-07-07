@@ -21,6 +21,7 @@ export function ProfileMangaFollow() {
     apiUrl: "/api/manga/following",
     limit: 5,
   });
+  console.log("🚀 ~ ProfileMangaFollow ~ followingMangas:", followingMangas);
 
   const [unfollowDialog, setUnfollowDialog] = useState({
     open: false,

@@ -95,13 +95,15 @@ export const getCommentsByUserId = async (
   const skip = (page - 1) * limit;
 
   // Get total count for pagination
-  const totalCount = await CommentModel.countDocuments({ userId });
+  const totalCount = await CommentModel.countDocuments({
+    userId,
+    mangaId: { $exists: true },
+  });
   const totalPages = Math.ceil(totalCount / limit);
 
   // Get comments with pagination
-  const comments = await CommentModel.find({ userId })
+  const comments = await CommentModel.find({ userId, mangaId: { $exists: true } })
     .populate("mangaId", "title poster")
-    .populate("postId", "title")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)

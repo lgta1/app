@@ -31,11 +31,19 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   const [followCount, setFollowCount] = useState(followNumber || 0);
   const [isLoadingFollow, setIsLoadingFollow] = useState(false);
 
-  // Mock data cho demo (sẽ được thay thế bằng dữ liệu thực)
-  const rating = 5.0;
-  const reviewCount = Math.floor(Math.random() * 100);
+  // State để track trạng thái like
+  const [isLiked, setIsLiked] = useState(false);
+  const [isLoadingLike, setIsLoadingLike] = useState(false);
 
-  // Fetch trạng thái follow khi component mount
+  // State để track trạng thái rating
+  const [hasRated, setHasRated] = useState(false);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [ratingAverage, setRatingAverage] = useState(manga.ratingAverage || 0);
+  const [ratingCount, setRatingCount] = useState(manga.ratingCount || 0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [isLoadingRating, setIsLoadingRating] = useState(false);
+
+  // Fetch trạng thái follow và like khi component mount
   useEffect(() => {
     const checkFollowStatus = async () => {
       try {
@@ -50,7 +58,38 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
       }
     };
 
+    const checkLikeStatus = async () => {
+      try {
+        const response = await fetch(`/api/manga-like?mangaId=${id}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          setIsLiked(data.isLiked);
+        }
+      } catch (error) {
+        console.error("Error checking like status:", error);
+      }
+    };
+
+    const checkRatingStatus = async () => {
+      try {
+        const response = await fetch(`/api/manga-rating?mangaId=${id}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          setHasRated(data.hasRated);
+          setUserRating(data.userRating);
+          setRatingAverage(data.ratingAverage);
+          setRatingCount(data.ratingCount);
+        }
+      } catch (error) {
+        console.error("Error checking rating status:", error);
+      }
+    };
+
     checkFollowStatus();
+    checkLikeStatus();
+    checkRatingStatus();
   }, [id]);
 
   // Handle follow/unfollow
@@ -86,6 +125,79 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     }
   };
 
+  // Handle like/unlike
+  const handleLikeToggle = async () => {
+    if (isLoadingLike) return;
+
+    setIsLoadingLike(true);
+
+    const formData = new FormData();
+    formData.append("intent", isLiked ? "unlike" : "like");
+    formData.append("mangaId", id);
+
+    try {
+      const response = await fetch("/api/manga-like", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setIsLiked(data.isLiked);
+        toast.success(data.message);
+      } else {
+        toast.error(data.error || "Có lỗi xảy ra");
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      toast.error("Có lỗi xảy ra khi xử lý yêu cầu");
+    } finally {
+      setIsLoadingLike(false);
+    }
+  };
+
+  // Handle rating
+  const handleRating = async (rating: number) => {
+    if (hasRated || isLoadingRating) return;
+
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn đánh giá ${rating} sao cho manga này? Bạn sẽ không thể thay đổi sau khi đánh giá.`,
+    );
+
+    if (!confirmed) return;
+
+    setIsLoadingRating(true);
+
+    const formData = new FormData();
+    formData.append("mangaId", id);
+    formData.append("rating", rating.toString());
+
+    try {
+      const response = await fetch("/api/manga-rating", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setHasRated(true);
+        setUserRating(rating);
+        setRatingAverage(data.ratingAverage);
+        setRatingCount(data.ratingCount);
+        toast.success(data.message);
+      } else {
+        toast.error(data.error || "Có lỗi xảy ra");
+      }
+    } catch (error) {
+      console.error("Error rating manga:", error);
+      toast.error("Có lỗi xảy ra khi đánh giá");
+    } finally {
+      setIsLoadingRating(false);
+    }
+  };
+
   return (
     <div className="w-full">
       <div className="flex flex-col gap-10 lg:flex-row">
@@ -104,16 +216,39 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
             <div className="flex items-start gap-3">
               {/* Sao đánh giá */}
               <div className="flex items-center">
-                {[...Array(5)].map((_, index) => (
-                  <Star key={index} className="h-6 w-6 fill-yellow-400 text-yellow-400" />
-                ))}
+                {[...Array(5)].map((_, index) => {
+                  const starValue = index + 1;
+                  const isActive = hasRated
+                    ? starValue <= (userRating || 0)
+                    : hoverRating
+                      ? starValue <= hoverRating
+                      : starValue <= Math.floor(ratingAverage);
+
+                  return (
+                    <Star
+                      key={index}
+                      className={`h-6 w-6 transition-colors ${
+                        hasRated ? "cursor-not-allowed" : "cursor-pointer hover:scale-110"
+                      } ${
+                        isActive
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "fill-transparent text-gray-300"
+                      }`}
+                      onClick={() => !hasRated && handleRating(starValue)}
+                      onMouseEnter={() => !hasRated && setHoverRating(starValue)}
+                      onMouseLeave={() => !hasRated && setHoverRating(0)}
+                    />
+                  );
+                })}
               </div>
               {/* Điểm và số đánh giá */}
               <div className="flex items-center gap-2">
-                <span className="text-txt-primary text-base font-medium">{rating}</span>
+                <span className="text-txt-primary text-base font-medium">
+                  {ratingAverage > 0 ? ratingAverage.toFixed(1) : "0.0"}
+                </span>
                 <div className="bg-txt-primary h-1 w-1 rounded-full" />
                 <span className="text-txt-primary text-base font-medium">
-                  {reviewCount} đánh giá
+                  {ratingCount} đánh giá
                 </span>
               </div>
             </div>
@@ -163,9 +298,17 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
           {/* Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-4 md:justify-start">
             {/* Nút Yêu thích */}
-            <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors">
-              <Heart className="h-5 w-5" />
-              <span className="text-sm font-semibold">Yêu thích</span>
+            <button
+              onClick={handleLikeToggle}
+              disabled={isLoadingLike}
+              className={`border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors ${isLoadingLike ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <Heart
+                className={`h-5 w-5 ${isLiked ? "fill-txt-focus text-txt-focus" : ""}`}
+              />
+              <span className="text-sm font-semibold">
+                {isLiked ? "Đã thích" : "Yêu thích"}
+              </span>
             </button>
 
             {/* Nút Theo dõi  */}

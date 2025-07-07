@@ -65,7 +65,7 @@ export default function Login() {
         <img src="/images/logo.png" alt="Logo" className="h-[75px] w-[240px]" />
 
         {/* Banner */}
-        <div className="flex w-full flex-col justify-center gap-[15px] md:gap-[12px]">
+        {/* <div className="flex w-full flex-col justify-center gap-[15px] md:gap-[12px]">
           <img
             src="/images/banners/topbanner-1.png"
             alt="Banner 1"
@@ -76,7 +76,7 @@ export default function Login() {
             alt="Banner 2"
             className="h-[53px] w-full md:h-[69px]"
           />
-        </div>
+        </div> */}
 
         {/* Form đăng nhập */}
         <div className="border-bd-default bg-bgc-layer1 flex h-[444px] w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4 md:max-h-[450px] md:min-h-[376px]">
