@@ -19,7 +19,6 @@ export type UserType = {
   banExpiresAt?: Date;
   banMessage?: string;
   isDeleted: boolean;
-  likedManga: string[];
   summonCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -46,7 +45,6 @@ const UserSchema = new Schema<UserType>(
     banExpiresAt: { type: Date },
     banMessage: { type: String },
     isDeleted: { type: Boolean, default: false },
-    likedManga: { type: [String], default: [] },
     mangasCount: { type: Number, default: 0 },
     warningsCount: { type: Number, default: 0 },
     summonCount: { type: Number, default: 0 },
@@ -57,6 +55,12 @@ const UserSchema = new Schema<UserType>(
 );
 
 UserSchema.index({ email: 1 }, { unique: true });
-UserSchema.index({ createdAt: -1 });
+
+// Index cho leaderboard - query: { role, isDeleted, isBanned } + sort { exp: -1 }
+UserSchema.index({ role: 1, isDeleted: 1, isBanned: 1, exp: -1 });
+
+// Index cho user search - query: { role, isDeleted } + regex search name/email
+UserSchema.index({ role: 1, isDeleted: 1, name: 1 });
+UserSchema.index({ role: 1, isDeleted: 1, email: 1 });
 
 export const UserModel = model("User", UserSchema);

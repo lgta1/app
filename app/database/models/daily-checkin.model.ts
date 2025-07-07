@@ -22,6 +22,5 @@ const DailyCheckinSchema = new Schema<DailyCheckinType>(
 
 // Index để tìm kiếm nhanh theo userId và tuần
 DailyCheckinSchema.index({ userId: 1, weekStart: 1 }, { unique: true });
-DailyCheckinSchema.index({ userId: 1 });
 
 export const DailyCheckinModel = model("DailyCheckin", DailyCheckinSchema);

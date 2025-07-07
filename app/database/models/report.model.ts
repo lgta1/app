@@ -28,4 +28,10 @@ const ReportSchema = new Schema<ReportType>(
   { timestamps: true },
 );
 
+// Index để tối ưu query sorting theo createdAt
+ReportSchema.index({ createdAt: -1 });
+
+// Index để tối ưu query filter theo reportType + sort theo createdAt
+ReportSchema.index({ reportType: 1, createdAt: -1 });
+
 export const ReportModel = model("Report", ReportSchema);

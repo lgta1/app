@@ -22,4 +22,7 @@ const GenresSchema = new Schema<GenresType>(
   { timestamps: true },
 );
 
+// Index cho slug lookup
+GenresSchema.index({ slug: 1 }, { unique: true });
+
 export const GenresModel = model("Genres", GenresSchema);

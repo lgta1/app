@@ -44,7 +44,8 @@ const BannerSchema = new Schema<BannerType>(
   { timestamps: true },
 );
 
-// Index for better query performance
-BannerSchema.index({ startDate: -1, endDate: -1 });
+// Index tối ưu cho các query patterns thực tế
+BannerSchema.index({ startDate: 1, endDate: 1 }); // Query active banners với range
+BannerSchema.index({ isRateUp: -1, startDate: -1 }); // Sort banners theo priority và date
 
 export const BannerModel = model("Banner", BannerSchema);

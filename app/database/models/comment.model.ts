@@ -34,13 +34,10 @@ CommentSchema.pre("save", function () {
   }
 });
 
-// Index để tối ưu hóa query theo mangaId và thời gian tạo
-CommentSchema.index({ mangaId: 1, createdAt: -1 });
-CommentSchema.index({ postId: 1, createdAt: -1 });
-CommentSchema.index({ userId: 1, createdAt: -1 });
-// Thêm index cho parentId để tối ưu hóa query nested comments
-CommentSchema.index({ parentId: 1, createdAt: 1 }); // Sort theo thời gian tạo tăng dần cho replies
-CommentSchema.index({ mangaId: 1, parentId: 1 }); // Query parent comments theo mangaId
-CommentSchema.index({ postId: 1, parentId: 1 }); // Query parent comments theo postId
+// Index tối ưu hóa cho các query patterns thực tế
+CommentSchema.index({ mangaId: 1, parentId: 1, createdAt: -1 }); // Query parent comments và replies theo mangaId
+CommentSchema.index({ postId: 1, parentId: 1, createdAt: -1 }); // Query parent comments và replies theo postId
+CommentSchema.index({ userId: 1, createdAt: -1 }); // Query comments theo user
+CommentSchema.index({ parentId: 1, createdAt: 1 }); // Query replies của một comment (sort tăng dần)
 
 export const CommentModel = model("Comment", CommentSchema);

@@ -53,6 +53,10 @@ const UserWaifuLeaderboardSchema = new Schema<UserWaifuLeaderboardType>(
   { timestamps: true },
 );
 
+// Index cho findOneAndUpdate({ userId }) và findOne({ userId })
+UserWaifuLeaderboardSchema.index({ userId: 1 });
+
+// Index cho leaderboard sorting
 UserWaifuLeaderboardSchema.index({
   totalWaifu5Stars: -1,
   totalWaifu4Stars: -1,

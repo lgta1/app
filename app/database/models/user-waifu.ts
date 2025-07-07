@@ -22,6 +22,10 @@ const UserWaifuSchema = new Schema<UserWaifuType>(
   { timestamps: true },
 );
 
-UserWaifuSchema.index({ userId: 1, waifuId: 1, bannerId: 1 });
+// 2. Query: { userId, bannerId } + sort { createdAt: -1 } - summon history pagination
+UserWaifuSchema.index({ userId: 1, bannerId: 1, createdAt: -1 });
+
+// 3. Query: { userId, waifuId } + sort { createdAt: -1 } - sacrifice operations
+UserWaifuSchema.index({ userId: 1, waifuId: 1, createdAt: -1 });
 
 export const UserWaifuModel = model("UserWaifu", UserWaifuSchema);

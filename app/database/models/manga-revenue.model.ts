@@ -18,4 +18,7 @@ const MangaRevenueSchema = new Schema<MangaRevenueType>(
   { timestamps: true },
 );
 
+// Index cho query theo period và sort theo revenue
+MangaRevenueSchema.index({ period: 1, revenue: -1 });
+
 export const MangaRevenueModel = model("MangaRevenue", MangaRevenueSchema);

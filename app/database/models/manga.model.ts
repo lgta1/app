@@ -40,6 +40,16 @@ const MangaSchema = new Schema<MangaType>(
   { timestamps: true },
 );
 
+// Text index cho search functionality
 MangaSchema.index({ title: "text" });
+
+// Compound index cho approved manga với pagination
+MangaSchema.index({ status: 1, createdAt: -1 });
+
+// Index cho uploaded manga by owner
+MangaSchema.index({ ownerId: 1, createdAt: -1 });
+
+// Index cho related manga by genres
+MangaSchema.index({ genres: 1 });
 
 export const MangaModel = model("Manga", MangaSchema);

@@ -18,6 +18,6 @@ const UserReadChapterSchema = new Schema<UserReadChapterType>(
 
 UserReadChapterSchema.index({ chapterId: 1, userId: 1 }, { unique: true });
 
-UserReadChapterSchema.index({ userId: 1, createdAt: 1 });
+UserReadChapterSchema.index({ userId: 1, createdAt: -1 });
 
 export const UserReadChapterModel = model("UserReadChapter", UserReadChapterSchema);

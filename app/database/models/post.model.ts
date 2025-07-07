@@ -34,10 +34,13 @@ const PostSchema = new Schema<PostType>(
   { timestamps: true },
 );
 
-// Index để tối ưu hóa query
-PostSchema.index({ authorId: 1, createdAt: -1 });
-PostSchema.index({ tags: 1, createdAt: -1 });
-PostSchema.index({ isPinned: -1, createdAt: -1 });
-PostSchema.index({ isPublished: 1, isDeleted: 1, createdAt: -1 });
+// Index chính cho listing posts với pagination
+PostSchema.index({ isPublished: 1, isDeleted: 1, isPinned: -1, createdAt: -1 });
+
+// Index cho filter by author
+PostSchema.index({ isPublished: 1, isDeleted: 1, authorId: 1, createdAt: -1 });
+
+// Index cho filter by tags
+PostSchema.index({ isPublished: 1, isDeleted: 1, tags: 1, createdAt: -1 });
 
 export const PostModel = model("Post", PostSchema);

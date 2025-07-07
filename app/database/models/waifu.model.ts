@@ -22,4 +22,10 @@ const WaifuSchema = new Schema<WaifuType>(
   { timestamps: true },
 );
 
+// Index cho random selection - query: { stars } + skip/limit operations
+WaifuSchema.index({ stars: 1 });
+
+// Index cho admin queries - sort { createdAt: -1 }
+WaifuSchema.index({ createdAt: -1 });
+
 export const WaifuModel = model("Waifu", WaifuSchema);

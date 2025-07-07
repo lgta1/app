@@ -32,6 +32,8 @@ const ChapterSchema = new Schema<ChapterType>(
   { timestamps: true },
 );
 
-ChapterSchema.index({ mangaId: 1 });
+// Index tối ưu cho các query patterns
+ChapterSchema.index({ mangaId: 1, chapterNumber: 1 }, { unique: true }); // Unique lookup và prevent duplicate
+ChapterSchema.index({ mangaId: 1, createdAt: -1 }); // List chapters của manga theo thời gian
 
 export const ChapterModel = model("Chapter", ChapterSchema);
