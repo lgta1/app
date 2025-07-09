@@ -105,7 +105,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="mt-6 flex flex-wrap gap-4">
             {mangaList?.map((manga) => <MangaCard key={manga.id} manga={manga} />)}
           </div>
 
