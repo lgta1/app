@@ -1,5 +1,10 @@
 import toast, { Toaster } from "react-hot-toast";
-import { type ClientActionFunctionArgs, Link, useSubmit } from "react-router";
+import {
+  type ClientActionFunctionArgs,
+  Link,
+  useNavigate,
+  useSubmit,
+} from "react-router";
 import { Edit, Menu, Plus, Star } from "lucide-react";
 
 import { submitMangaToReview } from "@/mutations/manga.mutation";
@@ -11,13 +16,14 @@ import type { Route } from "./+types/manga.$id";
 
 import { CHAPTER_STATUS } from "~/constants/chapter";
 import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 import { formatDate, formatTime } from "~/utils/date.utils";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { id } = params;
   const user = await requireLogin(request);
 
-  const manga = await getMangaByIdAndOwner(id, user.id);
+  const manga = await getMangaByIdAndOwner(id, user.id, isAdmin(user.role));
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy truyện");
@@ -100,7 +106,7 @@ const statuses = {
 export default function Index({ loaderData }: Route.ComponentProps) {
   const { manga, chapters } = loaderData;
   const submit = useSubmit();
-
+  const navigate = useNavigate();
   const {
     id,
     title,
@@ -271,53 +277,42 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           </div>
 
           {/* Container danh sách */}
-          <div className="flex max-h-[304px] flex-col gap-2 overflow-y-scroll rounded-lg md:max-h-[400px] lg:max-h-[492px]">
+          <div className="flex max-h-[304px] flex-col gap-2 overflow-y-auto rounded-lg md:max-h-[400px] lg:max-h-[492px]">
             {chapters.map((chapter) => (
               <Link
                 to={`/manga/chapter/${id}?chapterNumber=${chapter.chapterNumber}`}
                 key={chapter.id}
-                className="bg-bgc-layer2 border-bd-default hover:bg-bgc-layer2/80 flex cursor-pointer flex-row items-center justify-between gap-4 rounded-xl border p-3 transition-colors"
+                className="bg-bgc-layer2 border-bd-default hover:bg-bgc-layer2/80 flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-3 transition-colors"
               >
-                {/* Layout cho mobile và desktop */}
-                <div className="flex w-full items-center justify-between sm:justify-start sm:gap-4">
-                  {/* Phần bên trái - thumbnail và thông tin */}
-                  <div className="flex items-center gap-4">
-                    {/* Thumbnail */}
-                    <img
-                      src={chapter.thumbnail}
-                      alt={chapter.title}
-                      className="h-16 w-32 flex-shrink-0 rounded-lg object-cover"
-                    />
+                <div className="flex flex-col gap-1.5">
+                  {/* Tiêu đề */}
+                  <h3 className="text-txt-primary text-lg leading-7 font-medium">
+                    {chapter.title}
+                  </h3>
 
-                    {/* Thông tin chapter */}
-                    <div className="flex flex-col gap-1.5">
-                      {/* Tiêu đề */}
-                      <h3 className="text-txt-primary text-lg leading-7 font-medium">
-                        {chapter.title}
-                      </h3>
-
-                      <div className="flex items-center gap-3 lg:gap-5">
-                        <div
-                          className={`inline-flex items-center justify-center gap-2.5 rounded-[32px] ${statuses[chapter?.status || 0]?.bg} px-2 py-1 backdrop-blur-[3.40px]`}
-                        >
-                          <div
-                            className={`${statuses[chapter?.status || 0]?.text} justify-center text-xs leading-none font-medium`}
-                          >
-                            {statuses[chapter?.status || 0]?.label}
-                          </div>
-                        </div>
+                  <div className="flex items-center gap-3 lg:gap-5">
+                    <div
+                      className={`inline-flex items-center justify-center gap-2.5 rounded-[32px] ${statuses[chapter?.status || 0]?.bg} px-2 py-1 backdrop-blur-[3.40px]`}
+                    >
+                      <div
+                        className={`${statuses[chapter?.status || 0]?.text} justify-center text-xs leading-none font-medium`}
+                      >
+                        {statuses[chapter?.status || 0]?.label}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Ngày xuất bản - hiển thị bên phải trên desktop */}
-                <div className="items-center gap-4 sm:flex">
-                  <Link
-                    to={`/manga/chapter/edit/${id}?chapterNumber=${chapter.chapterNumber}`}
-                  >
-                    <Edit className="text-txt-secondary hover:text-txt-focus mr-2 h-6 w-6" />
-                  </Link>
+                <div className="flex items-center gap-4">
+                  <Edit
+                    onClick={() => {
+                      navigate(
+                        `/manga/chapter/edit/${id}?chapterNumber=${chapter.chapterNumber}`,
+                      );
+                    }}
+                    className="text-txt-secondary hover:text-txt-focus mr-2 h-6 w-6"
+                  />
                   <Menu className="text-txt-secondary mr-2 h-6 w-6" />
                 </div>
               </Link>

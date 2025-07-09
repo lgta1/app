@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { NavLink } from "react-router";
+import { Link } from "react-router";
 import { Eye, Heart, MessageCircle, Star, StarOff } from "lucide-react";
 
 import type { ChapterType } from "~/database/models/chapter.model";
@@ -328,14 +328,20 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
             </button>
 
             {/* Nút Đọc từ đầu */}
-            <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer justify-center rounded-xl border px-4 py-3 transition-colors">
+            <Link
+              to={`/manga/chapter/${id}?chapterNumber=1`}
+              className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer justify-center rounded-xl border px-4 py-3 transition-colors"
+            >
               <span className="text-sm font-medium">Đọc từ đầu</span>
-            </button>
+            </Link>
 
             {/* Nút Đọc Chap mới */}
-            <button className="flex min-w-32 cursor-pointer justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105">
+            <Link
+              to={`/manga/chapter/${id}?chapterNumber=${manga.chapters}`}
+              className="flex min-w-32 cursor-pointer justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
+            >
               <span className="text-sm font-semibold">Đọc Chap mới</span>
-            </button>
+            </Link>
           </div>
         </div>
       </div>
@@ -383,56 +389,42 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
         </div>
 
         {/* Container danh sách */}
-        <div className="flex max-h-[304px] flex-col gap-2 overflow-y-scroll rounded-lg md:max-h-[400px] lg:max-h-[492px]">
+        <div className="flex max-h-[304px] flex-col gap-2 overflow-y-auto rounded-lg md:max-h-[400px] lg:max-h-[492px]">
           {chapters.map((chapter) => (
-            <NavLink
+            <Link
               to={`/manga/chapter/${id}?chapterNumber=${chapter.chapterNumber}`}
               key={chapter.id}
               className="bg-bgc-layer2 border-bd-default hover:bg-bgc-layer2/80 flex cursor-pointer flex-col items-start gap-4 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between"
             >
-              {/* Layout cho mobile và desktop */}
-              <div className="flex w-full items-center justify-between sm:justify-start sm:gap-4">
-                {/* Phần bên trái - thumbnail và thông tin */}
-                <div className="flex items-center gap-4">
-                  {/* Thumbnail */}
-                  <img
-                    src={chapter.thumbnail}
-                    alt={chapter.title}
-                    className="h-16 w-32 flex-shrink-0 rounded-lg object-cover"
-                  />
+              <div className="flex flex-col gap-1.5">
+                {/* Tiêu đề */}
+                <h3 className="text-txt-primary text-lg leading-7 font-medium">
+                  {chapter.title}
+                </h3>
 
-                  {/* Thông tin chapter */}
-                  <div className="flex flex-col gap-1.5">
-                    {/* Tiêu đề */}
-                    <h3 className="text-txt-primary text-lg leading-7 font-medium">
-                      {chapter.title}
-                    </h3>
+                <div className="flex items-center gap-3 lg:gap-5">
+                  {/* Views */}
+                  <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
+                    <Eye className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
+                    <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
+                      {chapter.viewNumber?.toLocaleString()}
+                    </span>
+                  </div>
 
-                    <div className="flex items-center gap-3 lg:gap-5">
-                      {/* Views */}
-                      <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
-                        <Eye className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
-                        <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                          {chapter.viewNumber?.toLocaleString()}
-                        </span>
-                      </div>
+                  {/* Likes */}
+                  <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
+                    <Heart className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
+                    <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
+                      {chapter.likeNumber?.toLocaleString()}
+                    </span>
+                  </div>
 
-                      {/* Likes */}
-                      <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
-                        <Heart className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
-                        <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                          {chapter.likeNumber?.toLocaleString()}
-                        </span>
-                      </div>
-
-                      {/* Comments */}
-                      <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
-                        <MessageCircle className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
-                        <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                          {chapter.commentNumber?.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Comments */}
+                  <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
+                    <MessageCircle className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
+                    <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
+                      {chapter.commentNumber?.toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -443,7 +435,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
                   {formatDate(chapter.updatedAt)}
                 </span>
               </div>
-            </NavLink>
+            </Link>
           ))}
         </div>
       </div>

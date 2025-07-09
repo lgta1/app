@@ -45,7 +45,7 @@ export const updateChapter = async (
   request: Request,
   mangaId: string,
   chapterNumber: number,
-  updateData: Partial<Pick<ChapterType, "title" | "thumbnail" | "contentUrls">>,
+  updateData: Partial<Pick<ChapterType, "title" | "contentUrls">>,
 ) => {
   const userInfo = await getUserInfoFromSession(request);
   if (!userInfo) {

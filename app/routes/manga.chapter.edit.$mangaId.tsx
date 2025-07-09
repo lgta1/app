@@ -9,14 +9,14 @@ import {
   useParams,
   useSearchParams,
 } from "react-router";
-import { ArrowLeft, BookOpen, FileText, Image, Upload, X } from "lucide-react";
-
-import type { Route } from "./+types/manga.chapter.edit.$mangaId";
+import { ArrowLeft, BookOpen, FileText, Upload, X } from "lucide-react";
 
 import { createChapter, updateChapter } from "@/mutations/chapter.mutation";
 import { getChaptersByMangaIdAndNumber } from "@/queries/chapter.query";
+
+import type { Route } from "./+types/manga.chapter.edit.$mangaId";
+
 import { ChapterDetail } from "~/components/chapter-detail";
-import { ImageUploader } from "~/components/image-uploader";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
@@ -60,18 +60,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const title = formData.get("title") as string;
-    const thumbnail = formData.get("thumbnail") as string;
     const contentUrls = JSON.parse(formData.get("contentUrls") as string);
 
-    // For editing, thumbnail can be empty (cleared), for creating it's required
-    const isThumbnailRequired = !chapterNumber; // Required only when creating new chapter
-
-    if (
-      !title ||
-      (isThumbnailRequired && !thumbnail) ||
-      !contentUrls ||
-      contentUrls.length === 0
-    ) {
+    if (!title || !contentUrls || contentUrls.length === 0) {
       throw new BusinessError("Vui lòng điền đầy đủ thông tin");
     }
 
@@ -79,14 +70,12 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (chapterNumber) {
       await updateChapter(request, mangaId, parseInt(chapterNumber), {
         title: title.trim(),
-        thumbnail,
         contentUrls,
       });
     } else {
       // Create new chapter
       await createChapter(request, {
         title: title.trim(),
-        thumbnail,
         contentUrls,
         mangaId,
       });
@@ -115,10 +104,6 @@ export default function EditChapter() {
   const [title, setTitle] = useState("");
   const [contents, setContents] = useState<File[]>([]);
   const [previewImages, setPreviewImages] = useState<PreviewImage[]>([]);
-  const [thumbnail, setThumbnail] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
-  const [_, setOriginalThumbnail] = useState<string>("");
-  const [thumbnailCleared, setThumbnailCleared] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const actionData = useActionData<typeof action>();
@@ -131,8 +116,6 @@ export default function EditChapter() {
   useEffect(() => {
     if (isEdit && chapter) {
       setTitle(chapter.title);
-      setThumbnailPreview(chapter.thumbnail);
-      setOriginalThumbnail(chapter.thumbnail);
 
       // Convert existing content URLs to preview images
       const existingImages: PreviewImage[] = chapter.contentUrls.map((url, index) => ({
@@ -169,25 +152,6 @@ export default function EditChapter() {
     event.target.value = "";
   };
 
-  const handleThumbnailSelect = (file: File) => {
-    setThumbnail(file);
-    setThumbnailCleared(false);
-    const url = URL.createObjectURL(file);
-    setThumbnailPreview(url);
-  };
-
-  const handleThumbnailClear = () => {
-    setThumbnail(null);
-    setThumbnailCleared(true);
-
-    // Clean up object URL if it's a new file
-    if (thumbnailPreview && thumbnailPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(thumbnailPreview);
-    }
-
-    setThumbnailPreview("");
-  };
-
   const removePreviewImage = (id: string) => {
     setPreviewImages((prev) => {
       const imageToRemove = prev.find((img) => img.id === id);
@@ -217,10 +181,7 @@ export default function EditChapter() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    // Check validation - allow empty thumbnail only if it's cleared intentionally and we're editing
-    const isThumbnailValid = thumbnailPreview || (isEdit && thumbnailCleared);
-
-    if (!title.trim() || !isThumbnailValid || previewImages.length === 0) {
+    if (!title.trim() || previewImages.length === 0) {
       toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
@@ -233,27 +194,7 @@ export default function EditChapter() {
     setIsSubmitting(true);
 
     try {
-      let thumbnailUrl = thumbnailPreview;
       let contentUrls = previewImages.map((img) => img.url);
-
-      // Handle thumbnail logic
-      if (thumbnailCleared) {
-        // If thumbnail is cleared, use empty string or original if reverting
-        thumbnailUrl = "";
-      } else if (thumbnail) {
-        // If new thumbnail is selected, upload it
-        const thumbnailUpload = await uploadMultipleFiles([
-          {
-            file: thumbnail,
-            options: {
-              bucket: "manga-images",
-              category: "thumbnails",
-            },
-          },
-        ]);
-        thumbnailUrl = thumbnailUpload[0].url;
-      }
-      // If no changes to thumbnail (thumbnailPreview === originalThumbnail), keep current URL
 
       // Only upload content files if there are new files
       const filesToUpload: Array<{
@@ -289,7 +230,6 @@ export default function EditChapter() {
       // Submit form with updated URLs
       const formData = new FormData();
       formData.append("title", title.trim());
-      formData.append("thumbnail", thumbnailUrl);
       formData.append("contentUrls", JSON.stringify(contentUrls));
 
       const chapterNumber = searchParams.get("chapterNumber");
@@ -315,9 +255,7 @@ export default function EditChapter() {
   const responseData = fetcher.data || actionData;
 
   const handlePreview = () => {
-    const isThumbnailValid = thumbnailPreview || (isEdit && thumbnailCleared);
-
-    if (!title.trim() || !isThumbnailValid || previewImages.length === 0) {
+    if (!title.trim() || previewImages.length === 0) {
       toast.error("Vui lòng điền đầy đủ thông tin trước khi xem trước");
       return;
     }
@@ -334,7 +272,6 @@ export default function EditChapter() {
     title: title || "Tiêu đề chương",
     chapterNumber: isEdit && chapter ? chapter.chapterNumber : 1,
     contentUrls: previewImages.map((img) => img.url),
-    thumbnail: thumbnailPreview || "/placeholder-thumbnail.jpg", // Fallback for cleared thumbnail
     mangaId: mangaId || "",
     viewNumber: 0,
     likeNumber: 0,
@@ -530,37 +467,6 @@ export default function EditChapter() {
               )}
             </div>
           </div>
-
-          {/* Cover Image Section */}
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-0">
-            <div className="flex items-center gap-1.5">
-              <Image className="text-txt-secondary h-4 w-4" />
-              <span className="text-txt-primary text-base font-semibold">Ảnh bìa</span>
-            </div>
-
-            <div className="flex w-full flex-col items-start gap-6 sm:flex-row sm:gap-9 lg:w-[680px] lg:items-center">
-              <div className="h-24 w-44">
-                <ImageUploader
-                  onFileSelect={handleThumbnailSelect}
-                  onClear={handleThumbnailClear}
-                  preview={thumbnailPreview}
-                  uploadText="Tải ảnh lên"
-                  name="thumbnail"
-                  required={!isEdit && !thumbnailPreview}
-                  accept="image/*"
-                />
-              </div>
-
-              <div className="flex w-full flex-col gap-1 sm:w-56">
-                <p className="text-txt-secondary text-base leading-normal font-medium">
-                  1. Ảnh có tỷ lệ 9:5
-                </p>
-                <p className="text-txt-secondary text-base leading-normal font-medium">
-                  2. Ảnh có kích thước dưới 1MB
-                </p>
-              </div>
-            </div>
-          </div>
         </form>
       </div>
 
@@ -588,12 +494,7 @@ export default function EditChapter() {
           <button
             type="button"
             onClick={handleExternalSubmit}
-            disabled={
-              !title.trim() ||
-              (!thumbnailPreview && !(isEdit && thumbnailCleared)) ||
-              previewImages.length === 0 ||
-              isLoading
-            }
+            disabled={!title.trim() || previewImages.length === 0 || isLoading}
             className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9] disabled:cursor-not-allowed disabled:opacity-50 sm:w-52"
           >
             <span className="text-center text-sm font-semibold text-black">

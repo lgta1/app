@@ -1,7 +1,12 @@
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { MANGA_STATUS } from "~/constants/manga";
+import { ChapterModel } from "~/database/models/chapter.model";
+import { CommentModel } from "~/database/models/comment.model";
 import { MangaModel, type MangaType } from "~/database/models/manga.model";
+import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
+import { UserLikeMangaModel } from "~/database/models/user-like-manga.model";
+import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
 
@@ -15,6 +20,29 @@ export const deleteManga = async (request: Request, mangaId: string) => {
     throw new BusinessError("Bạn không có quyền xóa truyện");
   }
 
+  // Lấy tất cả chapterIds để xóa UserReadChapter records
+  const chapters = await ChapterModel.find({ mangaId: mangaId }).select("_id");
+  const chapterIds = chapters.map((chapter) => chapter._id.toString());
+
+  // Xóa cascade tất cả dữ liệu liên quan
+  await Promise.all([
+    // Xóa lịch sử đọc chapters của manga này
+    UserReadChapterModel.deleteMany({ chapterId: { $in: chapterIds } }),
+
+    // Xóa comments của manga
+    CommentModel.deleteMany({ mangaId: mangaId }),
+
+    // Xóa follow relationships
+    UserFollowMangaModel.deleteMany({ mangaId: mangaId }),
+
+    // Xóa like relationships
+    UserLikeMangaModel.deleteMany({ mangaId: mangaId }),
+
+    // Xóa tất cả chapters của manga
+    ChapterModel.deleteMany({ mangaId: mangaId }),
+  ]);
+
+  // Cuối cùng xóa manga
   await MangaModel.findByIdAndDelete(mangaId);
 
   return {

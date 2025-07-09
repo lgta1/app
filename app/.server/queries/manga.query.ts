@@ -49,7 +49,7 @@ export const searchMangaWithPagination = async (
     .lean();
 };
 
-export const getMangaById = async (id: string) => {
+export const getMangaApprovedById = async (id: string) => {
   return await MangaModel.findOneAndUpdate(
     { _id: id, status: MANGA_STATUS.APPROVED },
     { $inc: { viewNumber: 1 } },
@@ -100,6 +100,13 @@ export const getRelatedManga = async (genres: string[], limit: number = 10) => {
     .lean();
 };
 
-export const getMangaByIdAndOwner = async (id: string, ownerId: string) => {
-  return await MangaModel.findOne({ _id: id, ownerId }).lean();
+export const getMangaByIdAndOwner = async (
+  id: string,
+  ownerId: string,
+  isAdmin: boolean = false,
+) => {
+  return await MangaModel.findOne({
+    _id: id,
+    ...(!isAdmin && { ownerId }),
+  }).lean();
 };

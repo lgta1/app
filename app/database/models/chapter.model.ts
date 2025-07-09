@@ -5,7 +5,6 @@ import { CHAPTER_STATUS } from "~/constants/chapter";
 export type ChapterType = {
   id: string;
   title: string;
-  thumbnail: string;
   viewNumber?: number;
   likeNumber?: number;
   commentNumber?: number;
@@ -20,7 +19,6 @@ export type ChapterType = {
 const ChapterSchema = new Schema<ChapterType>(
   {
     title: { type: String, required: true },
-    thumbnail: { type: String, required: true },
     viewNumber: { type: Number, default: 0 },
     likeNumber: { type: Number, default: 0 },
     commentNumber: { type: Number, default: 0 },

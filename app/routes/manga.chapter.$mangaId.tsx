@@ -1,12 +1,13 @@
 import { useLoaderData } from "react-router";
 
 import { getChaptersByMangaIdAndNumber } from "@/queries/chapter.query";
-import { getMangaById, getMangaByIdAndOwner } from "@/queries/manga.query";
+import { getMangaApprovedById, getMangaByIdAndOwner } from "@/queries/manga.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/manga.chapter.$mangaId";
 
 import { ChapterDetail } from "~/components/chapter-detail";
+import { isAdmin } from "~/helpers/user.helper";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const mangaId = params.mangaId;
@@ -19,12 +20,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   // Lấy dữ liệu manga
-  let manga = await getMangaById(mangaId);
+  let manga = await getMangaApprovedById(mangaId);
 
   if (!manga) {
     const user = await getUserInfoFromSession(request);
     if (user) {
-      manga = await getMangaByIdAndOwner(mangaId, user.id);
+      manga = await getMangaByIdAndOwner(mangaId, user.id, isAdmin(user.role));
     }
   }
   if (!manga) {

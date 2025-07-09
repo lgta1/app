@@ -1,14 +1,13 @@
 import { useRef, useState } from "react";
 import { toast, Toaster } from "react-hot-toast";
 import { Link, redirect, useActionData, useFetcher, useParams } from "react-router";
-import { ArrowLeft, BookOpen, FileText, Image, Upload, X } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Upload, X } from "lucide-react";
 
 import { createChapter } from "@/mutations/chapter.mutation";
 
 import type { Route } from "./+types/manga.chapter.create.$mangaId";
 
 import { ChapterDetail } from "~/components/chapter-detail";
-import { ImageUploader } from "~/components/image-uploader";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
@@ -28,16 +27,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const title = formData.get("title") as string;
-    const thumbnail = formData.get("thumbnail") as string;
     const contentUrls = JSON.parse(formData.get("contentUrls") as string);
 
-    if (!title || !thumbnail || !contentUrls || contentUrls.length === 0) {
+    if (!title || !contentUrls || contentUrls.length === 0) {
       throw new BusinessError("Vui lòng điền đầy đủ thông tin");
     }
 
     await createChapter(request, {
       title: title.trim(),
-      thumbnail,
       contentUrls,
       mangaId,
     });
@@ -63,8 +60,6 @@ export default function CreateChapter() {
   const [title, setTitle] = useState("");
   const [contents, setContents] = useState<File[]>([]);
   const [previewImages, setPreviewImages] = useState<PreviewImage[]>([]);
-  const [thumbnail, setThumbnail] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const actionData = useActionData<typeof action>();
@@ -97,20 +92,6 @@ export default function CreateChapter() {
     event.target.value = "";
   };
 
-  const handleThumbnailSelect = (file: File) => {
-    setThumbnail(file);
-    const url = URL.createObjectURL(file);
-    setThumbnailPreview(url);
-  };
-
-  const handleThumbnailClear = () => {
-    setThumbnail(null);
-    if (thumbnailPreview) {
-      URL.revokeObjectURL(thumbnailPreview);
-      setThumbnailPreview("");
-    }
-  };
-
   const removePreviewImage = (id: string) => {
     setPreviewImages((prev) => {
       const imageToRemove = prev.find((img) => img.id === id);
@@ -140,7 +121,7 @@ export default function CreateChapter() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!title.trim() || !thumbnail || contents.length === 0) {
+    if (!title.trim() || contents.length === 0) {
       toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
@@ -153,37 +134,24 @@ export default function CreateChapter() {
     setIsSubmitting(true);
 
     try {
-      // Prepare files for upload
-      const filesToUpload = [
-        // Upload thumbnail
-        {
-          file: thumbnail,
-          options: {
-            bucket: "manga-images",
-            category: "thumbnails",
-          },
+      // Prepare files for upload - only content pages
+      const filesToUpload = contents.map((file) => ({
+        file,
+        options: {
+          bucket: "manga-images",
+          category: "pages",
         },
-        // Upload all content pages
-        ...contents.map((file) => ({
-          file,
-          options: {
-            bucket: "manga-images",
-            category: "pages",
-          },
-        })),
-      ];
+      }));
 
       // Upload all files
       const uploadResults = await uploadMultipleFiles(filesToUpload);
 
-      // First result is thumbnail, rest are content pages
-      const thumbnailUrl = uploadResults[0].url;
-      const contentUrls = uploadResults.slice(1).map((result) => result.url);
+      // Get content URLs
+      const contentUrls = uploadResults.map((result) => result.url);
 
       // Create chapter using fetcher
       const formData = new FormData();
       formData.append("title", title.trim());
-      formData.append("thumbnail", thumbnailUrl);
       formData.append("contentUrls", JSON.stringify(contentUrls));
 
       fetcher.submit(formData, { method: "POST" });
@@ -206,7 +174,7 @@ export default function CreateChapter() {
   const responseData = fetcher.data || actionData;
 
   const handlePreview = () => {
-    if (!title.trim() || !thumbnail || contents.length === 0) {
+    if (!title.trim() || contents.length === 0) {
       toast.error("Vui lòng điền đầy đủ thông tin trước khi xem trước");
       return;
     }
@@ -223,7 +191,6 @@ export default function CreateChapter() {
     title: title || "Tiêu đề chương",
     chapterNumber: 1,
     contentUrls: previewImages.map((img) => img.url),
-    thumbnail: thumbnailPreview,
     mangaId: mangaId || "",
     viewNumber: 0,
     likeNumber: 0,
@@ -410,37 +377,6 @@ export default function CreateChapter() {
               )}
             </div>
           </div>
-
-          {/* Cover Image Section */}
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-0">
-            <div className="flex items-center gap-1.5">
-              <Image className="text-txt-secondary h-4 w-4" />
-              <span className="text-txt-primary text-base font-semibold">Ảnh bìa</span>
-            </div>
-
-            <div className="flex w-full flex-col items-start gap-6 sm:flex-row sm:gap-9 lg:w-[680px] lg:items-center">
-              <div className="h-24 w-44">
-                <ImageUploader
-                  onFileSelect={handleThumbnailSelect}
-                  onClear={handleThumbnailClear}
-                  preview={thumbnailPreview}
-                  uploadText="Tải ảnh lên"
-                  name="thumbnail"
-                  required={true}
-                  accept="image/*"
-                />
-              </div>
-
-              <div className="flex w-full flex-col gap-1 sm:w-56">
-                <p className="text-txt-secondary text-base leading-normal font-medium">
-                  1. Ảnh có tỷ lệ 9:5
-                </p>
-                <p className="text-txt-secondary text-base leading-normal font-medium">
-                  2. Ảnh có kích thước dưới 1MB
-                </p>
-              </div>
-            </div>
-          </div>
         </form>
       </div>
 
@@ -468,7 +404,7 @@ export default function CreateChapter() {
           <button
             type="button"
             onClick={handleExternalSubmit}
-            disabled={!title.trim() || !thumbnail || contents.length === 0 || isLoading}
+            disabled={!title.trim() || contents.length === 0 || isLoading}
             className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9] disabled:cursor-not-allowed disabled:opacity-50 sm:w-52"
           >
             <span className="text-center text-sm font-semibold text-black">

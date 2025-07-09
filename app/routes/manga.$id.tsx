@@ -3,7 +3,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 
 import { getChaptersByMangaId } from "@/queries/chapter.query";
 import { getLeaderboard } from "@/queries/leaderboad.query";
-import { getMangaById, getRelatedManga } from "@/queries/manga.query";
+import { getMangaApprovedById, getRelatedManga } from "@/queries/manga.query";
 import { getRevenuesByPeriod } from "@/queries/manga-revenue.query";
 import { getTopUser } from "@/queries/user.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
@@ -22,7 +22,7 @@ import { isAdmin } from "~/helpers/user.helper";
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { id } = params;
 
-  const manga = await getMangaById(id);
+  const manga = await getMangaApprovedById(id);
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy truyện");

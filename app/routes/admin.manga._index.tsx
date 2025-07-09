@@ -3,6 +3,7 @@ import { toast, Toaster } from "react-hot-toast";
 import {
   type ActionFunctionArgs,
   type ClientActionFunctionArgs,
+  Link,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from "react-router";
@@ -99,20 +100,20 @@ export async function clientAction({ serverAction }: ClientActionFunctionArgs) {
 
 interface ActionButtonsProps {
   manga: MangaType;
-  onDeleteClick: (manga: MangaType) => void;
+  onDeleteClick: (e: React.MouseEvent<HTMLButtonElement>, manga: MangaType) => void;
 }
 
 function ActionButtons({ manga, onDeleteClick }: ActionButtonsProps) {
   return (
     <div className="flex items-center justify-start gap-3">
-      <div
+      <button
         className="flex cursor-pointer items-center justify-start gap-1 hover:opacity-70"
-        onClick={() => onDeleteClick(manga)}
+        onClick={(e) => onDeleteClick(e, manga)}
       >
         <div className="relative h-5 w-5 overflow-hidden">
           <Trash2 className="text-txt-secondary h-5 w-5" />
         </div>
-      </div>
+      </button>
     </div>
   );
 }
@@ -157,7 +158,11 @@ export default function AdminManga() {
   const submit = useSubmit();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
 
-  const handleDeleteClick = (manga: MangaType) => {
+  const handleDeleteClick = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    manga: MangaType,
+  ) => {
+    e.preventDefault();
     if (confirm(`Bạn có chắc chắn muốn xóa truyện "${manga.title}"?`)) {
       const formData = new FormData();
       formData.append("action", "delete");
@@ -259,8 +264,9 @@ export default function AdminManga() {
             const globalIndex = (currentPage - 1) * 7 + index + 1;
 
             return (
-              <div
+              <Link
                 key={manga.id}
+                to={`/manga/preview/${manga.id}`}
                 className="border-bd-default flex flex-col items-start justify-start gap-2 self-stretch border-b p-2 lg:flex-row lg:items-center lg:gap-0 lg:p-0"
               >
                 {/* Mobile Layout */}
@@ -299,7 +305,10 @@ export default function AdminManga() {
                     </div>
                   </div>
                   <div className="flex justify-end">
-                    <ActionButtons manga={manga} onDeleteClick={handleDeleteClick} />
+                    <ActionButtons
+                      manga={manga}
+                      onDeleteClick={(e) => handleDeleteClick(e, manga)}
+                    />
                   </div>
                 </div>
 
@@ -342,9 +351,12 @@ export default function AdminManga() {
                   </div>
                 </div>
                 <div className="hidden min-w-20 items-center justify-start gap-2.5 p-3 lg:flex">
-                  <ActionButtons manga={manga} onDeleteClick={handleDeleteClick} />
+                  <ActionButtons
+                    manga={manga}
+                    onDeleteClick={(e) => handleDeleteClick(e, manga)}
+                  />
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

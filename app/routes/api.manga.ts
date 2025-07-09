@@ -6,6 +6,7 @@ import { ChapterModel } from "~/database/models/chapter.model";
 import { CommentModel } from "~/database/models/comment.model";
 import { MangaModel } from "~/database/models/manga.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
+import { UserLikeMangaModel } from "~/database/models/user-like-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -60,6 +61,9 @@ export async function action({ request }: ActionFunctionArgs) {
 
       // Xóa follow relationships
       UserFollowMangaModel.deleteMany({ mangaId: mangaId }),
+
+      // Xóa like relationships
+      UserLikeMangaModel.deleteMany({ mangaId: mangaId }),
 
       // Xóa tất cả chapters của manga
       ChapterModel.deleteMany({ mangaId: mangaId }),

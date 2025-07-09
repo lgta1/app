@@ -74,11 +74,11 @@ export default function Profile() {
             </button>
           </Link>
         </div>
-        <div className="flex gap-4 overflow-x-scroll md:overflow-x-hidden lg:gap-6">
+        <div className="flex gap-4 md:overflow-x-hidden lg:gap-6">
           {user.waifuCollection.map((image: string, index: number) => (
             <img
               key={index}
-              className="aspect-2/3 h-40 w-full rounded-lg object-cover sm:h-48 lg:h-50"
+              className="aspect-2/3 h-40 rounded-lg object-cover sm:h-48 lg:h-50"
               src={image}
               alt={`Waifu ${index + 1}`}
             />
