@@ -11,12 +11,14 @@ import {
 } from "react-router";
 import { ArrowLeft, BookOpen, FileText, Upload, X } from "lucide-react";
 
-import { createChapter, updateChapter } from "@/mutations/chapter.mutation";
+import { updateChapter } from "@/mutations/chapter.mutation";
 import { getChaptersByMangaIdAndNumber } from "@/queries/chapter.query";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/manga.chapter.edit.$mangaId";
 
 import { ChapterDetail } from "~/components/chapter-detail";
+import type { UserType } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
@@ -31,21 +33,25 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const chapterNumber = url.searchParams.get("chapterNumber");
   const mangaId = params.mangaId;
-
+  const user = await getUserInfoFromSession(request);
   if (!mangaId) {
     throw new BusinessError("Không tìm thấy manga ID");
   }
 
-  // If chapterNumber is provided, load existing chapter data
-  if (chapterNumber) {
-    const chapter = await getChaptersByMangaIdAndNumber(mangaId, parseInt(chapterNumber));
-    if (!chapter) {
-      throw new BusinessError("Không tìm thấy chương");
-    }
-    return { chapter, isEdit: true };
+  if (!chapterNumber) {
+    throw new BusinessError("Thiếu số chương để chỉnh sửa");
   }
 
-  return { chapter: null, isEdit: false };
+  const chapter = await getChaptersByMangaIdAndNumber(
+    mangaId,
+    parseInt(chapterNumber),
+    user as UserType,
+  );
+  if (!chapter) {
+    throw new BusinessError("Không tìm thấy chương");
+  }
+
+  return { chapter };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -59,6 +65,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       throw new BusinessError("Không tìm thấy manga ID");
     }
 
+    if (!chapterNumber) {
+      throw new BusinessError("Thiếu số chương để chỉnh sửa");
+    }
+
     const title = formData.get("title") as string;
     const contentUrls = JSON.parse(formData.get("contentUrls") as string);
 
@@ -66,20 +76,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       throw new BusinessError("Vui lòng điền đầy đủ thông tin");
     }
 
-    // If chapterNumber exists, update existing chapter
-    if (chapterNumber) {
-      await updateChapter(request, mangaId, parseInt(chapterNumber), {
-        title: title.trim(),
-        contentUrls,
-      });
-    } else {
-      // Create new chapter
-      await createChapter(request, {
-        title: title.trim(),
-        contentUrls,
-        mangaId,
-      });
-    }
+    await updateChapter(request, mangaId, parseInt(chapterNumber), {
+      title: title.trim(),
+      contentUrls,
+    });
 
     return redirect(`/manga/uploaded/${mangaId}`);
   } catch (error) {
@@ -99,7 +99,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function EditChapter() {
   const { mangaId } = useParams();
   const [searchParams] = useSearchParams();
-  const { chapter, isEdit } = useLoaderData<typeof loader>();
+  const { chapter } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [title, setTitle] = useState("");
   const [contents, setContents] = useState<File[]>([]);
@@ -114,18 +114,16 @@ export default function EditChapter() {
 
   // Initialize form data when editing
   useEffect(() => {
-    if (isEdit && chapter) {
-      setTitle(chapter.title);
+    setTitle(chapter.title);
 
-      // Convert existing content URLs to preview images
-      const existingImages: PreviewImage[] = chapter.contentUrls.map((url, index) => ({
-        url,
-        id: `existing-${index}`,
-        isExisting: true,
-      }));
-      setPreviewImages(existingImages);
-    }
-  }, [isEdit, chapter]);
+    // Convert existing content URLs to preview images
+    const existingImages: PreviewImage[] = chapter.contentUrls.map((url, index) => ({
+      url,
+      id: `existing-${index}`,
+      isExisting: true,
+    }));
+    setPreviewImages(existingImages);
+  }, [chapter]);
 
   const handlePagesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -270,7 +268,7 @@ export default function EditChapter() {
   const previewChapterData = {
     id: "preview",
     title: title || "Tiêu đề chương",
-    chapterNumber: isEdit && chapter ? chapter.chapterNumber : 1,
+    chapterNumber: chapter.chapterNumber,
     contentUrls: previewImages.map((img) => img.url),
     mangaId: mangaId || "",
     viewNumber: 0,
@@ -279,7 +277,7 @@ export default function EditChapter() {
     status: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
-    breadcrumb: "Preview > Manga > " + (title || "Chương mới"),
+    breadcrumb: "Preview > Manga > " + (title || "Chương " + chapter.chapterNumber),
     hasPrevious: false,
     hasNext: false,
   };
@@ -314,7 +312,7 @@ export default function EditChapter() {
       {/* Header */}
       <div className="flex flex-col gap-6">
         <h1 className="text-txt-primary text-left font-sans text-2xl leading-9 font-semibold [text-shadow:_0px_0px_4px_rgb(182_25_255_/_0.59)] sm:text-3xl">
-          {isEdit ? "Chỉnh sửa chương" : "Đăng chương mới"}
+          Chỉnh sửa chương
         </h1>
 
         {/* Main Form Container */}
@@ -498,7 +496,7 @@ export default function EditChapter() {
             className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9] disabled:cursor-not-allowed disabled:opacity-50 sm:w-52"
           >
             <span className="text-center text-sm font-semibold text-black">
-              {isLoading ? "Đang xử lý..." : isEdit ? "Cập nhật" : "Gửi duyệt"}
+              {isLoading ? "Đang xử lý..." : "Cập nhật"}
             </span>
           </button>
         </div>

@@ -3,7 +3,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 
 import { getChaptersByMangaId } from "@/queries/chapter.query";
 import { getLeaderboard } from "@/queries/leaderboad.query";
-import { getMangaApprovedById, getRelatedManga } from "@/queries/manga.query";
+import { getMangaPublishedById, getRelatedManga } from "@/queries/manga.query";
 import { getRevenuesByPeriod } from "@/queries/manga-revenue.query";
 import { getTopUser } from "@/queries/user.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
@@ -22,7 +22,8 @@ import { isAdmin } from "~/helpers/user.helper";
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { id } = params;
 
-  const manga = await getMangaApprovedById(id);
+  const manga = await getMangaPublishedById(id);
+  const user = await getUserInfoFromSession(request);
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy truyện");
@@ -37,7 +38,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     monthlyLeaderboard,
     currentUser,
   ] = await Promise.all([
-    getChaptersByMangaId(manga.id),
+    getChaptersByMangaId(manga.id, user),
     getRelatedManga(manga.genres),
     getRevenuesByPeriod("monthly"),
     getTopUser(),

@@ -1,39 +1,37 @@
 import { useLoaderData } from "react-router";
 
 import { getChaptersByMangaIdAndNumber } from "@/queries/chapter.query";
-import { getMangaApprovedById, getMangaByIdAndOwner } from "@/queries/manga.query";
+import { getMangaPublishedById } from "@/queries/manga.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/manga.chapter.$mangaId";
 
 import { ChapterDetail } from "~/components/chapter-detail";
-import { isAdmin } from "~/helpers/user.helper";
+import type { UserType } from "~/database/models/user.model";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const mangaId = params.mangaId;
 
   const url = new URL(request.url);
   const chapterNumber = Number(url.searchParams.get("chapterNumber"));
+  const user = await getUserInfoFromSession(request);
 
   if (!mangaId) {
     throw new Response("Không tìm thấy chapter", { status: 404 });
   }
 
   // Lấy dữ liệu manga
-  let manga = await getMangaApprovedById(mangaId);
-
-  if (!manga) {
-    const user = await getUserInfoFromSession(request);
-    if (user) {
-      manga = await getMangaByIdAndOwner(mangaId, user.id, isAdmin(user.role));
-    }
-  }
+  const manga = await getMangaPublishedById(mangaId, user);
   if (!manga) {
     throw new Response("Không tìm thấy truyện", { status: 404 });
   }
 
   // Lấy dữ liệu chapter
-  const chapter = await getChaptersByMangaIdAndNumber(mangaId, chapterNumber);
+  const chapter = await getChaptersByMangaIdAndNumber(
+    mangaId,
+    chapterNumber,
+    user as UserType,
+  );
   if (!chapter) {
     throw new Response("Không tìm thấy chapter", { status: 404 });
   }

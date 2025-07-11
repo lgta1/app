@@ -231,3 +231,29 @@ print(
   `Manga with more than 500 chapters: ${db.mangas.count({ chapters: { $gt: 500 } })}`,
 );
 print(`Manga with 'Romance' genre: ${db.mangas.count({ genres: "Romance" })}`);
+
+// Update manga with code field starting from 99999 and decreasing
+print("\nUpdating manga with code field...");
+
+// Get all manga documents sorted by _id
+const allManga = db.mangas.find().sort({ _id: 1 }).toArray();
+let currentCode = 99999;
+
+// Update each manga with decreasing code
+allManga.forEach((manga) => {
+  db.mangas.updateOne({ _id: manga._id }, { $set: { code: currentCode } });
+  currentCode--;
+});
+
+print(`Successfully updated ${allManga.length} manga entries with code field.`);
+print(`Code range: ${99999 - allManga.length + 1} to 99999`);
+
+// Display sample of updated data
+print("\nSample of updated manga data with code:");
+db.mangas
+  .find({}, { title: 1, code: 1, _id: 0 })
+  .limit(5)
+  .sort({ code: -1 })
+  .forEach((manga) => {
+    printjson(manga);
+  });

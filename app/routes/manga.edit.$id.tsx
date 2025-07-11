@@ -43,10 +43,7 @@ export const meta: MetaFunction = () => {
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const userInfo = await requireLogin(request);
   const genres = await getAllGenres();
-  const manga: MangaType | null = await getMangaByIdAndOwner(
-    params.id || "",
-    userInfo.id,
-  );
+  const manga = await getMangaByIdAndOwner(params.id || "", userInfo.id);
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy truyện");

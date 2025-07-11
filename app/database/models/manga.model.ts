@@ -1,9 +1,11 @@
 import { model, Schema } from "mongoose";
+import { autoIncrement } from "mongoose-plugin-autoinc";
 
 import { MANGA_STATUS } from "~/constants/manga";
 
 export type MangaType = {
   id: string;
+  code?: number;
   title: string;
   description: string;
   poster: string;
@@ -25,6 +27,7 @@ export type MangaType = {
 
 const MangaSchema = new Schema<MangaType>(
   {
+    code: { type: Number, unique: true },
     title: { type: String, required: true },
     description: { type: String, required: true },
     poster: { type: String, required: true },
@@ -43,6 +46,14 @@ const MangaSchema = new Schema<MangaType>(
   },
   { timestamps: true },
 );
+
+// Cấu hình auto-increment cho trường code bắt đầu từ 100000
+MangaSchema.plugin(autoIncrement, {
+  model: "Manga",
+  field: "code",
+  startAt: 100000,
+  incrementBy: 1,
+});
 
 // Text index cho search functionality
 MangaSchema.index({ title: "text" });

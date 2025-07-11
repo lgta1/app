@@ -19,7 +19,7 @@ export const createChapter = async (
     { _id: chapter.mangaId, ownerId: userInfo.id },
     {
       $inc: { chapters: 1 },
-      $set: { status: MANGA_STATUS.CREATING },
+      $set: { status: MANGA_STATUS.PENDING },
     },
     { new: true },
   );
@@ -55,7 +55,7 @@ export const updateChapter = async (
   // Verify manga ownership
   const manga = await MangaModel.findOneAndUpdate(
     { _id: mangaId, ownerId: userInfo.id },
-    { $set: { status: MANGA_STATUS.CREATING } },
+    { $set: { status: MANGA_STATUS.PENDING } },
     { new: true },
   );
   if (!manga) {
@@ -75,9 +75,6 @@ export const updateChapter = async (
   if (!updatedChapter) {
     throw new BusinessError("Không tìm thấy chương");
   }
-
-  // Update manga status to waiting
-  await MangaModel.findByIdAndUpdate(mangaId, { status: MANGA_STATUS.CREATING });
 
   return updatedChapter;
 };

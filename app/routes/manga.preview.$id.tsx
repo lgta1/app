@@ -29,7 +29,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw new BusinessError("Không tìm thấy truyện");
   }
 
-  const chapters = await getChaptersByMangaId(manga.id);
+  const chapters = await getChaptersByMangaId(manga.id, user);
 
   return {
     manga,

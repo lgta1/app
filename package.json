@@ -27,6 +27,7 @@
     "minio": "^8.0.5",
     "mongoose": "^8.15.0",
     "mongoose-lean-id": "^1.0.0",
+    "mongoose-plugin-autoinc": "^1.1.9",
     "node-cron": "^4.0.7",
     "pm2": "^6.0.6",
     "react": "^19.1.0",
