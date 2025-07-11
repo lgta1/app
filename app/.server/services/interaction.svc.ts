@@ -1,4 +1,5 @@
 import { InteractionModel } from "~/database/models/interaction.model";
+import { MangaModel } from "~/database/models/manga.model";
 
 export type InteractionData = {
   story_id: string;
@@ -29,6 +30,10 @@ export const recordInteraction = async (data: InteractionData): Promise<void> =>
  * Ghi lại view cho manga (tự động khi user truy cập)
  */
 export const recordView = async (storyId: string, userId?: string): Promise<void> => {
+  await MangaModel.findByIdAndUpdate(storyId, {
+    $inc: { viewNumber: 1 },
+  });
+
   await recordInteraction({
     story_id: storyId,
     type: "view",

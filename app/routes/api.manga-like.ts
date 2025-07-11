@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
+import { recordLike } from "@/services/interaction.svc";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { MangaModel } from "~/database/models/manga.model";
@@ -86,6 +87,11 @@ export async function action({ request }: ActionFunctionArgs) {
       // Tăng likeNumber trong manga
       await MangaModel.findByIdAndUpdate(mangaId, {
         $inc: { likeNumber: 1 },
+      });
+
+      // Record like interaction (non-blocking)
+      recordLike(mangaId, user.id).catch((error) => {
+        console.error("Lỗi khi ghi like interaction:", error);
       });
 
       return Response.json({

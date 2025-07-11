@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 
 import { type InteractionData, recordInteraction } from "@/services/interaction.svc";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -8,10 +9,19 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json({ error: "Chỉ chấp nhận POST method" }, { status: 405 });
     }
 
+    const user = await getUserInfoFromSession(request);
+
+    if (!user) {
+      return Response.json(
+        { error: "Bạn cần đăng nhập để thực hiện hành động này" },
+        { status: 401 },
+      );
+    }
+
     const formData = await request.formData();
     const storyId = formData.get("story_id") as string;
     const type = formData.get("type") as string;
-    const userId = formData.get("user_id") as string | null;
+    const userId = user.id;
 
     // Validate required fields
     if (!storyId || !type) {

@@ -1,5 +1,6 @@
 import { createComment, deleteComment, likeComment } from "@/mutations/comment.mutation";
 import { getComments, getReplies } from "@/queries/comment.query";
+import { recordComment } from "@/services/interaction.svc";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.comments";
@@ -212,6 +213,13 @@ export async function action({ request }: Route.ActionArgs) {
         parentId: parentId || undefined,
         userId: user.id,
       });
+
+      // Record comment interaction for manga (non-blocking)
+      if (mangaId) {
+        recordComment(mangaId, user.id).catch((error) => {
+          console.error("Lỗi khi ghi comment interaction:", error);
+        });
+      }
 
       // Try to claim exp from comment (non-blocking)
       const expResult = await claimCommentExp(user.id);

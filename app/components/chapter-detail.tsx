@@ -150,6 +150,19 @@ export function ChapterDetail({
       method: "POST",
       action: "/api/reading-exp",
     });
+
+    // Record view interaction (non-blocking)
+    const viewFormData = new FormData();
+    viewFormData.append("story_id", chapter.mangaId);
+    viewFormData.append("type", "view");
+    // Note: userId sẽ được lấy từ session trong API
+
+    fetch("/api/interactions", {
+      method: "POST",
+      body: viewFormData,
+    }).catch((error) => {
+      console.error("Lỗi khi ghi view interaction:", error);
+    });
   };
 
   // Handle API response cho report
