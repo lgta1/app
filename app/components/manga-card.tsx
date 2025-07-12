@@ -8,7 +8,7 @@ export function MangaCard({ manga }: { manga: MangaType }) {
   const { title, chapters, createdAt, viewNumber, likeNumber, poster } = manga;
 
   return (
-    <Link to={`/manga/${manga.id}`} className="aspect-2/3 w-[46%] sm:w-[150px]">
+    <Link to={`/manga/${manga.id}`} className="aspect-2/3 w-[46%] lg:w-[150px]">
       <div className="relative h-3/4 w-full overflow-hidden rounded-t-lg">
         <img src={poster} alt={title} className="h-full w-full object-cover" />
         <div className="to-bgc-layer1 absolute inset-0 bg-gradient-to-b from-transparent"></div>

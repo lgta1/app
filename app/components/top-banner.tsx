@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { TopBannerItem } from "./top-banner-item";
 
 import type { MangaType } from "~/database/models/manga.model";
+
 export function TopBanner({ bannerItems }: { bannerItems: MangaType[] }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 

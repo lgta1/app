@@ -7,11 +7,22 @@ export async function loader({ request }: Route.LoaderArgs) {
   const page = parseInt(url.searchParams.get("page") || "1");
   const limit = parseInt(url.searchParams.get("limit") || "10");
 
-  const manga = await getNewManga(page, limit);
+  try {
+    const result = await getNewManga(page, limit);
 
-  return {
-    manga,
-    hasMore: manga.length === limit,
-    nextPage: page + 1,
-  };
+    return {
+      data: result.manga,
+      totalPages: result.totalPages,
+      currentPage: result.currentPage,
+      success: true,
+    };
+  } catch (error) {
+    return {
+      data: [],
+      totalPages: 0,
+      currentPage: page,
+      success: false,
+      error: "Có lỗi xảy ra khi tải dữ liệu",
+    };
+  }
 }

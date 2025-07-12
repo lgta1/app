@@ -71,7 +71,7 @@ export function UserMenu({ user, isAdmin = false, isMobile = false }: UserMenuPr
             sideOffset={8}
             align="end"
           >
-            <UserDropdownMenu />
+            <UserDropdownMenu setIsUserMenuOpen={setIsUserMenuOpen} />
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>

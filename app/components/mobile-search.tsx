@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 
 import { SearchItem } from "./header-search-item";
 
+import { LoadingSpinner } from "~/components/loading-spinner";
 import type { MangaType } from "~/database/models/manga.model";
 
 interface SearchResponse {
@@ -203,11 +204,7 @@ export function MobileSearch() {
                     </div>
                   ))}
 
-                  {isLoading && (
-                    <div className="flex items-center justify-center p-4">
-                      <div className="border-txt-secondary h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"></div>
-                    </div>
-                  )}
+                  {isLoading && <LoadingSpinner />}
 
                   {!hasMore && results.length > 0 && !isLoading && (
                     <div className="text-txt-secondary py-4 text-center text-sm">

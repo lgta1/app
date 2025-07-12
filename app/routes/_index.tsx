@@ -1,32 +1,30 @@
 import * as Tabs from "@radix-ui/react-tabs";
 
 import { getLeaderboard } from "@/queries/leaderboad.query";
-import { getNewManga } from "@/queries/manga.query";
 import { getRevenuesByPeriod } from "@/queries/manga-revenue.query";
 import { getTopUser } from "@/queries/user.query";
 
 import type { Route } from "./+types/_index";
 
 import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
-import { InfinityLoadingTrigger } from "~/components/infinity-loading-trigger";
+import { LoadingSpinner } from "~/components/loading-spinner";
 import { MangaCard } from "~/components/manga-card";
+import { Pagination } from "~/components/pagination";
 import RatingItem from "~/components/rating-item";
 import RatingItemUser from "~/components/rating-item-user";
 import { TopBanner } from "~/components/top-banner";
 import type { MangaType } from "~/database/models/manga.model";
-import { useInfinityLoading } from "~/hooks/use-infinity-loading";
+import { usePagination } from "~/hooks/use-pagination";
 
 export async function loader() {
   const [
     revenuesByPeriod,
-    newManga,
     topUser,
     dailyLeaderboard,
     weeklyLeaderboard,
     monthlyLeaderboard,
   ] = await Promise.all([
     getRevenuesByPeriod("monthly"),
-    getNewManga(1, 16),
     getTopUser(),
     getLeaderboard("daily"),
     getLeaderboard("weekly"),
@@ -35,7 +33,6 @@ export async function loader() {
 
   return {
     revenuesByPeriod,
-    newManga,
     topUser,
     dailyLeaderboard,
     weeklyLeaderboard,
@@ -53,7 +50,6 @@ export function meta({}: Route.MetaArgs) {
 export default function Index({ loaderData }: Route.ComponentProps) {
   const {
     revenuesByPeriod,
-    newManga,
     topUser,
     dailyLeaderboard,
     weeklyLeaderboard,
@@ -62,15 +58,13 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
   const {
     data: mangaList,
+    currentPage,
+    totalPages,
     isLoading,
-    hasMore,
-    loadingRef,
-    loadMore,
-  } = useInfinityLoading<MangaType>({
-    initialData: newManga,
+    goToPage,
+  } = usePagination<MangaType>({
     apiUrl: "/api/manga/latest",
-    limit: 16,
-    autoLoad: false,
+    limit: 20,
   });
 
   return (
@@ -105,19 +99,28 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-4">
-            {mangaList?.map((manga) => <MangaCard key={manga.id} manga={manga} />)}
-          </div>
+          {isLoading && mangaList.length === 0 ? (
+            <div className="flex justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <>
+              <div className="mt-6 flex flex-wrap gap-4">
+                {mangaList?.map((manga) => <MangaCard key={manga.id} manga={manga} />)}
+              </div>
 
-          {/* Loading indicator và trigger cho infinity scroll */}
-          <div ref={loadingRef}>
-            <InfinityLoadingTrigger
-              isAutoLoad={false}
-              isLoading={isLoading}
-              hasMore={hasMore}
-              onLoadMore={loadMore}
-            />
-          </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-8 flex justify-center">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={goToPage}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </section>
 
         {/* Section bảng xếp hạng */}

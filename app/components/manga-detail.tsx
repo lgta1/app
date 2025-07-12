@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router";
-import { Eye, Heart, MessageCircle, Star, StarOff } from "lucide-react";
+import { Copy, Eye, Heart, MessageCircle, Star, StarOff } from "lucide-react";
 
 import type { ChapterType } from "~/database/models/chapter.model";
 import type { MangaType } from "~/database/models/manga.model";
@@ -15,6 +15,7 @@ interface MangaDetailProps {
 export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   const {
     id,
+    code,
     title,
     poster,
     author,
@@ -24,6 +25,8 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     updatedAt,
     followNumber,
     translationTeam,
+    status,
+    ownerId,
   } = manga;
 
   // State để track trạng thái follow
@@ -42,6 +45,35 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   const [ratingCount, setRatingCount] = useState(manga.ratingCount || 0);
   const [hoverRating, setHoverRating] = useState(0);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
+
+  // Helper function để lấy text trạng thái
+  const getStatusText = (status: number) => {
+    switch (status) {
+      case 0:
+        return "Đang tiến hành";
+      case 1:
+        return "Đã duyệt";
+      case 2:
+        return "Bị từ chối";
+      case 3:
+        return "Đang tạo";
+      default:
+        return "Không xác định";
+    }
+  };
+
+  // Helper function để copy mã code
+  const handleCopyCode = async () => {
+    if (code) {
+      try {
+        await navigator.clipboard.writeText(code.toString());
+        toast.success("Đã copy mã truyện!");
+      } catch (error) {
+        console.error("Error copying to clipboard:", error);
+        toast.error("Không thể copy mã truyện");
+      }
+    }
+  };
 
   // Fetch trạng thái follow và like khi component mount
   useEffect(() => {
@@ -259,10 +291,38 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
 
           {/* Thông tin chi tiết */}
           <div className="grid grid-cols-[1fr_2fr] gap-3">
-            <div className="text-txt-secondary w-28 text-base font-medium">
-              Nhóm dịch:
+            <div className="text-txt-secondary w-28 text-base font-medium">Code:</div>
+            <div className="flex items-center gap-2">
+              <span className="text-txt-primary text-base font-medium">
+                {code || "Chưa có"}
+              </span>
+              {code && (
+                <button
+                  onClick={handleCopyCode}
+                  className="hover:bg-bgc-layer2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors"
+                  title="Copy mã truyện"
+                >
+                  <Copy className="text-txt-secondary h-4 w-4" />
+                </button>
+              )}
             </div>
-            <div className="text-txt-focus text-base font-medium">{translationTeam}</div>
+
+            <div className="text-txt-secondary w-28 text-base font-medium">
+              Tình trạng:
+            </div>
+            <div className="text-txt-primary text-base font-medium">
+              {getStatusText(status)}
+            </div>
+
+            <div className="text-txt-secondary w-28 text-base font-medium">
+              Người đăng:
+            </div>
+            <Link
+              to={`/profile/${ownerId}`}
+              className="text-txt-focus hover:text-txt-primary text-base font-medium transition-colors hover:underline"
+            >
+              {translationTeam}
+            </Link>
 
             <div className="text-txt-secondary w-28 text-base font-medium">Tác giả:</div>
             <div className="text-txt-primary text-base font-medium">{author}</div>
@@ -296,7 +356,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
           </div>
 
           {/* Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-4 md:justify-start">
+          <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
             {/* Nút Yêu thích */}
             <button
               onClick={handleLikeToggle}

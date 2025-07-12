@@ -2,13 +2,16 @@ import { useState } from "react";
 import { NavLink } from "react-router";
 import { Power } from "lucide-react";
 
-export function UserDropdownMenu() {
+export function UserDropdownMenu({
+  setIsUserMenuOpen,
+}: {
+  setIsUserMenuOpen: (isOpen: boolean) => void;
+}) {
   const [showTitle, setShowTitle] = useState(true);
 
   const handleToggleTitle = () => {
     setShowTitle(!showTitle);
-    // TODO: Implement toggle title display logic
-    console.log("Toggle title display:", !showTitle);
+    setIsUserMenuOpen(false);
   };
 
   return (
@@ -17,6 +20,7 @@ export function UserDropdownMenu() {
       <NavLink
         to="/manga/create"
         className="border-bd-default hover:bg-bgc-layer2 flex cursor-pointer items-center justify-start gap-2 border-b p-3 transition-colors md:border-b-0"
+        onClick={() => setIsUserMenuOpen(false)}
       >
         <span className="text-txt-primary justify-center text-center text-base leading-normal font-medium">
           Đăng truyện
@@ -27,6 +31,7 @@ export function UserDropdownMenu() {
       <NavLink
         to="/profile"
         className="border-bd-default hover:bg-bgc-layer2 flex cursor-pointer items-center justify-start gap-2 border-b p-3 transition-colors md:border-b-0"
+        onClick={() => setIsUserMenuOpen(false)}
       >
         <span className="text-txt-primary justify-center text-center text-base leading-normal font-medium">
           Trang cá nhân
@@ -37,6 +42,7 @@ export function UserDropdownMenu() {
       <NavLink
         to="/change-password"
         className="border-bd-default hover:bg-bgc-layer2 flex cursor-pointer items-center justify-start gap-2 border-b p-3 transition-colors md:border-b-0"
+        onClick={() => setIsUserMenuOpen(false)}
       >
         <span className="text-txt-primary justify-center text-center text-base leading-normal font-medium">
           Đổi mật khẩu
@@ -62,6 +68,7 @@ export function UserDropdownMenu() {
       <NavLink
         to="/logout"
         className="border-bd-default hover:bg-bgc-layer2 flex cursor-pointer items-center justify-start gap-2 border-b p-3 transition-colors md:border-b-0"
+        onClick={() => setIsUserMenuOpen(false)}
       >
         <Power className="h-4 w-4 text-[#E03F46]" />
         <span className="justify-center text-base leading-normal font-medium text-[#E03F46]">

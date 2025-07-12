@@ -15,6 +15,13 @@ export function TopBannerItem({ manga }: { manga: MangaType }) {
           backgroundPosition: "center",
         }}
       >
+        {/* Hot Badge */}
+        <div className="absolute top-2 left-2 z-10">
+          <div className="flex items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-pink-700 px-2.5 py-1 shadow-lg backdrop-blur-md">
+            <span className="text-xs font-bold text-white">Hot</span>
+          </div>
+        </div>
+
         {/* Gradient overlay */}
         <div className="to-bgc-layer1 absolute inset-0 bg-gradient-to-b from-transparent from-40%"></div>
 

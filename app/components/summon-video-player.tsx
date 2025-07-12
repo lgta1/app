@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { isMobile } from "react-device-detect";
 import { SkipForward } from "lucide-react";
 
+import { LoadingSpinner } from "~/components/loading-spinner";
+
 interface SummonVideoPlayerProps {
   isPlaying: boolean;
   onVideoEnd: () => void;
@@ -100,7 +102,7 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
       {/* Loading spinner */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-white"></div>
+          <LoadingSpinner />
         </div>
       )}
     </div>
