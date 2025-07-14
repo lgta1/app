@@ -52,16 +52,16 @@ export function RewardGoldDialog({
               </div>
               <div className="flex flex-col items-start justify-start gap-3 self-stretch">
                 <div className="text-txt-primary justify-start self-stretch text-center text-2xl leading-loose font-semibold">
-                  Thưởng dấm ngọc
+                  Thưởng dâm ngọc
                 </div>
                 <div className="text-txt-secondary self-stretch text-center text-sm leading-tight font-medium">
-                  Thưởng dấm ngọc cho thành viên{" "}
+                  Thưởng dâm ngọc cho thành viên{" "}
                   <span className="text-txt-primary font-semibold">{member.email}</span>
                 </div>
                 <div className="flex flex-col items-start justify-start gap-1.5 self-stretch">
                   <div className="inline-flex items-center justify-start gap-1.5">
                     <div className="text-txt-primary justify-center text-base leading-normal font-semibold">
-                      Số lượng dấm ngọc<span className="text-red-500">*</span>
+                      Số lượng dâm ngọc<span className="text-red-500">*</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-start justify-start self-stretch">
@@ -85,7 +85,7 @@ export function RewardGoldDialog({
                       <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        placeholder="VD: Bạn đã nhận được 500 dấm ngọc vì đạt top 10 doanh thu tuần."
+                        placeholder="VD: Bạn đã nhận được 500 dâm ngọc vì đạt top 10 doanh thu tuần."
                         className="text-txt-primary placeholder-txt-secondary h-full flex-1 resize-none bg-transparent text-base leading-normal font-medium focus:outline-none"
                       />
                     </div>

@@ -184,14 +184,14 @@ export default function WaifuSummon() {
         ? GOLD_COST_PER_SUMMON_MULTI.rateUp
         : GOLD_COST_PER_SUMMON_MULTI.normal;
       if (user.gold < goldCost) {
-        return toastWarning("Không đủ ngọc dâm");
+        return toastWarning("Không đủ dâm ngọc");
       }
     } else {
       const goldCost = banner.isRateUp
         ? GOLD_COST_PER_SUMMON.rateUp
         : GOLD_COST_PER_SUMMON.normal;
       if (user.gold < goldCost) {
-        return toastWarning("Không đủ ngọc dâm");
+        return toastWarning("Không đủ dâm ngọc");
       }
     }
 

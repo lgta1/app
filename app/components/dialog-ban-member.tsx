@@ -86,7 +86,7 @@ export function BanMemberDialog({
                       <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        placeholder="VD: Bạn đã nhận được 500 dấm ngọc vì đạt top 10 doanh thu tuần."
+                        placeholder="VD: Bạn đã nhận được 500 dâm ngọc vì đạt top 10 doanh thu tuần."
                         className="text-txt-primary placeholder-txt-secondary h-full flex-1 resize-none bg-transparent text-base leading-normal font-medium focus:outline-none"
                       />
                     </div>
