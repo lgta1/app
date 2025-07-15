@@ -1,8 +1,14 @@
 import { type ActionFunctionArgs } from "react-router";
 
-import { getUserInfoFromSession } from "~/.server/services/session.svc";
-import { UserModel } from "~/database/models/user.model";
+import {
+  commitUserSession,
+  getUserInfoFromSession,
+  getUserSession,
+  setUserDataToSession,
+} from "~/.server/services/session.svc";
+import { UserModel, type UserType } from "~/database/models/user.model";
 import { UserWaifuModel } from "~/database/models/user-waifu";
+import { updateUserExp } from "~/helpers/user-level.helper";
 
 // Bảng quy đổi theo cấp sao
 const SACRIFICE_RATES = {
@@ -119,17 +125,33 @@ export async function action({ request }: ActionFunctionArgs) {
     const waifuIdsToDelete = waifusToSacrifice.map((w) => w._id);
 
     // Xóa waifu và cập nhật user trong transaction
-    await Promise.all([
+    const [, updatedUser] = await Promise.all([
       UserWaifuModel.deleteMany({ _id: { $in: waifuIdsToDelete } }),
       UserModel.findByIdAndUpdate(user.id, {
         $inc: {
           exp: totalExp,
           gold: -totalGoldCost,
         },
-      }),
+      }).lean(),
     ]);
 
-    return Response.json({
+    // Kiểm tra level up và cập nhật session
+    let updatedSession = null;
+    if (updatedUser) {
+      const { newLevel } = updateUserExp(updatedUser as UserType, totalExp);
+
+      if (updatedUser.level && newLevel > updatedUser.level) {
+        await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+
+        // Cập nhật session khi level thay đổi
+        const session = await getUserSession(request);
+        const updatedUserData = { ...user, level: newLevel };
+        setUserDataToSession(session, updatedUserData);
+        updatedSession = session;
+      }
+    }
+
+    const response = {
       success: true,
       message: `Hiến tế thành công ${sacrificeAmount} ${waifuInfo.waifuName}!`,
       data: {
@@ -139,7 +161,17 @@ export async function action({ request }: ActionFunctionArgs) {
         waifuName: waifuInfo.waifuName,
         waifuStars: waifuStars,
       },
-    });
+    };
+
+    if (updatedSession) {
+      return Response.json(response, {
+        headers: {
+          "Set-Cookie": await commitUserSession(updatedSession),
+        },
+      });
+    }
+
+    return Response.json(response);
   } catch (error) {
     console.error("Error in waifu sacrifice:", error);
     return Response.json(

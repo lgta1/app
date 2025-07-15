@@ -93,6 +93,8 @@ export function DialogInventorySacrifice({
       method: "POST",
       action: "/api/waifu/sacrifice",
     });
+
+    setSacrificeAmount(0);
   };
 
   // Xử lý kết quả từ API

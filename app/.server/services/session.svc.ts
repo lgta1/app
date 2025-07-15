@@ -6,7 +6,7 @@ import type { UserType } from "~/database/models/user.model";
 
 const USER_INFO_SESSION_KEY = "userInfo";
 
-const sessionStorage = createCookieSessionStorage({
+export const sessionStorage = createCookieSessionStorage({
   cookie: {
     name: "__session",
     secrets: [ENV.SESSION.SECRET],
@@ -42,6 +42,19 @@ export const setUserDataToSession = (session: Session, user: UserType) => {
     gender: user.gender,
     role: user.role,
     level: user.level,
+    avatar: user.avatar,
+  });
+};
+
+export const commitUserSession = async (session: Session, remember = true) => {
+  return await sessionStorage.commitSession(session, {
+    httpOnly: true,
+    secure: false,
+    // secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: remember
+      ? 60 * 60 * 24 * 7 // 7 days
+      : undefined,
   });
 };
 

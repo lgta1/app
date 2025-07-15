@@ -1,10 +1,16 @@
 import type { ActionFunctionArgs } from "react-router";
 
-import { getUserInfoFromSession } from "@/services/session.svc";
+import {
+  commitUserSession,
+  getUserInfoFromSession,
+  getUserSession,
+  setUserDataToSession,
+} from "@/services/session.svc";
 
 import { ReadingExpModel } from "~/database/models/reading-exp.model";
-import { UserModel } from "~/database/models/user.model";
+import { UserModel, type UserType } from "~/database/models/user.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
+import { updateUserExp } from "~/helpers/user-level.helper";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -135,16 +141,28 @@ export async function action({ request }: ActionFunctionArgs) {
         { upsert: true, new: true },
       );
 
-      // Cập nhật exp cho user
-      await UserModel.findByIdAndUpdate(user.id, {
-        $inc: { exp: expToGain },
-      });
-      // do update level and exp later 🚀
+      const userFull = await UserModel.findOneAndUpdate(
+        { _id: user.id },
+        { $inc: { exp: expToGain } },
+      ).lean();
+
+      const { newLevel } = updateUserExp(userFull as UserType, expToGain);
+
+      let updatedSession = null;
+      if (userFull?.level && newLevel > userFull?.level) {
+        await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+
+        // Cập nhật session khi level thay đổi
+        const session = await getUserSession(request);
+        const updatedUser = { ...user, level: newLevel };
+        setUserDataToSession(session, updatedUser);
+        updatedSession = session;
+      }
 
       const remainingExp = Math.max(0, 100 - updatedExp.totalExp);
       const isFirstTenChapters = updatedExp.chaptersRead <= 10;
 
-      return Response.json({
+      const response = {
         success: true,
         message: `Bạn nhận được ${expToGain} exp! (${isFirstTenChapters ? "10 chapter đầu" : "sau 10 chapter đầu"})`,
         expGained: expToGain,
@@ -152,7 +170,17 @@ export async function action({ request }: ActionFunctionArgs) {
         chaptersRead: updatedExp.chaptersRead,
         remainingExp,
         isFirstTenChapters,
-      });
+      };
+
+      if (updatedSession) {
+        return Response.json(response, {
+          headers: {
+            "Set-Cookie": await commitUserSession(updatedSession),
+          },
+        });
+      }
+
+      return Response.json(response);
     }
 
     return Response.json(

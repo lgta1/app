@@ -1,5 +1,7 @@
 import { checkWaifuToUpdate } from "@/mutations/user-waifu-leaderboard";
 
+import { getUserSession, setUserDataToSession } from "./session.svc";
+
 import { GIFT_MILESTONES } from "~/constants/summon";
 import { type BannerType } from "~/database/models/banner.model";
 import { type PityCumulativeType } from "~/database/models/pity-cumulative.model";
@@ -21,8 +23,11 @@ export const summon = async (
   user: UserType,
   banner: BannerType,
   cum: PityCumulativeType,
+  request?: Request,
 ) => {
   let eligibleGift = false;
+  let updatedSession = null;
+
   if (banner.isRateUp) {
     const userFull = await UserModel.findOneAndUpdate(
       { _id: user.id },
@@ -59,6 +64,14 @@ export const summon = async (
 
     if (userFull?.level && newLevel > userFull?.level) {
       await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+
+      // Cập nhật session nếu có request
+      if (request) {
+        const session = await getUserSession(request);
+        const updatedUser = { ...user, level: newLevel };
+        setUserDataToSession(session, updatedUser);
+        updatedSession = session;
+      }
     }
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
@@ -76,6 +89,7 @@ export const summon = async (
       itemStar,
       item: expItem,
       expValue,
+      updatedSession,
     };
   }
 
@@ -109,6 +123,7 @@ export const summon = async (
     type: "waifu",
     itemStar,
     item: waifu,
+    updatedSession,
   };
 };
 
@@ -117,14 +132,22 @@ export const multiSummon = async (
   banner: BannerType,
   cum: PityCumulativeType,
   count: number,
+  request?: Request,
 ) => {
   const summons = Array(count)
     .fill(null)
-    .map(() => summon(user, banner, cum));
+    .map(() => summon(user, banner, cum, request));
 
   const summonResults = await Promise.all(summons);
 
-  return summonResults;
+  // Tìm session đã được update (nếu có)
+  const updatedSession =
+    summonResults.findLast((result) => result.updatedSession)?.updatedSession || null;
+
+  return {
+    items: summonResults,
+    updatedSession,
+  };
 };
 
 const checkEligibleGift = async (currentSummonCount: number) => {

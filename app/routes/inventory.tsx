@@ -82,7 +82,6 @@ export default function Inventory() {
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedWaifu, setSelectedWaifu] = useState<any>(null);
-  console.log("🚀 ~ Inventory ~ selectedWaifu:", selectedWaifu);
 
   const { paginatedItems, currentPage, totalPages, handlePageChange } =
     useClientPagination(user.waifuCollection, ITEMS_PER_PAGE);

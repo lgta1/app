@@ -13,6 +13,7 @@ import {
 
 import { incrementBannerRolls } from "@/mutations/banner.mutation";
 import { requireLogin } from "@/services/auth.server";
+import { commitUserSession } from "@/services/session.svc";
 import { multiSummon, summon } from "@/services/summon.svc";
 
 import { SummonHistoryDialog } from "~/components/dialog-summon-history";
@@ -124,13 +125,27 @@ export async function action({ request }: ActionFunctionArgs) {
       if (!goldReduce) throw new BusinessError("Không đủ vàng");
       await incrementBannerRolls(bannerId);
 
-      const result = await summon(user, banner, cum);
-      return {
+      const result = await summon(user, banner, cum, request);
+
+      const response = {
         success: true,
         data: { type: "single", items: [result] },
         message: "Triệu hồi thành công",
       };
-    } else if (intent === "multi") {
+
+      // Commit session nếu có cập nhật
+      if (result.updatedSession) {
+        return Response.json(response, {
+          headers: {
+            "Set-Cookie": await commitUserSession(result.updatedSession),
+          },
+        });
+      }
+
+      return response;
+    }
+
+    if (intent === "multi") {
       const goldCost = banner.isRateUp
         ? GOLD_COST_PER_SUMMON_MULTI.rateUp
         : GOLD_COST_PER_SUMMON_MULTI.normal;
@@ -142,12 +157,24 @@ export async function action({ request }: ActionFunctionArgs) {
       if (!goldReduce) throw new BusinessError("Không đủ vàng");
       await incrementBannerRolls(bannerId, 10);
 
-      const result = await multiSummon(user, banner, cum, 10);
-      return {
+      const result = await multiSummon(user, banner, cum, 10, request);
+
+      const response = {
         success: true,
-        data: { type: "multi", items: result },
+        data: { type: "multi", items: result.items },
         message: "Triệu hồi thành công",
       };
+
+      // Commit session nếu có cập nhật
+      if (result.updatedSession) {
+        return Response.json(response, {
+          headers: {
+            "Set-Cookie": await commitUserSession(result.updatedSession),
+          },
+        });
+      }
+
+      return response;
     }
 
     return Response.json({ message: "Hành động không hợp lệ" }, { status: 400 });

@@ -39,7 +39,7 @@ export function UserMenu({ user, isAdmin = false, isMobile = false }: UserMenuPr
               sideOffset={8}
               align="end"
             >
-              <UserDropdownMenu />
+              <UserDropdownMenu setIsUserMenuOpen={setIsUserMenuOpen} />
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
@@ -54,7 +54,15 @@ export function UserMenu({ user, isAdmin = false, isMobile = false }: UserMenuPr
       <Popover.Root open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>
         <Popover.Trigger asChild>
           <div className="flex cursor-pointer items-center gap-2">
-            <CircleUserRound className="h-7 w-7" />
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt="Avatar"
+                className="h-7 w-7 rounded-full object-cover"
+              />
+            ) : (
+              <CircleUserRound className="h-7 w-7" />
+            )}
             <div className="flex items-center gap-2">
               <span className="text-txt-primary text-base font-medium">{user?.name}</span>
               {!isAdmin && (

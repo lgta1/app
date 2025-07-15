@@ -11,6 +11,11 @@ import { Camera, FileText, Mail, User } from "lucide-react";
 
 import { updateUserProfile } from "~/.server/mutations/user.mutation";
 import { requireLogin } from "~/.server/services/auth.server";
+import {
+  commitUserSession,
+  getUserSession,
+  setUserDataToSession,
+} from "~/.server/services/session.svc";
 import { ImageUploader } from "~/components/image-uploader";
 import { UserModel } from "~/database/models/user.model";
 import { useFileOperations } from "~/hooks/use-file-operations";
@@ -45,7 +50,33 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const result = await updateUserProfile(request, user.id, updatedData);
 
-  return { success: true, message: result.message };
+  // Cập nhật session với thông tin mới
+  let updatedSession = null;
+  const hasNameChange = updatedData.name !== user.name;
+  const hasAvatarChange = updatedData.avatar && updatedData.avatar !== user.avatar;
+
+  if (hasNameChange || hasAvatarChange) {
+    const session = await getUserSession(request);
+    const updatedUser = {
+      ...user,
+      name: updatedData.name,
+      ...(updatedData.avatar && { avatar: updatedData.avatar }),
+    };
+    setUserDataToSession(session, updatedUser);
+    updatedSession = session;
+  }
+
+  const response = { success: true, message: result.message };
+
+  if (updatedSession) {
+    return Response.json(response, {
+      headers: {
+        "Set-Cookie": await commitUserSession(updatedSession),
+      },
+    });
+  }
+
+  return response;
 }
 
 export async function clientAction({ serverAction }: ClientActionFunctionArgs) {

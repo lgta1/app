@@ -1,13 +1,19 @@
 import { createComment, deleteComment, likeComment } from "@/mutations/comment.mutation";
 import { getComments, getReplies } from "@/queries/comment.query";
 import { recordComment } from "@/services/interaction.svc";
-import { getUserInfoFromSession } from "@/services/session.svc";
+import {
+  commitUserSession,
+  getUserInfoFromSession,
+  getUserSession,
+  setUserDataToSession,
+} from "@/services/session.svc";
 
 import type { Route } from "./+types/api.comments";
 
 import { CommentExpModel } from "~/database/models/comment-exp.model";
-import { UserModel } from "~/database/models/user.model";
+import { UserModel, type UserType } from "~/database/models/user.model";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
+import { updateUserExp } from "~/helpers/user-level.helper";
 
 export async function loader({ request }: Route.LoaderArgs) {
   try {
@@ -63,11 +69,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 // Helper function để claim exp từ comment
-async function claimCommentExp(userId: string) {
+async function claimCommentExp(user: UserType, request: Request) {
   try {
     const today = new Date().toISOString().split("T")[0];
     const now = new Date();
     const oneMinuteAgo = new Date(now.getTime() - 60000);
+    const userId = user.id;
 
     // Check if user can claim exp (rate limiting + daily limit)
     const currentExp = await CommentExpModel.findOne({
@@ -121,10 +128,23 @@ async function claimCommentExp(userId: string) {
       { upsert: true, new: true },
     );
 
-    // Update user exp
-    await UserModel.findByIdAndUpdate(userId, {
-      $inc: { exp: expToGain },
-    });
+    const userFull = await UserModel.findOneAndUpdate(
+      { _id: user.id },
+      { $inc: { exp: expToGain } },
+    ).lean();
+
+    const { newLevel } = updateUserExp(userFull as UserType, expToGain);
+
+    let updatedSession = null;
+    if (userFull?.level && newLevel > userFull?.level) {
+      await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+
+      // Cập nhật session khi level thay đổi
+      const session = await getUserSession(request);
+      const updatedUser = { ...user, level: newLevel };
+      setUserDataToSession(session, updatedUser);
+      updatedSession = session;
+    }
 
     const isFirstFiveComments = updatedExp.commentsPosted <= 5;
 
@@ -136,6 +156,7 @@ async function claimCommentExp(userId: string) {
       remainingExp: Math.max(0, 50 - updatedExp.totalExp),
       isFirstFiveComments,
       message: `Bạn nhận được ${expToGain} exp từ bình luận! (${isFirstFiveComments ? "5 comment đầu" : "comment thường"})`,
+      updatedSession,
     };
   } catch (error) {
     console.error("Error claiming comment exp:", error);
@@ -222,10 +243,9 @@ export async function action({ request }: Route.ActionArgs) {
       }
 
       // Try to claim exp from comment (non-blocking)
-      const expResult = await claimCommentExp(user.id);
+      const expResult = await claimCommentExp(user, request);
 
-      // Return response with both comment and exp info
-      return Response.json({
+      const response = {
         success: true,
         comment,
         expReward: expResult.success
@@ -236,7 +256,18 @@ export async function action({ request }: Route.ActionArgs) {
               remainingExp: expResult.remainingExp,
             }
           : null,
-      });
+      };
+
+      if (expResult.updatedSession) {
+        return Response.json(response, {
+          headers: {
+            "Set-Cookie": await commitUserSession(expResult.updatedSession),
+          },
+        });
+      }
+
+      // Return response with both comment and exp info
+      return Response.json(response);
     }
 
     if (intent === "like-comment") {
