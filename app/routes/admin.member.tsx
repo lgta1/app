@@ -7,7 +7,7 @@ import {
   type MetaFunction,
 } from "react-router";
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
-import { ChevronDown, Gift, Search, Trash2, TriangleAlert } from "lucide-react";
+import { Gift, Search, Trash2, TriangleAlert } from "lucide-react";
 
 import { banUser, deleteUser, rewardGoldUser } from "@/mutations/user.mutation";
 import { getListModAndAdmin, getListUser, getTotalUserCount } from "@/queries/user.query";
@@ -16,6 +16,7 @@ import { requireAdminOrModLogin } from "@/services/auth.server";
 import { BanMemberDialog } from "~/components/dialog-ban-member";
 import { RewardGoldDialog } from "~/components/dialog-reward-gold";
 import { WarningActionDialog } from "~/components/dialog-warning-action";
+import { Dropdown } from "~/components/dropdown";
 import { Pagination } from "~/components/pagination";
 import type { UserType } from "~/database/models/user.model";
 
@@ -26,6 +27,16 @@ export const meta: MetaFunction = () => {
   ];
 };
 
+const SORT_OPTIONS = [
+  { value: "newest", label: "Mới tham gia" },
+  { value: "oldest", label: "Tham gia lâu nhất" },
+  { value: "most_manga", label: "Đăng nhiều truyện nhất" },
+  { value: "least_manga", label: "Đăng ít truyện nhất" },
+  { value: "most_warnings", label: "Cảnh cáo nhiều nhất" },
+  { value: "highest_level", label: "Cấp cao nhất" },
+  { value: "lowest_level", label: "Cấp thấp nhất" },
+];
+
 interface LoaderData {
   members: UserType[];
   admins: UserType[];
@@ -33,6 +44,7 @@ interface LoaderData {
   totalPages: number;
   searchTerm: string;
   activeTab: string;
+  sortBy: string;
 }
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
@@ -40,6 +52,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
   const page = parseInt(url.searchParams.get("page") || "1");
   const searchTerm = url.searchParams.get("search") || "";
   const activeTab = url.searchParams.get("tab") || "members";
+  const sortBy = url.searchParams.get("sort") || "newest";
   const limit = 10;
 
   if (activeTab === "admins") {
@@ -51,11 +64,12 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
       totalPages: 1,
       searchTerm,
       activeTab,
+      sortBy,
     };
   }
 
   const [members, totalMembers] = await Promise.all([
-    getListUser(page, limit, searchTerm),
+    getListUser(page, limit, searchTerm, sortBy),
     getTotalUserCount(searchTerm),
   ]);
 
@@ -68,6 +82,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
     totalPages,
     searchTerm,
     activeTab,
+    sortBy,
   };
 }
 
@@ -111,10 +126,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (action === "reward" && typeof userId === "string") {
     const amount = formData.get("amount");
+    const message = formData.get("message");
 
-    if (typeof amount === "string") {
+    if (typeof amount === "string" && typeof message === "string") {
       try {
-        await rewardGoldUser(request, userId, parseInt(amount, 10));
+        await rewardGoldUser(request, userId, parseInt(amount, 10), message);
         return { success: true, message: "Thưởng dâm ngọc thành công" };
       } catch (error) {
         return {
@@ -238,6 +254,7 @@ export default function AdminMember() {
     totalPages,
     searchTerm: initialSearchTerm,
     activeTab: initialActiveTab,
+    sortBy: initialSortBy,
   } = useLoaderData<LoaderData>();
 
   const [searchParams] = useSearchParams();
@@ -309,12 +326,13 @@ export default function AdminMember() {
     }
   };
 
-  const handleRewardConfirm = (amount: number) => {
+  const handleRewardConfirm = (amount: number, message: string) => {
     if (rewardDialog.member) {
       const formData = new FormData();
       formData.append("action", "reward");
       formData.append("userId", rewardDialog.member.id);
       formData.append("amount", amount.toString());
+      formData.append("message", message);
       submit(formData, { method: "post" });
     }
   };
@@ -339,6 +357,13 @@ export default function AdminMember() {
     submit(params, { method: "get" });
   };
 
+  const handleSortChange = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("sort", value);
+    params.delete("page"); // Reset to first page when sorting
+    submit(params, { method: "get" });
+  };
+
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(searchParams);
     params.set("page", page.toString());
@@ -356,7 +381,7 @@ export default function AdminMember() {
         Quản lý thành viên
       </div>
       {/* Tab Navigation */}
-      <div className="border-bd-default inline-flex h-12 w-full max-w-[968px] items-center justify-start border-b">
+      <div className="inline-flex h-12 w-full max-w-[968px] items-center justify-start">
         <Tab active={activeTab === "members"} onClick={() => handleTabChange("members")}>
           Thành viên
         </Tab>
@@ -379,12 +404,13 @@ export default function AdminMember() {
               className="text-txt-secondary placeholder:text-txt-secondary focus:text-txt-primary flex-1 bg-transparent font-sans text-sm leading-tight font-semibold focus:outline-none"
             />
           </div>
-          <div className="bg-bgc-layer2 border-bd-default flex h-10 w-full items-center justify-between rounded-xl border px-3 py-2.5 md:w-72">
-            <div className="text-txt-secondary font-sans text-sm leading-tight font-medium">
-              Sắp xếp theo: Mới tham gia
-            </div>
-            <ChevronDown className="text-txt-secondary h-5 w-5" />
-          </div>
+          <Dropdown
+            options={SORT_OPTIONS}
+            value={initialSortBy}
+            onSelect={handleSortChange}
+            className="w-full md:w-72"
+            placeholder="Sắp xếp theo"
+          />
         </div>
 
         {/* Table */}

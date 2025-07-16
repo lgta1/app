@@ -1,5 +1,6 @@
 import { isValidObjectId } from "mongoose";
 
+import { createNotification } from "@/mutations/notification.mutation";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { ROLES } from "~/constants/user";
@@ -135,6 +136,15 @@ export const banUser = async (
     },
   );
 
+  await Promise.all([
+    UserModel.findByIdAndUpdate(userId, { $inc: { warningsCount: 1 } }),
+    createNotification({
+      userId,
+      title: `Bạn đã vi phạm quy định. Tài khoản sẽ bị cấm trong ${days} ngày`,
+      imgUrl: "/images/noti/ban.png",
+    }),
+  ]);
+
   return {
     success: true,
     message: "Khóa người dùng thành công",
@@ -145,6 +155,7 @@ export const rewardGoldUser = async (
   request: Request,
   userId: string,
   amount: number,
+  message: string,
 ) => {
   const currentUserInfo = await getUserInfoFromSession(request);
   if (!currentUserInfo) {
@@ -159,7 +170,14 @@ export const rewardGoldUser = async (
     throw new BusinessError("ID người dùng không hợp lệ");
   }
 
-  await UserModel.findByIdAndUpdate(userId, { $inc: { gold: amount } });
+  await Promise.all([
+    UserModel.findByIdAndUpdate(userId, { $inc: { gold: amount } }),
+    createNotification({
+      userId,
+      title: `Bạn đã nhận được ${amount} dâm ngọc. Vì ${message}`,
+      imgUrl: "/images/noti/gold.png",
+    }),
+  ]);
 
   return {
     success: true,

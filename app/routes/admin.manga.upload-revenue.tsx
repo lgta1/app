@@ -12,6 +12,8 @@ import XLSX from "xlsx";
 import { uploadMangaRevenues } from "@/mutations/manga-revenue.mutation";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
+import { Dropdown } from "~/components/dropdown";
+
 export const meta: MetaFunction = () => {
   return [
     { title: "Tải lên doanh thu Manga | Admin" },
@@ -107,9 +109,16 @@ export default function AdminMangaUploadRevenue() {
     setSelectedFile(file);
   };
 
-  const handlePeriodChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setPeriod(event.target.value as "daily" | "weekly" | "monthly");
+  const handlePeriodChange = (value: any) => {
+    setPeriod(value as "daily" | "weekly" | "monthly");
   };
+
+  // Period options for Dropdown
+  const periodOptions = [
+    { value: "daily", label: "Ngày" },
+    { value: "weekly", label: "Tuần" },
+    { value: "monthly", label: "Tháng" },
+  ];
 
   // Hàm tạo mẫu Excel
   const generateExcelTemplate = () => {
@@ -188,18 +197,14 @@ export default function AdminMangaUploadRevenue() {
               >
                 Kỳ báo cáo
               </label>
-              <select
-                id="period"
-                name="period"
+              <Dropdown
+                options={periodOptions}
                 value={period}
-                onChange={handlePeriodChange}
-                className="bg-bgc-layer2 border-bd-default text-txt-primary block w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required
-              >
-                <option value="daily">Ngày</option>
-                <option value="weekly">Tuần</option>
-                <option value="monthly">Tháng</option>
-              </select>
+                onSelect={handlePeriodChange}
+                placeholder="Chọn kỳ báo cáo"
+                className="w-full"
+              />
+              <input type="hidden" name="period" value={period} />
             </div>
 
             {/* File Input */}

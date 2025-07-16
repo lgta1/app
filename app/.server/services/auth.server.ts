@@ -82,11 +82,10 @@ export async function login({
   const email = formData.get("email")?.toString() ?? "";
   const password = formData.get("password")?.toString() ?? "";
 
-  // Check the user's credentials
+  // Check the user's credentials (không filter isBanned để kiểm tra ban status)
   const user = await UserModel.findOne({
     email: email.toLowerCase(),
     isDeleted: false,
-    isBanned: false,
   }).lean();
   if (!user) {
     throw new BusinessError("Tài khoản hoặc mật khẩu không chính xác");
@@ -95,6 +94,30 @@ export async function login({
   const hashedPassword = hashPassword(password, user.salt);
   if (hashedPassword !== user.password) {
     throw new BusinessError("Tài khoản hoặc mật khẩu không chính xác");
+  }
+
+  // Kiểm tra trạng thái ban và xử lý unban tự động
+  if (user.isBanned) {
+    const now = new Date();
+
+    // Nếu ban đã hết hạn, tự động unban
+    if (user.banExpiresAt && new Date(user.banExpiresAt) <= now) {
+      await UserModel.findByIdAndUpdate(user._id, {
+        $unset: {
+          banExpiresAt: 1,
+          banMessage: 1,
+        },
+        $set: {
+          isBanned: false,
+        },
+      });
+    } else {
+      // Vẫn còn trong thời gian ban
+      const banMessage = user.banMessage || "Vi phạm quy định của hệ thống";
+      throw new BusinessError(
+        `Tài khoản của bạn đã bị vô hiệu hóa với lý do: ${banMessage}`,
+      );
+    }
   }
 
   // Create a session

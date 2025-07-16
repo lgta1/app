@@ -27,6 +27,7 @@ import { ImageUploader } from "~/components/image-uploader";
 import { GENRE_CATEGORY } from "~/constants/genres";
 import { MANGA_STATUS } from "~/constants/manga";
 import type { GenresType } from "~/database/models/genres.model";
+import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
@@ -61,6 +62,10 @@ export async function action({ request }: ActionFunctionArgs) {
     };
 
     const manga = await createManga(request, mangaData);
+
+    await UserModel.findByIdAndUpdate(userInfo.id, {
+      $inc: { mangasCount: 1 },
+    });
 
     return redirect(`/manga/chapter/create/${manga._id.toString()}`);
   } catch (error) {

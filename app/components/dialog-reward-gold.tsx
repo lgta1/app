@@ -8,7 +8,7 @@ interface RewardGoldDialogProps {
   member: UserType | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (amount: number) => void;
+  onConfirm: (amount: number, message: string) => void;
 }
 
 export function RewardGoldDialog({
@@ -25,7 +25,7 @@ export function RewardGoldDialog({
   const handleConfirm = () => {
     const amountNumber = parseInt(amount, 10);
     if (amountNumber > 0) {
-      onConfirm(amountNumber);
+      onConfirm(amountNumber, message);
       onOpenChange(false);
       setAmount("");
       setMessage("");

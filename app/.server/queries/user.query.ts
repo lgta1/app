@@ -17,6 +17,7 @@ export const getListUser = async (
   page: number = 1,
   limit: number = 10,
   search?: string,
+  sortBy: string = "newest",
 ) => {
   const skip = (page - 1) * limit;
   const query: any = {
@@ -31,8 +32,37 @@ export const getListUser = async (
     ];
   }
 
+  // Determine sort order based on sortBy parameter
+  let sortOrder: any = { createdAt: -1 }; // Default to newest
+
+  switch (sortBy) {
+    case "newest":
+      sortOrder = { createdAt: -1 };
+      break;
+    case "oldest":
+      sortOrder = { createdAt: 1 };
+      break;
+    case "most_manga":
+      sortOrder = { mangasCount: -1, createdAt: -1 };
+      break;
+    case "least_manga":
+      sortOrder = { mangasCount: 1, createdAt: -1 };
+      break;
+    case "most_warnings":
+      sortOrder = { warningsCount: -1, createdAt: -1 };
+      break;
+    case "highest_level":
+      sortOrder = { level: -1, exp: -1, createdAt: -1 };
+      break;
+    case "lowest_level":
+      sortOrder = { level: 1, exp: 1, createdAt: -1 };
+      break;
+    default:
+      sortOrder = { createdAt: -1 };
+  }
+
   return await UserModel.find(query)
-    .sort({ _id: -1 })
+    .sort(sortOrder)
     .select("-password -salt")
     .skip(skip)
     .limit(limit)

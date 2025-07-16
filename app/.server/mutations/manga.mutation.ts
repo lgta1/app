@@ -4,6 +4,7 @@ import { MANGA_STATUS } from "~/constants/manga";
 import { ChapterModel } from "~/database/models/chapter.model";
 import { CommentModel } from "~/database/models/comment.model";
 import { MangaModel, type MangaType } from "~/database/models/manga.model";
+import { UserModel } from "~/database/models/user.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserLikeMangaModel } from "~/database/models/user-like-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
@@ -18,6 +19,12 @@ export const deleteManga = async (request: Request, mangaId: string) => {
 
   if (!isAdmin(userInfo.role)) {
     throw new BusinessError("Bạn không có quyền xóa truyện");
+  }
+
+  const manga = await MangaModel.findById(mangaId);
+
+  if (!manga) {
+    throw new BusinessError("Không tìm thấy truyện");
   }
 
   // Lấy tất cả chapterIds để xóa UserReadChapter records
@@ -44,6 +51,8 @@ export const deleteManga = async (request: Request, mangaId: string) => {
 
   // Cuối cùng xóa manga
   await MangaModel.findByIdAndDelete(mangaId);
+
+  await UserModel.findByIdAndUpdate(manga.ownerId, { $inc: { mangasCount: -1 } });
 
   return {
     success: true,

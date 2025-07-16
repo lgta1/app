@@ -2,16 +2,7 @@ import { useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useActionData, useFetcher, useLoaderData, useNavigation } from "react-router";
-import {
-  Calendar,
-  ChevronDown,
-  FileText,
-  Image,
-  Tag,
-  Upload,
-  User,
-  X,
-} from "lucide-react";
+import { Calendar, FileText, Image, Tag, Upload, User, X } from "lucide-react";
 
 import { updateBanner } from "@/mutations/banner.mutation";
 import { getBannerById } from "@/queries/banner.query";
@@ -19,6 +10,7 @@ import { getAllWaifus } from "@/queries/waifu.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { ButtonGroupForm } from "~/components/button-group-form";
+import { Dropdown } from "~/components/dropdown";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
@@ -143,6 +135,17 @@ export default function AdminEditBanner() {
   // Lọc waifu theo số sao
   const fiveStarWaifus = waifus.filter((waifu) => waifu.stars === 5);
   const fourStarWaifus = waifus.filter((waifu) => waifu.stars === 4);
+
+  // Create options for Dropdown components
+  const fiveStarOptions = fiveStarWaifus.map((waifu) => ({
+    value: waifu.id,
+    label: waifu.name,
+  }));
+
+  const fourStarOptions = fourStarWaifus.map((waifu) => ({
+    value: waifu.id,
+    label: waifu.name,
+  }));
 
   const handleBannerImageSelect = (file: File) => {
     setSelectedBannerFile(file);
@@ -464,23 +467,14 @@ export default function AdminEditBanner() {
                 </div>
               </div>
               <div className="relative inline-flex w-full max-w-[680px] flex-col items-start justify-start md:w-[680px]">
-                <div className="bg-bgc-layer2 outline-bd-default inline-flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 outline outline-offset-[-1px]">
-                  <select
-                    name="waifu5Star1"
-                    value={waifu5Star1}
-                    onChange={(e) => setWaifu5Star1(e.target.value)}
-                    className="text-txt-secondary w-full appearance-none bg-transparent text-base leading-normal font-medium focus:outline-none"
-                    required
-                  >
-                    <option value="">Chọn waifu...</option>
-                    {fiveStarWaifus.map((waifu) => (
-                      <option key={waifu.id} value={waifu.id} className="bg-bgc-layer2">
-                        {waifu.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="text-txt-secondary pointer-events-none h-5 w-5" />
-                </div>
+                <Dropdown
+                  options={fiveStarOptions}
+                  value={waifu5Star1}
+                  onSelect={(value: string) => setWaifu5Star1(value)}
+                  placeholder="Chọn waifu..."
+                  className="w-full"
+                />
+                <input type="hidden" name="waifu5Star1" value={waifu5Star1} />
               </div>
             </div>
 
@@ -495,23 +489,14 @@ export default function AdminEditBanner() {
                 </div>
               </div>
               <div className="relative inline-flex w-full max-w-[680px] flex-col items-start justify-start md:w-[680px]">
-                <div className="bg-bgc-layer2 outline-bd-default inline-flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 outline outline-offset-[-1px]">
-                  <select
-                    name="waifu5Star2"
-                    value={waifu5Star2}
-                    onChange={(e) => setWaifu5Star2(e.target.value)}
-                    className="text-txt-secondary w-full appearance-none bg-transparent text-base leading-normal font-medium focus:outline-none"
-                    required
-                  >
-                    <option value="">Chọn waifu...</option>
-                    {fiveStarWaifus.map((waifu) => (
-                      <option key={waifu.id} value={waifu.id} className="bg-bgc-layer2">
-                        {waifu.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="text-txt-secondary pointer-events-none h-5 w-5" />
-                </div>
+                <Dropdown
+                  options={fiveStarOptions}
+                  value={waifu5Star2}
+                  onSelect={(value: string) => setWaifu5Star2(value)}
+                  placeholder="Chọn waifu..."
+                  className="w-full"
+                />
+                <input type="hidden" name="waifu5Star2" value={waifu5Star2} />
               </div>
             </div>
 
@@ -526,23 +511,14 @@ export default function AdminEditBanner() {
                 </div>
               </div>
               <div className="relative inline-flex w-full max-w-[680px] flex-col items-start justify-start md:w-[680px]">
-                <div className="bg-bgc-layer2 outline-bd-default inline-flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 outline outline-offset-[-1px]">
-                  <select
-                    name="waifu4Star1"
-                    value={waifu4Star1}
-                    onChange={(e) => setWaifu4Star1(e.target.value)}
-                    className="text-txt-secondary w-full appearance-none bg-transparent text-base leading-normal font-medium focus:outline-none"
-                    required
-                  >
-                    <option value="">Chọn waifu...</option>
-                    {fourStarWaifus.map((waifu) => (
-                      <option key={waifu.id} value={waifu.id} className="bg-bgc-layer2">
-                        {waifu.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="text-txt-secondary pointer-events-none h-5 w-5" />
-                </div>
+                <Dropdown
+                  options={fourStarOptions}
+                  value={waifu4Star1}
+                  onSelect={(value: string) => setWaifu4Star1(value)}
+                  placeholder="Chọn waifu..."
+                  className="w-full"
+                />
+                <input type="hidden" name="waifu4Star1" value={waifu4Star1} />
               </div>
             </div>
 
@@ -557,23 +533,14 @@ export default function AdminEditBanner() {
                 </div>
               </div>
               <div className="relative inline-flex w-full max-w-[680px] flex-col items-start justify-start md:w-[680px]">
-                <div className="bg-bgc-layer2 outline-bd-default inline-flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 outline outline-offset-[-1px]">
-                  <select
-                    name="waifu4Star2"
-                    value={waifu4Star2}
-                    onChange={(e) => setWaifu4Star2(e.target.value)}
-                    className="text-txt-secondary w-full appearance-none bg-transparent text-base leading-normal font-medium focus:outline-none"
-                    required
-                  >
-                    <option value="">Chọn waifu...</option>
-                    {fourStarWaifus.map((waifu) => (
-                      <option key={waifu.id} value={waifu.id} className="bg-bgc-layer2">
-                        {waifu.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="text-txt-secondary pointer-events-none h-5 w-5" />
-                </div>
+                <Dropdown
+                  options={fourStarOptions}
+                  value={waifu4Star2}
+                  onSelect={(value: string) => setWaifu4Star2(value)}
+                  placeholder="Chọn waifu..."
+                  className="w-full"
+                />
+                <input type="hidden" name="waifu4Star2" value={waifu4Star2} />
               </div>
             </div>
 
@@ -588,23 +555,14 @@ export default function AdminEditBanner() {
                 </div>
               </div>
               <div className="relative inline-flex w-full max-w-[680px] flex-col items-start justify-start md:w-[680px]">
-                <div className="bg-bgc-layer2 outline-bd-default inline-flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 outline outline-offset-[-1px]">
-                  <select
-                    name="waifu4Star3"
-                    value={waifu4Star3}
-                    onChange={(e) => setWaifu4Star3(e.target.value)}
-                    className="text-txt-secondary w-full appearance-none bg-transparent text-base leading-normal font-medium focus:outline-none"
-                    required
-                  >
-                    <option value="">Chọn waifu...</option>
-                    {fourStarWaifus.map((waifu) => (
-                      <option key={waifu.id} value={waifu.id} className="bg-bgc-layer2">
-                        {waifu.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="text-txt-secondary pointer-events-none h-5 w-5" />
-                </div>
+                <Dropdown
+                  options={fourStarOptions}
+                  value={waifu4Star3}
+                  onSelect={(value: string) => setWaifu4Star3(value)}
+                  placeholder="Chọn waifu..."
+                  className="w-full"
+                />
+                <input type="hidden" name="waifu4Star3" value={waifu4Star3} />
               </div>
             </div>
           </div>

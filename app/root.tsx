@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   Links,
   Meta,
@@ -5,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  useNavigate,
 } from "react-router";
 
 import { getAllGenres } from "@/queries/genres.query";
@@ -18,6 +20,11 @@ import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundar
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
 import { isAdmin } from "~/helpers/user.helper";
+
+// Cấu hình thời gian check ban status (phút)
+const BAN_CHECK_INTERVAL_MINUTES = 1;
+const BAN_CHECK_INTERVAL_MS = BAN_CHECK_INTERVAL_MINUTES * 60 * 1000;
+const LAST_BAN_CHECK_KEY = "lastBanCheck";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -78,6 +85,52 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function App() {
   const { isAdmin, user, genres } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Chỉ chạy logic này nếu user đã đăng nhập
+    if (!user) return;
+
+    const checkUserBanStatus = async () => {
+      try {
+        const response = await fetch("/api/user");
+        const data = await response.json();
+
+        if (data.success && data.data && data.data.isBanned) {
+          // User bị ban, thực hiện logout
+          navigate("/logout");
+        }
+      } catch (error) {
+        console.error("Error checking user ban status:", error);
+      }
+    };
+
+    const shouldCheckNow = () => {
+      const lastCheck = localStorage.getItem(LAST_BAN_CHECK_KEY);
+      if (!lastCheck) return true;
+
+      const timeSinceLastCheck = Date.now() - parseInt(lastCheck, 10);
+      return timeSinceLastCheck >= BAN_CHECK_INTERVAL_MS;
+    };
+
+    const performBanCheck = () => {
+      if (shouldCheckNow()) {
+        localStorage.setItem(LAST_BAN_CHECK_KEY, Date.now().toString());
+        checkUserBanStatus();
+      }
+    };
+
+    // Check ngay lập tức nếu cần
+    performBanCheck();
+
+    // Setup interval để check định kỳ
+    const intervalId = setInterval(performBanCheck, BAN_CHECK_INTERVAL_MS);
+
+    // Cleanup interval khi component unmount
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [user, navigate]);
 
   return (
     <>

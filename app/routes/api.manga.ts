@@ -5,6 +5,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import { ChapterModel } from "~/database/models/chapter.model";
 import { CommentModel } from "~/database/models/comment.model";
 import { MangaModel } from "~/database/models/manga.model";
+import { UserModel } from "~/database/models/user.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserLikeMangaModel } from "~/database/models/user-like-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
@@ -71,6 +72,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Cuối cùng xóa manga
     await MangaModel.findByIdAndDelete(mangaId);
+
+    await UserModel.findByIdAndUpdate(manga.ownerId, { $inc: { mangasCount: -1 } });
 
     return Response.json({
       success: true,

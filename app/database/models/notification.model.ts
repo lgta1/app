@@ -15,7 +15,7 @@ const NotificationSchema = new Schema<NotificationType>(
   {
     userId: { type: String, required: true },
     title: { type: String, required: true },
-    subtitle: { type: String, required: true },
+    subtitle: { type: String },
     imgUrl: { type: String, required: true },
     isRead: { type: Boolean, default: false },
   },
