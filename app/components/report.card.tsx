@@ -7,16 +7,19 @@ import { formatDate, formatTime } from "~/utils/date.utils";
 interface ReportCardProps {
   report: ReportType;
   onDeleteClick: (reportId: string) => void;
-  onViewClick: (reportId: string) => void;
+  onViewClick: (report: ReportType) => void;
 }
 
 // Helper function để map report type
-function getReportTypeDisplay(reportType: string): string {
+function getReportTypeDisplay(reportType: string, mangaId: any): string {
   switch (reportType) {
     case REPORT_TYPE.MANGA:
       return "Truyện";
     case REPORT_TYPE.COMMENT:
-      return "Bình luận";
+      if (mangaId) {
+        return "Bình luận (truyện)";
+      }
+      return "Bình luận (diễn đàn)";
     default:
       return reportType;
   }
@@ -64,7 +67,7 @@ export function ReportCard({ report, onDeleteClick, onViewClick }: ReportCardPro
             <div
               className={`font-sans text-base leading-normal font-semibold ${reportTypeColor}`}
             >
-              {getReportTypeDisplay(report.reportType)}
+              {getReportTypeDisplay(report.reportType, report.mangaId)}
             </div>
           </div>
         </div>
@@ -101,7 +104,7 @@ export function ReportCard({ report, onDeleteClick, onViewClick }: ReportCardPro
         </button>
 
         <button
-          onClick={() => onViewClick(report.mangaId?.toString() || "")}
+          onClick={() => onViewClick(report)}
           className="flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)]"
         >
           <div className="cursor-pointer text-center font-sans text-sm leading-tight font-semibold text-black">

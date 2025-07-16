@@ -6,22 +6,32 @@ import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model"
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    const user = await getUserInfoFromSession(request);
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "10");
+    const userIdParam = url.searchParams.get("userId");
 
-    if (!user) {
-      return Response.json(
-        { error: "Vui lòng đăng nhập để xem danh sách theo dõi" },
-        { status: 401 },
-      );
+    let targetUserId: string;
+
+    if (userIdParam) {
+      // Nếu có userId trong query params, sử dụng userId đó
+      targetUserId = userIdParam;
+    } else {
+      // Nếu không có userId, lấy từ session (flow hiện tại)
+      const user = await getUserInfoFromSession(request);
+      if (!user) {
+        return Response.json(
+          { error: "Vui lòng đăng nhập để xem danh sách theo dõi" },
+          { status: 401 },
+        );
+      }
+      targetUserId = user.id;
     }
 
     // Lấy danh sách manga đã follow
     const skip = (page - 1) * limit;
 
-    const followedMangas = await UserFollowMangaModel.find({ userId: user.id })
+    const followedMangas = await UserFollowMangaModel.find({ userId: targetUserId })
       .populate({
         path: "mangaId",
         model: "Manga",
@@ -32,7 +42,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .limit(limit);
 
     // Đếm tổng số manga đã follow
-    const totalFollowed = await UserFollowMangaModel.countDocuments({ userId: user.id });
+    const totalFollowed = await UserFollowMangaModel.countDocuments({
+      userId: targetUserId,
+    });
     const totalPages = Math.ceil(totalFollowed / limit);
 
     // Chuyển đổi dữ liệu

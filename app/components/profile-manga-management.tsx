@@ -5,7 +5,11 @@ import { ProfileMangaFollow } from "~/components/profile-manga-follow";
 import { ProfileMangaRecentRead } from "~/components/profile-manga-recent-read";
 import { ProfileMangaUploaded } from "~/components/profile-manga-uploaded";
 
-export function ProfileMangaManagement() {
+interface ProfileMangaManagementProps {
+  userId?: string;
+}
+
+export function ProfileMangaManagement({ userId }: ProfileMangaManagementProps) {
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -39,15 +43,15 @@ export function ProfileMangaManagement() {
 
           {/* Tab Content */}
           <Tabs.Content value="following" className="mt-4">
-            <ProfileMangaFollow />
+            <ProfileMangaFollow userId={userId} />
           </Tabs.Content>
 
           <Tabs.Content value="recent-read" className="mt-4">
-            <ProfileMangaRecentRead />
+            <ProfileMangaRecentRead userId={userId} />
           </Tabs.Content>
 
           <Tabs.Content value="uploaded" className="mt-4">
-            <ProfileMangaUploaded />
+            <ProfileMangaUploaded userId={userId} />
           </Tabs.Content>
         </Tabs.Root>
       </div>

@@ -6,22 +6,32 @@ import { UserReadChapterModel } from "~/database/models/user-read-chapter.model"
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    const user = await getUserInfoFromSession(request);
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "10");
+    const userIdParam = url.searchParams.get("userId");
 
-    if (!user) {
-      return Response.json(
-        { error: "Vui lòng đăng nhập để xem lịch sử đọc" },
-        { status: 401 },
-      );
+    let targetUserId: string;
+
+    if (userIdParam) {
+      // Nếu có userId trong query params, sử dụng userId đó
+      targetUserId = userIdParam;
+    } else {
+      // Nếu không có userId, lấy từ session (flow hiện tại)
+      const user = await getUserInfoFromSession(request);
+      if (!user) {
+        return Response.json(
+          { error: "Vui lòng đăng nhập để xem lịch sử đọc" },
+          { status: 401 },
+        );
+      }
+      targetUserId = user.id;
     }
 
     // Lấy danh sách chapter đã đọc và populate manga
     const skip = (page - 1) * limit;
 
-    const recentReadChapters = await UserReadChapterModel.find({ userId: user.id })
+    const recentReadChapters = await UserReadChapterModel.find({ userId: targetUserId })
       .populate({
         path: "chapterId",
         model: "Chapter",

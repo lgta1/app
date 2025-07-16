@@ -185,8 +185,12 @@ export default function AdminReport() {
     submit(formData, { method: "post" });
   };
 
-  const handleViewClick = (mangaId: string) => {
-    navigate(`/manga/${mangaId}`);
+  const handleViewClick = (report: ReportType) => {
+    if (report.mangaId) {
+      navigate(`/manga/${report.mangaId}`);
+    } else {
+      navigate(`/post/${report.postId}`);
+    }
   };
 
   return (

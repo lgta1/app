@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { Eye, Heart } from "lucide-react";
 
 import { LoadingSpinner } from "~/components/loading-spinner";
@@ -5,7 +6,13 @@ import { Pagination } from "~/components/pagination";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
 
-export function ProfileMangaRecentRead() {
+interface ProfileMangaRecentReadProps {
+  userId?: string;
+}
+
+export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) {
+  const queryParams = userId ? { userId } : undefined;
+
   const {
     data: recentReadMangas,
     currentPage,
@@ -16,6 +23,7 @@ export function ProfileMangaRecentRead() {
   } = usePagination<MangaType>({
     apiUrl: "/api/manga/recent-read",
     limit: 5,
+    queryParams,
   });
 
   if (isLoading) {
@@ -50,8 +58,9 @@ export function ProfileMangaRecentRead() {
         <>
           <div className="flex w-full flex-col gap-2">
             {recentReadMangas.map((manga) => (
-              <div
+              <Link
                 key={manga.id}
+                to={`/manga/${manga.id}`}
                 className="bg-bgc-layer1 border-bd-default flex w-full items-center justify-between rounded-xl border p-3"
               >
                 <div className="flex items-center gap-3">
@@ -83,7 +92,7 @@ export function ProfileMangaRecentRead() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
 

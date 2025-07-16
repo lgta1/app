@@ -9,7 +9,13 @@ import { MANGA_STATUS } from "~/constants/manga";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
 
-export function ProfileMangaUploaded() {
+interface ProfileMangaUploadedProps {
+  userId?: string;
+}
+
+export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
+  const queryParams = userId ? { userId } : undefined;
+
   const {
     data: uploadedMangas,
     currentPage,
@@ -21,6 +27,7 @@ export function ProfileMangaUploaded() {
   } = usePagination<MangaType>({
     apiUrl: "/api/manga/uploaded", // API endpoint cần tạo
     limit: 5,
+    queryParams,
   });
 
   const [deleteDialog, setDeleteDialog] = useState({
@@ -31,16 +38,14 @@ export function ProfileMangaUploaded() {
   const deleteFetcher = useFetcher();
 
   const handleDelete = (mangaId: string) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa truyện này?")) {
-      const formData = new FormData();
-      formData.append("intent", "delete");
-      formData.append("mangaId", mangaId);
+    const formData = new FormData();
+    formData.append("intent", "delete");
+    formData.append("mangaId", mangaId);
 
-      deleteFetcher.submit(formData, {
-        method: "DELETE",
-        action: "/api/manga",
-      });
-    }
+    deleteFetcher.submit(formData, {
+      method: "DELETE",
+      action: "/api/manga",
+    });
   };
 
   // Refresh data when delete is successful
@@ -48,7 +53,7 @@ export function ProfileMangaUploaded() {
     if (deleteFetcher.data?.success && deleteFetcher.state === "idle") {
       refresh();
     }
-  }, [deleteFetcher.data, deleteFetcher.state, refresh]);
+  }, [deleteFetcher.data, deleteFetcher.state]);
 
   const getStatusText = (status: number) => {
     switch (status) {
@@ -103,13 +108,15 @@ export function ProfileMangaUploaded() {
         <div className="text-txt-secondary text-sm font-medium">
           Tổng cộng: {uploadedMangas.length}
         </div>
-        <Link
-          to="/manga/create"
-          className="flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-sm font-semibold text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all hover:opacity-90"
-        >
-          <Plus className="h-5 w-5" />
-          Đăng truyện
-        </Link>
+        {!userId && (
+          <Link
+            to="/manga/create"
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-sm font-semibold text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all hover:opacity-90"
+          >
+            <Plus className="h-5 w-5" />
+            Đăng truyện
+          </Link>
+        )}
       </div>
 
       {uploadedMangas.length === 0 ? (
@@ -122,8 +129,9 @@ export function ProfileMangaUploaded() {
         <>
           <div className="flex w-full flex-col gap-2">
             {uploadedMangas.map((manga) => (
-              <div
+              <Link
                 key={manga.id}
+                to={`/manga/${manga.id}`}
                 className="bg-bgc-layer1 border-bd-default flex w-full items-center justify-between rounded-xl border p-3"
               >
                 <div className="flex items-center gap-3">
@@ -162,27 +170,30 @@ export function ProfileMangaUploaded() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Link to={`/manga/preview/${manga.id}`}>
-                    <Edit className="h-5 w-5 cursor-pointer text-[#25EBAC] transition-colors hover:text-[#25EBAC]/80" />
-                  </Link>
-                  <Trash2
-                    className={`h-5 w-5 cursor-pointer transition-colors ${
-                      deleteFetcher.state === "submitting"
-                        ? "text-txt-disabled cursor-not-allowed"
-                        : "text-txt-secondary hover:text-error-error"
-                    }`}
-                    onClick={() => {
-                      if (deleteFetcher.state !== "submitting") {
-                        setDeleteDialog({
-                          open: true,
-                          mangaId: manga.id,
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </div>
+                {!userId && (
+                  <div className="flex items-center gap-2">
+                    <Link to={`/manga/preview/${manga.id}`}>
+                      <Edit className="h-5 w-5 cursor-pointer text-[#25EBAC] transition-colors hover:text-[#25EBAC]/80" />
+                    </Link>
+                    <Trash2
+                      className={`h-5 w-5 cursor-pointer transition-colors ${
+                        deleteFetcher.state === "submitting"
+                          ? "text-txt-disabled cursor-not-allowed"
+                          : "text-txt-secondary hover:text-error-error"
+                      }`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (deleteFetcher.state !== "submitting") {
+                          setDeleteDialog({
+                            open: true,
+                            mangaId: manga.id,
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </Link>
             ))}
           </div>
 

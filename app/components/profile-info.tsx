@@ -6,9 +6,10 @@ import { formatDate } from "~/utils/date.utils";
 
 interface ProfileInfoProps {
   user: any;
+  isOwner: boolean;
 }
 
-export function ProfileInfo({ user }: ProfileInfoProps) {
+export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {
   return (
     <div className="bg-bgc-layer1 border-bd-default flex w-full flex-col gap-6 rounded-xl border p-4 lg:flex-row lg:p-6">
       {/* Left Section - User Info */}
@@ -65,9 +66,11 @@ export function ProfileInfo({ user }: ProfileInfoProps) {
           <div className="flex flex-col gap-[5px]">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-white">Giới thiệu</h2>
-              <NavLink to="/profile-edit">
-                <Edit3 className="text-success-success h-4 w-4" />
-              </NavLink>
+              {isOwner && (
+                <NavLink to="/profile-edit">
+                  <Edit3 className="text-success-success h-4 w-4" />
+                </NavLink>
+              )}
             </div>
             <p className="text-txt-secondary text-xs leading-none font-medium">
               {user.bio}

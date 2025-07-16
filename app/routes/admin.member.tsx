@@ -3,6 +3,7 @@ import { toast, Toaster } from "react-hot-toast";
 import {
   type ActionFunctionArgs,
   type ClientActionFunctionArgs,
+  Link,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from "react-router";
@@ -466,7 +467,8 @@ export default function AdminMember() {
               activeTab === "members" ? (currentPage - 1) * 10 + index + 1 : index + 1;
 
             return (
-              <div
+              <Link
+                to={`/profile/${user.id}`}
                 key={user.id}
                 className="border-bd-default flex flex-col items-start justify-start gap-2 self-stretch border-b p-2 lg:flex-row lg:items-center lg:gap-0 lg:p-0"
               >
@@ -546,7 +548,7 @@ export default function AdminMember() {
                     onRewardClick={handleRewardClick}
                   />
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

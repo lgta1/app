@@ -98,7 +98,7 @@ export default function PostDetail() {
       <div className="mx-auto flex min-h-screen gap-4 px-4 py-4 sm:py-6 lg:py-8 lg:pt-16">
         <PostCreationSidebar className="hidden sm:flex" />
 
-        <div className="max-w-4xl">
+        <div className="w-full sm:w-[500px] xl:w-4xl">
           <div className="relative w-full">
             {/* Header Section */}
             <div className="flex flex-col gap-6">

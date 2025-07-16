@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import { Link, useFetcher } from "react-router";
 import { Eye, Heart, StarOff } from "lucide-react";
 
 import { WarningActionDialog } from "~/components/dialog-warning-action";
@@ -8,7 +8,13 @@ import { Pagination } from "~/components/pagination";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
 
-export function ProfileMangaFollow() {
+interface ProfileMangaFollowProps {
+  userId?: string;
+}
+
+export function ProfileMangaFollow({ userId }: ProfileMangaFollowProps) {
+  const queryParams = userId ? { userId } : undefined;
+
   const {
     data: followingMangas,
     currentPage,
@@ -20,6 +26,7 @@ export function ProfileMangaFollow() {
   } = usePagination<MangaType>({
     apiUrl: "/api/manga/following",
     limit: 5,
+    queryParams,
   });
 
   const [unfollowDialog, setUnfollowDialog] = useState({
@@ -45,7 +52,7 @@ export function ProfileMangaFollow() {
     if (unfollowFetcher.data?.success && unfollowFetcher.state === "idle") {
       refresh();
     }
-  }, [unfollowFetcher.data, unfollowFetcher.state, refresh]);
+  }, [unfollowFetcher.data, unfollowFetcher.state]);
 
   if (isLoading) {
     return (
@@ -79,8 +86,9 @@ export function ProfileMangaFollow() {
         <>
           <div className="flex w-full flex-col gap-2">
             {followingMangas.map((manga) => (
-              <div
+              <Link
                 key={manga.id}
+                to={`/manga/${manga.id}`}
                 className="bg-bgc-layer1 border-bd-default flex w-full items-center justify-between rounded-xl border p-3"
               >
                 <div className="flex items-center gap-3">
@@ -112,24 +120,27 @@ export function ProfileMangaFollow() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-center">
-                  <StarOff
-                    className={`h-5 w-5 cursor-pointer transition-colors ${
-                      unfollowFetcher.state === "submitting"
-                        ? "text-txt-disabled cursor-not-allowed"
-                        : "text-txt-secondary hover:text-error-error"
-                    }`}
-                    onClick={() => {
-                      if (unfollowFetcher.state !== "submitting") {
-                        setUnfollowDialog({
-                          open: true,
-                          mangaId: manga.id,
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </div>
+                {!userId && (
+                  <div className="flex items-center justify-center">
+                    <StarOff
+                      className={`h-5 w-5 cursor-pointer transition-colors ${
+                        unfollowFetcher.state === "submitting"
+                          ? "text-txt-disabled cursor-not-allowed"
+                          : "text-txt-secondary hover:text-error-error"
+                      }`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (unfollowFetcher.state !== "submitting") {
+                          setUnfollowDialog({
+                            open: true,
+                            mangaId: manga.id,
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </Link>
             ))}
           </div>
 

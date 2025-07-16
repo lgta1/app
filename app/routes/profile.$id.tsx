@@ -52,7 +52,7 @@ export default function Profile() {
 
   return (
     <div className="mx-auto flex w-full max-w-[968px] flex-col items-center gap-6 p-4 lg:py-8">
-      <ProfileInfo user={user} />
+      <ProfileInfo user={user} isOwner={false} />
 
       {/* Waifu Collection Section */}
       <div className="flex w-full flex-col gap-6">
