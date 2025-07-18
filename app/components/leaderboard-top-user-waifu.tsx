@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
 
@@ -15,7 +17,8 @@ export function LeaderboardTopUserWaifu({
   shadowColor,
 }: LeaderboardTopUserWaifuProps) {
   return (
-    <div
+    <Link
+      to={`/profile/${leaderboard.userId}`}
       className={`p-4 ${gradientStyle} rounded-2xl ${shadowColor} outline-1 outline-offset-[-1px] ${borderColor} flex items-start justify-start gap-4 backdrop-blur`}
     >
       <div className="flex w-72 flex-row items-center justify-start gap-4">
@@ -63,6 +66,6 @@ export function LeaderboardTopUserWaifu({
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

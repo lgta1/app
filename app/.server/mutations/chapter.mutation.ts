@@ -1,7 +1,6 @@
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { CHAPTER_STATUS } from "~/constants/chapter";
-import { MANGA_STATUS } from "~/constants/manga";
 import { ChapterModel, type ChapterType } from "~/database/models/chapter.model";
 import { MangaModel } from "~/database/models/manga.model";
 import { BusinessError } from "~/helpers/errors.helper";
@@ -19,7 +18,6 @@ export const createChapter = async (
     { _id: chapter.mangaId, ownerId: userInfo.id },
     {
       $inc: { chapters: 1 },
-      $set: { status: MANGA_STATUS.PENDING },
     },
     { new: true },
   );
@@ -53,11 +51,7 @@ export const updateChapter = async (
   }
 
   // Verify manga ownership
-  const manga = await MangaModel.findOneAndUpdate(
-    { _id: mangaId, ownerId: userInfo.id },
-    { $set: { status: MANGA_STATUS.PENDING } },
-    { new: true },
-  );
+  const manga = await MangaModel.findOne({ _id: mangaId, ownerId: userInfo.id });
   if (!manga) {
     throw new BusinessError("Không tìm thấy manga hoặc bạn không có quyền chỉnh sửa");
   }
@@ -67,7 +61,7 @@ export const updateChapter = async (
     { mangaId, chapterNumber },
     {
       ...updateData,
-      status: CHAPTER_STATUS.PENDING, // Set status to waiting for review
+      status: CHAPTER_STATUS.PENDING,
     },
     { new: true },
   );

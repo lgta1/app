@@ -10,10 +10,11 @@ import { Edit, Menu, Plus, Star } from "lucide-react";
 import { submitMangaToReview } from "@/mutations/manga.mutation";
 import { getChaptersByMangaId } from "@/queries/chapter.query";
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
-import { requireLogin } from "@/services/auth.server";
 
-import type { Route } from "./+types/manga.$id";
+import type { Route } from "./+types/manga.preview.$id";
 
+import { requireLogin } from "~/.server/services/auth.server";
+import { ChapterStatusDropdown } from "~/components/chapter-status-dropdown";
 import { CHAPTER_STATUS } from "~/constants/chapter";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
@@ -22,8 +23,9 @@ import { formatDate, formatTime } from "~/utils/date.utils";
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { id } = params;
   const user = await requireLogin(request);
+  const isAdminUser = isAdmin(user.role);
 
-  const manga = await getMangaByIdAndOwner(id, user.id, isAdmin(user.role));
+  const manga = await getMangaByIdAndOwner(id, user.id, isAdminUser);
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy truyện");
@@ -34,6 +36,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return {
     manga,
     chapters,
+    isAdminUser,
   };
 }
 
@@ -104,7 +107,7 @@ const statuses = {
 };
 
 export default function Index({ loaderData }: Route.ComponentProps) {
-  const { manga, chapters } = loaderData;
+  const { manga, chapters, isAdminUser } = loaderData;
   const submit = useSubmit();
   const navigate = useNavigate();
   const {
@@ -291,22 +294,32 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                   </h3>
 
                   <div className="flex items-center gap-3 lg:gap-5">
-                    <div
-                      className={`inline-flex items-center justify-center gap-2.5 rounded-[32px] ${statuses[chapter?.status || 0]?.bg} px-2 py-1 backdrop-blur-[3.40px]`}
-                    >
+                    {isAdminUser ? (
+                      <ChapterStatusDropdown
+                        chapterId={chapter.id}
+                        currentStatus={chapter?.status || 0}
+                        mangaId={id}
+                        chapterNumber={chapter.chapterNumber || 0}
+                      />
+                    ) : (
                       <div
-                        className={`${statuses[chapter?.status || 0]?.text} justify-center text-xs leading-none font-medium`}
+                        className={`inline-flex items-center justify-center gap-2.5 rounded-[32px] ${statuses[chapter?.status || 0]?.bg} px-2 py-1 backdrop-blur-[3.40px]`}
                       >
-                        {statuses[chapter?.status || 0]?.label}
+                        <div
+                          className={`${statuses[chapter?.status || 0]?.text} justify-center text-xs leading-none font-medium`}
+                        >
+                          {statuses[chapter?.status || 0]?.label}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Ngày xuất bản - hiển thị bên phải trên desktop */}
                 <div className="flex items-center gap-4">
                   <Edit
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
                       navigate(
                         `/manga/chapter/edit/${id}?chapterNumber=${chapter.chapterNumber}`,
                       );

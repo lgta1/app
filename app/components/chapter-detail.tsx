@@ -353,6 +353,7 @@ export function ChapterDetail({
           const isLastImage = index === chapter.contentUrls.length - 1;
           return (
             <img
+              loading="lazy"
               ref={isLastImage ? lastImageRef : undefined}
               src={url}
               alt={`Chapter Content ${index + 1}`}

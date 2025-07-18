@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { ClockIcon } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
@@ -14,7 +15,10 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
     <>
       <div className="hidden w-full flex-row items-center justify-center gap-2 overflow-x-auto lg:flex">
         {/* #2 */}
-        <div className="relative m-8 flex flex-col items-center">
+        <Link
+          to={`/manga/${topManga[1]?.id}`}
+          className="relative m-8 flex flex-col items-center"
+        >
           <div className="relative h-[300px] w-[207px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
             <img
               src={topManga[1]?.poster}
@@ -46,10 +50,13 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
             <img src="/images/leaderboard/2.svg" alt="Rank 2" className="h-14 w-auto" />
           </div>
-        </div>
+        </Link>
 
         {/* #1 */}
-        <div className="relative m-8 flex flex-col items-center">
+        <Link
+          to={`/manga/${topManga[0]?.id}`}
+          className="relative m-8 flex flex-col items-center"
+        >
           <div className="relative h-[305px] w-[208px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
             <img
               src={topManga[0]?.poster}
@@ -81,10 +88,13 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
             <img src="/images/leaderboard/1.svg" alt="Rank 1" className="h-14 w-auto" />
           </div>
-        </div>
+        </Link>
 
         {/* #3 */}
-        <div className="relative m-8 flex flex-col items-center">
+        <Link
+          to={`/manga/${topManga[2]?.id}`}
+          className="relative m-8 flex flex-col items-center"
+        >
           <div className="relative h-[305px] w-[207px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
             <img
               src={topManga[2]?.poster}
@@ -116,12 +126,15 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
             <img src="/images/leaderboard/3.svg" alt="Rank 3" className="h-14 w-auto" />
           </div>
-        </div>
+        </Link>
       </div>
 
       <div className="flex w-full flex-col items-center justify-center gap-2 overflow-x-auto lg:hidden">
         {/* #1 */}
-        <div className="relative m-6 flex flex-col items-center">
+        <Link
+          to={`/manga/${topManga[0]?.id}`}
+          className="relative m-6 flex flex-col items-center"
+        >
           <div className="relative h-[470px] w-[320px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
             <img
               src={topManga[0]?.poster}
@@ -153,10 +166,13 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           <div className="absolute top-5 left-5 flex items-center justify-center">
             <img src="/images/leaderboard/1.svg" alt="Rank 1" className="h-14 w-auto" />
           </div>
-        </div>
+        </Link>
 
         {/* #2 */}
-        <div className="relative m-6 flex flex-col items-center">
+        <Link
+          to={`/manga/${topManga[1]?.id}`}
+          className="relative m-6 flex flex-col items-center"
+        >
           <div className="relative h-[470px] w-[320px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
             <img
               src={topManga[1]?.poster}
@@ -188,10 +204,13 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           <div className="absolute top-5 left-5 flex items-center justify-center">
             <img src="/images/leaderboard/2.svg" alt="Rank 2" className="h-14 w-auto" />
           </div>
-        </div>
+        </Link>
 
         {/* #3 */}
-        <div className="relative m-6 flex flex-col items-center">
+        <Link
+          to={`/manga/${topManga[2]?.id}`}
+          className="relative m-6 flex flex-col items-center"
+        >
           <div className="relative h-[470px] w-[320px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
             <img
               src={topManga[2]?.poster}
@@ -223,7 +242,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           <div className="absolute top-5 left-5 flex items-center justify-center">
             <img src="/images/leaderboard/3.svg" alt="Rank 3" className="h-14 w-auto" />
           </div>
-        </div>
+        </Link>
       </div>
     </>
   );

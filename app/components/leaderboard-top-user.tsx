@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import type { UserType } from "~/database/models/user.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
 
@@ -15,7 +17,8 @@ export function LeaderboardTopUser({
   shadowColor,
 }: LeaderboardTopUserProps) {
   return (
-    <div
+    <Link
+      to={`/profile/${user.id}`}
       className={`p-4 ${gradientStyle} rounded-2xl ${shadowColor} outline-1 outline-offset-[-1px] ${borderColor} flex items-start justify-start gap-4 backdrop-blur`}
     >
       <div className="flex items-center justify-start gap-4">
@@ -45,6 +48,6 @@ export function LeaderboardTopUser({
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

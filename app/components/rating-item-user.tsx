@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import type { UserType } from "~/database/models/user.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
 
@@ -14,7 +16,7 @@ export default function RatingItemUser({
     (index === 3 && "text-[#FF7158]") ||
     "text-txt-primary";
   return (
-    <div className="flex items-center gap-3 p-3">
+    <Link to={`/profile/${user.id}`} className="flex items-center gap-3 p-3">
       <span className={`w-5 text-center text-base font-semibold ${color}`}>{index}</span>
       <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded">
         <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
@@ -41,6 +43,6 @@ export default function RatingItemUser({
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

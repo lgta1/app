@@ -1,4 +1,5 @@
 import { isMobile } from "react-device-detect";
+import { Link } from "react-router";
 
 import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
@@ -36,7 +37,10 @@ export default function LeaderboardUserWaifuItem({
   };
 
   return (
-    <div className="border-bd-default inline-flex flex-col items-start justify-start self-stretch overflow-hidden rounded-xl border">
+    <Link
+      to={`/profile/${leaderboard.userId}`}
+      className="border-bd-default inline-flex flex-col items-start justify-start self-stretch overflow-hidden rounded-xl border"
+    >
       <div className="bg-background-layer-1 flex flex-col items-start justify-center gap-4 self-stretch overflow-hidden p-3 md:flex-row md:justify-between md:gap-3">
         {/* User Info Section */}
         <div className="inline-flex items-center justify-start gap-3">
@@ -105,6 +109,6 @@ export default function LeaderboardUserWaifuItem({
 
       {/* Waifu List */}
       {renderWaifuList()}
-    </div>
+    </Link>
   );
 }

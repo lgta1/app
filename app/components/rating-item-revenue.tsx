@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { Banknote } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
@@ -15,7 +16,7 @@ export default function RatingItemRevenue({
     (index === 3 && "text-[#FF7158]") ||
     "text-txt-primary";
   return (
-    <div className="flex items-center gap-3 p-3">
+    <Link to={`/manga/${manga.id}`} className="flex items-center gap-3 p-3">
       <span className={`w-5 text-center text-base font-semibold ${color}`}>{index}</span>
       <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded">
         <img
@@ -42,6 +43,6 @@ export default function RatingItemRevenue({
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
