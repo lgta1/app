@@ -8,16 +8,17 @@ import {
   type MetaFunction,
 } from "react-router";
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
-import { ChevronDown, Search, Trash2 } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 
 import { deleteManga } from "@/mutations/manga.mutation";
 import {
   getAllMangaAdmin,
-  getTotalMangaCount,
+  getTotalMangaCountAdmin,
   searchMangaWithPagination,
 } from "@/queries/manga.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
+import { Dropdown } from "~/components/dropdown";
 import { Pagination } from "~/components/pagination";
 import { MANGA_STATUS } from "~/constants/manga";
 import type { MangaType } from "~/database/models/manga.model";
@@ -34,12 +35,15 @@ interface LoaderData {
   currentPage: number;
   totalPages: number;
   searchTerm: string;
+  statusFilter: number | undefined;
 }
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const searchTerm = url.searchParams.get("search") || "";
+  const statusParam = url.searchParams.get("status");
+  const statusFilter = statusParam ? parseInt(statusParam) : undefined;
   const limit = 10;
 
   let mangas: MangaType[];
@@ -47,13 +51,13 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
 
   if (searchTerm) {
     [mangas, totalMangas] = await Promise.all([
-      searchMangaWithPagination(searchTerm, page, limit),
-      getTotalMangaCount({ searchTerm }),
+      searchMangaWithPagination(searchTerm, page, limit, statusFilter),
+      getTotalMangaCountAdmin({ searchTerm, status: statusFilter }),
     ]);
   } else {
     [mangas, totalMangas] = await Promise.all([
-      getAllMangaAdmin(page, limit),
-      getTotalMangaCount({}),
+      getAllMangaAdmin(page, limit, statusFilter),
+      getTotalMangaCountAdmin({ status: statusFilter }),
     ]);
   }
 
@@ -64,6 +68,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
     currentPage: page,
     totalPages,
     searchTerm,
+    statusFilter,
   };
 }
 
@@ -152,11 +157,21 @@ export default function AdminManga() {
     currentPage,
     totalPages,
     searchTerm: initialSearchTerm,
+    statusFilter,
   } = useLoaderData<LoaderData>();
 
   const [searchParams] = useSearchParams();
   const submit = useSubmit();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
+
+  // Status options for dropdown
+  const statusOptions = [
+    { value: "", label: "Tất cả trạng thái" },
+    { value: MANGA_STATUS.PENDING, label: "Chờ duyệt" },
+    { value: MANGA_STATUS.APPROVED, label: "Đã duyệt" },
+    { value: MANGA_STATUS.REJECTED, label: "Từ chối" },
+    { value: MANGA_STATUS.CREATING, label: "Đang tạo" },
+  ];
 
   const handleDeleteClick = (
     e: React.MouseEvent<HTMLButtonElement>,
@@ -189,6 +204,17 @@ export default function AdminManga() {
     submit(params, { method: "get" });
   };
 
+  const handleStatusChange = (value: string | number) => {
+    const params = new URLSearchParams(searchParams);
+    if (value === "" || value === undefined) {
+      params.delete("status");
+    } else {
+      params.set("status", value.toString());
+    }
+    params.delete("page");
+    submit(params, { method: "get" });
+  };
+
   return (
     <div className="container mx-auto my-8 w-full max-w-[1141px] gap-4 px-4 lg:px-0">
       <Toaster position="bottom-right" />
@@ -210,12 +236,13 @@ export default function AdminManga() {
               className="text-txt-secondary placeholder:text-txt-secondary focus:text-txt-primary flex-1 bg-transparent font-sans text-sm leading-tight font-semibold focus:outline-none"
             />
           </div>
-          <div className="bg-bgc-layer2 border-bd-default flex h-10 w-full items-center justify-between rounded-xl border px-3 py-2.5 md:w-60">
-            <div className="text-txt-secondary font-sans text-sm leading-tight font-medium">
-              Sắp xếp theo: Mới cập nhật
-            </div>
-            <ChevronDown className="text-txt-secondary h-5 w-5" />
-          </div>
+          <Dropdown
+            options={statusOptions}
+            value={statusFilter ?? ""}
+            onSelect={handleStatusChange}
+            className="w-full md:w-60"
+            placeholder="Chọn trạng thái"
+          />
         </div>
 
         {/* Table */}
@@ -292,7 +319,7 @@ export default function AdminManga() {
                         {manga.title}
                       </div>
                       <div className="text-txt-secondary font-sans text-xs font-medium">
-                        {manga.author}
+                        {manga.translationTeam}
                       </div>
                     </div>
                   </div>
@@ -330,7 +357,7 @@ export default function AdminManga() {
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">
                   <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
-                    {manga.author}
+                    {manga.translationTeam}
                   </div>
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">

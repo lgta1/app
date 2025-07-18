@@ -31,6 +31,7 @@ import { MANGA_STATUS } from "~/constants/manga";
 import type { GenresType } from "~/database/models/genres.model";
 import type { MangaType } from "~/database/models/manga.model";
 import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 
 export const meta: MetaFunction = () => {
@@ -43,7 +44,11 @@ export const meta: MetaFunction = () => {
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const userInfo = await requireLogin(request);
   const genres = await getAllGenres();
-  const manga = await getMangaByIdAndOwner(params.id || "", userInfo.id);
+  const manga = await getMangaByIdAndOwner(
+    params.id || "",
+    userInfo.id,
+    isAdmin(userInfo.role),
+  );
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy truyện");

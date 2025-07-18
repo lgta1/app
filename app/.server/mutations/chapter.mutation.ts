@@ -4,6 +4,7 @@ import { CHAPTER_STATUS } from "~/constants/chapter";
 import { ChapterModel, type ChapterType } from "~/database/models/chapter.model";
 import { MangaModel } from "~/database/models/manga.model";
 import { BusinessError } from "~/helpers/errors.helper";
+import { isAdmin } from "~/helpers/user.helper";
 
 export const createChapter = async (
   request: Request,
@@ -14,8 +15,19 @@ export const createChapter = async (
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
+  let query: any = {
+    _id: chapter.mangaId,
+  };
+
+  if (!isAdmin(userInfo.role)) {
+    query = {
+      ...query,
+      ownerId: userInfo.id,
+    };
+  }
+
   const manga = await MangaModel.findOneAndUpdate(
-    { _id: chapter.mangaId, ownerId: userInfo.id },
+    query,
     {
       $inc: { chapters: 1 },
     },
@@ -50,8 +62,19 @@ export const updateChapter = async (
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
+  let query: any = {
+    _id: mangaId,
+  };
+
+  if (!isAdmin(userInfo.role)) {
+    query = {
+      ...query,
+      ownerId: userInfo.id,
+    };
+  }
+
   // Verify manga ownership
-  const manga = await MangaModel.findOne({ _id: mangaId, ownerId: userInfo.id });
+  const manga = await MangaModel.findOne(query);
   if (!manga) {
     throw new BusinessError("Không tìm thấy manga hoặc bạn không có quyền chỉnh sửa");
   }

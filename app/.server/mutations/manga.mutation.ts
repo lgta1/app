@@ -111,3 +111,53 @@ export const submitMangaToReview = async (request: Request, mangaId: string) => 
     message: "Nộp truyện thành công",
   };
 };
+
+export const approveManga = async (request: Request, mangaId: string) => {
+  const userInfo = await getUserInfoFromSession(request);
+  if (!userInfo) {
+    throw new BusinessError("Bạn cần đăng nhập để duyệt truyện");
+  }
+
+  if (!isAdmin(userInfo.role)) {
+    throw new BusinessError("Bạn không có quyền duyệt truyện");
+  }
+
+  const manga = await MangaModel.findById(mangaId);
+  if (!manga) {
+    throw new BusinessError("Không tìm thấy truyện");
+  }
+
+  await MangaModel.findByIdAndUpdate(mangaId, {
+    $set: { status: MANGA_STATUS.APPROVED, updatedAt: new Date() },
+  });
+
+  return {
+    success: true,
+    message: "Duyệt truyện thành công",
+  };
+};
+
+export const rejectManga = async (request: Request, mangaId: string) => {
+  const userInfo = await getUserInfoFromSession(request);
+  if (!userInfo) {
+    throw new BusinessError("Bạn cần đăng nhập để từ chối truyện");
+  }
+
+  if (!isAdmin(userInfo.role)) {
+    throw new BusinessError("Bạn không có quyền từ chối truyện");
+  }
+
+  const manga = await MangaModel.findById(mangaId);
+  if (!manga) {
+    throw new BusinessError("Không tìm thấy truyện");
+  }
+
+  await MangaModel.findByIdAndUpdate(mangaId, {
+    $set: { status: MANGA_STATUS.REJECTED, updatedAt: new Date() },
+  });
+
+  return {
+    success: true,
+    message: "Từ chối truyện thành công",
+  };
+};

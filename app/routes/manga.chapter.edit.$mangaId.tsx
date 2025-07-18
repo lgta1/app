@@ -21,12 +21,26 @@ import { ChapterDetail } from "~/components/chapter-detail";
 import type { UserType } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
+import {
+  compressMultipleImages,
+  formatFileSize,
+  validateImageFile,
+} from "~/utils/image-compression.utils";
 
 interface PreviewImage {
   file?: File;
   url: string;
   id: string;
   isExisting?: boolean;
+  originalSize?: number;
+  compressedSize?: number;
+  compressionRatio?: number;
+}
+
+interface CompressionProgress {
+  isCompressing: boolean;
+  current: number;
+  total: number;
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -106,6 +120,11 @@ export default function EditChapter() {
   const [previewImages, setPreviewImages] = useState<PreviewImage[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState<CompressionProgress>({
+    isCompressing: false,
+    current: 0,
+    total: 0,
+  });
   const actionData = useActionData<typeof action>();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,25 +144,93 @@ export default function EditChapter() {
     setPreviewImages(existingImages);
   }, [chapter]);
 
-  const handlePagesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePagesChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files) {
-      const newFiles = Array.from(files);
-      setContents((prev) => [...prev, ...newFiles]);
+    if (!files || files.length === 0) return;
 
-      // Create preview images
-      const newPreviewImages: PreviewImage[] = [];
-      newFiles.forEach((file, index) => {
-        const url = URL.createObjectURL(file);
-        newPreviewImages.push({
-          file,
+    const newFiles = Array.from(files);
+
+    // Validate files first
+    try {
+      newFiles.forEach((file) => validateImageFile(file));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "File không hợp lệ");
+      event.target.value = "";
+      return;
+    }
+
+    // Set compression progress
+    setCompressionProgress({
+      isCompressing: true,
+      current: 0,
+      total: newFiles.length,
+    });
+
+    try {
+      toast.loading("Đang nén và chuyển đổi ảnh sang WebP...", { id: "compression" });
+
+      // Compress images with progress callback
+      const compressionResults = await compressMultipleImages(
+        newFiles,
+        (current, total) => {
+          setCompressionProgress({
+            isCompressing: true,
+            current,
+            total,
+          });
+        },
+      );
+
+      // Update files and preview images
+      const compressedFiles = compressionResults.map((result) => result.compressedFile);
+      setContents((prev) => [...prev, ...compressedFiles]);
+
+      // Create preview images with compression info
+      const newPreviewImages: PreviewImage[] = compressionResults.map((result, index) => {
+        const url = URL.createObjectURL(result.compressedFile);
+        return {
+          file: result.compressedFile,
           url,
           id: `${Date.now()}-${index}`,
           isExisting: false,
-        });
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize,
+          compressionRatio: result.compressionRatio,
+        };
       });
 
       setPreviewImages((prev) => [...prev, ...newPreviewImages]);
+
+      // Calculate total savings
+      const totalOriginalSize = compressionResults.reduce(
+        (acc, curr) => acc + curr.originalSize,
+        0,
+      );
+      const totalCompressedSize = compressionResults.reduce(
+        (acc, curr) => acc + curr.compressedSize,
+        0,
+      );
+      const totalSavings =
+        ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100;
+
+      toast.success(
+        `Đã nén ${newFiles.length} ảnh thành công! Tiết kiệm ${formatFileSize(totalOriginalSize - totalCompressedSize)} (${Math.round(totalSavings)}%)`,
+        { id: "compression" },
+      );
+    } catch (error) {
+      console.error("Error compressing images:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Có lỗi xảy ra khi nén ảnh. Vui lòng thử lại.",
+        { id: "compression" },
+      );
+    } finally {
+      setCompressionProgress({
+        isCompressing: false,
+        current: 0,
+        total: 0,
+      });
     }
 
     // Reset input value to allow selecting the same files again
@@ -164,15 +251,11 @@ export default function EditChapter() {
     });
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(0)) + sizes[i];
-  };
-
   const triggerFileInput = () => {
+    if (compressionProgress.isCompressing) {
+      toast.error("Đang nén ảnh, vui lòng chờ...");
+      return;
+    }
     fileInputRef.current?.click();
   };
 
@@ -186,6 +269,11 @@ export default function EditChapter() {
 
     if (!mangaId) {
       toast.error("Không tìm thấy manga ID");
+      return;
+    }
+
+    if (compressionProgress.isCompressing) {
+      toast.error("Đang nén ảnh, vui lòng chờ...");
       return;
     }
 
@@ -247,7 +335,8 @@ export default function EditChapter() {
   };
 
   // Update loading state based on fetcher
-  const isLoading = isSubmitting || fetcher.state === "submitting";
+  const isLoading =
+    isSubmitting || fetcher.state === "submitting" || compressionProgress.isCompressing;
 
   // Sử dụng data từ fetcher nếu có, nếu không thì dùng actionData
   const responseData = fetcher.data || actionData;
@@ -257,6 +346,12 @@ export default function EditChapter() {
       toast.error("Vui lòng điền đầy đủ thông tin trước khi xem trước");
       return;
     }
+
+    if (compressionProgress.isCompressing) {
+      toast.error("Đang nén ảnh, vui lòng chờ...");
+      return;
+    }
+
     setIsPreviewMode(true);
   };
 
@@ -328,6 +423,32 @@ export default function EditChapter() {
             </div>
           )}
 
+          {/* Compression Progress */}
+          {compressionProgress.isCompressing && (
+            <div className="bg-lav-500/10 w-full rounded p-3">
+              <div className="text-lav-500 flex items-center justify-between text-sm font-medium">
+                <span>
+                  Đang nén ảnh {compressionProgress.current}/{compressionProgress.total}
+                  ...
+                </span>
+                <span>
+                  {Math.round(
+                    (compressionProgress.current / compressionProgress.total) * 100,
+                  )}
+                  %
+                </span>
+              </div>
+              <div className="bg-lav-500/20 mt-2 h-2 rounded-full">
+                <div
+                  className="bg-lav-500 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${(compressionProgress.current / compressionProgress.total) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Hidden input for mangaId */}
           <input type="hidden" name="mangaId" value={mangaId || ""} />
 
@@ -377,6 +498,7 @@ export default function EditChapter() {
                   accept="image/*"
                   onChange={handlePagesChange}
                   className="sr-only"
+                  disabled={compressionProgress.isCompressing}
                 />
 
                 {/* Upload Button and Text - Mobile: centered, Desktop: absolutely positioned */}
@@ -384,15 +506,22 @@ export default function EditChapter() {
                   <button
                     type="button"
                     onClick={triggerFileInput}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9]"
+                    disabled={compressionProgress.isCompressing}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Upload className="h-5 w-5 text-black" />
                     <span className="text-center text-sm font-semibold text-black">
-                      {previewImages.length > 0 ? "Thêm ảnh" : "Tải ảnh lên"}
+                      {compressionProgress.isCompressing
+                        ? "Đang nén..."
+                        : previewImages.length > 0
+                          ? "Thêm ảnh"
+                          : "Tải ảnh lên"}
                     </span>
                   </button>
                   <span className="text-txt-primary text-center text-sm font-medium">
-                    Click để {previewImages.length > 0 ? "thêm ảnh mới" : "tải ảnh lên"}
+                    {compressionProgress.isCompressing
+                      ? "Đang xử lý ảnh..."
+                      : `Click để ${previewImages.length > 0 ? "thêm ảnh mới" : "tải ảnh lên"}`}
                   </span>
                 </div>
 
@@ -401,25 +530,33 @@ export default function EditChapter() {
                   <button
                     type="button"
                     onClick={triggerFileInput}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9]"
+                    disabled={compressionProgress.isCompressing}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Upload className="h-5 w-5 text-black" />
                     <span className="text-center text-sm font-semibold text-black">
-                      {previewImages.length > 0 ? "Thêm ảnh" : "Tải ảnh lên"}
+                      {compressionProgress.isCompressing
+                        ? "Đang nén..."
+                        : previewImages.length > 0
+                          ? "Thêm ảnh"
+                          : "Tải ảnh lên"}
                     </span>
                   </button>
                   <span className="text-txt-primary text-center text-sm font-medium">
-                    Click để {previewImages.length > 0 ? "thêm ảnh mới" : "tải ảnh lên"}
+                    {compressionProgress.isCompressing
+                      ? "Đang xử lý ảnh..."
+                      : `Click để ${previewImages.length > 0 ? "thêm ảnh mới" : "tải ảnh lên"}`}
                   </span>
                 </div>
               </div>
 
               <p className="text-txt-secondary text-sm leading-tight font-medium">
-                Kích thước ảnh lớn nhất 2000 x 8000 pixel, văn bản không vượt quá 10MB.
+                Ảnh mới sẽ được tự động nén và chuyển đổi sang định dạng WebP để tối ưu
+                hóa tải trang.
               </p>
               <p className="text-txt-secondary text-sm leading-tight font-medium">
-                Tác phẩm uược ghép từ các ảnh ngắn sẽ tải nhanh hơn và đẹp hơn là ghép từ
-                nhiều ảnh dài
+                Kích thước ảnh lớn nhất 2000 x 8000 pixel. Tác phẩm được ghép từ các ảnh
+                ngắn sẽ tải nhanh hơn.
               </p>
 
               {/* Preview Images - Below text */}
@@ -445,17 +582,32 @@ export default function EditChapter() {
                           <X className="text-txt-primary h-4 w-4" />
                         </button>
 
-                        {/* File size - only show for new files */}
-                        {image.file && (
-                          <div className="text-txt-primary absolute bottom-1 left-1 rounded bg-black/70 px-2 py-1 text-xs">
-                            {formatFileSize(image.file.size)}
-                          </div>
-                        )}
+                        {/* File info */}
+                        <div className="text-txt-primary absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-xs">
+                          {image.file ? (
+                            <div>
+                              <div>{formatFileSize(image.file.size)}</div>
+                              {image.originalSize &&
+                                image.compressedSize &&
+                                image.originalSize !== image.compressedSize && (
+                                  <div className="text-lav-300">
+                                    -{Math.round(image.compressionRatio || 0)}%
+                                  </div>
+                                )}
+                            </div>
+                          ) : (
+                            <div>Hiện tại</div>
+                          )}
+                        </div>
 
-                        {/* Existing image indicator */}
-                        {image.isExisting && (
-                          <div className="text-txt-primary absolute bottom-1 left-1 rounded bg-blue-600/70 px-2 py-1 text-xs">
-                            Hiện tại
+                        {/* Format indicator */}
+                        {image.isExisting ? (
+                          <div className="bg-lav-400 absolute top-1 left-1 rounded px-1 py-0.5 text-xs text-white">
+                            Gốc
+                          </div>
+                        ) : (
+                          <div className="bg-lav-500 absolute top-1 left-1 rounded px-1 py-0.5 text-xs text-white">
+                            WebP
                           </div>
                         )}
                       </div>
@@ -482,7 +634,8 @@ export default function EditChapter() {
           <button
             type="button"
             onClick={handlePreview}
-            className="border-lav-500 hover:bg-lav-500/5 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] transition-colors sm:w-52"
+            disabled={compressionProgress.isCompressing}
+            className="border-lav-500 hover:bg-lav-500/5 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-52"
           >
             <span className="text-txt-focus text-center text-sm font-semibold">
               Xem trước
@@ -496,7 +649,11 @@ export default function EditChapter() {
             className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9] disabled:cursor-not-allowed disabled:opacity-50 sm:w-52"
           >
             <span className="text-center text-sm font-semibold text-black">
-              {isLoading ? "Đang xử lý..." : "Cập nhật"}
+              {compressionProgress.isCompressing
+                ? "Đang nén ảnh..."
+                : isLoading
+                  ? "Đang xử lý..."
+                  : "Cập nhật"}
             </span>
           </button>
         </div>

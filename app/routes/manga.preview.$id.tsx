@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   type ClientActionFunctionArgs,
@@ -5,14 +6,18 @@ import {
   useNavigate,
   useSubmit,
 } from "react-router";
-import { Edit, Menu, Plus, Star } from "lucide-react";
+import { CheckCircle, Edit, Menu, Plus, Star, XCircle } from "lucide-react";
 
-import { submitMangaToReview } from "@/mutations/manga.mutation";
 import { getChaptersByMangaId } from "@/queries/chapter.query";
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
 
 import type { Route } from "./+types/manga.preview.$id";
 
+import {
+  approveManga,
+  rejectManga,
+  submitMangaToReview,
+} from "~/.server/mutations/manga.mutation";
 import { requireLogin } from "~/.server/services/auth.server";
 import { ChapterStatusDropdown } from "~/components/chapter-status-dropdown";
 import { CHAPTER_STATUS } from "~/constants/chapter";
@@ -43,7 +48,23 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { id } = params;
-    const result = await submitMangaToReview(request, id);
+    const formData = await request.formData();
+    const actionType = formData.get("actionType") as string;
+
+    let result;
+
+    switch (actionType) {
+      case "approve":
+        result = await approveManga(request, id);
+        break;
+      case "reject":
+        result = await rejectManga(request, id);
+        break;
+      case "submit":
+      default:
+        result = await submitMangaToReview(request, id);
+        break;
+    }
 
     return Response.json(result);
   } catch (error) {
@@ -121,11 +142,31 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     updatedAt,
     followNumber,
     translationTeam,
+    ownerId,
   } = manga;
 
-  // Mock data cho demo (sẽ được thay thế bằng dữ liệu thực)
-  const rating = 5.0;
-  const reviewCount = Math.floor(Math.random() * 100);
+  // State để track rating data
+  const [ratingAverage, setRatingAverage] = useState(manga.ratingAverage || 0);
+  const [ratingCount, setRatingCount] = useState(manga.ratingCount || 0);
+
+  // Fetch rating data khi component mount
+  useEffect(() => {
+    const checkRatingStatus = async () => {
+      try {
+        const response = await fetch(`/api/manga-rating?mangaId=${id}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          setRatingAverage(data.ratingAverage);
+          setRatingCount(data.ratingCount);
+        }
+      } catch (error) {
+        console.error("Error checking rating status:", error);
+      }
+    };
+
+    checkRatingStatus();
+  }, [id]);
 
   return (
     <div className="container-ad mx-auto px-4 py-6">
@@ -147,19 +188,30 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               <div className="flex items-start gap-3">
                 {/* Sao đánh giá */}
                 <div className="flex items-center">
-                  {[...Array(5)].map((_, index) => (
-                    <Star
-                      key={index}
-                      className="h-6 w-6 fill-yellow-400 text-yellow-400"
-                    />
-                  ))}
+                  {[...Array(5)].map((_, index) => {
+                    const starValue = index + 1;
+                    const isActive = starValue <= Math.floor(ratingAverage);
+
+                    return (
+                      <Star
+                        key={index}
+                        className={`h-6 w-6 ${
+                          isActive
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "fill-transparent text-gray-300"
+                        }`}
+                      />
+                    );
+                  })}
                 </div>
                 {/* Điểm và số đánh giá */}
                 <div className="flex items-center gap-2">
-                  <span className="text-txt-primary text-base font-medium">{rating}</span>
+                  <span className="text-txt-primary text-base font-medium">
+                    {ratingAverage > 0 ? ratingAverage.toFixed(1) : "0.0"}
+                  </span>
                   <div className="bg-txt-primary h-1 w-1 rounded-full" />
                   <span className="text-txt-primary text-base font-medium">
-                    {reviewCount} đánh giá
+                    {ratingCount} đánh giá
                   </span>
                 </div>
               </div>
@@ -173,9 +225,12 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               <div className="text-txt-secondary w-28 text-base font-medium">
                 Nhóm dịch:
               </div>
-              <div className="text-txt-focus text-base font-medium">
+              <Link
+                to={`/profile/${ownerId}`}
+                className="text-txt-focus text-base font-medium"
+              >
                 {translationTeam}
-              </div>
+              </Link>
 
               <div className="text-txt-secondary w-28 text-base font-medium">
                 Tác giả:
@@ -224,6 +279,39 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                   <span className="text-sm font-semibold">Sửa</span>
                 </button>
               </Link>
+
+              {/* Admin buttons - only show for admin when manga is pending */}
+              {isAdminUser && (
+                <>
+                  <button
+                    className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-green-500 px-4 py-3 text-green-400 shadow-[0px_4px_8.9px_0px_rgba(34,197,94,0.25)] transition-colors hover:bg-green-500/10"
+                    onClick={() => {
+                      const formData = new FormData();
+                      formData.append("actionType", "approve");
+                      submit(formData, {
+                        method: "POST",
+                      });
+                    }}
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Duyệt</span>
+                  </button>
+
+                  <button
+                    className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500 px-4 py-3 text-red-400 shadow-[0px_4px_8.9px_0px_rgba(239,68,68,0.25)] transition-colors hover:bg-red-500/10"
+                    onClick={() => {
+                      const formData = new FormData();
+                      formData.append("actionType", "reject");
+                      submit(formData, {
+                        method: "POST",
+                      });
+                    }}
+                  >
+                    <XCircle className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Từ chối</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -336,7 +424,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             <button
               className="to-btn-primary flex min-w-40 cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-3 text-sm font-semibold text-black"
               onClick={() => {
-                submit(null, {
+                const formData = new FormData();
+                formData.append("actionType", "submit");
+                submit(formData, {
                   method: "POST",
                 });
               }}

@@ -24,7 +24,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const [manga, total] = await Promise.all([
     searchMangaApprovedWithPagination({ keyword, page, limit }),
-    getTotalMangaCount({ searchTerm: keyword, query: { status: MANGA_STATUS.APPROVED } }),
+    getTotalMangaCount({
+      searchTerm: keyword,
+      query: { status: { $in: [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING] } },
+    }),
   ]);
 
   return {
