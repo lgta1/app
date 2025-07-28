@@ -48,7 +48,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
   const query = {
     genres: genre.slug,
-    status: { $in: [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING] },
+    status: MANGA_STATUS.APPROVED,
   };
 
   const [manga, totalCount] = await Promise.all([

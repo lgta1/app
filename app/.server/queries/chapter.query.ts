@@ -13,13 +13,16 @@ export const getChaptersByMangaId = async (mangaId: string, user?: UserType) => 
 
   let query: any = { mangaId };
   if (manga.ownerId !== user?.id && !isAdmin(user?.role || "")) {
-    query = { ...query, status: CHAPTER_STATUS.APPROVED };
+    query = {
+      ...query,
+      status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] },
+    };
   }
 
   return await ChapterModel.find(query).sort({ createdAt: -1 }).lean();
 };
 
-export const getChaptersByMangaIdAndNumber = async (
+export const getChapterByMangaIdAndNumber = async (
   mangaId: string,
   chapterNumber: number,
   user?: UserType,
@@ -34,7 +37,10 @@ export const getChaptersByMangaIdAndNumber = async (
     chapterNumber,
   }).lean();
 
-  if (chapter?.status === CHAPTER_STATUS.APPROVED) {
+  if (
+    chapter?.status === CHAPTER_STATUS.APPROVED ||
+    chapter?.status === CHAPTER_STATUS.PENDING
+  ) {
     return chapter;
   }
 

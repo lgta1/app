@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { Link } from "react-router";
 import { Copy, Eye, Heart, MessageCircle, Star, StarOff } from "lucide-react";
 
+import { MANGA_USER_STATUS } from "~/constants/manga";
 import type { ChapterType } from "~/database/models/chapter.model";
 import type { MangaType } from "~/database/models/manga.model";
 import { formatDate, formatTime } from "~/utils/date.utils";
@@ -25,7 +26,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     updatedAt,
     followNumber,
     translationTeam,
-    status,
+    userStatus,
     ownerId,
   } = manga;
 
@@ -49,16 +50,12 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   // Helper function để lấy text trạng thái
   const getStatusText = (status: number) => {
     switch (status) {
-      case 0:
-        return "Đang tiến hành";
-      case 1:
-        return "Đã duyệt";
-      case 2:
-        return "Bị từ chối";
-      case 3:
-        return "Đang tạo";
+      case MANGA_USER_STATUS.ON_GOING:
+        return "Đang ra";
+      case MANGA_USER_STATUS.COMPLETED:
+        return "Đã hoàn thành";
       default:
-        return "Không xác định";
+        return "Đang ra";
     }
   };
 
@@ -311,7 +308,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
               Tình trạng:
             </div>
             <div className="text-txt-primary text-base font-medium">
-              {getStatusText(status)}
+              {getStatusText(userStatus)}
             </div>
 
             <div className="text-txt-secondary w-28 text-base font-medium">

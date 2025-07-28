@@ -68,7 +68,6 @@ export async function action({ request }: ActionFunctionArgs) {
         star4: pitySetting.star4,
         star5: pitySetting.star5,
         total: 100, // Always set to 100
-        updatedAt: new Date(),
       },
       { new: true },
     ).lean();

@@ -63,8 +63,6 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
         return "Đã duyệt";
       case MANGA_STATUS.REJECTED:
         return "Bị từ chối";
-      case MANGA_STATUS.CREATING:
-        return "Đang tạo";
       default:
         return "Không xác định";
     }
@@ -78,8 +76,6 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
         return "bg-[#25EBAC]/10 text-[#25EBAC]";
       case MANGA_STATUS.REJECTED:
         return "bg-red-500/10 text-red-500";
-      case MANGA_STATUS.CREATING:
-        return "bg-blue-500/10 text-blue-500";
       default:
         return "bg-gray-500/10 text-gray-500";
     }

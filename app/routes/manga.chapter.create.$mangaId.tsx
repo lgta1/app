@@ -223,7 +223,7 @@ export default function CreateChapter() {
 
     try {
       // Prepare files for upload - only content pages
-      const filesToUpload = contents.map((file, index) => ({
+      const filesToUpload = contents.map((file) => ({
         file,
         options: {
           bucket: "manga-images",

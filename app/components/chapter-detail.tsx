@@ -6,8 +6,10 @@ import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
 
 import ReportDialog from "./dialog-report";
 
+import RelatedManga from "~/components/related-manga";
 import { REPORT_TYPE } from "~/constants/report";
 import type { ChapterType } from "~/database/models/chapter.model";
+import type { MangaType } from "~/database/models/manga.model";
 import { formatDate, formatTime } from "~/utils/date.utils";
 
 type ChapterDetailProps = {
@@ -17,11 +19,13 @@ type ChapterDetailProps = {
     hasNext: boolean;
   };
   isEnableClaimReward?: boolean;
+  relatedManga?: MangaType[];
 };
 
 export function ChapterDetail({
   chapter,
   isEnableClaimReward: isEnableClaimGold = false,
+  relatedManga = [],
 }: ChapterDetailProps) {
   const [_, setSearchParams] = useSearchParams();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
@@ -369,6 +373,63 @@ export function ChapterDetail({
           );
         })}
       </div>
+
+      {/* Navigation Controls */}
+      <div className="mb-6 flex items-center justify-center gap-3 sm:mb-8">
+        {/* Previous Button */}
+        <button
+          className={`flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] p-3 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all ${
+            chapter.hasPrevious
+              ? "cursor-pointer hover:shadow-[0px_6px_12px_0px_rgba(196,69,255,0.35)]"
+              : "cursor-not-allowed opacity-50"
+          }`}
+          disabled={!chapter.hasPrevious}
+          onClick={() => {
+            setSearchParams((prev) => {
+              const newParams = new URLSearchParams(prev);
+              newParams.set(
+                "chapterNumber",
+                ((chapter.chapterNumber || 2) - 1).toString(),
+              );
+              return newParams;
+            });
+          }}
+        >
+          <ChevronLeft className="text-bgc-layer1 h-5 w-5" />
+        </button>
+
+        {/* Chapter Selector */}
+        <div className="bg-bgc-layer2 border-bd-default flex h-11 items-center gap-2.5 rounded-xl border px-3 py-2.5">
+          <span className="text-txt-primary font-sans text-base leading-normal font-medium">
+            Chương {chapter.chapterNumber}
+          </span>
+          <ChevronDown className="text-txt-secondary h-4 w-4 rotate-0" />
+        </div>
+
+        {/* Next Button */}
+        <button
+          className={`flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] p-3 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all ${
+            chapter.hasNext
+              ? "cursor-pointer hover:shadow-[0px_6px_12px_0px_rgba(196,69,255,0.35)]"
+              : "cursor-not-allowed opacity-50"
+          }`}
+          disabled={!chapter.hasNext}
+          onClick={() => {
+            setSearchParams((prev) => {
+              const newParams = new URLSearchParams(prev);
+              newParams.set(
+                "chapterNumber",
+                ((chapter.chapterNumber || 1) + 1).toString(),
+              );
+              return newParams;
+            });
+          }}
+        >
+          <ChevronRight className="text-bgc-layer1 h-5 w-5" />
+        </button>
+      </div>
+
+      {relatedManga.length > 0 && <RelatedManga mangaList={relatedManga} />}
 
       {/* Report Dialog */}
       <ReportDialog

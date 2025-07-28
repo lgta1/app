@@ -39,7 +39,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     currentUser,
   ] = await Promise.all([
     getChaptersByMangaId(manga.id, user),
-    getRelatedManga(manga.genres),
+    getRelatedManga(manga),
     getRevenuesByPeriod("monthly"),
     getTopUser(),
     getLeaderboard("weekly"),

@@ -1,6 +1,6 @@
 import { getUserInfoFromSession } from "@/services/session.svc";
 
-import { MANGA_STATUS } from "~/constants/manga";
+import { MANGA_STATUS, MANGA_USER_STATUS } from "~/constants/manga";
 import { ChapterModel } from "~/database/models/chapter.model";
 import { CommentModel } from "~/database/models/comment.model";
 import { MangaModel, type MangaType } from "~/database/models/manga.model";
@@ -62,9 +62,9 @@ export const deleteManga = async (request: Request, mangaId: string) => {
 
 export const createManga = async (
   request: Request,
-  manga: Omit<MangaType, "id" | "createdAt" | "updatedAt" | "chapters">,
+  manga: Omit<MangaType, "id" | "createdAt" | "updatedAt" | "chapters" | "status">,
 ) => {
-  if (![MANGA_STATUS.CREATING, MANGA_STATUS.PENDING].includes(manga.status)) {
+  if (!Object.values(MANGA_USER_STATUS).includes(manga.userStatus)) {
     throw new BusinessError("Truyện không được tạo với trạng thái này");
   }
 
@@ -97,13 +97,13 @@ export const submitMangaToReview = async (request: Request, mangaId: string) => 
     {
       _id: mangaId,
       ownerId: userInfo.id,
-      status: { $ne: MANGA_STATUS.PENDING },
+      status: { $ne: MANGA_STATUS.APPROVED },
     },
     { $set: { status: MANGA_STATUS.PENDING } },
   );
 
   if (!updatedManga) {
-    throw new BusinessError("Truyện đã được nộp");
+    throw new BusinessError("Truyện đã được duyệt");
   }
 
   return {
@@ -128,7 +128,7 @@ export const approveManga = async (request: Request, mangaId: string) => {
   }
 
   await MangaModel.findByIdAndUpdate(mangaId, {
-    $set: { status: MANGA_STATUS.APPROVED, updatedAt: new Date() },
+    $set: { status: MANGA_STATUS.APPROVED },
   });
 
   return {
@@ -153,7 +153,7 @@ export const rejectManga = async (request: Request, mangaId: string) => {
   }
 
   await MangaModel.findByIdAndUpdate(mangaId, {
-    $set: { status: MANGA_STATUS.REJECTED, updatedAt: new Date() },
+    $set: { status: MANGA_STATUS.REJECTED },
   });
 
   return {

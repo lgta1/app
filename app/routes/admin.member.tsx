@@ -217,11 +217,29 @@ function ActionButtons({
   onBanClick,
   onRewardClick,
 }: ActionButtonsProps) {
+  const handleRewardClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRewardClick(member);
+  };
+
+  const handleBanClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onBanClick(member);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDeleteClick(member);
+  };
+
   return (
     <div className="flex items-center justify-start gap-3">
       <div
         className="flex cursor-pointer items-center justify-start gap-1 hover:opacity-70"
-        onClick={() => onRewardClick(member)}
+        onClick={handleRewardClick}
       >
         <div className="relative h-5 w-5 overflow-hidden">
           <Gift className="h-5 w-5 text-[#25EBAC]" />
@@ -229,7 +247,7 @@ function ActionButtons({
       </div>
       <div
         className="flex cursor-pointer items-center justify-start gap-1 hover:opacity-70"
-        onClick={() => onBanClick(member)}
+        onClick={handleBanClick}
       >
         <div className="relative h-5 w-5 overflow-hidden">
           <TriangleAlert className="h-5 w-5 text-[#FFE133]" />
@@ -237,7 +255,7 @@ function ActionButtons({
       </div>
       <div
         className="flex cursor-pointer items-center justify-start gap-1 hover:opacity-70"
-        onClick={() => onDeleteClick(member)}
+        onClick={handleDeleteClick}
       >
         <div className="relative h-5 w-5 overflow-hidden">
           <Trash2 className="text-txt-secondary h-5 w-5" />

@@ -21,7 +21,9 @@ import {
 import { requireLogin } from "~/.server/services/auth.server";
 import { ChapterStatusDropdown } from "~/components/chapter-status-dropdown";
 import { CHAPTER_STATUS } from "~/constants/chapter";
+import { MANGA_STATUS } from "~/constants/manga";
 import { BusinessError } from "~/helpers/errors.helper";
+import { toastWarning } from "~/helpers/toast.helper";
 import { isAdmin } from "~/helpers/user.helper";
 import { formatDate, formatTime } from "~/utils/date.utils";
 
@@ -143,6 +145,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     followNumber,
     translationTeam,
     ownerId,
+    status,
   } = manga;
 
   // State để track rating data
@@ -424,6 +427,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             <button
               className="to-btn-primary flex min-w-40 cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-3 text-sm font-semibold text-black"
               onClick={() => {
+                if (status === MANGA_STATUS.PENDING) {
+                  toastWarning("Truyện đã được nộp");
+                  return;
+                }
+
+                if (status === MANGA_STATUS.APPROVED) {
+                  toastWarning("Truyện đã được duyệt");
+                  return;
+                }
+
                 const formData = new FormData();
                 formData.append("actionType", "submit");
                 submit(formData, {

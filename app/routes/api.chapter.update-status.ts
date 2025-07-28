@@ -49,7 +49,6 @@ export async function action({ request }: Route.ActionArgs) {
     // Update chapter status
     await ChapterModel.findByIdAndUpdate(chapterId, {
       status: status,
-      updatedAt: new Date(),
     });
 
     const statusLabels = {

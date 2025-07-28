@@ -25,7 +25,7 @@ import { requireLogin } from "@/services/auth.server";
 import { Dropdown } from "~/components/dropdown";
 import { ImageUploader } from "~/components/image-uploader";
 import { GENRE_CATEGORY } from "~/constants/genres";
-import { MANGA_STATUS } from "~/constants/manga";
+import { MANGA_USER_STATUS } from "~/constants/manga";
 import type { GenresType } from "~/database/models/genres.model";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
@@ -54,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
       description: formData.get("description") as string,
       author: formData.get("author") as string,
       keywords: formData.get("keywords") as string,
-      status: Number(formData.get("status")),
+      userStatus: Number(formData.get("userStatus")),
       poster: formData.get("posterUrl") as string,
       genres: JSON.parse(formData.get("genres") as string),
       translationTeam: userInfo.name,
@@ -83,8 +83,8 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 const STATUS_OPTIONS = [
-  { value: MANGA_STATUS.CREATING, label: "Đang tạo" },
-  { value: MANGA_STATUS.PENDING, label: "Chờ duyệt" },
+  { value: MANGA_USER_STATUS.ON_GOING, label: "Đang ra" },
+  { value: MANGA_USER_STATUS.COMPLETED, label: "Đã hoàn thành" },
 ];
 
 interface FormData {
@@ -92,7 +92,7 @@ interface FormData {
   description: string;
   author: string;
   keywords: string;
-  status: number;
+  userStatus: number;
   genres: string[];
   poster: File | null;
 }
@@ -105,7 +105,7 @@ export default function CreateStory() {
     description: "",
     author: "",
     keywords: "",
-    status: MANGA_STATUS.CREATING,
+    userStatus: MANGA_USER_STATUS.ON_GOING,
     genres: [],
     poster: null,
   });
@@ -191,7 +191,7 @@ export default function CreateStory() {
       submitFormData.append("description", formData.description);
       submitFormData.append("author", formData.author);
       submitFormData.append("keywords", formData.keywords);
-      submitFormData.append("status", formData.status.toString());
+      submitFormData.append("userStatus", formData.userStatus.toString());
       submitFormData.append("posterUrl", posterData.url);
       submitFormData.append("genres", JSON.stringify(formData.genres));
 
@@ -409,7 +409,7 @@ export default function CreateStory() {
             <div className="w-full sm:w-[680px]">
               <Dropdown
                 options={STATUS_OPTIONS}
-                value={formData.status}
+                value={formData.userStatus}
                 placeholder="Chọn trạng thái"
                 onSelect={handleStatusSelect}
               />

@@ -12,7 +12,7 @@ import {
 import { ArrowLeft, BookOpen, FileText, Upload, X } from "lucide-react";
 
 import { updateChapter } from "@/mutations/chapter.mutation";
-import { getChaptersByMangaIdAndNumber } from "@/queries/chapter.query";
+import { getChapterByMangaIdAndNumber } from "@/queries/chapter.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/manga.chapter.edit.$mangaId";
@@ -56,7 +56,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new BusinessError("Thiếu số chương để chỉnh sửa");
   }
 
-  const chapter = await getChaptersByMangaIdAndNumber(
+  const chapter = await getChapterByMangaIdAndNumber(
     mangaId,
     parseInt(chapterNumber),
     user as UserType,

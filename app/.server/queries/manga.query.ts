@@ -1,5 +1,5 @@
 import { MANGA_STATUS } from "~/constants/manga";
-import { MangaModel } from "~/database/models/manga.model";
+import { MangaModel, type MangaType } from "~/database/models/manga.model";
 import type { UserType } from "~/database/models/user.model";
 import { isAdmin } from "~/helpers/user.helper";
 
@@ -7,7 +7,7 @@ export const getNewManga = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
 
   const filter = {
-    status: { $in: [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING] },
+    status: MANGA_STATUS.APPROVED,
   };
 
   const [manga, totalCount] = await Promise.all([
@@ -109,7 +109,7 @@ export const searchMangaApprovedWithPagination = async ({
     const mangas = await MangaModel.find(
       {
         $text: { $search: keyword },
-        status: { $in: [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING] },
+        status: MANGA_STATUS.APPROVED,
         ...query,
       },
       { score: { $meta: "textScore" } },
@@ -122,7 +122,7 @@ export const searchMangaApprovedWithPagination = async ({
     if (mangas.length === 0 && Number.isInteger(Number(keyword))) {
       return await MangaModel.find({
         code: keyword,
-        status: { $in: [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING] },
+        status: MANGA_STATUS.APPROVED,
       }).lean();
     }
 
@@ -130,7 +130,7 @@ export const searchMangaApprovedWithPagination = async ({
   }
 
   return await MangaModel.find({
-    status: { $in: [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING] },
+    status: MANGA_STATUS.APPROVED,
     ...query,
   })
     .sort({ createdAt: -1 })
@@ -139,8 +139,16 @@ export const searchMangaApprovedWithPagination = async ({
     .lean();
 };
 
-export const getRelatedManga = async (genres: string[], limit: number = 10) => {
-  return await MangaModel.find({ genres: { $in: genres } })
+export const getRelatedManga = async (manga: MangaType, limit: number = 10) => {
+  return await MangaModel.find({
+    $or: [
+      { genres: { $in: manga.genres } },
+      { ownerId: manga.ownerId },
+      { author: manga.author },
+    ],
+    status: MANGA_STATUS.APPROVED,
+    _id: { $ne: manga.id },
+  })
     .limit(limit)
     .lean();
 };
@@ -148,7 +156,7 @@ export const getRelatedManga = async (genres: string[], limit: number = 10) => {
 export const getMangaPublishedById = async (id: string, user?: UserType) => {
   const manga = await MangaModel.findById(id).lean();
 
-  if ([MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING].includes(manga?.status ?? Infinity)) {
+  if (manga?.status === MANGA_STATUS.APPROVED) {
     return manga;
   }
 

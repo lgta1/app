@@ -11,7 +11,5 @@ export const getLeaderboard = async (period: LeaderboardPeriod) => {
 
   return leaderboard
     .map((item) => item.story_id)
-    .filter((manga: any) =>
-      [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING].includes(manga?.status ?? Infinity),
-    );
+    .filter((manga: any) => manga?.status === MANGA_STATUS.APPROVED);
 };

@@ -26,7 +26,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     searchMangaApprovedWithPagination({ keyword, page, limit }),
     getTotalMangaCount({
       searchTerm: keyword,
-      query: { status: { $in: [MANGA_STATUS.APPROVED, MANGA_STATUS.PENDING] } },
+      query: { status: MANGA_STATUS.APPROVED },
     }),
   ]);
 

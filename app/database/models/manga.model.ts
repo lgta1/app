@@ -1,7 +1,7 @@
 import { model, Schema } from "mongoose";
 import { autoIncrement } from "mongoose-plugin-autoinc";
 
-import { MANGA_STATUS } from "~/constants/manga";
+import { MANGA_STATUS, MANGA_USER_STATUS } from "~/constants/manga";
 
 export type MangaType = {
   id: string;
@@ -12,6 +12,7 @@ export type MangaType = {
   chapters: number;
   author: string;
   status: number;
+  userStatus: number;
   genres: string[];
   likeNumber?: number;
   viewNumber?: number;
@@ -33,7 +34,12 @@ const MangaSchema = new Schema<MangaType>(
     poster: { type: String, required: true },
     chapters: { type: Number, default: 0 },
     author: { type: String, required: true },
-    status: { type: Number, enum: MANGA_STATUS, default: MANGA_STATUS.CREATING },
+    status: { type: Number, enum: MANGA_STATUS, default: MANGA_STATUS.PENDING },
+    userStatus: {
+      type: Number,
+      enum: MANGA_USER_STATUS,
+      default: MANGA_USER_STATUS.ON_GOING,
+    },
     genres: { type: [String], required: true },
     likeNumber: { type: Number, default: 0 },
     viewNumber: { type: Number, default: 0 },

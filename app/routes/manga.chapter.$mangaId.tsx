@@ -1,12 +1,14 @@
 import { useLoaderData } from "react-router";
 
-import { getChaptersByMangaIdAndNumber } from "@/queries/chapter.query";
-import { getMangaPublishedById } from "@/queries/manga.query";
+import { getChapterByMangaIdAndNumber } from "@/queries/chapter.query";
+import { getMangaPublishedById, getRelatedManga } from "@/queries/manga.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/manga.chapter.$mangaId";
 
 import { ChapterDetail } from "~/components/chapter-detail";
+import { CHAPTER_STATUS } from "~/constants/chapter";
+import { ChapterModel } from "~/database/models/chapter.model";
 import type { UserType } from "~/database/models/user.model";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -27,7 +29,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   // Lấy dữ liệu chapter
-  const chapter = await getChaptersByMangaIdAndNumber(
+  const chapter = await getChapterByMangaIdAndNumber(
     mangaId,
     chapterNumber,
     user as UserType,
@@ -36,16 +38,32 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw new Response("Không tìm thấy chapter", { status: 404 });
   }
 
-  const totalChapters = manga?.chapters || 1;
   const breadcrumb = `Trang chủ / ${manga?.title || "Manga"} / Chapter ${chapter.chapterNumber}`;
+
+  let preChapter, nextChapter;
+
+  if (chapter.chapterNumber) {
+    preChapter = await ChapterModel.findOne({
+      mangaId,
+      chapterNumber: chapter.chapterNumber - 1,
+      status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] },
+    });
+
+    nextChapter = await ChapterModel.findOne({
+      mangaId,
+      chapterNumber: chapter.chapterNumber + 1,
+      status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] },
+    });
+  }
 
   return {
     chapter: {
       ...chapter,
       breadcrumb,
-      hasPrevious: chapter.chapterNumber && chapter.chapterNumber > 1,
-      hasNext: chapter.chapterNumber && chapter.chapterNumber < totalChapters,
+      hasPrevious: Boolean(preChapter),
+      hasNext: Boolean(nextChapter),
     },
+    relatedManga: await getRelatedManga(manga),
   };
 }
 
@@ -64,7 +82,7 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export default function ChapterReader() {
-  const { chapter } = useLoaderData<typeof loader>();
+  const { chapter, relatedManga } = useLoaderData<typeof loader>();
 
   return (
     <div className="container-ad mx-auto px-4 py-6 sm:px-6">
@@ -75,6 +93,7 @@ export default function ChapterReader() {
           hasNext: Boolean(chapter.hasNext),
         }}
         isEnableClaimReward={true}
+        relatedManga={relatedManga}
       />
     </div>
   );

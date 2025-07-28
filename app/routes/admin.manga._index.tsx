@@ -8,7 +8,7 @@ import {
   type MetaFunction,
 } from "react-router";
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
-import { Search, Trash2 } from "lucide-react";
+import { Search, Trash2, Upload } from "lucide-react";
 
 import { deleteManga } from "@/mutations/manga.mutation";
 import {
@@ -131,8 +131,6 @@ const getStatusText = (status: number) => {
       return "Đã duyệt";
     case MANGA_STATUS.REJECTED:
       return "Từ chối";
-    case MANGA_STATUS.CREATING:
-      return "Đang tạo";
     default:
       return "Không xác định";
   }
@@ -170,7 +168,6 @@ export default function AdminManga() {
     { value: MANGA_STATUS.PENDING, label: "Chờ duyệt" },
     { value: MANGA_STATUS.APPROVED, label: "Đã duyệt" },
     { value: MANGA_STATUS.REJECTED, label: "Từ chối" },
-    { value: MANGA_STATUS.CREATING, label: "Đang tạo" },
   ];
 
   const handleDeleteClick = (
@@ -218,8 +215,21 @@ export default function AdminManga() {
   return (
     <div className="container mx-auto my-8 w-full max-w-[1141px] gap-4 px-4 lg:px-0">
       <Toaster position="bottom-right" />
+      {/* Header with Title */}
       <div className="text-txt-primary justify-center text-center text-2xl leading-loose font-semibold">
         Quản lý truyện
+      </div>
+
+      {/* Upload Button */}
+      <div className="flex justify-end">
+        <Link to="/admin/manga/upload-revenue">
+          <button className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#C466FF] to-[#924DBF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)]">
+            <Upload className="h-5 w-5 text-black" />
+            <div className="text-center font-sans text-sm leading-tight font-semibold text-black">
+              Upload doanh thu
+            </div>
+          </button>
+        </Link>
       </div>
 
       {/* Main Content */}

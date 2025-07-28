@@ -75,7 +75,7 @@ export function UserMenu({ user, isAdmin = false, isMobile = false }: UserMenuPr
 
         <Popover.Portal>
           <Popover.Content
-            className="bg-bgc-layer1 border-bd-default animate-slideDownAndFade z-50 mt-3 w-40 overflow-hidden rounded-lg border"
+            className="bg-bgc-layer1 border-bd-default animate-slideDownAndFade z-50 mt-3 w-36 overflow-hidden rounded-lg border"
             sideOffset={8}
             align="end"
           >
