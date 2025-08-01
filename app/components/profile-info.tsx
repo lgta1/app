@@ -6,7 +6,7 @@ import { formatDate } from "~/utils/date.utils";
 
 interface ProfileInfoProps {
   user: any;
-  isOwner: boolean;
+  isOwner?: boolean;
 }
 
 export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {

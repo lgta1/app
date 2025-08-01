@@ -11,6 +11,6 @@ export const GENDERS = {
 };
 
 export const DAILY_REWARD = {
-  GOLD_AMOUNT: 200,
+  GOLD_AMOUNT: 20,
   DAYS_IN_WEEK: 7,
 } as const;

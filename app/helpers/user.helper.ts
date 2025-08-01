@@ -6,6 +6,10 @@ export const isAdmin = (role: string) => {
 };
 
 export const getTitleImgPath = (user: UserType) => {
+  if (user.level > 9) {
+    return `/images/title/${user.faction}/9.png`;
+  }
+
   if (user.faction === 0) {
     if (user.level <= 3) {
       return `/images/title/0/${user.level}_${user.gender}.png`;

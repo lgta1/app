@@ -9,41 +9,52 @@ export function MangaCard({ manga }: { manga: MangaType }) {
 
   return (
     <Link to={`/manga/${manga.id}`} className="aspect-2/3 w-[46%] lg:w-[150px]">
-      <div className="relative h-3/4 w-full overflow-hidden rounded-t-lg">
-        <img src={poster} alt={title} className="h-full w-full object-cover" />
+      <div
+        className="relative h-full w-full overflow-hidden rounded-lg"
+        style={{
+          backgroundImage: `url(${poster})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        {/* Gradient overlay */}
         <div className="to-bgc-layer1 absolute inset-0 bg-gradient-to-b from-transparent"></div>
-        <div className="absolute bottom-2 left-1/2 flex w-full -translate-x-1/2 justify-between px-3">
-          <div className="flex items-center gap-1.5 py-1.5">
+
+        {/* View and Like counts - moved to top */}
+        <div className="absolute top-2 left-1/2 flex w-full -translate-x-1/2 justify-between px-3">
+          <div className="bg-bgc-layer-semi-neutral flex items-center gap-1.5 rounded-full px-1.5 py-1 backdrop-blur-md">
             <EyeIcon className="h-3 w-3" />
             <span className="text-txt-primary text-[10px] leading-none font-medium">
               {viewNumber?.toLocaleString()}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 py-1.5">
+          <div className="bg-bgc-layer-semi-neutral flex items-center gap-1.5 rounded-full px-1.5 py-1 backdrop-blur-md">
             <HeartIcon className="h-3 w-3" />
             <span className="text-txt-primary text-[10px] leading-none font-medium">
               {likeNumber?.toLocaleString()}
             </span>
           </div>
         </div>
-      </div>
-      <div className="flex h-1/4 w-full flex-col justify-end">
-        <div className="flex flex-1 items-center justify-start">
-          <h3 className="text-txt-primary line-clamp-2 text-sm leading-normal font-semibold">
-            {title}
-          </h3>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="bg-bgc-layer-semi-purple flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-sm">
-            <span className="text-txt-focus line-clamp-1 text-[10px] leading-none font-medium">
-              Chương {chapters}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full backdrop-blur-sm">
-            <ClockIcon className="text-txt-secondary h-3 w-3" />
-            <span className="text-txt-secondary line-clamp-1 text-[10px] leading-none font-medium">
-              {formatDistanceToNow(createdAt)}
-            </span>
+
+        {/* Content - positioned at bottom with proper spacing */}
+        <div className="absolute bottom-0 left-0 w-full px-2 pb-2">
+          <div className="flex flex-col gap-2">
+            <h3 className="text-txt-primary line-clamp-2 text-sm leading-normal font-semibold">
+              {title}
+            </h3>
+            <div className="flex items-center justify-between">
+              <div className="bg-bgc-layer-semi-purple flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-sm">
+                <span className="text-txt-focus line-clamp-1 text-[10px] leading-none font-medium">
+                  Chương {chapters}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full backdrop-blur-sm">
+                <ClockIcon className="text-txt-secondary h-3 w-3" />
+                <span className="text-txt-secondary line-clamp-1 text-[10px] leading-none font-medium">
+                  {formatDistanceToNow(createdAt)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

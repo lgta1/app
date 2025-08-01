@@ -1,3 +1,5 @@
+import Promise from "bluebird";
+
 import { checkWaifuToUpdate } from "@/mutations/user-waifu-leaderboard";
 
 import { getUserSession, setUserDataToSession } from "./session.svc";
@@ -134,11 +136,14 @@ export const multiSummon = async (
   count: number,
   request?: Request,
 ) => {
-  const summons = Array(count)
-    .fill(null)
-    .map(() => summon(user, banner, cum, request));
+  const summons = Array(count).fill(null);
 
-  const summonResults = await Promise.all(summons);
+  const summonResults: any[] = [];
+
+  await Promise.each(summons, async () => {
+    const result = await summon(user, banner, cum, request);
+    summonResults.push(result);
+  });
 
   // Tìm session đã được update (nếu có)
   const updatedSession =

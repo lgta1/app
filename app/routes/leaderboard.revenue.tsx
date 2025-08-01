@@ -19,28 +19,23 @@ export const meta: MetaFunction = () => {
 };
 
 export async function loader() {
-  const [dailyLeaderboard, weeklyLeaderboard, monthlyLeaderboard] = await Promise.all([
-    getRevenuesByPeriod("daily"),
+  const [weeklyLeaderboard, monthlyLeaderboard] = await Promise.all([
     getRevenuesByPeriod("weekly"),
     getRevenuesByPeriod("monthly"),
   ]);
 
   return {
-    dailyLeaderboard: dailyLeaderboard.length > 0 ? dailyLeaderboard : weeklyLeaderboard,
     weeklyLeaderboard,
     monthlyLeaderboard,
   };
 }
 
 export default function LeaderboardIndex() {
-  const { dailyLeaderboard, weeklyLeaderboard, monthlyLeaderboard } =
-    useLoaderData<typeof loader>();
-  const [activeTab, setActiveTab] = useState<"monthly" | "weekly" | "daily">("monthly");
+  const { weeklyLeaderboard, monthlyLeaderboard } = useLoaderData<typeof loader>();
+  const [activeTab, setActiveTab] = useState<"monthly" | "weekly">("monthly");
 
   const getTopThreeManga = () => {
     switch (activeTab) {
-      case "daily":
-        return dailyLeaderboard?.slice(0, 3) as MangaType[];
       case "weekly":
         return weeklyLeaderboard?.slice(0, 3) as MangaType[];
       case "monthly":
@@ -92,7 +87,7 @@ export default function LeaderboardIndex() {
         <Tabs.Root
           defaultValue="monthly"
           className="w-full"
-          onValueChange={(value) => setActiveTab(value as "monthly" | "weekly" | "daily")}
+          onValueChange={(value) => setActiveTab(value as "monthly" | "weekly")}
         >
           {/* Tab Navigation */}
           <Tabs.List className="flex w-full border-b border-slate-700">
@@ -108,12 +103,6 @@ export default function LeaderboardIndex() {
             >
               Top tuần
             </Tabs.Trigger>
-            <Tabs.Trigger
-              value="daily"
-              className="data-[state=active]:border-lav-500 data-[state=active]:text-txt-primary text-txt-secondary hover:text-txt-primary flex-1 cursor-pointer bg-transparent px-3 py-3 text-base font-medium transition-colors data-[state=active]:border-b-2 data-[state=active]:font-semibold"
-            >
-              Top ngày
-            </Tabs.Trigger>
           </Tabs.List>
 
           {/* Ranking Lists */}
@@ -127,14 +116,6 @@ export default function LeaderboardIndex() {
 
           <Tabs.Content value="weekly" className="space-y-0 pb-4">
             {weeklyLeaderboard
-              ?.filter((manga) => !!manga)
-              .map((manga, index) => (
-                <RatingItemRevenue key={manga.id} manga={manga} index={index + 1} />
-              ))}
-          </Tabs.Content>
-
-          <Tabs.Content value="daily" className="space-y-0 pb-4">
-            {dailyLeaderboard
               ?.filter((manga) => !!manga)
               .map((manga, index) => (
                 <RatingItemRevenue key={manga.id} manga={manga} index={index + 1} />

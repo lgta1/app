@@ -213,7 +213,7 @@ export default function AdminManga() {
   };
 
   return (
-    <div className="container mx-auto my-8 w-full max-w-[1141px] gap-4 px-4 lg:px-0">
+    <div className="my-8 w-full gap-4 px-4">
       <Toaster position="bottom-right" />
       {/* Header with Title */}
       <div className="text-txt-primary justify-center text-center text-2xl leading-loose font-semibold">
@@ -259,6 +259,11 @@ export default function AdminManga() {
         <div className="flex flex-col items-start justify-start self-stretch">
           {/* Table Header */}
           <div className="bg-bgc-layer2 hidden items-center justify-start self-stretch rounded-xl lg:flex">
+            <div className="flex min-w-64 items-center justify-center gap-2.5 p-3">
+              <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
+                ID
+              </div>
+            </div>
             <div className="flex min-w-12 items-center justify-center gap-2.5 p-3">
               <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
                 STT
@@ -350,6 +355,18 @@ export default function AdminManga() {
                 </div>
 
                 {/* Desktop Layout */}
+                <div
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigator.clipboard.writeText(manga.id);
+                    toast.success("Đã copy ID");
+                  }}
+                  className="hidden min-w-64 cursor-pointer items-center justify-center gap-2.5 p-3 lg:flex"
+                >
+                  <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
+                    {manga.id}
+                  </div>
+                </div>
                 <div className="hidden min-w-12 items-center justify-center gap-2.5 p-3 lg:flex">
                   <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
                     {globalIndex}

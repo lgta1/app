@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { SquareUserRound } from "lucide-react";
 
 import type { UserType } from "~/database/models/user.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
@@ -19,7 +20,11 @@ export default function RatingItemUser({
     <Link to={`/profile/${user.id}`} className="flex items-center gap-3 p-3">
       <span className={`w-5 text-center text-base font-semibold ${color}`}>{index}</span>
       <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded">
-        <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+        {user.avatar ? (
+          <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+        ) : (
+          <SquareUserRound className="h-14 w-14" />
+        )}
       </div>
       <div className="flex-1 space-y-1">
         <h3 className="text-txt-primary text-base leading-6 font-semibold">
@@ -37,7 +42,7 @@ export default function RatingItemUser({
                 />
               </div>
               <span className="text-txt-primary text-xs font-medium">
-                {user.gold.toLocaleString()}
+                {user.gold.toLocaleString("vi-VN")}
               </span>
             </div>
           </div>

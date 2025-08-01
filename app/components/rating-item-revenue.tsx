@@ -1,5 +1,4 @@
 import { Link } from "react-router";
-import { Banknote } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
 
@@ -36,9 +35,15 @@ export default function RatingItemRevenue({
             </span>
           </div>
           <div className="mr-2 flex items-center gap-1.5 backdrop-blur-md">
-            <Banknote className="h-3 w-3 text-[#25eaac]" />
-            <span className="text-xs font-medium text-[#25eaac]">
-              {manga.revenue.toLocaleString("vi-VN")} VNĐ
+            <div className="relative h-3 w-3">
+              <img
+                src="/images/icons/gold-icon.png"
+                alt="gold"
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <span className="text-txt-primary text-xs font-medium">
+              {manga.revenue.toLocaleString("vi-VN")}
             </span>
           </div>
         </div>

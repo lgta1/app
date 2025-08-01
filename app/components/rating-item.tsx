@@ -39,13 +39,13 @@ export default function RatingItem({
             <div className="flex items-center gap-1.5 backdrop-blur-md">
               <Eye className="text-txt-primary h-3 w-3" />
               <span className="text-txt-primary text-xs font-medium">
-                {manga.viewNumber?.toLocaleString()}
+                {manga.viewNumber?.toLocaleString("vi-VN")}
               </span>
             </div>
             <div className="flex items-center gap-1.5 backdrop-blur-md">
               <Heart className="text-txt-primary h-3 w-3" />
               <span className="text-txt-primary text-xs font-medium">
-                {manga.likeNumber?.toLocaleString()}
+                {manga.likeNumber?.toLocaleString("vi-VN")}
               </span>
             </div>
           </div>
