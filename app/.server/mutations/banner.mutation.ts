@@ -1,6 +1,7 @@
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { BannerModel } from "~/database/models/banner.model";
+import { UserModel } from "~/database/models/user.model";
 import { WaifuModel } from "~/database/models/waifu.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
@@ -142,4 +143,8 @@ export const incrementBannerRolls = async (bannerId: string, count: number = 1) 
   }
 
   return banner;
+};
+
+export const resetSummon = async () => {
+  await UserModel.updateMany({}, { $set: { summonCount: 0 } });
 };

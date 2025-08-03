@@ -11,6 +11,7 @@ import { UserModel, type UserType } from "~/database/models/user.model";
 import { UserWaifuModel } from "~/database/models/user-waifu";
 import { WaifuModel } from "~/database/models/waifu.model";
 import { BusinessError } from "~/helpers/errors.helper";
+import { cleanupUserSummonHistory } from "~/helpers/user.helper";
 import { updateUserExp } from "~/helpers/user-level.helper";
 
 const RATE_UP_PERCENT = 55;
@@ -78,6 +79,8 @@ export const summon = async (
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
 
+    await cleanupUserSummonHistory(user.id, 50);
+
     await UserWaifuModel.create({
       bannerId: banner.id,
       userId: user.id,
@@ -112,6 +115,8 @@ export const summon = async (
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");
 
   await checkWaifuToUpdate(user.id, waifu.id);
+
+  await cleanupUserSummonHistory(user.id, 50);
 
   await UserWaifuModel.create({
     bannerId: banner.id,

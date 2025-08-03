@@ -9,7 +9,8 @@ export const getSummonHistoryWithPagination = async (
   const skip = (page - 1) * limit;
 
   // Lấy tổng số record để tính totalPages
-  const totalCount = await UserWaifuModel.countDocuments({ userId, bannerId });
+  let totalCount = await UserWaifuModel.countDocuments({ userId, bannerId });
+  totalCount = Math.min(totalCount, 50);
   const totalPages = Math.ceil(totalCount / limit);
 
   const userWaifus = await UserWaifuModel.find({ userId, bannerId })

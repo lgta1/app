@@ -8,9 +8,9 @@ import {
   useSearchParams,
   useSubmit,
 } from "react-router";
-import { Plus } from "lucide-react";
+import { Plus, Zap } from "lucide-react";
 
-import { deleteBanner } from "@/mutations/banner.mutation";
+import { deleteBanner, resetSummon } from "@/mutations/banner.mutation";
 import { countBanners, getAllBanners } from "@/queries/banner.query";
 
 import { Pagination } from "~/components/pagination";
@@ -54,6 +54,15 @@ export async function action({ request }: { request: Request }) {
   if (intent === "delete") {
     const result = await deleteBanner(request, bannerId as string);
     return result;
+  }
+
+  if (intent === "reset-summon") {
+    await resetSummon();
+
+    return Response.json({
+      success: true,
+      message: "Reset triệu hồi thành công",
+    });
   }
 
   return Response.json({ message: "Thao tác không hợp lệ" }, { status: 400 });
@@ -100,6 +109,20 @@ export default function AdminWaifuBanner() {
     }
   };
 
+  const handleResetSummon = () => {
+    if (
+      confirm(
+        "Lưu ý: Triệu hồi sẽ được reset về 0 cho tất cả người dùng.\nChỉ nên làm điều này khi chạy banner mới!\nBạn có chắc chắn muốn reset triệu hồi không?",
+      )
+    ) {
+      const formData = new FormData();
+      formData.append("intent", "reset-summon");
+      submit(formData, {
+        method: "POST",
+      });
+    }
+  };
+
   const tabs = [
     { key: "banner" as const, label: "Quản lý banner" },
     { key: "index" as const, label: "Quản lý waifu" },
@@ -139,14 +162,26 @@ export default function AdminWaifuBanner() {
         {/* Banner List Section */}
         <div className="flex w-full flex-col items-end justify-start gap-4">
           {/* Add Banner Button */}
-          <Link to="/admin/waifu/create-banner">
-            <button className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#C466FF] to-[#924DBF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)]">
-              <Plus className="h-5 w-5 text-black" />
+          <div className="flex items-center gap-4">
+            <button
+              className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#C466FF] to-[#924DBF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)]"
+              onClick={handleResetSummon}
+            >
+              <Zap className="h-5 w-5 text-black" />
               <div className="text-center font-sans text-sm leading-tight font-semibold text-black">
-                Thêm banner
+                Reset triệu hồi
               </div>
             </button>
-          </Link>
+
+            <Link to="/admin/waifu/create-banner">
+              <button className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#C466FF] to-[#924DBF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)]">
+                <Plus className="h-5 w-5 text-black" />
+                <div className="text-center font-sans text-sm leading-tight font-semibold text-black">
+                  Thêm banner
+                </div>
+              </button>
+            </Link>
+          </div>
 
           {/* Banner Items */}
           {banners.length > 0 ? (
