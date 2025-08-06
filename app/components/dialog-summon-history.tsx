@@ -33,9 +33,7 @@ export function SummonHistoryDialog({
     queryParams: { bannerId },
   });
 
-  const minMilestoneGreaterThanCurrentSummons =
-    GIFT_MILESTONES.find((milestone) => milestone > currentSummons) ?? 100;
-  const remainingSummons = minMilestoneGreaterThanCurrentSummons - currentSummons;
+  const remainingSummons = GIFT_MILESTONES[GIFT_MILESTONES.length - 1] - currentSummons;
 
   const getTextColor = (waifuStars: number) => {
     if (waifuStars === 5) return "text-txt-focus";
@@ -61,6 +59,13 @@ export function SummonHistoryDialog({
 
   const getRarityText = (stars: number) => {
     return `${stars} sao`;
+  };
+
+  const getProgressPercentage = () => {
+    if (currentSummons < 100) return (currentSummons / 100) * 33;
+    if (currentSummons < 200) return 33 + ((currentSummons - 100) / 100) * 33;
+    if (currentSummons < 450) return 66 + ((currentSummons - 200) / 250) * 34;
+    return 100;
   };
 
   return (
@@ -95,11 +100,7 @@ export function SummonHistoryDialog({
                     <div
                       className="bg-btn-primary h-full rounded-full"
                       style={{
-                        width: `${Math.min(
-                          (currentSummons / GIFT_MILESTONES[GIFT_MILESTONES.length - 1]) *
-                            100,
-                          100,
-                        )}%`,
+                        width: `${getProgressPercentage()}%`,
                       }}
                     />
                   </div>

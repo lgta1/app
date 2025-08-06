@@ -22,13 +22,58 @@ const getExpValue = (star: number) => {
   return 0;
 };
 
+const processMilestoneReward = async (
+  user: UserType,
+  reachedMilestone: number,
+  request?: Request,
+) => {
+  let exp = 0;
+  let gold = 0;
+  let itemStar = 1;
+
+  if (reachedMilestone === 50) {
+    gold = 50;
+    exp = 25;
+  } else if (reachedMilestone === 100) {
+    gold = 100;
+    exp = 50;
+  } else if (reachedMilestone === 200) {
+    gold = 200;
+    itemStar = 4;
+  } else if (reachedMilestone === 450) {
+    itemStar = 5;
+  }
+
+  const userFull = await UserModel.findOneAndUpdate(
+    { _id: user.id },
+    { $inc: { gold, exp } },
+    { new: true },
+  ).lean();
+
+  const { newLevel } = updateUserExp(userFull as UserType, exp);
+
+  if (userFull?.level && newLevel > userFull?.level) {
+    await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+  }
+
+  let updatedSession = null;
+  if (request) {
+    const session = await getUserSession(request);
+    const updatedUser = { ...user, level: newLevel };
+    setUserDataToSession(session, updatedUser);
+    updatedSession = session;
+  }
+
+  return { itemStar, updatedSession };
+};
+
 export const summon = async (
   user: UserType,
   banner: BannerType,
   cum: PityCumulativeType,
   request?: Request,
 ) => {
-  let eligibleGift = false;
+  let reachedMilestone: number | false = false;
   let updatedSession = null;
 
   if (banner.isRateUp) {
@@ -37,13 +82,15 @@ export const summon = async (
       { $inc: { summonCount: 1 } },
       { new: true },
     ).lean();
-    eligibleGift = await checkEligibleGift(userFull?.summonCount ?? 0);
+    reachedMilestone = await checkEligibleGift(userFull?.summonCount ?? 0);
   }
 
   //   Get item star
   let itemStar = 1;
-  if (eligibleGift) {
-    itemStar = 5;
+  if (reachedMilestone) {
+    const milestoneResult = await processMilestoneReward(user, reachedMilestone, request);
+    itemStar = milestoneResult.itemStar;
+    updatedSession = milestoneResult.updatedSession;
   } else {
     const r = Math.random() * 100;
     for (let i = 0; i < cum.rates.length; i++) {
@@ -164,7 +211,7 @@ const checkEligibleGift = async (currentSummonCount: number) => {
   const summonCount = currentSummonCount;
   const milestone = GIFT_MILESTONES.find((milestone) => milestone === summonCount);
   if (milestone) {
-    return true;
+    return milestone;
   }
   return false;
 };
