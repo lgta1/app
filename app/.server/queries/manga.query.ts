@@ -97,11 +97,13 @@ export const searchMangaApprovedWithPagination = async ({
   page,
   limit,
   query = {},
+  sort,
 }: {
   keyword?: string;
   page: number;
   limit: number;
   query?: Record<string, any>;
+  sort?: Record<string, 1 | -1>;
 }) => {
   const skip = (page - 1) * limit;
 
@@ -133,7 +135,7 @@ export const searchMangaApprovedWithPagination = async ({
     status: MANGA_STATUS.APPROVED,
     ...query,
   })
-    .sort({ createdAt: -1 })
+    .sort(sort ?? { createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .lean();

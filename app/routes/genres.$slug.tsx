@@ -10,9 +10,10 @@ import {
   searchMangaApprovedWithPagination,
 } from "@/queries/manga.query";
 
+import { Dropdown } from "~/components/dropdown";
 import { MangaCard } from "~/components/manga-card";
 import { Pagination } from "~/components/pagination";
-import { MANGA_STATUS } from "~/constants/manga";
+import { MANGA_STATUS, MANGA_USER_STATUS } from "~/constants/manga";
 import { GenresModel, type GenresType } from "~/database/models/genres.model";
 import type { MangaType } from "~/database/models/manga.model";
 
@@ -38,6 +39,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const { slug } = params;
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
+  const sortParam = url.searchParams.get("sort") || "updatedAt";
   const limit = 18;
 
   const genre = await GenresModel.findOne({ slug }).lean();
@@ -46,13 +48,32 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     throw new Response("Không tìm thấy thể loại", { status: 404 });
   }
 
-  const query = {
+  const query: Record<string, any> = {
     genres: genre.slug,
     status: MANGA_STATUS.APPROVED,
   };
 
+  // sorting & extra filtering
+  let sort: Record<string, 1 | -1> | undefined;
+  switch (sortParam) {
+    case "viewNumber":
+      sort = { viewNumber: -1 };
+      break;
+    case "likeNumber":
+      sort = { likeNumber: -1 };
+      break;
+    case "completed":
+      query.userStatus = MANGA_USER_STATUS.COMPLETED;
+      sort = { updatedAt: -1 };
+      break;
+    case "updatedAt":
+    default:
+      sort = { updatedAt: -1 };
+      break;
+  }
+
   const [manga, totalCount] = await Promise.all([
-    searchMangaApprovedWithPagination({ page, limit, query }),
+    searchMangaApprovedWithPagination({ page, limit, query, sort }),
     getTotalMangaCount({ query }),
   ]);
 
@@ -63,6 +84,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     manga,
     currentPage: page,
     totalPages,
+    sort: sortParam,
   });
 }
 
@@ -73,11 +95,20 @@ export default function Genres() {
     currentPage: number;
     totalPages: number;
   }>();
-  const [_, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sortParam = searchParams.get("sort") || "updatedAt";
 
   const handlePageChange = (page: number) => {
     setSearchParams((prev) => {
       prev.set("page", page.toString());
+      return prev;
+    });
+  };
+
+  const handleSortChange = (value: string) => {
+    setSearchParams((prev) => {
+      prev.set("sort", value);
+      prev.set("page", "1");
       return prev;
     });
   };
@@ -92,14 +123,28 @@ export default function Genres() {
         <p className="text-txt-primary text-sm leading-tight font-normal">
           {genre?.description}
         </p>
+
+        <div className="mt-2 flex items-center gap-3">
+          <span className="text-txt-secondary text-sm">Sắp xếp theo:</span>
+          <div className="w-64">
+            <Dropdown
+              options={[
+                { value: "updatedAt", label: "Mới cập nhật" },
+                { value: "viewNumber", label: "Đọc nhiều" },
+                { value: "likeNumber", label: "Được yêu thích" },
+                { value: "completed", label: "Đã hoàn thành" },
+              ]}
+              value={sortParam}
+              onSelect={(v) => handleSortChange(String(v))}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Manga list */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="flex w-full flex-wrap gap-4">
         {manga.map((item) => (
-          <div key={item.id} className="w-full">
-            <MangaCard manga={item} />
-          </div>
+          <MangaCard key={item.id} manga={item} />
         ))}
       </div>
 

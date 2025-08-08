@@ -7,6 +7,8 @@ import {
   setUserDataToSession,
 } from "@/services/session.svc";
 
+import { ChapterModel } from "~/database/models/chapter.model";
+import { MangaModel } from "~/database/models/manga.model";
 import { ReadingExpModel } from "~/database/models/reading-exp.model";
 import { UserModel, type UserType } from "~/database/models/user.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
@@ -70,6 +72,14 @@ export async function action({ request }: ActionFunctionArgs) {
         { updatedAt: now },
         { upsert: true },
       );
+
+      const chapter = await ChapterModel.findByIdAndUpdate(chapterId, {
+        $inc: { viewNumber: 1 },
+      }).lean();
+
+      await MangaModel.findByIdAndUpdate(chapter?.mangaId, {
+        $inc: { viewNumber: 1 },
+      });
 
       // Nếu không tìm thấy record phù hợp = bị rate limit hoặc đã đủ 100 exp
       if (!currentExp) {

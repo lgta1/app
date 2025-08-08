@@ -67,6 +67,14 @@ MangaSchema.index({ title: "text" });
 // Compound index cho approved manga với pagination
 MangaSchema.index({ status: 1, createdAt: -1 });
 
+// Compound indexes for genre page sorting/filtering
+// - Default & completed: sort by updatedAt desc
+MangaSchema.index({ status: 1, genres: 1, updatedAt: -1 });
+MangaSchema.index({ status: 1, genres: 1, userStatus: 1, updatedAt: -1 });
+// - Sort by view and like counts within a genre
+MangaSchema.index({ status: 1, genres: 1, viewNumber: -1 });
+MangaSchema.index({ status: 1, genres: 1, likeNumber: -1 });
+
 // Index cho uploaded manga by owner
 MangaSchema.index({ ownerId: 1, createdAt: -1 });
 
