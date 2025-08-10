@@ -25,10 +25,14 @@ export async function calculateAndUpdateMangaRating(mangaId: string): Promise<{
   const ratingCount = ratingStats.length > 0 ? ratingStats[0].totalRatings : 0;
 
   // Cập nhật manga với rating mới
-  await MangaModel.findByIdAndUpdate(mangaId, {
-    ratingAverage,
-    ratingCount,
-  });
+  await MangaModel.findByIdAndUpdate(
+    mangaId,
+    {
+      ratingAverage,
+      ratingCount,
+    },
+    { timestamps: false },
+  );
 
   return { ratingAverage, ratingCount };
 }

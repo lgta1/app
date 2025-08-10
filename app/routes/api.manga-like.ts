@@ -85,9 +85,11 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       // Tăng likeNumber trong manga
-      await MangaModel.findByIdAndUpdate(mangaId, {
-        $inc: { likeNumber: 1 },
-      });
+      await MangaModel.findByIdAndUpdate(
+        mangaId,
+        { $inc: { likeNumber: 1 } },
+        { timestamps: false },
+      );
 
       // Record like interaction (non-blocking)
       recordLike(mangaId, user.id).catch((error) => {
@@ -119,9 +121,11 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       // Giảm likeNumber trong manga
-      await MangaModel.findByIdAndUpdate(mangaId, {
-        $inc: { likeNumber: -1 },
-      });
+      await MangaModel.findByIdAndUpdate(
+        mangaId,
+        { $inc: { likeNumber: -1 } },
+        { timestamps: false },
+      );
 
       return Response.json({
         success: true,

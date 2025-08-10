@@ -87,9 +87,11 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       // Tăng followNumber trong manga
-      await MangaModel.findByIdAndUpdate(mangaId, {
-        $inc: { followNumber: 1 },
-      });
+      await MangaModel.findByIdAndUpdate(
+        mangaId,
+        { $inc: { followNumber: 1 } },
+        { timestamps: false },
+      );
 
       return Response.json({
         success: true,
@@ -116,9 +118,11 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       // Giảm followNumber trong manga
-      await MangaModel.findByIdAndUpdate(mangaId, {
-        $inc: { followNumber: -1 },
-      });
+      await MangaModel.findByIdAndUpdate(
+        mangaId,
+        { $inc: { followNumber: -1 } },
+        { timestamps: false },
+      );
 
       return Response.json({
         success: true,

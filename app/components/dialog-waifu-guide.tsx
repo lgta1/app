@@ -1,35 +1,17 @@
-import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
 import * as Dialog from "@radix-ui/react-dialog";
-
-import type { PityType } from "~/database/models/pity.model";
 
 interface WaifuGuideDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type PityApiResponse = {
-  success: boolean;
-  data: PityType[];
-  error?: string;
-};
-
 export function WaifuGuideDialog({ open, onOpenChange }: WaifuGuideDialogProps) {
-  const fetcher = useFetcher<PityApiResponse>();
-  const [pityData, setPityData] = useState<PityType[]>([]);
-
-  useEffect(() => {
-    if (open && !fetcher.data) {
-      fetcher.load("/api/pity");
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (fetcher.data?.success) {
-      setPityData(fetcher.data.data);
-    }
-  }, [fetcher.data]);
+  const milestoneRewards: Array<{ threshold: number; reward: string }> = [
+    { threshold: 50, reward: "50 vàng + 25 EXP" },
+    { threshold: 100, reward: "100 vàng + 50 EXP" },
+    { threshold: 200, reward: "200 vàng + 1 Waifu 4★" },
+    { threshold: 450, reward: "🎁 Chắc chắn nhận 1 Waifu 5★ trong banner" },
+  ];
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -46,125 +28,107 @@ export function WaifuGuideDialog({ open, onOpenChange }: WaifuGuideDialogProps) 
                 <div className="h-0 w-24 outline-1 outline-offset-[-0.50px] outline-white/20 sm:w-96"></div>
               </div>
 
-              {/* Introduction Text */}
+              {/* Description & Banner Types */}
               <div className="w-full justify-center text-sm leading-normal sm:text-base">
-                <span className="text-txt-secondary font-medium">
-                  Chào mừng đến với tính năng{" "}
-                </span>
-                <span className="text-txt-primary font-medium">Triệu Hồi Waifu</span>
-                <span className="text-txt-secondary font-medium">
-                  , nơi bạn có thể chiêu mộ những waifu xinh đẹp và mạnh mẽ để gia tăng
-                  sức mạnh cho đội hình của mình! Để thực hiện Triệu Hồi, bạn cần sử dụng
-                  Dâm Ngọc
-                </span>
+                <div className="text-txt-secondary font-medium">
+                  Chào mừng bạn đến với tính năng
+                  <span className="text-txt-primary font-medium">Triệu Hồi Waifu</span> —
+                  nơi bạn có thể sưu tầm những waifu xinh đẹp, quyến rũ và hiếm có đang
+                  chờ được bạn triệu hồi về, để góp mặt trong dàn harem độc nhất vô nhị
+                  của riêng bạn!
+                </div>
+                <div className="text-txt-secondary font-medium">
+                  Hãy bắt đầu hành trình sưu tầm và mở rộng bộ sưu tập waifu mơ ước ngay
+                  hôm nay!
+                </div>
+                <br />
+                <div className="text-txt-primary mb-2 text-xl font-medium">
+                  Phân Loại Banner
+                </div>
+                <ul className="text-txt-secondary list-disc space-y-2 pl-5 font-medium">
+                  <li>
+                    <span>Banner Thường</span>
+                    <ul className="list-[circle] space-y-1 pl-5">
+                      <li>
+                        <span>1 lượt: </span>
+                        <span className="text-txt-focus font-medium">
+                          Tốn 10 Dâm Ngọc
+                        </span>
+                      </li>
+                      <li>
+                        <span>10 lượt: </span>
+                        <span className="text-txt-focus font-medium">
+                          Tốn 90 Dâm Ngọc
+                        </span>
+                      </li>
+                      <li>
+                        <span className="text-txt-focus font-medium">Lưu ý: </span> Các
+                        lượt quay KHÔNG được tích lũy nhận thưởng.
+                      </li>
+                    </ul>
+                  </li>
+                  <li>
+                    <span>Banner Rate Up</span>
+                    <ul className="list-[circle] space-y-1 pl-5">
+                      <li>
+                        <span>1 lượt: </span>
+                        <span className="text-txt-focus font-medium">
+                          Tốn 15 Dâm Ngọc
+                        </span>
+                      </li>
+                      <li>
+                        <span>10 lượt: </span>
+                        <span className="text-txt-focus font-medium">
+                          Tốn 130 Dâm Ngọc
+                        </span>
+                      </li>
+                      <li>
+                        <span className="text-txt-focus font-medium">Đặc biệt: </span>
+                        <span className="text-txt-secondary font-medium">
+                          Khi quay banner Rate Up, lượt quay sẽ được tích lũy để nhận
+                          thưởng theo các mốc dưới đây:
+                        </span>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
               </div>
 
-              {/* How to Summon */}
-              <div className="w-full justify-center text-sm leading-normal sm:text-base">
-                <span className="text-txt-primary font-medium">
-                  Cách thức Triệu Hồi:
-                  <br />
-                </span>
-                <span className="text-txt-secondary font-medium">Triệu Hồi Đơn: Tốn</span>
-                <span className="text-txt-focus font-medium"> 1 Dâm Ngọc</span>
-                <span className="text-txt-secondary font-medium">
-                  {" "}
-                  cho một lần triệu hồi.
-                  <br />
-                  Triệu Hồi 10 lần: Tốn{" "}
-                </span>
-                <span className="text-txt-focus font-medium">10 Dâm Ngọc</span>
-                <span className="text-txt-secondary font-medium">
-                  {" "}
-                  và đảm bảo nhận được ít nhất một waifu 4 sao
-                </span>
-              </div>
-
-              {/* Rates Title */}
+              {/* Milestone Rewards Title */}
               <div className="text-txt-primary w-full justify-center text-sm leading-normal font-medium sm:text-base">
-                Tỉ Lệ Triệu Hồi:
+                Mốc Quay Tích Lũy Banner Rate Up
               </div>
 
-              {/* Pity Table */}
+              {/* Milestone Rewards Table */}
               <div className="w-full flex-col items-start justify-start overflow-hidden">
                 {/* Header */}
                 <div className="bg-bgc-layer2 outline-bd-default flex w-full outline-1 outline-offset-[-1px]">
-                  <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
+                  <div className="border-bd-default flex flex-[2] items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
                     <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      %
+                      Mốc Quay Tích Lũy
                     </div>
                   </div>
-                  <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
+                  <div className="flex flex-[3] items-center justify-center gap-2.5 px-2 py-2 sm:px-3">
                     <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      1 sao
-                    </div>
-                  </div>
-                  <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                    <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      2 sao
-                    </div>
-                  </div>
-                  <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                    <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      3 sao
-                    </div>
-                  </div>
-                  <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                    <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      4 sao
-                    </div>
-                  </div>
-                  <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                    <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      5 sao
-                    </div>
-                  </div>
-                  <div className="flex flex-1 items-center justify-center gap-2.5 px-2 py-2 sm:px-3">
-                    <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      Tổng
+                      Phần Thưởng
                     </div>
                   </div>
                 </div>
 
                 {/* Data Rows */}
-                {pityData.map((row) => (
+                {milestoneRewards.map((item) => (
                   <div
-                    key={row.id}
+                    key={item.threshold}
                     className="border-bd-default outline-bd-default flex w-full border-b outline-1 outline-offset-[-1px]"
                   >
-                    <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
+                    <div className="border-bd-default flex flex-[2] items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
                       <div className="text-txt-secondary justify-center text-xs font-medium sm:text-base">
-                        {row.label}
+                        {item.threshold} lượt
                       </div>
                     </div>
-                    <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
+                    <div className="flex flex-[3] items-center justify-center gap-2.5 px-2 py-2 sm:px-3">
                       <div className="text-txt-secondary justify-center text-xs font-medium sm:text-base">
-                        {row.star1}
-                      </div>
-                    </div>
-                    <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                      <div className="text-txt-secondary justify-center text-xs font-medium sm:text-base">
-                        {row.star2}
-                      </div>
-                    </div>
-                    <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                      <div className="text-txt-secondary justify-center text-xs font-medium sm:text-base">
-                        {row.star3}
-                      </div>
-                    </div>
-                    <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                      <div className="text-txt-secondary justify-center text-xs font-medium sm:text-base">
-                        {row.star4}
-                      </div>
-                    </div>
-                    <div className="border-bd-default flex flex-1 items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
-                      <div className="text-txt-secondary justify-center text-xs font-medium sm:text-base">
-                        {row.star5}
-                      </div>
-                    </div>
-                    <div className="flex flex-1 items-center justify-center gap-2.5 px-2 py-2 sm:px-3">
-                      <div className="text-txt-secondary justify-center text-xs font-medium sm:text-base">
-                        {row.total}
+                        {item.reward}
                       </div>
                     </div>
                   </div>

@@ -73,13 +73,17 @@ export async function action({ request }: ActionFunctionArgs) {
         { upsert: true },
       );
 
-      const chapter = await ChapterModel.findByIdAndUpdate(chapterId, {
-        $inc: { viewNumber: 1 },
-      }).lean();
+      const chapter = await ChapterModel.findByIdAndUpdate(
+        chapterId,
+        { $inc: { viewNumber: 1 } },
+        { timestamps: false },
+      ).lean();
 
-      await MangaModel.findByIdAndUpdate(chapter?.mangaId, {
-        $inc: { viewNumber: 1 },
-      });
+      await MangaModel.findByIdAndUpdate(
+        chapter?.mangaId,
+        { $inc: { viewNumber: 1 } },
+        { timestamps: false },
+      );
 
       // Nếu không tìm thấy record phù hợp = bị rate limit hoặc đã đủ 100 exp
       if (!currentExp) {

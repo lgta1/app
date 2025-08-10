@@ -11,66 +11,157 @@ interface CompressionProgressCallback {
   (current: number, total: number): void;
 }
 
+interface CompressionTarget {
+  minSizeKB: number;
+  maxSizeKB: number;
+  initialQuality: number;
+}
+
 /**
- * Nén ảnh theo quy tắc:
- * ≤ 250KB: Giữ nguyên
- * 250KB – 1MB: Nén xuống 250KB
- * 1MB – 2MB: Nén xuống 600KB
- * > 2MB: Nén xuống ~1MB
+ * Nén ảnh theo quy tắc quality-based:
+ * A: ≤ 300KB: Giữ nguyên
+ * B: 300KB-1MB: Nén về 250-350KB (quality khởi điểm 80)
+ * C: 1MB-2MB: Nén về 350-500KB (quality khởi điểm 80)
+ * D: >2MB: Nén về 500-700KB (quality khởi điểm 80)
  */
 export async function compressImageToWebP(file: File): Promise<CompressionResult> {
   const originalSize = file.size;
-  const sizeInMB = originalSize / (1024 * 1024);
-  const sizeInKB = originalSize / 1024;
 
-  let targetSizeInMB: number;
-  const maxWidthOrHeight: number = 2000; // Max dimension to prevent too large images
+  // Bước 1: Chuyển sang WebP với quality 100 để đo dung lượng
+  const initialWebPFile = await convertToWebP(file);
+  const webpSizeKB = initialWebPFile.size / 1024;
 
-  // Determine target size based on original size
-  if (sizeInKB <= 250) {
-    // ≤ 250KB: Giữ nguyên, chỉ chuyển sang WebP
-    targetSizeInMB = sizeInMB;
-  } else if (sizeInKB > 250 && sizeInMB <= 1) {
-    // 250KB – 1MB: Nén xuống 250KB
-    targetSizeInMB = 0.25;
-  } else if (sizeInMB > 1 && sizeInMB <= 2) {
-    // 1MB – 2MB: Nén xuống 600KB
-    targetSizeInMB = 0.6;
-  } else {
-    // > 2MB: Nén xuống ~1MB
-    targetSizeInMB = 1;
+  // Phân nhóm dựa trên kích thước WebP
+  if (webpSizeKB <= 300) {
+    // Nhóm A: Giữ nguyên
+    return {
+      compressedFile: initialWebPFile,
+      originalSize,
+      compressedSize: initialWebPFile.size,
+      compressionRatio: ((originalSize - initialWebPFile.size) / originalSize) * 100,
+    };
   }
 
+  // Xác định target compression cho các nhóm B, C, D
+  let target: CompressionTarget;
+  if (webpSizeKB > 300 && webpSizeKB <= 1024) {
+    // Nhóm B: 300KB-1MB
+    target = { minSizeKB: 250, maxSizeKB: 350, initialQuality: 80 };
+  } else if (webpSizeKB > 1024 && webpSizeKB <= 2048) {
+    // Nhóm C: 1MB-2MB
+    target = { minSizeKB: 350, maxSizeKB: 500, initialQuality: 75 };
+  } else {
+    // Nhóm D: >2MB
+    target = { minSizeKB: 500, maxSizeKB: 700, initialQuality: 70 };
+  }
+
+  // Bước 2: Nén với quality adjustment
+  const finalFile = await compressWithQualityAdjustment(file, target);
+
+  return {
+    compressedFile: finalFile,
+    originalSize,
+    compressedSize: finalFile.size,
+    compressionRatio: ((originalSize - finalFile.size) / originalSize) * 100,
+  };
+}
+
+/**
+ * Chuyển ảnh sang WebP với quality 100 (chỉ đổi format)
+ */
+async function convertToWebP(file: File): Promise<File> {
   const options = {
-    maxSizeMB: targetSizeInMB,
-    maxWidthOrHeight,
     useWebWorker: true,
     fileType: "image/webp" as const,
-    initialQuality: 1,
-    alwaysKeepResolution: false,
+    initialQuality: 1, // Quality 100%
+    alwaysKeepResolution: true,
     exifOrientation: 1,
   };
 
-  try {
-    const compressedFile = await imageCompression(file, options);
+  const convertedFile = await imageCompression(file, options);
+  const webpFileName = createWebPFileName(file.name);
 
-    // Ensure the file has WebP extension
-    const webpFileName = createWebPFileName(file.name);
-    const webpFile = new File([compressedFile], webpFileName, {
-      type: "image/webp",
-      lastModified: Date.now(),
-    });
+  return new File([convertedFile], webpFileName, {
+    type: "image/webp",
+    lastModified: Date.now(),
+  });
+}
 
-    return {
-      compressedFile: webpFile,
-      originalSize,
-      compressedSize: webpFile.size,
-      compressionRatio: ((originalSize - webpFile.size) / originalSize) * 100,
+/**
+ * Nén với điều chỉnh quality để đạt target size
+ */
+async function compressWithQualityAdjustment(
+  file: File,
+  target: CompressionTarget,
+): Promise<File> {
+  let quality = target.initialQuality;
+  let attempts = 0;
+  const maxAttempts = 5;
+  const qualityStep = 5;
+  const minQuality = 50;
+  const maxQuality = 95;
+
+  while (attempts < maxAttempts) {
+    const options = {
+      useWebWorker: true,
+      fileType: "image/webp" as const,
+      initialQuality: quality / 100, // Convert to 0-1 range
+      alwaysKeepResolution: true,
+      exifOrientation: 1,
     };
-  } catch (error) {
-    console.error("Error compressing image:", error);
-    throw new Error("Không thể nén ảnh. Vui lòng thử lại.");
+
+    try {
+      const compressedFile = await imageCompression(file, options);
+      const webpFileName = createWebPFileName(file.name);
+      const finalFile = new File([compressedFile], webpFileName, {
+        type: "image/webp",
+        lastModified: Date.now(),
+      });
+
+      const resultSizeKB = finalFile.size / 1024;
+
+      // Kiểm tra giới hạn quality
+      if (quality <= minQuality || quality >= maxQuality) {
+        return finalFile;
+      }
+
+      // Kiểm tra nếu đạt target
+      if (resultSizeKB >= target.minSizeKB && resultSizeKB <= target.maxSizeKB) {
+        return finalFile;
+      }
+
+      // Điều chỉnh quality
+      if (resultSizeKB > target.maxSizeKB) {
+        // Quá lớn → giảm quality
+        quality = Math.max(minQuality, quality - qualityStep);
+      } else {
+        // Quá nhỏ → tăng quality
+        quality = Math.min(maxQuality, quality + qualityStep);
+      }
+
+      attempts++;
+    } catch (error) {
+      console.error(`Error at quality ${quality}:`, error);
+      break;
+    }
   }
+
+  // Fallback: trả về với quality cuối cùng
+  const fallbackOptions = {
+    useWebWorker: true,
+    fileType: "image/webp" as const,
+    initialQuality: quality / 100,
+    alwaysKeepResolution: true,
+    exifOrientation: 1,
+  };
+
+  const fallbackFile = await imageCompression(file, fallbackOptions);
+  const webpFileName = createWebPFileName(file.name);
+
+  return new File([fallbackFile], webpFileName, {
+    type: "image/webp",
+    lastModified: Date.now(),
+  });
 }
 
 /**
