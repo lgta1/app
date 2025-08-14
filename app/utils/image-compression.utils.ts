@@ -26,9 +26,18 @@ interface CompressionTarget {
  */
 export async function compressImageToWebP(file: File): Promise<CompressionResult> {
   const originalSize = file.size;
+  const isAlreadyWebP = file.type === "image/webp";
 
-  // Bước 1: Chuyển sang WebP với quality 100 để đo dung lượng
-  const initialWebPFile = await convertToWebP(file);
+  // Bước 1: Xử lý file để có được file WebP để đo dung lượng
+  let initialWebPFile: File;
+  if (isAlreadyWebP) {
+    // Nếu đã là WebP, sử dụng trực tiếp
+    initialWebPFile = file;
+  } else {
+    // Chuyển sang WebP với quality 100 để đo dung lượng
+    initialWebPFile = await convertToWebP(file);
+  }
+
   const webpSizeKB = initialWebPFile.size / 1024;
 
   // Phân nhóm dựa trên kích thước WebP
@@ -56,7 +65,11 @@ export async function compressImageToWebP(file: File): Promise<CompressionResult
   }
 
   // Bước 2: Nén với quality adjustment
-  const finalFile = await compressWithQualityAdjustment(file, target);
+  const finalFile = await compressWithQualityAdjustment(
+    initialWebPFile,
+    target,
+    isAlreadyWebP,
+  );
 
   return {
     compressedFile: finalFile,
@@ -93,6 +106,7 @@ async function convertToWebP(file: File): Promise<File> {
 async function compressWithQualityAdjustment(
   file: File,
   target: CompressionTarget,
+  isAlreadyWebP: boolean = false,
 ): Promise<File> {
   let quality = target.initialQuality;
   let attempts = 0;
@@ -112,7 +126,7 @@ async function compressWithQualityAdjustment(
 
     try {
       const compressedFile = await imageCompression(file, options);
-      const webpFileName = createWebPFileName(file.name);
+      const webpFileName = isAlreadyWebP ? file.name : createWebPFileName(file.name);
       const finalFile = new File([compressedFile], webpFileName, {
         type: "image/webp",
         lastModified: Date.now(),
@@ -156,7 +170,7 @@ async function compressWithQualityAdjustment(
   };
 
   const fallbackFile = await imageCompression(file, fallbackOptions);
-  const webpFileName = createWebPFileName(file.name);
+  const webpFileName = isAlreadyWebP ? file.name : createWebPFileName(file.name);
 
   return new File([fallbackFile], webpFileName, {
     type: "image/webp",

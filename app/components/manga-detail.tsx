@@ -60,10 +60,10 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   };
 
   // Helper function để copy mã code
-  const handleCopyCode = async () => {
+  const handleCopyCode = () => {
     if (code) {
       try {
-        await navigator.clipboard.writeText(code.toString());
+        navigator.clipboard.writeText(code.toString());
         toast.success("Đã copy mã truyện!");
       } catch (error) {
         console.error("Error copying to clipboard:", error);
