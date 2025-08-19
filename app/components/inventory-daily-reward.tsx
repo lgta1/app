@@ -135,7 +135,7 @@ export default function InventoryDailyReward({
 
                   <button
                     onClick={onUnsetWaifu}
-                    className="border-lav-500 text-txt-focus hover:bg-lav-500/10 w-full self-start rounded-xl border px-4 py-1.5 text-xs font-semibold shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors"
+                    className="border-lav-500 text-txt-focus hover:bg-lav-500/10 w-full cursor-pointer self-start rounded-xl border px-4 py-1.5 text-xs font-semibold shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors"
                   >
                     Gỡ
                   </button>

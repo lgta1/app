@@ -1,12 +1,12 @@
 import { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
-import { ChevronDown, CircleUserRound, Menu, X } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 
 import { NotificationBell } from "./notification-bell";
 import { UserDropdownMenu } from "./user-dropdown-menu";
 
 import type { UserType } from "~/database/models/user.model";
-import { getTitleImgPath } from "~/helpers/user.helper";
+import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";
 
 interface UserMenuProps {
   user: UserType;
@@ -54,15 +54,12 @@ export function UserMenu({ user, isAdmin = false, isMobile = false }: UserMenuPr
       <Popover.Root open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>
         <Popover.Trigger asChild>
           <div className="flex cursor-pointer items-center gap-2">
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt="Avatar"
-                className="h-7 w-7 rounded-full object-cover"
-              />
-            ) : (
-              <CircleUserRound className="h-7 w-7" />
-            )}
+            <img
+              src={getAvatarPath(user)}
+              alt="Avatar"
+              className="h-7 w-7 rounded-full object-cover"
+            />
+
             <div className="flex items-center gap-2">
               <span className="text-txt-primary text-base font-medium">{user?.name}</span>
               {!isAdmin && (

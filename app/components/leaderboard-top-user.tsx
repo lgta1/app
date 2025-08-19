@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 
 import type { UserType } from "~/database/models/user.model";
-import { getTitleImgPath } from "~/helpers/user.helper";
+import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";
 
 interface LeaderboardTopUserProps {
   user: UserType;
@@ -23,7 +23,11 @@ export function LeaderboardTopUser({
     >
       <div className="flex items-center justify-start gap-4">
         <div className="relative h-24 w-24 overflow-hidden rounded bg-gradient-to-b from-gray-900/0 to-gray-900">
-          <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+          <img
+            src={getAvatarPath(user)}
+            alt={user.name}
+            className="h-full w-full object-cover"
+          />
         </div>
         <div className="inline-flex flex-col items-start justify-start gap-3">
           <div className="text-txt-primary w-44 justify-center text-base font-semibold">

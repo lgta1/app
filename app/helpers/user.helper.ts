@@ -21,7 +21,12 @@ export const getTitleImgPath = (user: UserType) => {
   }
 };
 
-// ... existing code ...
+export const getAvatarPath = (user: UserType) => {
+  if (user.avatar) {
+    return user.avatar;
+  }
+  return `/images/genders/${user.gender}-character.png`;
+};
 
 /**
  * Cleanup lịch sử summon cho user, chỉ giữ lại 50 bản ghi gần nhất

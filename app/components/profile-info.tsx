@@ -1,7 +1,7 @@
 import { NavLink } from "react-router";
 import { Edit3 } from "lucide-react";
 
-import { getTitleImgPath } from "~/helpers/user.helper";
+import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";
 import { formatDate } from "~/utils/date.utils";
 
 interface ProfileInfoProps {
@@ -16,7 +16,7 @@ export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {
       <div className="flex flex-1 gap-4 lg:max-w-[514px]">
         <img
           className="h-16 w-16 rounded-full object-cover lg:h-24 lg:w-24"
-          src={user.avatar}
+          src={getAvatarPath(user)}
           alt={user.name}
         />
         <div className="flex flex-1 flex-col gap-3">

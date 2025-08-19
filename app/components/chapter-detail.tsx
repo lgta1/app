@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "react-hot-toast";
-import { useSearchParams } from "react-router";
-import { useFetcher } from "react-router";
-import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { useFetcher, useSearchParams } from "react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import ReportDialog from "./dialog-report";
+import { Dropdown } from "./dropdown";
 
 import RelatedManga from "~/components/related-manga";
 import { REPORT_TYPE } from "~/constants/report";
@@ -30,6 +30,7 @@ export function ChapterDetail({
   const [_, setSearchParams] = useSearchParams();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [hasClaimedThisChapter, setHasClaimedThisChapter] = useState(false);
+  const [chapters, setChapters] = useState<Array<{ value: number; label: string }>>([]);
 
   // New states for reading completion tracking
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
@@ -39,10 +40,30 @@ export function ChapterDetail({
   const fetcher = useFetcher();
   const rewardFetcher = useFetcher();
   const expFetcher = useFetcher();
+  const chaptersFetcher = useFetcher();
   const readingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const lastImageRef = useRef<HTMLImageElement | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch chapters list
+  useEffect(() => {
+    chaptersFetcher.load(`/api/chapters/list?mangaId=${chapter.mangaId}`);
+  }, [chapter.mangaId]);
+
+  // Handle chapters list response
+  useEffect(() => {
+    if (chaptersFetcher.data) {
+      const response = chaptersFetcher.data as {
+        success: boolean;
+        chapters?: Array<{ value: number; label: string }>;
+        error?: string;
+      };
+      if (response.success && response.chapters) {
+        setChapters(response.chapters);
+      }
+    }
+  }, [chaptersFetcher.data]);
 
   // Reset states khi chuyển chapter
   useEffect(() => {
@@ -252,6 +273,14 @@ export function ChapterDetail({
     });
   };
 
+  const handleChapterSelect = (chapterNumber: number) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set("chapterNumber", chapterNumber.toString());
+      return newParams;
+    });
+  };
+
   return (
     <>
       <Toaster position="bottom-right" />
@@ -275,7 +304,7 @@ export function ChapterDetail({
         {/* Error Report Section */}
         <div className="flex flex-col items-start justify-start gap-4 sm:flex-row sm:items-center">
           <div className="text-txt-secondary font-sans text-base leading-normal font-medium">
-            Nếu không Nếu bạn không đọc được truyện/chương lỗi, hãy ấn nút Báo Lỗi
+            Nếu bạn không đọc được truyện/chương lỗi, hãy ấn nút Báo Lỗi
           </div>
           <button
             className="border-lav-500 hover:bg-bgc-layer-semi-purple flex cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 transition-colors"
@@ -288,11 +317,27 @@ export function ChapterDetail({
         </div>
 
         {/* Info Section */}
-        <div className="bg-bgc-layer2 flex items-center gap-2 rounded-xl p-3">
-          <Info className="text-txt-primary h-4 w-4 flex-shrink-0" />
+        <div className="bg-bgc-layer2 flex flex-col items-center gap-2 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-txt-primary font-sans text-base leading-normal font-medium">
-            Sử dụng mũi tên trái (←) hoặc phải (→) để chuyển chapter
+            Nhận thông tin mới, chém gió cùng mọi người, liên hệ dịch giả:
           </div>
+          <a
+            href="https://discord.gg/rFwBnNAJk5"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Tham gia Discord VinaHentai"
+            className="flex cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-[#6B8CFF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all hover:scale-105 hover:shadow-[0px_6px_12px_0px_rgba(196,69,255,0.35)]"
+          >
+            <img
+              src="/images/icons/discord-white.svg"
+              alt=""
+              className="h-5 w-5"
+              aria-hidden="true"
+            />
+            <span className="font-sans text-sm leading-tight font-semibold">
+              Tham gia Discord VinaHentai
+            </span>
+          </a>
         </div>
 
         {/* Navigation Controls */}
@@ -320,12 +365,13 @@ export function ChapterDetail({
           </button>
 
           {/* Chapter Selector */}
-          <div className="bg-bgc-layer2 border-bd-default flex h-11 items-center gap-2.5 rounded-xl border px-3 py-2.5">
-            <span className="text-txt-primary font-sans text-base leading-normal font-medium">
-              Chương {chapter.chapterNumber}
-            </span>
-            <ChevronDown className="text-txt-secondary h-4 w-4 rotate-0" />
-          </div>
+          <Dropdown
+            options={chapters}
+            value={chapter.chapterNumber}
+            placeholder="Chọn chương"
+            onSelect={handleChapterSelect}
+            className="min-w-[140px]"
+          />
 
           {/* Next Button */}
           <button
@@ -352,7 +398,7 @@ export function ChapterDetail({
       </div>
 
       {/* Content Section */}
-      <div className="my-6 flex flex-col items-center justify-center sm:my-8">
+      <div className="-mx-4 my-6 flex flex-col items-center justify-center sm:mx-0 sm:my-8">
         {chapter.contentUrls.map((url, index) => {
           const isLastImage = index === chapter.contentUrls.length - 1;
           return (
@@ -399,12 +445,13 @@ export function ChapterDetail({
         </button>
 
         {/* Chapter Selector */}
-        <div className="bg-bgc-layer2 border-bd-default flex h-11 items-center gap-2.5 rounded-xl border px-3 py-2.5">
-          <span className="text-txt-primary font-sans text-base leading-normal font-medium">
-            Chương {chapter.chapterNumber}
-          </span>
-          <ChevronDown className="text-txt-secondary h-4 w-4 rotate-0" />
-        </div>
+        <Dropdown
+          options={chapters}
+          value={chapter.chapterNumber}
+          placeholder="Chọn chương"
+          onSelect={handleChapterSelect}
+          className="min-w-[140px]"
+        />
 
         {/* Next Button */}
         <button
