@@ -226,8 +226,7 @@ export default function CreateChapter() {
       const filesToUpload = contents.map((file) => ({
         file,
         options: {
-          bucket: "manga-images",
-          category: "pages",
+          prefixPath: "manga-images",
         },
       }));
 

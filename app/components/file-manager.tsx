@@ -23,7 +23,6 @@ interface FileManagerProps {
 
 export function FileManager({
   bucket = "uploads",
-  category = "general",
   allowMultiple = true,
   maxFileSize = 10,
   allowedTypes = [
@@ -93,8 +92,7 @@ export function FileManager({
 
       // Upload file
       uploadFileWithFetcher(file, {
-        bucket,
-        category,
+        prefixPath: bucket,
         onSuccess: () => {
           loadFiles(); // Reload file list
         },
@@ -133,8 +131,7 @@ export function FileManager({
 
       // Upload file
       uploadFileWithFetcher(file, {
-        bucket,
-        category,
+        prefixPath: bucket,
         onSuccess: () => {
           loadFiles(); // Reload file list
         },
@@ -153,7 +150,7 @@ export function FileManager({
 
   const handleFileDelete = (fileName: string) => {
     deleteFile(fileName, {
-      bucket,
+      prefixPath: bucket,
       onSuccess: () => {
         loadFiles(); // Reload file list
         setSelectedFiles((prev) => prev.filter((f) => f !== fileName));
@@ -168,7 +165,7 @@ export function FileManager({
     }
 
     deleteFiles(selectedFiles, {
-      bucket,
+      prefixPath: bucket,
       onSuccess: () => {
         loadFiles(); // Reload file list
         setSelectedFiles([]);

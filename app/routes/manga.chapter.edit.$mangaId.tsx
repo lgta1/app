@@ -286,8 +286,7 @@ export default function EditChapter() {
       const filesToUpload: Array<{
         file: File;
         options: {
-          bucket: string;
-          category: string;
+          prefixPath: string;
         };
       }> = [];
 
@@ -296,8 +295,7 @@ export default function EditChapter() {
         filesToUpload.push({
           file,
           options: {
-            bucket: "manga-images",
-            category: "pages",
+            prefixPath: "manga-images",
           },
         });
       });

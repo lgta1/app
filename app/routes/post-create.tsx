@@ -124,8 +124,7 @@ export default function PostCreate() {
         const filesToUpload = uploadedFiles.map((file) => ({
           file,
           options: {
-            bucket: "post-images",
-            category: "attachments",
+            prefixPath: "post-images",
           },
         }));
 

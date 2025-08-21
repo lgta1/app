@@ -159,8 +159,7 @@ export default function ProfileEdit() {
     // Nếu có file mới được chọn, upload trước
     if (selectedFile) {
       uploadFileWithFetcher(selectedFile, {
-        category: "avatar",
-        bucket: "avatar-uploads",
+        prefixPath: "avatar-uploads",
         onSuccess: (data) => {
           // Clean up local preview URL
           if (avatarPreview.startsWith("blob:")) {

@@ -14,7 +14,7 @@ export const ENV = {
     ACCESS_KEY: process.env.MINIO_ACCESS_KEY || "minioadmin",
     SECRET_KEY: process.env.MINIO_SECRET_KEY || "minioadmin",
     USE_SSL: process.env.MINIO_USE_SSL === "true" || false,
-    DEFAULT_BUCKET: process.env.MINIO_DEFAULT_BUCKET || "uploads",
+    DEFAULT_BUCKET: process.env.MINIO_DEFAULT_BUCKET || "vnht-images",
   },
   NODE_ENV: process.env.NODE_ENV || "development",
   LEADERBOARD: {

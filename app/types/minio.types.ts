@@ -1,13 +1,13 @@
 export interface UploadResult {
-  bucket: string;
   objectName: string;
   etag: string;
   url: string;
   versionId?: string;
+  fullPath: string; // Complete path including prefix
 }
 
 export interface UploadOptions {
-  bucket?: string;
+  prefixPath?: string; // Prefix path for file organization (e.g., "images/avatars", "documents/pdfs")
   metadata?: Record<string, string>;
   contentType?: string;
   generateUniqueFileName?: boolean;
@@ -15,30 +15,30 @@ export interface UploadOptions {
 }
 
 export interface DownloadOptions {
-  bucket?: string;
+  prefixPath?: string;
   expires?: number; // URL expiration time in seconds (default: 7 days)
 }
 
 export interface FileInfo {
-  name: string;
+  name: string; // Original file name
+  fullPath: string; // Complete path in bucket (prefix + name)
   lastModified: Date;
   etag: string;
   size: number;
-  bucket: string;
   url?: string;
   contentType?: string;
   metadata?: Record<string, string>;
+  prefixPath?: string; // Extracted prefix path
 }
 
 export interface ListObjectsOptions {
-  bucket?: string;
-  prefix?: string;
+  prefixPath?: string; // Filter by prefix path
   recursive?: boolean;
   maxKeys?: number;
 }
 
 export interface DeleteOptions {
-  bucket?: string;
+  prefixPath?: string; // Prefix path for file location
 }
 
 export interface MinioError extends Error {

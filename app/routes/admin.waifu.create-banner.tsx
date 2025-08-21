@@ -149,11 +149,11 @@ export default function AdminCreateBanner() {
       const [bannerData, mobileBannerData] = await uploadMultipleFiles([
         {
           file: selectedBannerFile,
-          options: { bucket: "banner-images", category: "banner" },
+          options: { prefixPath: "banner-images" },
         },
         {
           file: selectedMobileBannerFile,
-          options: { bucket: "banner-images", category: "mobile-banner" },
+          options: { prefixPath: "banner-images" },
         },
       ]);
 

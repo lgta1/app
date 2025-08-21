@@ -189,13 +189,13 @@ export default function AdminEditBanner() {
       if (selectedBannerFile) {
         filesToUpload.push({
           file: selectedBannerFile,
-          options: { bucket: "banner-images", category: "banner" },
+          options: { prefixPath: "banner-images" },
         });
       }
       if (selectedMobileBannerFile) {
         filesToUpload.push({
           file: selectedMobileBannerFile,
-          options: { bucket: "banner-images", category: "mobile-banner" },
+          options: { prefixPath: "banner-images" },
         });
       }
 

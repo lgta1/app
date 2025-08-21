@@ -177,7 +177,7 @@ export default function CreateStory() {
       const [posterData] = await uploadMultipleFiles([
         {
           file: formData.poster,
-          options: { bucket: "story-images", category: "poster" },
+          options: { prefixPath: "story-images" },
         },
       ]);
 

@@ -195,7 +195,7 @@ export default function EditStory() {
         [posterData] = await uploadMultipleFiles([
           {
             file: formData.poster,
-            options: { bucket: "story-images", category: "poster" },
+            options: { prefixPath: "story-images" },
           },
         ]);
       }

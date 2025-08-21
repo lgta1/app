@@ -1,4 +1,3 @@
-import { ensurePublicBucketExists } from "@/configs/minio.config";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.files.upload";
@@ -35,8 +34,7 @@ export async function action({ request }: Route.ActionArgs) {
     // Parse form data
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const bucket = (formData.get("bucket") as string) || "public-uploads";
-    const category = (formData.get("category") as string) || "general";
+    const prefixPath = (formData.get("prefixPath") as string) || "uploads";
 
     // Validate file
     if (!file || file.size === 0) {
@@ -88,23 +86,19 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
 
-    // Ensure public bucket exists
-    await ensurePublicBucketExists(bucket);
-
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to public bucket with metadata including userId
+    // Upload to default bucket with prefix path and metadata including userId
     const result = await uploadToPublicBucket(buffer, file.name, {
-      bucket,
+      prefixPath: prefixPath,
       generateUniqueFileName: true,
       contentType: file.type,
       metadata: {
         "original-name": file.name,
         "upload-date": new Date().toISOString(),
         "uploaded-by": userInfo.id,
-        category: category,
         size: file.size.toString(),
         "user-agent": request.headers.get("user-agent") || "unknown",
       },
@@ -114,14 +108,15 @@ export async function action({ request }: Route.ActionArgs) {
       success: true,
       data: {
         objectName: result.objectName,
+        fullPath: result.fullPath,
         url: result.url, // Direct public URL
-        bucket: result.bucket,
+        prefixPath: prefixPath,
         size: file.size,
         type: file.type,
         originalName: file.name,
         isPublic: true,
       },
-      message: "Tải file lên public bucket thành công",
+      message: "Tải file lên thành công",
     });
   } catch (error) {
     console.error("Upload error:", error);

@@ -5,20 +5,19 @@ import { useFetcher, useSubmit } from "react-router";
 import { BusinessError } from "~/helpers/errors.helper";
 
 interface UploadFileOptions {
-  bucket?: string;
-  category?: string;
+  prefixPath?: string;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
 }
 
 interface DeleteFileOptions {
-  bucket?: string;
+  prefixPath?: string;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
 }
 
 interface DeleteFilesOptions {
-  bucket?: string;
+  prefixPath?: string;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
 }
@@ -72,12 +71,8 @@ export function useFileOperations() {
       const formData = new FormData();
       formData.append("file", file);
 
-      if (options.bucket) {
-        formData.append("bucket", options.bucket);
-      }
-
-      if (options.category) {
-        formData.append("category", options.category);
+      if (options.prefixPath) {
+        formData.append("prefixPath", options.prefixPath);
       }
 
       submit(formData, {
@@ -95,12 +90,8 @@ export function useFileOperations() {
       const formData = new FormData();
       formData.append("file", file);
 
-      if (options.bucket) {
-        formData.append("bucket", options.bucket);
-      }
-
-      if (options.category) {
-        formData.append("category", options.category);
+      if (options.prefixPath) {
+        formData.append("prefixPath", options.prefixPath);
       }
 
       // Store callbacks before submitting
@@ -121,8 +112,8 @@ export function useFileOperations() {
       const formData = new FormData();
       formData.append("objectName", objectName);
 
-      if (options.bucket) {
-        formData.append("bucket", options.bucket);
+      if (options.prefixPath) {
+        formData.append("prefixPath", options.prefixPath);
       }
 
       // Store callbacks before submitting
@@ -142,8 +133,8 @@ export function useFileOperations() {
       const formData = new FormData();
       formData.append("objectNames", JSON.stringify(objectNames));
 
-      if (options.bucket) {
-        formData.append("bucket", options.bucket);
+      if (options.prefixPath) {
+        formData.append("prefixPath", options.prefixPath);
       }
 
       // Store callbacks before submitting
@@ -158,15 +149,15 @@ export function useFileOperations() {
   );
 
   // Direct download file
-  const downloadFile = useCallback(async (objectName: string, bucket?: string) => {
+  const downloadFile = useCallback(async (objectName: string, prefixPath?: string) => {
     try {
       const searchParams = new URLSearchParams({
         objectName,
         download: "true",
       });
 
-      if (bucket) {
-        searchParams.append("bucket", bucket);
+      if (prefixPath) {
+        searchParams.append("prefixPath", prefixPath);
       }
 
       // Show loading toast
@@ -208,12 +199,8 @@ export function useFileOperations() {
           const formData = new FormData();
           formData.append("file", file);
 
-          if (options.bucket) {
-            formData.append("bucket", options.bucket);
-          }
-
-          if (options.category) {
-            formData.append("category", options.category);
+          if (options.prefixPath) {
+            formData.append("prefixPath", options.prefixPath);
           }
 
           const response = await fetch("/api/files/upload", {

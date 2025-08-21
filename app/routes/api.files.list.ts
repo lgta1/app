@@ -10,15 +10,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     await requireLogin(request);
 
     const url = new URL(request.url);
-    const bucket = url.searchParams.get("bucket") || "public-uploads";
-    const prefix = url.searchParams.get("prefix") || "";
+    const prefixPath = url.searchParams.get("prefixPath") || "";
     const limit = Number(url.searchParams.get("limit")) || 100;
     const recursive = url.searchParams.get("recursive") === "true";
 
-    // List files from public bucket
+    // List files from default bucket
     const files = await listPublicFiles({
-      bucket,
-      prefix,
+      prefixPath,
       recursive,
       maxKeys: limit,
     });
@@ -29,13 +27,11 @@ export async function loader({ request }: Route.LoaderArgs) {
         ...file,
         isPublic: true, // Indicate these are public URLs
       })),
-      message: "Lấy danh sách file công khai thành công",
+      message: "Lấy danh sách file thành công",
       meta: {
-        bucket,
-        prefix,
+        prefixPath,
         count: files.length,
         limit,
-        isPublicBucket: true,
       },
     });
   } catch (error) {

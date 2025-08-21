@@ -19,26 +19,25 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     const formData = await request.formData();
-    const objectName = formData.get("objectName") as string;
-    const objectNames = formData.get("objectNames") as string;
-    const bucket = (formData.get("bucket") as string) || "public-uploads";
+    const fullPath = formData.get("fullPath") as string;
+    const fullPaths = formData.get("fullPaths") as string;
 
     // Validate input
-    if (!objectName && !objectNames) {
+    if (!fullPath && !fullPaths) {
       return Response.json(
         {
           success: false,
-          error: "Phải cung cấp objectName hoặc objectNames",
+          error: "Phải cung cấp fullPath hoặc fullPaths",
         },
         { status: 400 },
       );
     }
 
-    if (objectName && objectNames) {
+    if (fullPath && fullPaths) {
       return Response.json(
         {
           success: false,
-          error: "Không thể cung cấp cả objectName và objectNames",
+          error: "Không thể cung cấp cả fullPath và fullPaths",
         },
         { status: 400 },
       );
@@ -47,27 +46,27 @@ export async function action({ request }: Route.ActionArgs) {
     let deletedCount = 0;
     let deletedItems: string[] = [];
 
-    if (objectName) {
-      // Delete single file from public bucket
-      await deletePublicFile(objectName, bucket);
+    if (fullPath) {
+      // Delete single file
+      await deletePublicFile(fullPath);
       deletedCount = 1;
-      deletedItems = [objectName];
-    } else if (objectNames) {
-      // Delete multiple files from public bucket
-      const namesArray = JSON.parse(objectNames) as string[];
+      deletedItems = [fullPath];
+    } else if (fullPaths) {
+      // Delete multiple files
+      const pathsArray = JSON.parse(fullPaths) as string[];
 
-      if (!Array.isArray(namesArray) || namesArray.length === 0) {
+      if (!Array.isArray(pathsArray) || pathsArray.length === 0) {
         return Response.json(
           {
             success: false,
-            error: "objectNames phải là một mảng không rỗng",
+            error: "fullPaths phải là một mảng không rỗng",
           },
           { status: 400 },
         );
       }
 
       // Limit batch delete to 100 items for performance
-      if (namesArray.length > 100) {
+      if (pathsArray.length > 100) {
         return Response.json(
           {
             success: false,
@@ -77,9 +76,9 @@ export async function action({ request }: Route.ActionArgs) {
         );
       }
 
-      await deletePublicFiles(namesArray, bucket);
-      deletedCount = namesArray.length;
-      deletedItems = namesArray;
+      await deletePublicFiles(pathsArray);
+      deletedCount = pathsArray.length;
+      deletedItems = pathsArray;
     }
 
     return Response.json({
@@ -87,10 +86,8 @@ export async function action({ request }: Route.ActionArgs) {
       data: {
         deletedCount,
         deletedItems,
-        bucket,
-        isPublicBucket: true,
       },
-      message: `Đã xóa thành công ${deletedCount} file từ public bucket`,
+      message: `Đã xóa thành công ${deletedCount} file`,
     });
   } catch (error) {
     console.error("Delete error:", error);

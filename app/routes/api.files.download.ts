@@ -20,15 +20,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
 
     const url = new URL(request.url);
-    const objectName = url.searchParams.get("objectName");
-    const bucket = url.searchParams.get("bucket") || "public-uploads";
+    const fullPath = url.searchParams.get("fullPath");
     const download = url.searchParams.get("download") === "true";
 
-    if (!objectName) {
+    if (!fullPath) {
       return Response.json(
         {
           success: false,
-          error: "Tham số objectName là bắt buộc",
+          error: "Tham số fullPath là bắt buộc",
         },
         { status: 400 },
       );
@@ -36,8 +35,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 
     if (download) {
       // Direct download - stream the file
-      const fileStream = await downloadFile(objectName, { bucket });
-      const fileInfo = await getPublicFileInfo(objectName, bucket);
+      const fileStream = await downloadFile(fullPath);
+      const fileInfo = await getPublicFileInfo(fullPath);
 
       // Convert stream to response
       const chunks: Buffer[] = [];
@@ -62,25 +61,26 @@ export async function loader({ request }: Route.LoaderArgs) {
       });
     } else {
       // Return direct public URL (no expiration needed)
-      const downloadUrl = getPublicFileUrl(objectName, bucket);
-      const fileInfo = await getPublicFileInfo(objectName, bucket);
+      const downloadUrl = getPublicFileUrl(fullPath);
+      const fileInfo = await getPublicFileInfo(fullPath);
 
       return Response.json({
         success: true,
         data: {
           downloadUrl, // Direct public URL
-          objectName,
-          bucket,
+          fullPath,
           isPublic: true,
           fileInfo: {
             name: fileInfo.name,
+            fullPath: fileInfo.fullPath,
             size: fileInfo.size,
             contentType: fileInfo.contentType,
             lastModified: fileInfo.lastModified,
             url: fileInfo.url, // Also direct public URL
+            prefixPath: fileInfo.prefixPath,
           },
         },
-        message: "Tạo URL tải xuống công khai thành công",
+        message: "Tạo URL tải xuống thành công",
       });
     }
   } catch (error) {

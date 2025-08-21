@@ -92,8 +92,7 @@ export default function AdminCreateWaifu() {
 
     // Upload ảnh trước
     uploadFileWithFetcher(selectedImageFile, {
-      bucket: "waifu-images",
-      category: "card",
+      prefixPath: "waifu-images",
       onSuccess: (data) => {
         // Sau khi upload thành công, submit form với URL
         const formData = new FormData();
