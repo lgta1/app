@@ -1,9 +1,12 @@
 import type { ActionFunctionArgs } from "react-router";
 
+import { createNotification } from "@/mutations/notification.mutation";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { ReadingRewardModel } from "~/database/models/reading-reward.model";
 import { UserModel } from "~/database/models/user.model";
+
+const GOLD_REWARD_CHANCE = 0.25;
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -91,7 +94,7 @@ export async function action({ request }: ActionFunctionArgs) {
       }
 
       // Random 15% chance
-      const isRewardGranted = Math.random() < 0.15;
+      const isRewardGranted = Math.random() < GOLD_REWARD_CHANCE;
 
       if (!isRewardGranted) {
         // Cập nhật timestamp ngay cả khi không trúng để tránh spam
@@ -125,11 +128,15 @@ export async function action({ request }: ActionFunctionArgs) {
         $inc: { gold: goldAmount },
       });
 
+      createNotification({
+        userId: user.id,
+        title: "Thưởng đọc truyện.",
+        subtitle: `Chúc mừng bạn nhận được ${goldAmount} vàng!`,
+        imgUrl: "/images/noti/gold.png",
+      });
+
       return Response.json({
         success: true,
-        message: `Chúc mừng! Bạn nhận được ${goldAmount} vàng!`,
-        goldAmount,
-        remainingClaims: 10 - updatedReward.rewardCount,
       });
     }
 

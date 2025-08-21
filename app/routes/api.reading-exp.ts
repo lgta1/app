@@ -204,7 +204,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Lỗi khi nhận exp đọc truyện:", error);
     return Response.json(
-      { success: false, error: "Có lỗi xảy ra khi xử lý yêu cầu" },
+      { success: false, error: "Có lỗi xảy ra khi xử lý yêu cầu nhận exp" },
       { status: 500 },
     );
   }

@@ -1,3 +1,4 @@
+import { notifyNewChapter } from "@/services/notification.svc";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { CHAPTER_STATUS } from "~/constants/chapter";
@@ -42,6 +43,8 @@ export const createChapter = async (
       ...chapter,
       chapterNumber: manga.chapters,
     });
+
+    notifyNewChapter(newChapter, manga);
 
     return newChapter;
   } catch (error) {

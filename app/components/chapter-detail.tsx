@@ -209,24 +209,7 @@ export function ChapterDetail({
   // Handle API response cho reading reward
   useEffect(() => {
     if (rewardFetcher.data) {
-      const response = rewardFetcher.data as {
-        success: boolean;
-        message?: string;
-        error?: string;
-        goldAmount?: number;
-        remainingClaims?: number;
-      };
-
-      if (response.success) {
-        toast.success(response.message || "Nhận vàng thành công!");
-        setHasClaimedThisChapter(true);
-      } else {
-        // Chỉ hiển thị toast error cho các lỗi không phải "không trúng"
-        if (response.error && !response.error.includes("Chúc bạn may mắn lần sau")) {
-          toast.error(response.error);
-        }
-        setHasClaimedThisChapter(true); // Đánh dấu đã thử claim rồi
-      }
+      setHasClaimedThisChapter(true);
     }
   }, [rewardFetcher.data]);
 
@@ -243,17 +226,13 @@ export function ChapterDetail({
         remainingExp?: number;
       };
 
-      if (response.success) {
-        toast.success(response.message || "Nhận exp thành công!");
-      } else {
-        // Chỉ hiển thị error nếu không phải lỗi rate limit hoặc đã đủ exp
-        if (
-          response.error &&
-          !response.error.includes("Vui lòng chờ") &&
-          !response.error.includes("đã nhận đủ")
-        ) {
-          toast.error(response.error);
-        }
+      // Chỉ hiển thị error nếu không phải lỗi rate limit hoặc đã đủ exp
+      if (
+        response.error &&
+        !response.error.includes("Vui lòng chờ") &&
+        !response.error.includes("đã nhận đủ")
+      ) {
+        toast.error(response.error);
       }
     }
   }, [expFetcher.data]);
