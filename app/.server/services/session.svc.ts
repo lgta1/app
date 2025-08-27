@@ -12,8 +12,7 @@ export const sessionStorage = createCookieSessionStorage({
     secrets: [ENV.SESSION.SECRET],
     path: "/",
     httpOnly: true,
-    // secure: ENV.NODE_ENV === "production",
-    secure: false,
+    secure: ENV.IS_PRODUCTION,
   },
 });
 
@@ -49,8 +48,7 @@ export const setUserDataToSession = (session: Session, user: UserType) => {
 export const commitUserSession = async (session: Session, remember = true) => {
   return await sessionStorage.commitSession(session, {
     httpOnly: true,
-    secure: false,
-    // secure: process.env.NODE_ENV === "production",
+    secure: ENV.IS_PRODUCTION,
     sameSite: "lax",
     maxAge: remember
       ? 60 * 60 * 24 * 7 // 7 days
@@ -77,8 +75,7 @@ export async function createUserSession({
     headers: {
       "Set-Cookie": await sessionStorage.commitSession(session, {
         httpOnly: true,
-        secure: false,
-        // secure: process.env.NODE_ENV === "production",
+        secure: ENV.IS_PRODUCTION,
         sameSite: "lax",
         maxAge: remember
           ? 60 * 60 * 24 * 7 // 7 days

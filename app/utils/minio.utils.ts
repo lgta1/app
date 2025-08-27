@@ -2,6 +2,7 @@ import * as Minio from "minio";
 import type { Readable } from "stream";
 import { v4 as uuidv4 } from "uuid";
 
+import { ENV } from "@/configs/env.config";
 import { MINIO_CONFIG } from "@/configs/minio.config";
 
 import { BusinessError } from "~/helpers/errors.helper";
@@ -83,18 +84,44 @@ interface ExtendedListOptions extends ListObjectsOptions {
 // =============================================================================
 
 /**
- * Tạo full path từ prefix và file name
+ * Tạo environment prefix - thêm '/test' nếu không phải production
+ */
+export const getEnvironmentPrefix = (): string => {
+  return ENV.IS_PRODUCTION ? "" : "test";
+};
+
+/**
+ * Tạo full path từ prefix và file name với environment prefix tự động
  */
 export const createFullPath = (fileName: string, prefixPath?: string): string => {
-  if (!prefixPath) return fileName;
+  // Lấy environment prefix
+  const envPrefix = getEnvironmentPrefix();
 
-  // Normalize paths
-  const normalizedPrefix = prefixPath.replace(/^\/+|\/+$/g, "");
+  // Normalize file name
   const normalizedFileName = fileName.replace(/^\/+/, "");
 
-  return normalizedPrefix
-    ? `${normalizedPrefix}/${normalizedFileName}`
-    : normalizedFileName;
+  // Tạo danh sách các prefix parts (environment prefix + user prefix)
+  const prefixParts: string[] = [];
+
+  // Thêm environment prefix nếu có
+  if (envPrefix) {
+    prefixParts.push(envPrefix);
+  }
+
+  // Thêm user prefix nếu có
+  if (prefixPath) {
+    const normalizedPrefix = prefixPath.replace(/^\/+|\/+$/g, "");
+    if (normalizedPrefix) {
+      prefixParts.push(normalizedPrefix);
+    }
+  }
+
+  // Kết hợp tất cả prefix parts với file name
+  if (prefixParts.length === 0) {
+    return normalizedFileName;
+  }
+
+  return `${prefixParts.join("/")}/${normalizedFileName}`;
 };
 
 /**
@@ -207,7 +234,7 @@ export const getPublicFileUrl = (fullPath: string): string => {
   if (isUsingCloudflareR2()) {
     // R2 public URL format với r2.dev subdomain
     // Lưu ý: Cần enable public access trong Cloudflare Dashboard
-    return `https://pub-${bucket}.r2.dev/${fullPath}`;
+    return `https://cdn.vinahentai.com/${fullPath}`;
   }
 
   // MinIO public URL format

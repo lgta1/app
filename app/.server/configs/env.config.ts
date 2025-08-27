@@ -16,7 +16,6 @@ export const ENV = {
     USE_SSL: process.env.MINIO_USE_SSL === "true" || false,
     DEFAULT_BUCKET: process.env.MINIO_DEFAULT_BUCKET || "vnht-images",
   },
-  NODE_ENV: process.env.NODE_ENV || "development",
   LEADERBOARD: {
     daily: {
       VIEW_WEIGHT: Number(process.env.DAILY_LEADERBOARD_VIEW_WEIGHT) || 1,
@@ -35,4 +34,6 @@ export const ENV = {
     },
     MAX_ITEMS: Number(process.env.LEADERBOARD_MAX_ITEMS) || 10,
   },
+  NODE_ENV: process.env.NODE_ENV || "development",
+  IS_PRODUCTION: process.env.NODE_ENV === "production",
 };

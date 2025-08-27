@@ -6,6 +6,7 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import { PassThrough } from "node:stream";
 
+import { ENV } from "@/configs/env.config";
 import { initLeaderboardScheduler } from "@/jobs/leaderboard.server";
 
 import { initMongoDB } from "~/database/connection";
@@ -16,7 +17,7 @@ export const streamTimeout = 5_000;
 initMongoDB();
 
 // Initialize Leaderboard Scheduler (chỉ chạy ở production)
-if (process.env.NODE_ENV === "production") {
+if (ENV.IS_PRODUCTION) {
   initLeaderboardScheduler();
 }
 
