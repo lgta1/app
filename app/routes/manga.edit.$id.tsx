@@ -72,7 +72,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       keywords: formData.get("keywords") as string,
       userStatus: Number(formData.get("userStatus")),
       genres: JSON.parse(formData.get("genres") as string),
-      translationTeam: userInfo.name,
     };
 
     // Chỉ update poster nếu có upload ảnh mới

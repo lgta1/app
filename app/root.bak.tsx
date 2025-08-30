@@ -47,37 +47,9 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-// ✅ META mặc định cho toàn site
-export function meta({}: Route.MetaArgs) {
-  return [
-    {
-      title: "Vinahentai - Đọc hentai 18+ ÍT QUẢNG CÁO hot nhất 2025",
-    },
-    {
-      name: "description",
-      content:
-        "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!",
-    },
-
-    // (Tuỳ chọn) Open Graph / Twitter để hiển thị đẹp khi share
-    { property: "og:type", content: "website" },
-    { property: "og:site_name", content: "Vinahentai" },
-    {
-      property: "og:title",
-      content: "Vinahentai - Hentai 18+ ít quảng cáo 2025",
-    },
-    {
-      property: "og:description",
-      content:
-        "Trang đọc hentai/manhwa 18+ vietsub, cập nhật nhanh, ít quảng cáo. Trải nghiệm ngay!",
-    },
-    { name: "twitter:card", content: "summary_large_image" },
-  ];
-}
-
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi">
+    <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

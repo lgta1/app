@@ -20,10 +20,11 @@ import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Đăng ký | WuxiaWorld" },
+    { title: "Đăng ký – Vinahentai" },
     {
       name: "description",
-      content: "Tạo tài khoản WuxiaWorld để tham gia cộng đồng đọc truyện",
+      content:
+        "Tạo tài khoản Vinahentai để theo dõi truyện 18+ vietsub, đồng bộ danh sách yêu thích và nhận cập nhật nhanh. Trải nghiệm mượt, ít quảng cáo.",
     },
   ];
 };
@@ -110,30 +111,16 @@ export default function Register() {
     <>
       <div className="bg-gradient-radial to-bgc-layer1 mb-10 min-h-screen w-full from-[#191758] px-4">
         {/* Container chính */}
-        <div className="mx-auto mb-10 flex w-full max-w-[402px] flex-col items-center gap-[46px] pt-[104px] md:max-w-[558px] md:gap-6 md:pt-[104px]">
+        <div className="mx-auto mb-10 flex w-full max-w-[402px] flex-col items-center gap-[46px] pt-[104px] md:max-w=[558px] md:gap-6 md:pt-[104px]">
           {/* Logo */}
-          <img src="/images/logo.png" alt="Logo" className="h-[75px] w-[240px]" />
-
-          {/* Banner */}
-          {/* <div className="flex w-full flex-col justify-center gap-[15px] md:gap-[12px]">
-            <img
-              src="/images/banners/topbanner-1.png"
-              alt="Banner 1"
-              className="h-[53px] w-full md:h-[69px]"
-            />
-            <img
-              src="/images/banners/topbanner-2.png"
-              alt="Banner 2"
-              className="h-[53px] w-full md:h-[69px]"
-            />
-          </div> */}
+          <img src="/images/logo.png" alt="Logo Vinahentai" className="h-[75px] w-[240px]" />
 
           {/* Form đăng ký */}
           <div className="border-bd-default bg-bgc-layer1 flex w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4 md:min-h-[450px]">
             {/* Tiêu đề */}
             <div className="flex w-full flex-col gap-[11px]">
-              <h1 className="text-txt-primary text-center text-3xl font-semibold md:text-left md:text-[30px] md:leading-9">
-                Đăng ký
+              <h1 className="sr-only">
+                Đăng ký tài khoản Vinahentai miễn phí để tham gia cộng đồng đọc truyện
               </h1>
               <div className="from-txt-secondary h-[1px] w-full bg-gradient-to-r to-transparent md:w-[370px]"></div>
             </div>
@@ -248,7 +235,7 @@ export default function Register() {
                   Đã có tài khoản?
                 </span>
                 <Link
-                  to="/dang-nhap"
+                  to="/login"
                   className="text-txt-focus text-sm leading-5 font-medium"
                 >
                   Đăng nhập ngay

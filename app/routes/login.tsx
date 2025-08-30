@@ -18,10 +18,11 @@ import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Đăng nhập | WuxiaWorld" },
+    { title: "Đăng nhập – Vinahentai" },
     {
       name: "description",
-      content: "Đăng nhập vào tài khoản WuxiaWorld để trải nghiệm đầy đủ",
+      content:
+        "Đăng nhập Vinahentai để tiếp tục đọc, theo dõi và lưu truyện 18+ yêu thích. Trải nghiệm mượt, ít quảng cáo.",
     },
   ];
 };
@@ -62,28 +63,14 @@ export default function Login() {
       {/* Container chính */}
       <div className="mx-auto mb-10 flex w-full max-w-[402px] flex-col items-center gap-[46px] pt-[104px] md:max-w-[558px] md:gap-6 md:pt-[104px]">
         {/* Logo */}
-        <img src="/images/logo.png" alt="Logo" className="h-[75px] w-[240px]" />
-
-        {/* Banner */}
-        {/* <div className="flex w-full flex-col justify-center gap-[15px] md:gap-[12px]">
-          <img
-            src="/images/banners/topbanner-1.png"
-            alt="Banner 1"
-            className="h-[53px] w-full md:h-[69px]"
-          />
-          <img
-            src="/images/banners/topbanner-2.png"
-            alt="Banner 2"
-            className="h-[53px] w-full md:h-[69px]"
-          />
-        </div> */}
+        <img src="/images/logo.png" alt="Logo Vinahentai" className="h-[75px] w-[240px]" />
 
         {/* Form đăng nhập */}
         <div className="border-bd-default bg-bgc-layer1 flex h-[444px] w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4 md:max-h-[450px] md:min-h-[376px]">
           {/* Tiêu đề */}
           <div className="flex w-full flex-col gap-[11px]">
-            <h1 className="text-txt-primary text-center text-3xl leading-9 font-semibold md:text-left">
-              Đăng nhập
+            <h1 className="sr-only">
+              Đăng nhập tài khoản Vinahentai để trải nghiệm đầy đủ
             </h1>
             <div className="from-txt-secondary h-[1px] w-full bg-gradient-to-r to-transparent md:w-[370px]"></div>
           </div>
@@ -156,7 +143,7 @@ export default function Login() {
                 Chưa có tài khoản?
               </span>
               <Link
-                to="/dang-ky"
+                to="/register"
                 className="text-txt-focus text-sm leading-5 font-medium"
               >
                 Đăng ký ngay

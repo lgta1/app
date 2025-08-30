@@ -42,8 +42,8 @@ export async function loader() {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "WuxiaWorld - Đọc truyện online" },
-    { name: "description", content: "WuxiaWorld - Nền tảng đọc truyện online" },
+    { title: "Vinahentai - Đọc hentai 18+ ÍT QUẢNG CÁO hot nhất 2025" },
+    { name: "description", content: "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!" },
   ];
 }
 
@@ -68,18 +68,21 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   });
 
   return (
-    <div className="container-ad mx-auto px-4 py-6">
-      <DialogWarningAdultContent />
+  <div className="container-ad mx-auto px-4 py-6">
+    <DialogWarningAdultContent />
 
-      <TopBanner
-        bannerItems={
-          dailyLeaderboard.length > 0
-            ? (dailyLeaderboard as MangaType[]).filter((manga) => !!manga)
-            : (weeklyLeaderboard as MangaType[]).filter((manga) => !!manga)
-        }
-      />
+    <h1 className="sr-only">
+      Vinahentai – Đọc hentai 18+ vietsub, ít quảng cáo hot nhất 2025
+    </h1>
 
-      <img className="pt-10" src="/images/home/vnht.svg" alt="" />
+    <TopBanner
+      bannerItems={
+        dailyLeaderboard.length > 0
+          ? (dailyLeaderboard as MangaType[]).filter((manga) => !!manga)
+          : (weeklyLeaderboard as MangaType[]).filter((manga) => !!manga)
+      }
+    />
+      <img className="pt-10" src="/images/home/vnht.svg" alt="Vinahentai - banner trang chủ" />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
         {/* Section truyện mới cập nhật */}
