@@ -1,60 +1,45 @@
-import { Link } from "react-router";
-import { ClockIcon, EyeIcon, HeartIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ClockIcon } from "lucide-react";
 
 import { type MangaType } from "~/database/models/manga.model";
 import { formatDistanceToNow } from "~/utils/date.utils";
 
 export function MangaCard({ manga }: { manga: MangaType }) {
-  const { title, chapters, createdAt, viewNumber, likeNumber, poster } = manga;
+  const { title, chapters, createdAt, poster } = manga;
 
   return (
-    <Link to={`/manga/${manga.id}`} className="aspect-2/3 w-[46%] lg:w-[150px]">
-      <div
-        className="relative h-full w-full overflow-hidden rounded-lg"
-        style={{
-          backgroundImage: `url(${poster})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* Gradient overlay */}
-        <div className="to-bgc-layer1 absolute inset-0 bg-gradient-to-b from-transparent"></div>
+    <Link to={`/manga/${manga.id}`} className="block aspect-2/3 w-full">
+      <div className="relative h-full w-full overflow-hidden rounded-lg">
+        {/* ?nh bìa */}
+        <img
+          src={poster}
+          alt={title}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+        />
 
-        {/* View and Like counts - moved to top */}
-        <div className="absolute top-2 left-1/2 flex w-full -translate-x-1/2 justify-between px-3">
-          <div className="bg-bgc-layer-semi-neutral flex items-center gap-1.5 rounded-full px-1.5 py-1 backdrop-blur-md">
-            <EyeIcon className="h-3 w-3" />
-            <span className="text-txt-primary text-[10px] leading-none font-medium">
-              {viewNumber?.toLocaleString()}
-            </span>
-          </div>
-          <div className="bg-bgc-layer-semi-neutral flex items-center gap-1.5 rounded-full px-1.5 py-1 backdrop-blur-md">
-            <HeartIcon className="h-3 w-3" />
-            <span className="text-txt-primary text-[10px] leading-none font-medium">
-              {likeNumber?.toLocaleString()}
-            </span>
-          </div>
-        </div>
-
-        {/* Content - positioned at bottom with proper spacing */}
-        <div className="absolute bottom-0 left-0 w-full px-2 pb-2">
-          <div className="flex flex-col gap-2">
-            <h3 className="text-txt-primary line-clamp-2 text-sm leading-normal font-semibold">
+        {/* Overlay: d?ch xu?ng sát dáy, 2 bên sát vi?n hon */}
+        <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-1 pt-0.5">
+          {/* Tiêu d?: full chi?u ngang, n?n den 55%, ôm sát ch? */}
+          <h3 className="mb-1 leading-tight">
+            <span className="block w-full truncate rounded-lg bg-black/55 px-2 py-0.5 text-sm font-semibold text-white leading-none backdrop-blur-[1px]">
               {title}
-            </h3>
-            <div className="flex items-center justify-between">
-              <div className="bg-bgc-layer-semi-purple flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-sm">
-                <span className="text-txt-focus line-clamp-1 text-[10px] leading-none font-medium">
-                  ChÆ°Æ¡ng {chapters}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 rounded-full backdrop-blur-sm">
-                <ClockIcon className="text-txt-secondary h-3 w-3" />
-                <span className="text-txt-secondary line-clamp-1 text-[10px] leading-none font-medium">
-                  {formatDistanceToNow(createdAt)}
-                </span>
-              </div>
-            </div>
+            </span>
+          </h3>
+
+          {/* Hàng nhãn 1 dòng: sát tiêu d? hon, sát dáy hon */}
+          <div className="flex items-center gap-1.5">
+            {/* Chap: nh?, n?n tím 55%, ôm sát ch? */}
+            <span className="inline-block whitespace-nowrap rounded-full bg-violet-500/55 px-1.5 py-0.5 text-xs font-semibold text-white leading-none backdrop-blur-[1px]">
+              Chap {chapters}
+            </span>
+
+            {/* Th?i gian: nh?, 1 dòng, n?n den 55%, icon tr?ng m? */}
+            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-black/55 px-1.5 py-0.5 text-xs text-white leading-none backdrop-blur-[1px]">
+              <ClockIcon className="h-3.5 w-3.5 text-white/90" />
+              {formatDistanceToNow(createdAt)}
+            </span>
           </div>
         </div>
       </div>

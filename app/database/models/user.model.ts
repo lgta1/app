@@ -31,7 +31,7 @@ export type UserType = {
 const UserSchema = new Schema<UserType>(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true },
     password: { type: String, required: true },
     salt: { type: String, required: true },
     faction: { type: Number, enum: [0, 1] },

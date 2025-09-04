@@ -70,14 +70,24 @@ export function updateUserExp(
 } {
   const oldExp = user.exp || 0;
   const oldLevel = calculateLevel(oldExp);
-  const newExp = oldExp + expToAdd;
-  const newLevel = calculateLevel(newExp);
+  const totalExp = oldExp + expToAdd;
+  const newLevel = calculateLevel(totalExp);
+  const didLevelUp = newLevel > oldLevel;
+
+  // Tính exp còn lại sau khi level up
+  let newExp = totalExp;
+  if (didLevelUp && newLevel <= MAX_LEVEL) {
+    // Lấy ngưỡng exp của level hiện tại
+    const currentLevelThreshold = LEVEL_THRESHOLDS[newLevel - 1];
+    // Tính exp còn lại sau khi trừ đi ngưỡng level hiện tại
+    newExp = totalExp - currentLevelThreshold;
+  }
 
   return {
     newExp,
     oldLevel,
     newLevel,
-    didLevelUp: newLevel > oldLevel,
+    didLevelUp,
   };
 }
 

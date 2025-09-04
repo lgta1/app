@@ -4,6 +4,7 @@ import {
   type ActionFunctionArgs,
   type ClientActionFunctionArgs,
   type LoaderFunctionArgs,
+  redirect,
 } from "react-router";
 import { Form, useActionData } from "react-router";
 
@@ -90,11 +91,16 @@ export async function action({ request }: ActionFunctionArgs) {
 export async function clientAction({ serverAction }: ClientActionFunctionArgs) {
   try {
     const response = await serverAction<typeof action>();
-    if (response.success && response.step === 3) {
-      toast.success("Mật khẩu đã được cập nhật thành công");
-    } else {
-      toast.error(response.error || "Vui lòng kiểm tra lại thông tin");
+    if (response.step === 3) {
+      if (response.success) {
+        toast.success("Mật khẩu đã được cập nhật thành công");
+        return redirect("/profile");
+      } else {
+        toast.error(response.error || "Vui lòng kiểm tra lại thông tin");
+      }
     }
+
+    return response;
   } catch (error) {
     toast.error("Có lỗi xảy ra khi cập nhật mật khẩu");
   }

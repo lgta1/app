@@ -111,9 +111,13 @@ export default function Register() {
     <>
       <div className="bg-gradient-radial to-bgc-layer1 mb-10 min-h-screen w-full from-[#191758] px-4">
         {/* Container chính */}
-        <div className="mx-auto mb-10 flex w-full max-w-[402px] flex-col items-center gap-[46px] pt-[104px] md:max-w=[558px] md:gap-6 md:pt-[104px]">
+        <div className="mx-auto mb-10 flex w-full flex-col items-center gap-[46px] pt-[104px] md:max-w-[558px] md:gap-6 md:pt-[104px]">
           {/* Logo */}
-          <img src="/images/logo.png" alt="Logo Vinahentai" className="h-[75px] w-[240px]" />
+          <img
+            src="/images/logo.png"
+            alt="Logo Vinahentai"
+            className="h-[75px] w-[240px]"
+          />
 
           {/* Form đăng ký */}
           <div className="border-bd-default bg-bgc-layer1 flex w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4 md:min-h-[450px]">

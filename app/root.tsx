@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
   useLoaderData,
   useNavigate,
+  useLocation, // << ADDED
 } from "react-router";
 
 import { getAllGenres } from "@/queries/genres.query";
@@ -21,7 +22,7 @@ import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
 import { isAdmin } from "~/helpers/user.helper";
 
-// Cấu hình thời gian check ban status (phút)
+// C?u h�nh th?i gian check ban status (ph�t)
 const BAN_CHECK_INTERVAL_MINUTES = 1;
 const BAN_CHECK_INTERVAL_MS = BAN_CHECK_INTERVAL_MINUTES * 60 * 1000;
 const LAST_BAN_CHECK_KEY = "lastBanCheck";
@@ -47,29 +48,29 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-// ✅ META mặc định cho toàn site
+// ? META m?c d?nh cho to�n site
 export function meta({}: Route.MetaArgs) {
   return [
     {
-      title: "Vinahentai - Đọc hentai 18+ ÍT QUẢNG CÁO hot nhất 2025",
+      title: "Vinahentai - �?c hentai 18+ �T QU?NG C�O hot nh?t 2025",
     },
     {
       name: "description",
       content:
-        "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!",
+        "Vinahentai - Trang d?c truy?n hentai, manhwa 18+ vietsub, hentaiVN kh�ng che. �t qu?ng c�o, c?p nh?t nhanh, da d?ng th? lo?i hot nh?t 2025. Tr?i nghi?m ngay!",
     },
 
-    // (Tuỳ chọn) Open Graph / Twitter để hiển thị đẹp khi share
+    // (Tu? ch?n) Open Graph / Twitter d? hi?n th? d?p khi share
     { property: "og:type", content: "website" },
     { property: "og:site_name", content: "Vinahentai" },
     {
       property: "og:title",
-      content: "Vinahentai - Hentai 18+ ít quảng cáo 2025",
+      content: "Vinahentai - Hentai 18+ �t qu?ng c�o 2025",
     },
     {
       property: "og:description",
       content:
-        "Trang đọc hentai/manhwa 18+ vietsub, cập nhật nhanh, ít quảng cáo. Trải nghiệm ngay!",
+        "Trang d?c hentai/manhwa 18+ vietsub, c?p nh?t nhanh, �t qu?ng c�o. Tr?i nghi?m ngay!",
     },
     { name: "twitter:card", content: "summary_large_image" },
   ];
@@ -114,9 +115,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function App() {
   const { isAdmin, user, genres } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  const location = useLocation(); // << ADDED
+
+  // ?n Footer n?u dang ? trang tri?u h?i (bao ph? /waifu/summon v� m?i nh�nh con)
+  const hideFooter = location.pathname.startsWith("/waifu/summon"); // << ADDED
 
   useEffect(() => {
-    // Chỉ chạy logic này nếu user đã đăng nhập
+    // Ch? ch?y logic n�y n?u user d� dang nh?p
     if (!user) return;
 
     const checkUserBanStatus = async () => {
@@ -125,7 +130,7 @@ export default function App() {
         const data = await response.json();
 
         if (data.success && data.data && data.data.isBanned) {
-          // User bị ban, thực hiện logout
+          // User b? ban, th?c hi?n logout
           navigate("/logout");
         }
       } catch (error) {
@@ -148,10 +153,10 @@ export default function App() {
       }
     };
 
-    // Check ngay lập tức nếu cần
+    // Check ngay l?p t?c n?u c?n
     performBanCheck();
 
-    // Setup interval để check định kỳ
+    // Setup interval d? check d?nh k?
     const intervalId = setInterval(performBanCheck, BAN_CHECK_INTERVAL_MS);
 
     // Cleanup interval khi component unmount
@@ -164,7 +169,7 @@ export default function App() {
     <>
       <Header isAdmin={isAdmin} user={user} genres={genres} />
       <Outlet />
-      <Footer />
+      {!hideFooter && <Footer />}{/* << CHANGED: ch? render Footer khi kh�ng ? summon */}
     </>
   );
 }

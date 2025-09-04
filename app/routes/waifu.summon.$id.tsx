@@ -30,6 +30,7 @@ import {
 } from "~/components/summon-top-action-buttons";
 import { SummonVideoPlayer } from "~/components/summon-video-player";
 import { SummonWaifuCards } from "~/components/summon-waifu-cards";
+import SummonAssetPreloader from "~/components/summon-asset-preloader";
 import { GOLD_COST_PER_SUMMON, GOLD_COST_PER_SUMMON_MULTI } from "~/constants/summon";
 import type { BannerType } from "~/database/models/banner.model";
 import { BannerModel } from "~/database/models/banner.model";
@@ -38,11 +39,12 @@ import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { toastWarning } from "~/helpers/toast.helper";
 
+/* =================== LOADER / ACTION =================== */
+
 export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
   const { id } = params;
 
   try {
-    // Fetch opened banners from API
     const [bannersResponse, userResponse] = await Promise.all([
       fetch("/api/banners?type=opened"),
       fetch("/api/user"),
@@ -70,7 +72,7 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
       id: "leaderboard",
     });
 
-    const banner = openedBanners.find((banner) => banner.id === id);
+    const banner = openedBanners.find((b) => b.id === id);
 
     return { navItems, banner, user: userResult.data };
   } catch (error) {
@@ -121,27 +123,21 @@ export async function action({ request }: ActionFunctionArgs) {
         { $inc: { gold: -goldCost } },
         { new: true },
       );
-
-      if (!goldReduce) throw new BusinessError("Không đủ vàng");
+      if (!goldReduce) throw new BusinessError("Không đủ dâm ngọc");
       await incrementBannerRolls(bannerId);
 
       const result = await summon(user, banner, cum, request);
-
       const response = {
         success: true,
         data: { type: "single", items: [result] },
         message: "Triệu hồi thành công",
       };
 
-      // Commit session nếu có cập nhật
       if (result.updatedSession) {
         return Response.json(response, {
-          headers: {
-            "Set-Cookie": await commitUserSession(result.updatedSession),
-          },
+          headers: { "Set-Cookie": await commitUserSession(result.updatedSession) },
         });
       }
-
       return response;
     }
 
@@ -154,26 +150,21 @@ export async function action({ request }: ActionFunctionArgs) {
         { $inc: { gold: -goldCost } },
         { new: true },
       );
-      if (!goldReduce) throw new BusinessError("Không đủ vàng");
+      if (!goldReduce) throw new BusinessError("Không đủ dâm ngọc");
       await incrementBannerRolls(bannerId, 10);
 
       const result = await multiSummon(user, banner, cum, 10, request);
-
       const response = {
         success: true,
         data: { type: "multi", items: result.items },
         message: "Triệu hồi thành công",
       };
 
-      // Commit session nếu có cập nhật
       if (result.updatedSession) {
         return Response.json(response, {
-          headers: {
-            "Set-Cookie": await commitUserSession(result.updatedSession),
-          },
+          headers: { "Set-Cookie": await commitUserSession(result.updatedSession) },
         });
       }
-
       return response;
     }
 
@@ -181,11 +172,13 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Summon error:", error);
     return Response.json(
-      { message: "Có lỗi xảy ra vui lòng tải lại trang" },
+      { message: "Có lỗi xảy ra, vui lòng tải lại trang" },
       { status: 500 },
     );
   }
 }
+
+/* =================== PAGE =================== */
 
 export default function WaifuSummon() {
   const { navItems, banner, user } = useLoaderData<typeof clientLoader>();
@@ -195,54 +188,69 @@ export default function WaifuSummon() {
 
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [showSummonResult, setShowSummonResult] = useState(false);
+  const [summonResult, setSummonResult] = useState<any>([]);
+  const [isSummoning, setIsSummoning] = useState(false);
+
+  // Switch “bỏ qua video” (ghi nhớ localStorage)
+  const [skipCinematic, setSkipCinematic] = useState(false);
+
   const navigate = useNavigate();
   const submit = useSubmit();
-  const [summonResult, setSummonResult] = useState<any>([]);
   const actionData = useActionData<typeof action>();
+
+  useEffect(() => {
+    document.title = banner?.title
+      ? `VinaHentai – Triệu hồi: ${banner.title}`
+      : "VinaHentai – Triệu hồi Waifu";
+  }, [banner?.title]);
+
+  useEffect(() => {
+    const v = localStorage.getItem("vh_skip_cinematic");
+    setSkipCinematic(v === "1");
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("vh_skip_cinematic", skipCinematic ? "1" : "0");
+  }, [skipCinematic]);
 
   const handleSummon = (type: "single" | "multi") => {
     if (!banner?.id) return;
-    if (!user) {
-      return navigate("/login");
-    }
+    if (!user) return navigate("/login");
 
     if (type === "multi") {
-      const goldCost = banner.isRateUp
+      const cost = banner.isRateUp
         ? GOLD_COST_PER_SUMMON_MULTI.rateUp
         : GOLD_COST_PER_SUMMON_MULTI.normal;
-      if (user.gold < goldCost) {
-        return toastWarning("Không đủ dâm ngọc");
-      }
+      if (user.gold < cost) return toastWarning("Không đủ dâm ngọc");
     } else {
-      const goldCost = banner.isRateUp
+      const cost = banner.isRateUp
         ? GOLD_COST_PER_SUMMON.rateUp
         : GOLD_COST_PER_SUMMON.normal;
-      if (user.gold < goldCost) {
-        return toastWarning("Không đủ dâm ngọc");
-      }
+      if (user.gold < cost) return toastWarning("Không đủ dâm ngọc");
     }
 
     const formData = new FormData();
     formData.append("intent", type);
     formData.append("bannerId", banner.id);
 
+    setIsSummoning(skipCinematic);
     submit(formData, { method: "post" });
-    setIsVideoPlaying(true);
+
+    if (skipCinematic) setIsVideoPlaying(false);
+    else setIsVideoPlaying(true);
   };
 
   useEffect(() => {
-    if (actionData?.message) {
-      if (actionData?.success) {
-        setSummonResult(actionData.data.items);
-      } else {
-        toastWarning(actionData?.message || "Có lỗi xảy ra vui lòng tải lại trang");
-      }
+    if (!actionData) return;
+    if (actionData?.success) {
+      setSummonResult(actionData.data.items);
+      if (skipCinematic) setShowSummonResult(true);
+    } else if (actionData?.message) {
+      toastWarning(actionData.message || "Có lỗi xảy ra, vui lòng tải lại trang");
     }
-  }, [actionData]);
+    setIsSummoning(false);
+  }, [actionData, skipCinematic]);
 
-  const handleVideoEnd = () => {
-    setShowSummonResult(true);
-  };
+  const handleVideoEnd = () => setShowSummonResult(true);
 
   const handleCloseSummonResult = () => {
     setShowSummonResult(false);
@@ -253,79 +261,122 @@ export default function WaifuSummon() {
   return (
     <div className="relative w-full">
       <Toaster position="bottom-right" />
-      {/* Navigation Bar - chung cho cả mobile và desktop */}
       <SummonNavigationBar navItems={navItems} />
 
       {/* Desktop */}
       <BrowserView>
-        <SummonDesktopTopActionButtons
-          onGuideClick={() => setIsGuideDialogOpen(true)}
-          onHistoryClick={() => setIsHistoryDialogOpen(true)}
-          onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
-          user={user}
-        />
-        <div className="w-full">
-          <img
-            src={banner?.imageUrl}
-            alt={banner?.title}
-            className="w-full object-cover"
+        <div className="relative w-full">
+          <SummonDesktopTopActionButtons
+            onGuideClick={() => setIsGuideDialogOpen(true)}
+            onHistoryClick={() => setIsHistoryDialogOpen(true)}
+            onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
+            user={user}
           />
+          <img src={banner?.imageUrl} alt={banner?.title} className="w-full object-cover" />
         </div>
-        <div className="absolute right-8 bottom-8 flex w-auto min-w-[500px] flex-col items-center justify-start gap-4">
+
+        {/* Cụm thẻ + nút triệu hồi + switch (bên phải, không cần center) */}
+        <div className="absolute right-8 bottom-8 flex w-auto min-w-[500px] flex-col items-start gap-3">
           <SummonWaifuCards waifuList={banner?.waifuList || []} />
           <SummonDesktopButtons isRateUp={banner?.isRateUp} onSummon={handleSummon} />
+
+          {/* Switch bỏ qua video — nhỏ gọn, ngay dưới 2 nút */}
+          <button
+            onClick={() => setSkipCinematic((v) => !v)}
+            className="flex items-center gap-2 text-xs text-white mt-1"
+            aria-pressed={skipCinematic}
+          >
+            <span>Bỏ qua video</span>
+            <span
+              className={[
+                "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                skipCinematic ? "bg-[#DD94FF]" : "bg-white/30",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                  skipCinematic ? "translate-x-3.5" : "translate-x-1",
+                ].join(" ")}
+              />
+            </span>
+          </button>
         </div>
       </BrowserView>
 
       {/* Mobile */}
       <MobileView>
-        <SummonMobileTopActionButtons
-          onGuideClick={() => setIsGuideDialogOpen(true)}
-          onHistoryClick={() => setIsHistoryDialogOpen(true)}
-          onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
-          user={user}
-        />
-        <img
-          src={banner?.mobileImageUrl}
-          alt={banner?.title}
-          className="w-full object-cover"
-        />
+        <div className="relative w-full">
+          <SummonMobileTopActionButtons
+            onGuideClick={() => setIsGuideDialogOpen(true)}
+            onHistoryClick={() => setIsHistoryDialogOpen(true)}
+            onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
+            user={user}
+          />
+          <img src={banner?.mobileImageUrl} alt={banner?.title} className="w-full object-cover" />
+        </div>
 
-        <div className="absolute right-6 bottom-9 flex w-auto flex-col items-center justify-start gap-3">
+        {/* 2 nút triệu hồi + switch (căn giữa theo cụm) */}
+        <div className="absolute left-1/2 bottom-9 -translate-x-1/2 flex w-[calc(100%-24px)] max-w-[460px] flex-col items-center gap-3">
           <SummonMobileButtons isRateUp={banner?.isRateUp} onSummon={handleSummon} />
+
+          <button
+            onClick={() => setSkipCinematic((v) => !v)}
+            className="flex items-center gap-2 text-xs text-white mt-1"
+            aria-pressed={skipCinematic}
+          >
+            <span>Bỏ qua video</span>
+            <span
+              className={[
+                "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                skipCinematic ? "bg-[#DD94FF]" : "bg-white/30",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                  skipCinematic ? "translate-x-3.5" : "translate-x-1",
+                ].join(" ")}
+              />
+            </span>
+          </button>
         </div>
       </MobileView>
 
       {/* Video Player */}
       <SummonVideoPlayer isPlaying={isVideoPlaying} onVideoEnd={handleVideoEnd} />
 
-      {/* Guide Dialog */}
+      {/* Dialogs */}
       <WaifuGuideDialog open={isGuideDialogOpen} onOpenChange={setIsGuideDialogOpen} />
-
-      {/* History Dialog */}
       <SummonHistoryDialog
         open={isHistoryDialogOpen}
         onOpenChange={setIsHistoryDialogOpen}
         currentSummons={user?.summonCount}
         bannerId={banner?.id}
       />
-
-      {/* Waifu List Dialog */}
       <WaifuListDialog
         open={isWaifuListDialogOpen}
         onOpenChange={setIsWaifuListDialogOpen}
         banner={banner}
       />
-
-      {/* Device Rotation Warning Dialog */}
       <DeviceRotationWarningDialog />
 
-      {/* Summon Result Overlay */}
+      {/* Kết quả */}
       <SummonResultOverlay
         isVisible={showSummonResult}
         results={summonResult}
         onClose={handleCloseSummonResult}
       />
+
+      {/* Preload video + background + card-back */}
+      <SummonAssetPreloader />
+
+      {/* Loading khi bỏ qua video và đang chờ kết quả */}
+      {isSummoning && skipCinematic && (
+        <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/60">
+          <LoadingSpinner />
+        </div>
+      )}
     </div>
   );
 }

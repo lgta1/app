@@ -15,49 +15,41 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
   const [hasVideoEnded, setHasVideoEnded] = useState(false);
 
   useEffect(() => {
-    if (isPlaying) {
-      setHasVideoEnded(false);
-    }
+    if (isPlaying) setHasVideoEnded(false);
   }, [isPlaying]);
 
-  // Ngăn chặn scroll khi video đang phát
+  // Ngăn scroll khi video đang phát
   useEffect(() => {
-    if (isPlaying) {
-      // Thêm class để ngăn scroll thay vì manipulate styles trực tiếp
-      document.documentElement.classList.add("overflow-hidden");
-      document.body.classList.add("overflow-hidden");
-
-      // Cleanup khi component unmount hoặc video dừng
-      return () => {
-        document.documentElement.classList.remove("overflow-hidden");
-        document.body.classList.remove("overflow-hidden");
-      };
-    }
+    if (!isPlaying) return;
+    document.documentElement.classList.add("overflow-hidden");
+    document.body.classList.add("overflow-hidden");
+    return () => {
+      document.documentElement.classList.remove("overflow-hidden");
+      document.body.classList.remove("overflow-hidden");
+    };
   }, [isPlaying]);
 
   useEffect(() => {
-    if (isPlaying && videoRef) {
-      setIsLoading(true);
-      videoRef.currentTime = 0;
-      videoRef
-        .play()
-        .then(() => setIsLoading(false))
-        .catch((error) => {
-          console.error("Error playing video:", error);
-          setIsLoading(false);
-        });
-    }
+    if (!(isPlaying && videoRef)) return;
+    setIsLoading(true);
+    videoRef.currentTime = 0;
+    videoRef
+      .play()
+      .then(() => setIsLoading(false))
+      .catch((error) => {
+        console.error("Error playing video:", error);
+        setIsLoading(false);
+      });
   }, [isPlaying, videoRef]);
 
   const handleSkipVideo = () => {
-    if (videoRef) {
-      // Seek video đến cuối
-      videoRef.currentTime = videoRef.duration - 0.1; // Trừ 0.1s để trigger onEnded
-    }
+    if (!videoRef) return;
+    videoRef.currentTime = Math.max(0, videoRef.duration - 0.1); // trigger onEnded
   };
 
   const handleVideoEnded = () => {
     setHasVideoEnded(true);
+    setIsLoading(false);
     onVideoEnd();
   };
 
@@ -67,7 +59,7 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
     <div className="fixed inset-0 z-10 flex touch-none items-center justify-center bg-black">
       {/* Skip button - chỉ hiện khi video chưa ended */}
       {!hasVideoEnded && (
-        <div className="absolute top-2 right-2 z-10 lg:top-4 lg:right-4">
+        <div className="absolute right-2 top-2 z-10 lg:right-4 lg:top-4">
           <button
             onClick={handleSkipVideo}
             className="to-lav-500 flex cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-3 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
@@ -79,11 +71,25 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
 
       {/* Hiển thị video hoặc background image */}
       {hasVideoEnded ? (
-        <img
-          src="/videos/background.png"
-          alt="Background"
-          className="h-full w-full object-cover"
-        />
+        // ⬇️ Quan trọng: cho <picture> full màn hình, tránh viền đen
+        <picture className="absolute inset-0 block h-full w-full">
+          {/* Mobile ưu tiên bản nhẹ */}
+          <source
+            media="(max-width: 640px)"
+            type="image/webp"
+            srcSet="/videos/background.mobile.webp"
+          />
+          {/* Desktop WebP */}
+          <source type="image/webp" srcSet="/videos/background.webp" />
+          {/* Fallback PNG */}
+          <img
+            src="/videos/background.png"
+            alt="summon background"
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        </picture>
       ) : (
         <video
           ref={setVideoRef}

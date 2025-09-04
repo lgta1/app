@@ -12,7 +12,11 @@ export function SummonNavigationBar({ navItems }: NavigationBarProps) {
           key={item.id}
           to={item.to}
           className={({ isActive }) =>
-            `${isActive ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
+            `${
+              isActive
+                ? "bg-btn-primary text-txt-inverse"
+                : "bg-bgc-layer-semi-neutral text-txt-primary"
+            } rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
           }
         >
           {item.label}

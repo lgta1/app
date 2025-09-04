@@ -63,10 +63,14 @@ export default function Login() {
       {/* Container chính */}
       <div className="mx-auto mb-10 flex w-full max-w-[402px] flex-col items-center gap-[46px] pt-[104px] md:max-w-[558px] md:gap-6 md:pt-[104px]">
         {/* Logo */}
-        <img src="/images/logo.png" alt="Logo Vinahentai" className="h-[75px] w-[240px]" />
+        <img
+          src="/images/logo.png"
+          alt="Logo Vinahentai"
+          className="h-[75px] w-[240px]"
+        />
 
         {/* Form đăng nhập */}
-        <div className="border-bd-default bg-bgc-layer1 flex h-[444px] w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4 md:max-h-[450px] md:min-h-[376px]">
+        <div className="border-bd-default bg-bgc-layer1 flex w-full flex-col items-center gap-6 overflow-y-auto rounded-xl border p-4 md:max-h-[450px]">
           {/* Tiêu đề */}
           <div className="flex w-full flex-col gap-[11px]">
             <h1 className="sr-only">

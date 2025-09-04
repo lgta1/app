@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CircleArrowOutUpRight, SkipForward } from "lucide-react";
 
 import { SummonCard } from "./summon-card";
+import "../styles/summon.css"; // desktop auto-fit & mobile styles
 
 interface SummonItem {
   type: "waifu";
@@ -33,6 +34,23 @@ export function SummonResultOverlay({
     }
   }, [isVisible, results]);
 
+  // Phát hiện F11 (fullscreen) để đổi cách canh dọc
+  useEffect(() => {
+    const updateFS = () => {
+      const fs =
+        Math.abs(window.innerHeight - screen.availHeight) <= 2 &&
+        Math.abs(window.innerWidth - screen.availWidth) <= 2;
+      document.body.setAttribute("data-fs", fs ? "1" : "0");
+    };
+    updateFS();
+    window.addEventListener("resize", updateFS);
+    window.addEventListener("fullscreenchange", updateFS);
+    return () => {
+      window.removeEventListener("resize", updateFS);
+      window.removeEventListener("fullscreenchange", updateFS);
+    };
+  }, []);
+
   if (!isVisible || results.length === 0) {
     return null;
   }
@@ -43,10 +61,7 @@ export function SummonResultOverlay({
 
   const handleRevealAll = () => {
     setForceRevealAll(true);
-    // Reset after a delay to allow for next usage
-    setTimeout(() => {
-      setForceRevealAll(false);
-    }, 1000);
+    setTimeout(() => setForceRevealAll(false), 1000);
   };
 
   const allCardsRevealed = revealedCards.size === results.length;
@@ -70,40 +85,108 @@ export function SummonResultOverlay({
     const firstRow = results.slice(0, 5);
     const secondRow = results.slice(5, 10);
 
+    // === MOBILE (3–4–3) + DESKTOP (5+5) ===
     return (
-      <div className="relative z-10 flex w-full max-w-7xl flex-col items-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
-        {/* First row */}
-        <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
-          {firstRow.map((item, index) => (
-            <SummonCard
-              key={index}
-              item={item}
-              index={index}
-              size="medium"
-              isRevealed={revealedCards.has(index)}
-              onReveal={handleCardReveal}
-              forceReveal={forceRevealAll}
-              dropDelay={index * 150}
-            />
-          ))}
+      <>
+        {/* ===== MOBILE (3–4–3) ===== */}
+        <div className="sm:hidden relative z-10">
+          {/* Hàng 1: 3 thẻ */}
+          <div className="flex items-center justify-center gap-3 mb-3">
+            {results.slice(0, 3).map((item, index) => (
+              <SummonCard
+                key={index}
+                item={item}
+                index={index}
+                size="medium"
+                isRevealed={revealedCards.has(index)}
+                onReveal={handleCardReveal}
+                forceReveal={forceRevealAll}
+                dropDelay={index * 120}
+              />
+            ))}
+          </div>
+
+          {/* Hàng 2: 4 thẻ */}
+          <div className="flex items-center justify-center gap-3 mb-3">
+            {results.slice(3, 7).map((item, i) => {
+              const index = 3 + i;
+              return (
+                <SummonCard
+                  key={index}
+                  item={item}
+                  index={index}
+                  size="medium"
+                  isRevealed={revealedCards.has(index)}
+                  onReveal={handleCardReveal}
+                  forceReveal={forceRevealAll}
+                  dropDelay={index * 120}
+                />
+              );
+            })}
+          </div>
+
+          {/* Hàng 3: 3 thẻ */}
+          <div className="flex items-center justify-center gap-3">
+            {results.slice(7, 10).map((item, i) => {
+              const index = 7 + i;
+              return (
+                <SummonCard
+                  key={index}
+                  item={item}
+                  index={index}
+                  size="medium"
+                  isRevealed={revealedCards.has(index)}
+                  onReveal={handleCardReveal}
+                  forceReveal={forceRevealAll}
+                  dropDelay={index * 120}
+                />
+              );
+            })}
+          </div>
         </div>
 
-        {/* Second row */}
-        <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
-          {secondRow.map((item, index) => (
-            <SummonCard
-              key={index + 5}
-              item={item}
-              index={index + 5}
-              size="medium"
-              isRevealed={revealedCards.has(index + 5)}
-              onReveal={handleCardReveal}
-              forceReveal={forceRevealAll}
-              dropDelay={(index + 5) * 150}
-            />
-          ))}
+        {/* ===== DESKTOP (5+5, auto-fit) ===== */}
+        <div className="hidden sm:block summon-desktop-fit-wrap">
+          <div className="summon-desktop-fit">
+            <div className="relative z-10 flex w-full max-w-7xl flex-col items-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+              {/* First row */}
+              <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+                {firstRow.map((item, index) => (
+                  <SummonCard
+                    key={index}
+                    item={item}
+                    index={index}
+                    size="medium"
+                    isRevealed={revealedCards.has(index)}
+                    onReveal={handleCardReveal}
+                    forceReveal={forceRevealAll}
+                    dropDelay={index * 150}
+                  />
+                ))}
+              </div>
+
+              {/* Second row */}
+              <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+                {secondRow.map((item, index) => {
+                  const idx = index + 5;
+                  return (
+                    <SummonCard
+                      key={idx}
+                      item={item}
+                      index={idx}
+                      size="medium"
+                      isRevealed={revealedCards.has(idx)}
+                      onReveal={handleCardReveal}
+                      forceReveal={forceRevealAll}
+                      dropDelay={idx * 150}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </>
     );
   };
 

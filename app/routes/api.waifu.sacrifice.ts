@@ -124,31 +124,42 @@ export async function action({ request }: ActionFunctionArgs) {
     // Thực hiện hiến tế
     const waifuIdsToDelete = waifusToSacrifice.map((w) => w._id);
 
-    // Xóa waifu và cập nhật user trong transaction
-    const [, updatedUser] = await Promise.all([
-      UserWaifuModel.deleteMany({ _id: { $in: waifuIdsToDelete } }),
-      UserModel.findByIdAndUpdate(user.id, {
-        $inc: {
-          exp: totalExp,
-          gold: -totalGoldCost,
-        },
-      }).lean(),
-    ]);
+    // Tính toán exp và level trước khi cập nhật database
+    const { newExp, newLevel, didLevelUp } = updateUserExp(
+      currentUser as UserType,
+      totalExp,
+    );
 
-    // Kiểm tra level up và cập nhật session
+    // Xóa waifu và cập nhật user
+    await UserWaifuModel.deleteMany({ _id: { $in: waifuIdsToDelete } });
+
     let updatedSession = null;
-    if (updatedUser) {
-      const { newLevel } = updateUserExp(updatedUser as UserType, totalExp);
+    if (didLevelUp) {
+      // Nếu level up, cập nhật exp (reset), level và trừ gold
+      await UserModel.updateOne(
+        { _id: user.id },
+        {
+          $set: { exp: newExp, level: newLevel },
+          $inc: { gold: -totalGoldCost },
+        },
+      );
 
-      if (updatedUser.level && newLevel > updatedUser.level) {
-        await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
-
-        // Cập nhật session khi level thay đổi
-        const session = await getUserSession(request);
-        const updatedUserData = { ...user, level: newLevel };
-        setUserDataToSession(session, updatedUserData);
-        updatedSession = session;
-      }
+      // Cập nhật session khi level thay đổi
+      const session = await getUserSession(request);
+      const updatedUserData = { ...user, level: newLevel, exp: newExp };
+      setUserDataToSession(session, updatedUserData);
+      updatedSession = session;
+    } else {
+      // Nếu không level up, chỉ tăng exp và trừ gold
+      await UserModel.updateOne(
+        { _id: user.id },
+        {
+          $inc: {
+            exp: totalExp,
+            gold: -totalGoldCost,
+          },
+        },
+      );
     }
 
     const response = {

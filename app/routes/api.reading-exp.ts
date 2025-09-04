@@ -155,22 +155,36 @@ export async function action({ request }: ActionFunctionArgs) {
         { upsert: true, new: true },
       );
 
-      const userFull = await UserModel.findOneAndUpdate(
-        { _id: user.id },
-        { $inc: { exp: expToGain } },
-      ).lean();
+      // Lấy thông tin user hiện tại trước khi update
+      const currentUser = await UserModel.findById(user.id).lean();
+      if (!currentUser) {
+        return Response.json(
+          { success: false, error: "Không tìm thấy thông tin người dùng" },
+          { status: 404 },
+        );
+      }
 
-      const { newLevel } = updateUserExp(userFull as UserType, expToGain);
+      const { newExp, newLevel, didLevelUp } = updateUserExp(
+        currentUser as UserType,
+        expToGain,
+      );
 
       let updatedSession = null;
-      if (userFull?.level && newLevel > userFull?.level) {
-        await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+      if (didLevelUp) {
+        // Nếu level up, cập nhật cả exp và level
+        await UserModel.updateOne(
+          { _id: user.id },
+          { $set: { exp: newExp, level: newLevel } },
+        );
 
         // Cập nhật session khi level thay đổi
         const session = await getUserSession(request);
-        const updatedUser = { ...user, level: newLevel };
+        const updatedUser = { ...user, level: newLevel, exp: newExp };
         setUserDataToSession(session, updatedUser);
         updatedSession = session;
+      } else {
+        // Nếu không level up, chỉ tăng exp
+        await UserModel.updateOne({ _id: user.id }, { $inc: { exp: expToGain } });
       }
 
       const remainingExp = Math.max(0, 100 - updatedExp.totalExp);

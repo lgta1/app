@@ -1,3 +1,4 @@
+import WaifuMeta from "~/components/common/WaifuMeta";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
@@ -56,20 +57,27 @@ interface ReplyVisibilityState {
 }
 
 // Helper function to format comment content with reply highlighting
-const formatCommentContent = (content: string) => {
-  const replyPattern = /^Tráº£ lá»i (.+?):/;
-  const match = content.match(replyPattern);
+const formatCommentContent = (raw: string) => {
+  if (!raw) return raw;
 
-  if (match) {
-    const replyText = match[0];
-    const restContent = content.slice(replyText.length).trim();
+  // B? kho?ng tr?ng/ xu?ng dòng d?u chu?i d? tránh l?ch match
+  const content = raw.replace(/^\s+/, "");
 
-    return (
-      <>
-        <span className="text-txt-focus font-medium">{replyText}</span>
-        {restContent && <span> {restContent}</span>}
-      </>
-    );
+  const PREFIX = "Tr? l?i ";
+  if (content.startsWith(PREFIX)) {
+    const colonIdx = content.indexOf(":");
+    // ph?i có d?u ":" và sau "Tr? l?i "
+    if (colonIdx > PREFIX.length) {
+      const name = content.slice(PREFIX.length, colonIdx).trim();
+      const rest = content.slice(colonIdx + 1).trim(); // ph?n sau d?u ":"
+
+      return (
+        <span className="text-txt-primary">
+          <span className="font-semibold">{name}</span>
+          {rest ? ` ${rest}` : ""}
+        </span>
+      );
+    }
   }
 
   return content;
@@ -563,7 +571,7 @@ export default function CommentDetail({
         {/* Comment Card */}
         <div className="bg-bgc-layer1 border-bd-default flex flex-col items-start justify-start self-stretch overflow-hidden rounded-lg border">
           {/* Comment Header */}
-          <div className="bg-bgc-layer2 border-bd-default flex flex-col items-start justify-start gap-1.5 self-stretch overflow-hidden border-b p-3">
+          <div className="bg-bgc-layer2 border-bd-default flex flex-col items-start justify-start gap-1.5 self-stretch overflow-hidden border-b px-3 py-1">
             <div className="flex items-center justify-between self-stretch">
               <div className="flex items-center justify-start gap-2">
                 <div className="text-txt-primary font-sans text-sm leading-tight font-medium">
@@ -574,6 +582,8 @@ export default function CommentDetail({
                   src={getTitleImgPath(reply.userId)}
                   alt="User badge"
                 />
+                {/* Waifu badge for reply */}
+                <WaifuMeta filename={(reply as any)?.userId?.waifuFilename ?? null} height={32} />
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -754,7 +764,7 @@ export default function CommentDetail({
                     {/* Comment Card */}
                     <div className="bg-bgc-layer1 border-bd-default flex flex-col items-start justify-start self-stretch overflow-hidden rounded-lg border">
                       {/* Comment Header */}
-                      <div className="bg-bgc-layer2 border-bd-default flex flex-col items-start justify-start gap-1.5 self-stretch overflow-hidden border-b p-3">
+                      <div className="bg-bgc-layer2 border-bd-default flex flex-col items-start justify-start gap-1.5 self-stretch overflow-hidden border-b px-3 py-1">
                         <div className="flex items-center justify-between self-stretch">
                           <div className="flex items-center justify-start gap-2">
                             <div className="text-txt-primary font-sans text-sm leading-tight font-medium">
@@ -765,6 +775,8 @@ export default function CommentDetail({
                               src={getTitleImgPath(comment.userId)}
                               alt="User badge"
                             />
+                            {/* Waifu badge for top-level comment */}
+                            <WaifuMeta filename={(comment as any)?.userId?.waifuFilename ?? null} height={40} />
                           </div>
                           <div className="flex items-center gap-2">
                             <button

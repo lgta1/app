@@ -44,24 +44,35 @@ const processMilestoneReward = async (
     itemStar = 5;
   }
 
-  const userFull = await UserModel.findOneAndUpdate(
-    { _id: user.id },
-    { $inc: { gold, exp } },
-    { new: true },
-  ).lean();
-
-  const { newLevel } = updateUserExp(userFull as UserType, exp);
-
-  if (userFull?.level && newLevel > userFull?.level) {
-    await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+  // Lấy thông tin user hiện tại trước khi update
+  const currentUser = await UserModel.findById(user.id).lean();
+  if (!currentUser) {
+    throw new BusinessError("Không tìm thấy thông tin người dùng");
   }
 
+  const { newExp, newLevel, didLevelUp } = updateUserExp(currentUser as UserType, exp);
+
   let updatedSession = null;
-  if (request) {
-    const session = await getUserSession(request);
-    const updatedUser = { ...user, level: newLevel };
-    setUserDataToSession(session, updatedUser);
-    updatedSession = session;
+  if (didLevelUp) {
+    // Nếu level up, cập nhật exp (reset), level và tăng gold
+    await UserModel.updateOne(
+      { _id: user.id },
+      {
+        $set: { exp: newExp, level: newLevel },
+        $inc: { gold },
+      },
+    );
+
+    // Cập nhật session khi level thay đổi
+    if (request) {
+      const session = await getUserSession(request);
+      const updatedUser = { ...user, level: newLevel, exp: newExp };
+      setUserDataToSession(session, updatedUser);
+      updatedSession = session;
+    }
+  } else {
+    // Nếu không level up, chỉ tăng exp và gold
+    await UserModel.updateOne({ _id: user.id }, { $inc: { gold, exp } });
   }
 
   return { itemStar, updatedSession };
@@ -105,23 +116,34 @@ export const summon = async (
   if (itemStar < 3) {
     const expValue = getExpValue(itemStar);
 
-    const userFull = await UserModel.findOneAndUpdate(
-      { _id: user.id },
-      { $inc: { exp: expValue } },
-    ).lean();
+    // Lấy thông tin user hiện tại trước khi update
+    const currentUserForExp = await UserModel.findById(user.id).lean();
+    if (!currentUserForExp) {
+      throw new BusinessError("Không tìm thấy thông tin người dùng");
+    }
 
-    const { newLevel } = updateUserExp(userFull as UserType, expValue);
+    const { newExp, newLevel, didLevelUp } = updateUserExp(
+      currentUserForExp as UserType,
+      expValue,
+    );
 
-    if (userFull?.level && newLevel > userFull?.level) {
-      await UserModel.updateOne({ _id: user.id }, { $set: { level: newLevel } });
+    if (didLevelUp) {
+      // Nếu level up, cập nhật exp (reset) và level
+      await UserModel.updateOne(
+        { _id: user.id },
+        { $set: { exp: newExp, level: newLevel } },
+      );
 
       // Cập nhật session nếu có request
       if (request) {
         const session = await getUserSession(request);
-        const updatedUser = { ...user, level: newLevel };
+        const updatedUser = { ...user, level: newLevel, exp: newExp };
         setUserDataToSession(session, updatedUser);
         updatedSession = session;
       }
+    } else {
+      // Nếu không level up, chỉ tăng exp
+      await UserModel.updateOne({ _id: user.id }, { $inc: { exp: expValue } });
     }
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();

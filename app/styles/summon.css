@@ -1,0 +1,22 @@
+/* === Desktop: auto-fit + hành vi theo F11 === */
+@media (min-width: 1024px) {
+  .summon-desktop-fit-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;   /* m?c d?nh: c?a s? thu?ng ? d?y xu?ng */
+    min-height: 100vh;
+    overflow: hidden;
+    padding-top: 14vh;          /* kho?ng th?t xu?ng, ch?nh 6–10vh theo m?t */
+  }
+
+  .summon-desktop-fit {
+    transform: scale(0.85);
+    transform-origin: top center;
+  }
+
+  /* F11: d?t t? JS (body[data-fs="1"]) ? canh gi?a d?p */
+  body[data-fs="1"] .summon-desktop-fit-wrap {
+    align-items: center;
+    padding-top: 0;
+  }
+}

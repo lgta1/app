@@ -25,7 +25,7 @@ export const getComments = async (
 
   // Get parent comments with pagination
   const comments = await CommentModel.find(filter)
-    .populate("userId", "name avatar gender level faction")
+    .populate("userId", "name avatar gender level faction waifuFilename")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
@@ -53,7 +53,7 @@ export const getComments = async (
 // Function để lấy replies cho một parent comment cụ thể
 export const getReplies = async (parentId: string) => {
   const replies = await CommentModel.find({ parentId })
-    .populate("userId", "name avatar gender level faction")
+    .populate("userId", "name avatar gender level faction waifuFilename")
     .sort({ createdAt: 1 }) // Sort theo thời gian tạo tăng dần cho replies
     .lean();
 
@@ -63,7 +63,7 @@ export const getReplies = async (parentId: string) => {
 // Function để lấy comment với replies (dùng khi cần load cả parent và replies)
 export const getCommentWithReplies = async (commentId: string) => {
   const comment = await CommentModel.findById(commentId)
-    .populate("userId", "name avatar gender level faction")
+    .populate("userId", "name avatar gender level faction waifuFilename")
     .lean();
 
   if (!comment) {
@@ -81,7 +81,7 @@ export const getCommentWithReplies = async (commentId: string) => {
 
 export const getCommentById = async (commentId: string) => {
   return await CommentModel.findById(commentId)
-    .populate("userId", "name avatar gender level faction")
+    .populate("userId", "name avatar gender level faction waifuFilename")
     .populate("mangaId", "title")
     .populate("postId", "title")
     .lean();

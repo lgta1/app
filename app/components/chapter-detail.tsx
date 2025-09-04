@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "react-hot-toast";
-import { useFetcher, useSearchParams } from "react-router";
+import { useFetcher, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import ReportDialog from "./dialog-report";

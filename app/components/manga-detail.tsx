@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Copy, Eye, Heart, MessageCircle, Star, StarOff } from "lucide-react";
 
 import { MANGA_USER_STATUS } from "~/constants/manga";
