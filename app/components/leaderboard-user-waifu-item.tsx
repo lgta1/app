@@ -1,5 +1,5 @@
 import { isMobile } from "react-device-detect";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 
 import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { getTitleImgPath } from "~/helpers/user.helper";

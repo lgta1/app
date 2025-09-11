@@ -77,8 +77,8 @@ export function SummonCard({
         shouldAnimate && isHovering && !localIsRevealed && !isFlipping
           ? "animate-card-hover"
           : shouldAnimate && !localIsRevealed && !isFlipping
-          ? "animate-card-idle"
-          : ""
+            ? "animate-card-idle"
+            : ""
       }`}
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovering(true)}

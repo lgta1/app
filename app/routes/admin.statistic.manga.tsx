@@ -1,4 +1,4 @@
-import { type MetaFunction, NavLink, useLoaderData } from "react-router";
+import { type MetaFunction, NavLink, useLoaderData } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { BookOpen, Eye, Users } from "lucide-react";
 

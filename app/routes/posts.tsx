@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { ChevronDown, Eye, Heart, MessageCircle, Search } from "lucide-react";
 
 import { Pagination } from "~/components/pagination";

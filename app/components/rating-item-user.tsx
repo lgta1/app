@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 
 import type { UserType } from "~/database/models/user.model";
 import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";

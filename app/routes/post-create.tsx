@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Form, useNavigate } from "react-router";
+import { Form, useNavigate } from "react-router-dom";
 import { FileText, MessageSquare, Plus, Tag, Upload, X } from "lucide-react";
 
 import { useFileOperations } from "~/hooks/use-file-operations";

@@ -5,8 +5,8 @@ import {
   type ClientActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
-} from "react-router";
-import { Form, useActionData } from "react-router";
+} from "react-router-dom";
+import { Form, useActionData } from "react-router-dom";
 
 import { generateSalt, hashPassword, requireLogin } from "@/services/auth.server";
 

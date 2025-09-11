@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import * as Popover from "@radix-ui/react-popover";
 
 import type { MangaType } from "~/database/models/manga.model";

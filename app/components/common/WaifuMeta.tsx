@@ -1,8 +1,8 @@
 // app/components/common/WaifuMeta.tsx
 type WaifuMetaProps = {
-  /** Tên file ?nh tinh dã luu trong DB */
+  /** Tï¿½n file ?nh tinh dï¿½ luu trong DB */
   filename?: string | null;
-  /** Chi?u cao ?nh (px). Ví d?: 40 cho top-level, 32 cho reply */
+  /** Chi?u cao ?nh (px). Vï¿½ d?: 40 cho top-level, 32 cho reply */
   height?: number;
 };
 
@@ -12,7 +12,7 @@ export default function WaifuMeta({ filename, height = 28 }: WaifuMetaProps) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 leading-none align-middle text-[12px] text-txt-secondary"
+      className="text-txt-secondary inline-flex items-center gap-1 align-middle text-[12px] leading-none"
       style={{ height }}
     >
       <span className="text-txt-secondary/70">|</span>

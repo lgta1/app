@@ -1,0 +1,10 @@
+app/components/footer.tsx
+app/components/header-genres.tsx
+app/components/manga-detail.tsx
+app/constants/header.ts
+app/routes/_index.tsx
+app/routes/admin.manga._index.tsx
+app/routes/genres.$slug.tsx
+app/routes/manga.create.tsx
+app/routes/manga.edit.$id.tsx
+app/routes/manga.preview.$id.tsx

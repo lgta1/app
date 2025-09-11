@@ -11,6 +11,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
     label: "Trang chủ",
     href: "/",
+    mobile: true, // 👈 thêm dòng này để hiển thị trên mobile
   },
   {
     label: "Thể loại",

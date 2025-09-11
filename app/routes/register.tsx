@@ -7,7 +7,7 @@ import {
   useActionData,
   useNavigation,
   useSubmit,
-} from "react-router";
+} from "react-router-dom";
 
 import { register } from "@/services/auth.server";
 import { getUserInfoFromSession } from "@/services/session.svc";

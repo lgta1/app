@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { useFetcher } from "react-router";
+import { useFetcher } from "react-router-dom";
 
 import { useFileOperations } from "~/hooks/use-file-operations";
 

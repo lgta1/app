@@ -1,7 +1,7 @@
 // app/components/common/WaifuMeta.tsx
 
 type WaifuMetaProps = {
-  /** Tên file ?nh tinh dã luu trong DB, ví d?:
+  /** Tï¿½n file ?nh tinh dï¿½ luu trong DB, vï¿½ d?:
    *  "mitsuri vinahentai.com-1756571970280-47bb08f5.webp"
    */
   filename?: string | null;
@@ -14,12 +14,12 @@ export default function WaifuMeta({ filename }: WaifuMetaProps) {
   const url = `/images/waifu/${encodeURIComponent(filename)}`;
 
   return (
-    <span className="inline-flex items-center gap-1 h-7 leading-none align-middle text-[12px] text-txt-secondary">
+    <span className="text-txt-secondary inline-flex h-7 items-center gap-1 align-middle text-[12px] leading-none">
       <span className="text-txt-secondary/70">|</span>
       <span>Waifu:</span>
 
       {/* Mobile: nh? */}
-      <span className="sm:hidden inline-flex items-center h-6">
+      <span className="inline-flex h-6 items-center sm:hidden">
         <img
           src={url}
           alt="Waifu"
@@ -32,7 +32,7 @@ export default function WaifuMeta({ filename }: WaifuMetaProps) {
       </span>
 
       {/* Desktop: l?n hon */}
-      <span className="hidden sm:inline-flex items-center h-6">
+      <span className="hidden h-6 items-center sm:inline-flex">
         <img
           src={url}
           alt="Waifu"

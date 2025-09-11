@@ -1,4 +1,4 @@
-import { NavLink } from "react-router";
+import { NavLink } from "react-router-dom";
 
 interface NavigationBarProps {
   navItems: Array<{ label: string; to: string; id: string }>;

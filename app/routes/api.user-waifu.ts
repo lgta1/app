@@ -1,6 +1,7 @@
 // app/routes/api.user-waifu.ts
-import { UserModel } from "~/database/models/user.model";
 import mongoose from "mongoose";
+
+import { UserModel } from "~/database/models/user.model";
 
 // POST /api/user-waifu
 export async function action({ request }: { request: Request }) {
@@ -17,7 +18,7 @@ export async function action({ request }: { request: Request }) {
       });
     }
 
-    // Validate ObjectId d? tránh CastError ? 500
+    // Validate ObjectId d? trï¿½nh CastError ? 500
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return new Response(JSON.stringify({ error: "Invalid userId format" }), {
         status: 400,
@@ -28,7 +29,7 @@ export async function action({ request }: { request: Request }) {
     const updated = await UserModel.findByIdAndUpdate(
       userId,
       { waifuFilename: filename },
-      { new: true }
+      { new: true },
     );
 
     if (!updated) {
@@ -38,10 +39,17 @@ export async function action({ request }: { request: Request }) {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, userId: updated.id, waifuFilename: updated.waifuFilename }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        userId: updated.id,
+        waifuFilename: updated.waifuFilename,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (err) {
     console.error("[POST /api/user-waifu] error:", err);
     return new Response(JSON.stringify({ error: "Internal Error" }), {

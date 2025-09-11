@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { useFetcher } from "react-router";
+import { useFetcher } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 
 import { CHAPTER_STATUS } from "~/constants/chapter";

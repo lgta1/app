@@ -1,0 +1,2 @@
+app/components/header.tsx:3:import { HeaderGenres } from "./header-genres";
+app/components/header.tsx:5:import { MobileMenuPublic } from "./mobile-menu-public";

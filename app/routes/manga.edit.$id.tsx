@@ -1,4 +1,5 @@
-import { useState } from "react";
+// app/routes/manga.edit.$id.tsx
+import { useMemo, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import {
@@ -26,7 +27,6 @@ import { requireLogin } from "@/services/auth.server";
 
 import { Dropdown } from "~/components/dropdown";
 import { ImageUploader } from "~/components/image-uploader";
-import { GENRE_CATEGORY } from "~/constants/genres";
 import { MANGA_USER_STATUS } from "~/constants/manga";
 import type { GenresType } from "~/database/models/genres.model";
 import type { MangaType } from "~/database/models/manga.model";
@@ -59,7 +59,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
-    const userInfo = await requireLogin(request);
+    await requireLogin(request);
     const formData = await request.formData();
 
     const url = new URL(request.url);
@@ -74,30 +74,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
       genres: JSON.parse(formData.get("genres") as string),
     };
 
-    // Chỉ update poster nếu có upload ảnh mới
     const posterUrl = formData.get("posterUrl");
-    if (posterUrl) {
-      mangaData.poster = posterUrl as string;
-    }
+    if (posterUrl) mangaData.poster = posterUrl as string;
 
     await updateManga(request, params.id || "", mangaData);
 
-    if (newParam === "true") {
-      return redirect(`/manga/chapter/create/${params.id}`);
-    }
-
+    if (newParam === "true") return redirect(`/manga/chapter/create/${params.id}`);
     return redirect(`/manga/preview/${params.id}`);
   } catch (error) {
     if (error instanceof BusinessError) {
-      return {
-        success: false,
-        error: { message: error.message },
-      };
+      return { success: false, error: { message: error.message } };
     }
-    return {
-      success: false,
-      error: { message: "Có lỗi xảy ra, vui lòng thử lại" },
-    };
+    return { success: false, error: { message: "Có lỗi xảy ra, vui lòng thử lại" } };
   }
 }
 
@@ -122,12 +110,13 @@ export default function EditStory() {
 
   const { genres, manga } = useLoaderData<typeof loader>();
 
+  // ⚠️ Sửa lỗi key: dùng manga.userStatus thay vì manga.status
   const [formData, setFormData] = useState<FormData>({
     title: manga.title,
     description: manga.description,
     author: manga.author,
     keywords: manga.keywords || "",
-    userStatus: manga.status,
+    userStatus: (manga as any).userStatus ?? MANGA_USER_STATUS.ON_GOING, // fallback an toàn
     genres: manga.genres,
     poster: null,
   });
@@ -142,18 +131,30 @@ export default function EditStory() {
     navigation.state === "submitting" || fetcher.state === "submitting";
   const { uploadMultipleFiles } = useFileOperations();
 
-  // Phân loại genres theo category
-  const popularGenres = genres.filter(
-    (genre: GenresType) => genre.category === GENRE_CATEGORY.MOST_VIEWED,
-  );
+  // ====== THỂ LOẠI: phẳng, A→Z (KHÔNG pin Oneshot), loại trùng theo slug ======
+  const fold = (s: string) =>
+    (s || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
 
-  const otherGenres = genres.filter(
-    (genre: GenresType) => genre.category === GENRE_CATEGORY.OTHER,
-  );
-
-  const hardcoreGenres = genres.filter(
-    (genre: GenresType) => genre.category === GENRE_CATEGORY.HARDCORE,
-  );
+  const sortedGenres: GenresType[] = useMemo(() => {
+    const list = Array.isArray(genres) ? (genres as GenresType[]).slice() : [];
+    const uniq = new Map<string, GenresType>();
+    for (const g of list) {
+      if (!g?.slug || !g?.name) continue;
+      if (!uniq.has(g.slug)) uniq.set(g.slug, g);
+    }
+    return Array.from(uniq.values()).sort((a, b) => {
+      const aa = fold(a.name);
+      const bb = fold(b.name);
+      if (aa < bb) return -1;
+      if (aa > bb) return 1;
+      return 0;
+    });
+  }, [genres]);
 
   const handleGenreToggle = (genreSlug: string) => {
     setFormData((prev) => ({
@@ -175,9 +176,7 @@ export default function EditStory() {
   const handleFileSelect = (file: File) => {
     setFormData((prev) => ({ ...prev, poster: file }));
     const reader = new FileReader();
-    reader.onload = (event) => {
-      setPosterPreview(event.target?.result as string);
-    };
+    reader.onload = (event) => setPosterPreview(event.target?.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -192,10 +191,7 @@ export default function EditStory() {
     try {
       if (formData.poster) {
         [posterData] = await uploadMultipleFiles([
-          {
-            file: formData.poster,
-            options: { prefixPath: "story-images" },
-          },
+          { file: formData.poster, options: { prefixPath: "story-images" } },
         ]);
       }
 
@@ -218,52 +214,53 @@ export default function EditStory() {
     }
   };
 
-  const renderGenreSection = (
-    title: string,
-    genreList: GenresType[],
-    titleColor: string = "text-txt-focus",
-  ) => {
-    if (genreList.length === 0) return null;
-
+  // ====== Render danh sách Thể loại: auto-fit + khung cuộn (không giới hạn số item) ======
+  const renderGenresFlat = (items: GenresType[]) => {
+    if (!items?.length) return null;
     return (
       <div className="flex flex-col gap-4">
-        <h3 className={`${titleColor} font-sans text-base font-semibold`}>{title}</h3>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {genreList.map((genre: GenresType) => (
-            <div key={genre.slug} className="flex items-center gap-2 py-1">
-              <label className="flex cursor-pointer items-center gap-2">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={formData.genres.includes(genre.slug)}
-                    onChange={() => handleGenreToggle(genre.slug)}
-                    className="bg-bgc-layer2 border-bd-default checked:bg-lav-500 checked:border-lav-500 h-4 w-4 cursor-pointer appearance-none rounded border"
-                  />
-                  {formData.genres.includes(genre.slug) && (
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                      <Check className="text-txt-primary h-3 w-3" />
-                    </div>
-                  )}
-                </div>
-                <span className="text-txt-primary font-sans text-xs font-medium">
-                  {genre.name}
-                </span>
-              </label>
-            </div>
-          ))}
+        <h3 className="text-txt-focus font-sans text-base font-semibold">Thể loại</h3>
+
+        <div className="max-h-[360px] overflow-y-auto rounded-lg border border-white/10 p-3 pr-1 [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]">
+          <div className="grid [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))] gap-2">
+            {items.map((genre) => {
+              const checked = formData.genres.includes(genre.slug);
+              return (
+                <label
+                  key={genre.slug}
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 select-none hover:bg-white/5"
+                >
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => handleGenreToggle(genre.slug)}
+                      className="bg-bgc-layer2 border-bd-default checked:bg-lav-500 checked:border-lav-500 h-4 w-4 cursor-pointer appearance-none rounded border"
+                    />
+                    {checked && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <Check className="text-txt-primary h-3 w-3" />
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-txt-primary line-clamp-1 font-sans text-xs font-medium">
+                    {genre.name}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
   };
 
-  // Sử dụng data từ fetcher nếu có, nếu không thì dùng actionData
   const responseData = fetcher.data || actionData;
 
   return (
     <div className="mx-auto flex w-full max-w-[950px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-0">
       <Toaster position="bottom-right" />
 
-      {/* Header */}
       <h1
         className="text-txt-primary font-sans text-2xl leading-9 font-semibold sm:text-3xl"
         style={{ textShadow: "0px 0px 4px rgba(182, 25, 255, 0.59)" }}
@@ -272,9 +269,7 @@ export default function EditStory() {
       </h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        {/* Main Form */}
         <div className="bg-bgc-layer1 border-bd-default flex flex-col gap-6 rounded-xl border p-4 shadow-lg sm:p-6">
-          {/* Error/Success Message */}
           {responseData?.error && (
             <div className="w-full rounded bg-red-500/10 p-3 text-sm font-medium text-red-500">
               {responseData.error.message}
@@ -301,7 +296,7 @@ export default function EditStory() {
             </div>
           </div>
 
-          {/* Thể loại */}
+          {/* Thể loại (phẳng, auto-fit + scroll) */}
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
             <div className="flex min-w-fit items-center gap-1.5 sm:items-start">
               <Tag className="text-txt-secondary mt-0.5 h-4 w-4" />
@@ -310,14 +305,7 @@ export default function EditStory() {
               </label>
             </div>
             <div className="flex w-full flex-col gap-5 sm:w-[680px]">
-              {/* Đọc nhiều nhất */}
-              {renderGenreSection("Đọc nhiều nhất", popularGenres)}
-
-              {/* Thể loại khác */}
-              {renderGenreSection("Thể loại khác", otherGenres)}
-
-              {/* Hardcore */}
-              {renderGenreSection("Hardcore", hardcoreGenres, "text-error-error")}
+              {renderGenresFlat(sortedGenres)}
             </div>
           </div>
 
@@ -350,7 +338,6 @@ export default function EditStory() {
               </label>
             </div>
             <div className="flex w-full flex-row items-start gap-4 sm:w-[680px] sm:gap-9">
-              {/* Upload area */}
               <div className="min-h-64 min-w-44">
                 <ImageUploader
                   onFileSelect={handleFileSelect}
@@ -361,8 +348,6 @@ export default function EditStory() {
                   aspectRatio="poster"
                 />
               </div>
-
-              {/* Upload info */}
               <div className="flex h-64 flex-col justify-center gap-4 p-4">
                 <p className="text-txt-secondary font-sans text-base font-medium">
                   1. Ảnh có tỷ lệ 3:4
@@ -432,7 +417,6 @@ export default function EditStory() {
           </div>
         </div>
 
-        {/* Submit Button */}
         <div className="flex justify-end">
           <button
             type="submit"

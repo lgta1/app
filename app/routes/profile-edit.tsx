@@ -5,8 +5,8 @@ import {
   type ClientActionFunctionArgs,
   type LoaderFunctionArgs,
   useSubmit,
-} from "react-router";
-import { useActionData, useLoaderData, useNavigation } from "react-router";
+} from "react-router-dom";
+import { useActionData, useLoaderData, useNavigation } from "react-router-dom";
 import { Camera, FileText, Mail, User } from "lucide-react";
 
 import { updateUserProfile } from "~/.server/mutations/user.mutation";

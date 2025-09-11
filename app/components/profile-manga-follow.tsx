@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useFetcher } from "react-router";
+import { Link, useFetcher } from "react-router-dom";
 import { Eye, Heart, StarOff } from "lucide-react";
 
 import { WarningActionDialog } from "~/components/dialog-warning-action";

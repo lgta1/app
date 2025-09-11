@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { ClockIcon } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";

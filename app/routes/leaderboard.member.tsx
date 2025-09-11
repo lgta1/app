@@ -1,5 +1,5 @@
-import { type MetaFunction, useLoaderData } from "react-router";
-import { NavLink } from "react-router";
+import { type MetaFunction, useLoaderData } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 import { getTopUser } from "@/queries/user.query";
 
@@ -9,10 +9,10 @@ import type { UserType } from "~/database/models/user.model";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Bảng xếp hạng thành viên | WuxiaWorld" },
+    { title: "Bảng xếp hạng thành viên | VinaHentai" },
     {
       name: "description",
-      content: "Xem bảng xếp hạng thành viên xuất sắc nhất tại WuxiaWorld",
+      content: "Xem bảng xếp hạng thành viên xuất sắc nhất tại VinaHentai",
     },
   ];
 };

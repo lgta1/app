@@ -1,4 +1,3 @@
-import WaifuMeta from "~/components/common/WaifuMeta";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
@@ -16,6 +15,7 @@ import {
 import ReportDialog from "./dialog-report";
 import { Pagination } from "./pagination";
 
+import WaifuMeta from "~/components/common/WaifuMeta";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { REPORT_TYPE } from "~/constants/report";
 import type { CommentType } from "~/database/models/comment.model";
@@ -60,13 +60,13 @@ interface ReplyVisibilityState {
 const formatCommentContent = (raw: string) => {
   if (!raw) return raw;
 
-  // B? kho?ng tr?ng/ xu?ng dòng d?u chu?i d? tránh l?ch match
+  // B? kho?ng tr?ng/ xu?ng dï¿½ng d?u chu?i d? trï¿½nh l?ch match
   const content = raw.replace(/^\s+/, "");
 
   const PREFIX = "Tr? l?i ";
   if (content.startsWith(PREFIX)) {
     const colonIdx = content.indexOf(":");
-    // ph?i có d?u ":" và sau "Tr? l?i "
+    // ph?i cï¿½ d?u ":" vï¿½ sau "Tr? l?i "
     if (colonIdx > PREFIX.length) {
       const name = content.slice(PREFIX.length, colonIdx).trim();
       const rest = content.slice(colonIdx + 1).trim(); // ph?n sau d?u ":"
@@ -583,7 +583,10 @@ export default function CommentDetail({
                   alt="User badge"
                 />
                 {/* Waifu badge for reply */}
-                <WaifuMeta filename={(reply as any)?.userId?.waifuFilename ?? null} height={32} />
+                <WaifuMeta
+                  filename={(reply as any)?.userId?.waifuFilename ?? null}
+                  height={32}
+                />
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -776,7 +779,10 @@ export default function CommentDetail({
                               alt="User badge"
                             />
                             {/* Waifu badge for top-level comment */}
-                            <WaifuMeta filename={(comment as any)?.userId?.waifuFilename ?? null} height={40} />
+                            <WaifuMeta
+                              filename={(comment as any)?.userId?.waifuFilename ?? null}
+                              height={40}
+                            />
                           </div>
                           <div className="flex items-center gap-2">
                             <button

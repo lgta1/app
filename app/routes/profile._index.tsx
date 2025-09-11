@@ -1,5 +1,5 @@
-import { Link, type LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { Link, type LoaderFunctionArgs } from "react-router-dom";
+import { useLoaderData } from "react-router-dom";
 import { Eye } from "lucide-react";
 
 import { requireLogin } from "@/services/auth.server";

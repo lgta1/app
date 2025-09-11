@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Toaster } from "react-hot-toast";
-import type { ActionFunctionArgs } from "react-router";
-import { useActionData, useFetcher, useNavigation } from "react-router";
+import type { ActionFunctionArgs } from "react-router-dom";
+import { useActionData, useFetcher, useNavigation } from "react-router-dom";
 import { FileText, Image, Star, Upload, User, X } from "lucide-react";
 
 import { createWaifu } from "@/mutations/waifu.mutation";

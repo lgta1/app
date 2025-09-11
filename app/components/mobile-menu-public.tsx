@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import * as Popover from "@radix-ui/react-popover";
 import { Menu, X } from "lucide-react";
 

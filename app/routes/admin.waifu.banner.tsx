@@ -7,7 +7,7 @@ import {
   useLoaderData,
   useSearchParams,
   useSubmit,
-} from "react-router";
+} from "react-router-dom";
 import { Plus, Zap } from "lucide-react";
 
 import { deleteBanner, resetSummon } from "@/mutations/banner.mutation";

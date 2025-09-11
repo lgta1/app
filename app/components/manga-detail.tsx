@@ -1,17 +1,49 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
-import { Copy, Eye, Heart, MessageCircle, Star, StarOff } from "lucide-react";
+import { Copy, Eye, Heart, Star, StarOff } from "lucide-react";
 
 import { MANGA_USER_STATUS } from "~/constants/manga";
 import type { ChapterType } from "~/database/models/chapter.model";
 import type { MangaType } from "~/database/models/manga.model";
 import { formatDate, formatTime } from "~/utils/date.utils";
+import { toSlug } from "~/utils/slug.utils"; // dùng để tạo slug
 
 interface MangaDetailProps {
   manga: MangaType;
   chapters: ChapterType[];
 }
+
+/* ===================== BEGIN <feature> CHIP_STYLES_SURFACE_BLEND ===================== */
+/**
+ * Mục tiêu: chip hoà vào nền (dark surface) thay vì tách khối đen.
+ * - surfaceBlend: dùng cho "Người đăng" (ưu tiên nhẹ, không át CTA)
+ * - brandTint: tím trong suốt cho "Tác giả" (nhấn nhận diện)
+ * - outlineSubtle: viền mờ cho "Thể loại" (secondary)
+ * Tất cả đều có border subtle + hover tăng mờ/sáng rất nhẹ để hợp theme.
+ */
+const chipBase =
+  "inline-flex items-center gap-1.5 rounded-full h-8 px-3 text-sm whitespace-nowrap max-w-[180px] truncate select-none transition-colors transition-shadow";
+
+const chipVariants = {
+  /** Hoà nền: bề mặt tối + border subtle + text trắng 90% */
+  surfaceBlend:
+    `${chipBase} bg-white/5 border border-white/8 text-white/90 ` +
+    `hover:bg-white/8 hover:border-white/12 ` +
+    `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/35`,
+
+  /** Tím trong suốt: tạo điểm nhấn nhẹ cho "Tác giả" */
+  brandTint:
+    `${chipBase} bg-[rgba(211,115,255,.10)] border border-[rgba(211,115,255,.22)] text-[#EBD7FF] ` +
+    `hover:bg-[rgba(211,115,255,.14)] hover:border-[rgba(211,115,255,.28)] ` +
+    `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/45`,
+
+  /** Viền mờ: dành cho "Thể loại", không chiếm nổi bật */
+  outlineSubtle:
+    `${chipBase} border border-white/10 text-[#EBD7FF]/90 hover:border-[#D373FF]/35 hover:bg-white/[.04] ` +
+    `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/30`,
+};
+/* ====================== END <feature> CHIP_STYLES_SURFACE_BLEND ====================== */
 
 export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   const {
@@ -30,16 +62,13 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     ownerId,
   } = manga;
 
-  // State để track trạng thái follow
   const [isFollowing, setIsFollowing] = useState(false);
   const [followCount, setFollowCount] = useState(followNumber || 0);
   const [isLoadingFollow, setIsLoadingFollow] = useState(false);
 
-  // State để track trạng thái like
   const [isLiked, setIsLiked] = useState(false);
   const [isLoadingLike, setIsLoadingLike] = useState(false);
 
-  // State để track trạng thái rating
   const [hasRated, setHasRated] = useState(false);
   const [userRating, setUserRating] = useState<number | null>(null);
   const [ratingAverage, setRatingAverage] = useState(manga.ratingAverage || 0);
@@ -47,7 +76,12 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
   const [hoverRating, setHoverRating] = useState(0);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
 
-  // Helper function để lấy text trạng thái
+  // Lấy chương mới nhất để dùng cho "Đọc Chap mới"
+  const latestChapterNumber =
+    chapters && chapters.length
+      ? Math.max(...chapters.map((c) => Number(c.chapterNumber) || 0))
+      : 1;
+
   const getStatusText = (status: number) => {
     switch (status) {
       case MANGA_USER_STATUS.ON_GOING:
@@ -59,7 +93,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     }
   };
 
-  // Helper function để copy mã code
   const handleCopyCode = async () => {
     if (code) {
       try {
@@ -72,16 +105,12 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     }
   };
 
-  // Fetch trạng thái follow và like khi component mount
   useEffect(() => {
     const checkFollowStatus = async () => {
       try {
         const response = await fetch(`/api/manga-follow?mangaId=${id}`);
         const data = await response.json();
-
-        if (response.ok) {
-          setIsFollowing(data.isFollowing);
-        }
+        if (response.ok) setIsFollowing(data.isFollowing);
       } catch (error) {
         console.error("Error checking follow status:", error);
       }
@@ -91,10 +120,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
       try {
         const response = await fetch(`/api/manga-like?mangaId=${id}`);
         const data = await response.json();
-
-        if (response.ok) {
-          setIsLiked(data.isLiked);
-        }
+        if (response.ok) setIsLiked(data.isLiked);
       } catch (error) {
         console.error("Error checking like status:", error);
       }
@@ -104,7 +130,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
       try {
         const response = await fetch(`/api/manga-rating?mangaId=${id}`);
         const data = await response.json();
-
         if (response.ok) {
           setHasRated(data.hasRated);
           setUserRating(data.userRating);
@@ -121,10 +146,8 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     checkRatingStatus();
   }, [id]);
 
-  // Handle follow/unfollow
   const handleFollowToggle = async () => {
     if (isLoadingFollow) return;
-
     setIsLoadingFollow(true);
 
     const formData = new FormData();
@@ -136,9 +159,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
         method: "POST",
         body: formData,
       });
-
       const data = await response.json();
-
       if (response.ok) {
         setIsFollowing(data.isFollowing);
         setFollowCount((prev) => prev + (data.isFollowing ? 1 : -1));
@@ -154,10 +175,8 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     }
   };
 
-  // Handle like/unlike
   const handleLikeToggle = async () => {
     if (isLoadingLike) return;
-
     setIsLoadingLike(true);
 
     const formData = new FormData();
@@ -169,9 +188,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
         method: "POST",
         body: formData,
       });
-
       const data = await response.json();
-
       if (response.ok) {
         setIsLiked(data.isLiked);
         toast.success(data.message);
@@ -186,14 +203,11 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     }
   };
 
-  // Handle rating
   const handleRating = async (rating: number) => {
     if (hasRated || isLoadingRating) return;
-
     const confirmed = window.confirm(
       `Bạn có chắc muốn đánh giá ${rating} sao cho manga này? Bạn sẽ không thể thay đổi sau khi đánh giá.`,
     );
-
     if (!confirmed) return;
 
     setIsLoadingRating(true);
@@ -207,9 +221,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
         method: "POST",
         body: formData,
       });
-
       const data = await response.json();
-
       if (response.ok) {
         setHasRated(true);
         setUserRating(rating);
@@ -243,7 +255,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
               {title}
             </h1>
             <div className="flex items-start gap-3">
-              {/* Sao đánh giá */}
               <div className="flex items-center">
                 {[...Array(5)].map((_, index) => {
                   const starValue = index + 1;
@@ -270,7 +281,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
                   );
                 })}
               </div>
-              {/* Điểm và số đánh giá */}
               <div className="flex items-center gap-2">
                 <span className="text-txt-primary text-base font-medium">
                   {ratingAverage > 0 ? ratingAverage.toFixed(1) : "0.0"}
@@ -283,7 +293,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
             </div>
           </div>
 
-          {/* Đường phân cách */}
           <div className="border-bd-default h-0 border-t" />
 
           {/* Thông tin chi tiết */}
@@ -314,15 +323,38 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
             <div className="text-txt-secondary w-28 text-base font-medium">
               Người đăng:
             </div>
+            {/* BEGIN <feature> UPLOADER_CHIP_SURFACE_BLEND_NO_STRETCH */}
             <Link
               to={`/profile/${ownerId}`}
-              className="text-txt-focus hover:text-txt-primary text-base font-medium transition-colors hover:underline"
+              className={`${chipVariants.surfaceBlend} w-fit justify-self-start`}
+              title={translationTeam}
             >
-              {translationTeam}
+              <span className="capitalize">{String(translationTeam || "")}</span>
             </Link>
+            {/* END <feature> UPLOADER_CHIP_SURFACE_BLEND_NO_STRETCH */}
 
             <div className="text-txt-secondary w-28 text-base font-medium">Tác giả:</div>
-            <div className="text-txt-primary text-base font-medium">{author}</div>
+            {/* BEGIN <feature> AUTHORS_CHIP_BRAND_TINT_NO_STRETCH */}
+            <div className="flex flex-wrap gap-2 justify-self-start">
+              {String(author || "")
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((name) => {
+                  const slug = toSlug(name);
+                  return (
+                    <Link
+                      key={slug}
+                      to={`/authors/${slug}`}
+                      className={chipVariants.brandTint + " w-fit"}
+                      title={name}
+                    >
+                      <span className="capitalize">{name}</span>
+                    </Link>
+                  );
+                })}
+            </div>
+            {/* END <feature> AUTHORS_CHIP_BRAND_TINT_NO_STRETCH */}
 
             <div className="text-txt-secondary w-28 text-base font-medium">Cập nhật:</div>
             <div className="flex items-start gap-2">
@@ -335,9 +367,27 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
             </div>
 
             <div className="text-txt-secondary w-28 text-base font-medium">Thể loại:</div>
-            <div className="text-txt-focus text-base font-medium">
-              {genres.join(", ")}
+            {/* BEGIN <feature> GENRES_CHIP_OUTLINE_SUBTLE_NO_STRETCH */}
+            <div className="flex flex-wrap gap-2 justify-self-start">
+              {Array.isArray(genres) && genres.length > 0
+                ? genres.map((g, idx) => {
+                    const label = String(g);
+                    const slug = toSlug(label);
+                    return (
+                      <Link
+                        key={`${slug}-${idx}`}
+                        to={`/genres/${slug}`}
+                        prefetch="intent"
+                        className={chipVariants.outlineSubtle + " w-fit"}
+                        title={label}
+                      >
+                        <span className="capitalize">{label}</span>
+                      </Link>
+                    );
+                  })
+                : null}
             </div>
+            {/* END <feature> GENRES_CHIP_OUTLINE_SUBTLE_NO_STRETCH */}
 
             <div className="text-txt-secondary w-28 text-base font-medium">Lượt xem:</div>
             <div className="text-txt-primary text-base font-medium">
@@ -354,7 +404,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
 
           {/* Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-            {/* Nút Yêu thích */}
             <button
               onClick={handleLikeToggle}
               disabled={isLoadingLike}
@@ -368,7 +417,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
               </span>
             </button>
 
-            {/* Nút Theo dõi  */}
             <button
               onClick={handleFollowToggle}
               disabled={isLoadingFollow}
@@ -384,7 +432,6 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
               </span>
             </button>
 
-            {/* Nút Đọc từ đầu */}
             <Link
               to={`/manga/chapter/${id}?chapterNumber=1`}
               className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer justify-center rounded-xl border px-4 py-3 transition-colors"
@@ -392,9 +439,9 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
               <span className="text-sm font-medium">Đọc từ đầu</span>
             </Link>
 
-            {/* Nút Đọc Chap mới */}
+            {/* luôn trỏ tới chương mới nhất */}
             <Link
-              to={`/manga/chapter/${id}?chapterNumber=${manga.chapters}`}
+              to={`/manga/chapter/${id}?chapterNumber=${latestChapterNumber}`}
               className="flex min-w-32 cursor-pointer justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
             >
               <span className="text-sm font-semibold">Đọc Chap mới</span>
@@ -405,9 +452,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
 
       {/* Phần nội dung */}
       <div className="mt-8 flex flex-col gap-6">
-        {/* Tiêu đề nội dung */}
         <div className="border-bd-default flex items-center gap-3 border-b pb-3">
-          {/* Icon trang trí */}
           <div className="relative h-[15px] w-[15px]">
             <img
               src="/images/icons/multi-star.svg"
@@ -415,10 +460,8 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
               className="absolute top-0 left-[4.62px] h-4"
             />
           </div>
-          <h2 className="text-txt-primary text-xl font-semibold uppercase">NỘI DUNG</h2>
         </div>
 
-        {/* Nội dung mô tả */}
         <div className="text-txt-primary text-base leading-normal font-medium">
           {description.split("\n").map((paragraph, index) => (
             <p key={index} className={index > 0 ? "mt-4" : ""}>
@@ -430,9 +473,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
 
       {/* Danh sách chapter */}
       <div className="mt-8 flex flex-col gap-6">
-        {/* Header danh sách chương */}
         <div className="border-bd-default flex items-center gap-3 border-b pb-3">
-          {/* Icons trang trí */}
           <div className="relative h-[15px] w-[15px]">
             <img
               src="/images/icons/multi-star.svg"
@@ -445,50 +486,22 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
           </h2>
         </div>
 
-        {/* Container danh sách */}
         <div className="flex max-h-[304px] flex-col gap-2 overflow-y-auto rounded-lg md:max-h-[400px] lg:max-h-[492px]">
           {chapters.map((chapter) => (
             <Link
               to={`/manga/chapter/${id}?chapterNumber=${chapter.chapterNumber}`}
               key={chapter.id}
-              className="bg-bgc-layer2 border-bd-default hover:bg-bgc-layer2/80 flex cursor-pointer flex-col items-start gap-4 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between"
+              className="bg-bgc-layer1 border-bd-default flex items-center justify-between rounded-xl border px-4 py-2 transition-colors hover:bg-white/5"
             >
-              <div className="flex flex-col gap-1.5">
-                {/* Tiêu đề */}
-                <h3 className="text-txt-primary text-lg leading-7 font-medium">
-                  {chapter.title}
-                </h3>
-
-                <div className="flex items-center gap-3 lg:gap-5">
-                  {/* Views */}
-                  <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
-                    <Eye className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
-                    <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                      {chapter.viewNumber?.toLocaleString()}
-                    </span>
-                  </div>
-
-                  {/* Likes */}
-                  <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
-                    <Heart className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
-                    <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                      {chapter.likeNumber?.toLocaleString()}
-                    </span>
-                  </div>
-
-                  {/* Comments */}
-                  <div className="flex items-center gap-1 rounded-[32px] backdrop-blur-[3.40px] lg:gap-1.5">
-                    <MessageCircle className="text-txt-secondary h-4 w-4 lg:h-6 lg:w-6" />
-                    <span className="text-txt-secondary w-8 text-sm font-medium lg:w-10 lg:text-base">
-                      {chapter.commentNumber?.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Ngày xuất bản - hiển thị bên phải trên desktop */}
-              <div className="hidden items-center gap-4 sm:flex">
-                <span className="text-txt-secondary text-sm font-medium lg:text-base">
+              <span className="text-txt-primary text-base font-medium">
+                Chương {chapter.chapterNumber}
+              </span>
+              <div className="flex items-center gap-6">
+                <span className="text-txt-secondary flex items-center gap-1 text-sm">
+                  <Eye className="h-4 w-4" />
+                  {chapter.viewNumber?.toLocaleString() ?? 0}
+                </span>
+                <span className="text-txt-secondary text-sm">
                   {formatDate(chapter.updatedAt)}
                 </span>
               </div>
@@ -499,3 +512,5 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     </div>
   );
 }
+
+export default MangaDetail;

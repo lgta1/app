@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { useFetcher } from "react-router";
+import { useFetcher } from "react-router-dom";
 import { Check, Gift, Heart, PlusCircle, Star } from "lucide-react";
 
 import type { WaifuType } from "~/database/models/waifu.model";

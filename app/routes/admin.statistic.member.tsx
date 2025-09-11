@@ -1,4 +1,4 @@
-import { NavLink, useLoaderData } from "react-router";
+import { NavLink, useLoaderData } from "react-router-dom";
 import { BookOpen, Eye, Users } from "lucide-react";
 
 import { getStatistic } from "@/queries/statistic.query";

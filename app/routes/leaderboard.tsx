@@ -7,10 +7,10 @@ import {
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Bảng xếp hạng | WuxiaWorld" },
+    { title: "Bảng xếp hạng | VinaHentai" },
     {
       name: "description",
-      content: "Xem bảng xếp hạng truyện và thành viên tại WuxiaWorld",
+      content: "Xem bảng xếp hạng truyện và thành viên tại VinaHentai",
     },
   ];
 };

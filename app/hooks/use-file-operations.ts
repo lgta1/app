@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
-import { useFetcher, useSubmit } from "react-router";
+import { useFetcher, useSubmit } from "react-router-dom";
 
 import { BusinessError } from "~/helpers/errors.helper";
 

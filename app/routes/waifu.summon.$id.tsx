@@ -21,6 +21,7 @@ import { WaifuGuideDialog } from "~/components/dialog-waifu-guide";
 import { WaifuListDialog } from "~/components/dialog-waifu-list";
 import { DeviceRotationWarningDialog } from "~/components/dialog-warning-device-rotation";
 import { LoadingSpinner } from "~/components/loading-spinner";
+import SummonAssetPreloader from "~/components/summon-asset-preloader";
 import { SummonDesktopButtons, SummonMobileButtons } from "~/components/summon-buttons";
 import { SummonNavigationBar } from "~/components/summon-navigation-bar";
 import { SummonResultOverlay } from "~/components/summon-result-overlay";
@@ -30,7 +31,6 @@ import {
 } from "~/components/summon-top-action-buttons";
 import { SummonVideoPlayer } from "~/components/summon-video-player";
 import { SummonWaifuCards } from "~/components/summon-waifu-cards";
-import SummonAssetPreloader from "~/components/summon-asset-preloader";
 import { GOLD_COST_PER_SUMMON, GOLD_COST_PER_SUMMON_MULTI } from "~/constants/summon";
 import type { BannerType } from "~/database/models/banner.model";
 import { BannerModel } from "~/database/models/banner.model";
@@ -272,7 +272,11 @@ export default function WaifuSummon() {
             onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
             user={user}
           />
-          <img src={banner?.imageUrl} alt={banner?.title} className="w-full object-cover" />
+          <img
+            src={banner?.imageUrl}
+            alt={banner?.title}
+            className="w-full object-cover"
+          />
         </div>
 
         {/* Cụm thẻ + nút triệu hồi + switch (bên phải, không cần center) */}
@@ -283,7 +287,7 @@ export default function WaifuSummon() {
           {/* Switch bỏ qua video — nhỏ gọn, ngay dưới 2 nút */}
           <button
             onClick={() => setSkipCinematic((v) => !v)}
-            className="flex items-center gap-2 text-xs text-white mt-1"
+            className="mt-1 flex items-center gap-2 text-xs text-white"
             aria-pressed={skipCinematic}
           >
             <span>Bỏ qua video</span>
@@ -313,16 +317,20 @@ export default function WaifuSummon() {
             onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
             user={user}
           />
-          <img src={banner?.mobileImageUrl} alt={banner?.title} className="w-full object-cover" />
+          <img
+            src={banner?.mobileImageUrl}
+            alt={banner?.title}
+            className="w-full object-cover"
+          />
         </div>
 
         {/* 2 nút triệu hồi + switch (căn giữa theo cụm) */}
-        <div className="absolute left-1/2 bottom-9 -translate-x-1/2 flex w-[calc(100%-24px)] max-w-[460px] flex-col items-center gap-3">
+        <div className="absolute bottom-9 left-1/2 flex w-[calc(100%-24px)] max-w-[460px] -translate-x-1/2 flex-col items-center gap-3">
           <SummonMobileButtons isRateUp={banner?.isRateUp} onSummon={handleSummon} />
 
           <button
             onClick={() => setSkipCinematic((v) => !v)}
-            className="flex items-center gap-2 text-xs text-white mt-1"
+            className="mt-1 flex items-center gap-2 text-xs text-white"
             aria-pressed={skipCinematic}
           >
             <span>Bỏ qua video</span>

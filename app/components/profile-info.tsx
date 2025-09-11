@@ -1,4 +1,4 @@
-import { NavLink } from "react-router";
+import { NavLink } from "react-router-dom";
 import { Edit3 } from "lucide-react";
 
 import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";

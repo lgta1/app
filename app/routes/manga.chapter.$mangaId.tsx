@@ -70,14 +70,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.chapter) {
     return [
-      { title: "Không tìm thấy chương | WuxiaWorld" },
+      { title: "Không tìm thấy chương | VinaHentai" },
       { name: "description", content: "Chương truyện không tồn tại" },
     ];
   }
 
   return [
-    { title: `${data.chapter.title} | WuxiaWorld` },
-    { name: "description", content: `Đọc ${data.chapter.title} tại WuxiaWorld` },
+    { title: `${data.chapter.title} | VinaHentai` },
+    { name: "description", content: `Đọc ${data.chapter.title} tại VinaHentai` },
   ];
 }
 

@@ -1,4 +1,4 @@
-import { Link, NavLink } from "react-router";
+import { Link, NavLink } from "react-router-dom";
 
 import { HeaderGenres } from "./header-genres";
 import { HeaderSearch } from "./header-search";
@@ -32,12 +32,15 @@ const getNavigationItems = (
 
       if (item.isSpecial) {
         return (
-          <div key={item.href} className="flex h-6 items-center justify-center">
+          <div
+            key={item.href}
+            className="flex h-6 items-center justify-center whitespace-nowrap"
+          >
             <img src={item.icon || ""} alt={item.label} className="h-6" />
             <NavLink
               to={item.href}
               className={({ isActive }) =>
-                `text-sm leading-normal font-semibold ${
+                `text-sm leading-normal font-semibold whitespace-nowrap ${
                   isActive ? "text-txt-focus" : "text-txt-primary"
                 }`
               }
@@ -53,7 +56,7 @@ const getNavigationItems = (
           key={item.href}
           to={item.href}
           className={({ isActive }) =>
-            `text-sm leading-normal font-semibold ${
+            `text-sm leading-normal font-semibold whitespace-nowrap ${
               isActive ? "text-txt-focus" : "text-txt-primary"
             }`
           }
@@ -94,7 +97,7 @@ export function Header({ user, isAdmin = false, genres = [] }: HeaderProps) {
             <Link to="/">
               <img
                 src="/images/logo.png"
-                alt="WuxiaWorld Logo"
+                alt="VinaHentai Logo"
                 className="h-auto w-30 cursor-pointer"
               />
             </Link>
@@ -134,7 +137,7 @@ export function Header({ user, isAdmin = false, genres = [] }: HeaderProps) {
           <Link to="/">
             <img
               src="/images/logo.png"
-              alt="WuxiaWorld Logo"
+              alt="VinaHentai Logo"
               className="h-9 w-auto cursor-pointer"
             />
           </Link>
@@ -156,7 +159,8 @@ export function Header({ user, isAdmin = false, genres = [] }: HeaderProps) {
       </nav>
 
       {/* Mobile Navigation Menu - Hiển thị menu trên mobile */}
-      <nav className="flex w-full flex-row flex-wrap items-center justify-center gap-8 bg-[rgba(9,16,26,0.34)] px-8 py-3 md:hidden">
+      {/* ✅ Không wrap, chia đều, giữ một hàng */}
+      <nav className="flex w-full flex-row flex-nowrap items-center justify-between gap-4 bg-[rgba(9,16,26,0.34)] px-4 py-3 md:hidden">
         {getNavigationItems(true, isAdmin, genres)}
       </nav>
     </header>

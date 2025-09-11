@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { type LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { type LoaderFunctionArgs } from "react-router-dom";
+import { useFetcher, useLoaderData } from "react-router-dom";
 import { Briefcase } from "lucide-react";
 
 import { requireLogin } from "@/services/auth.server";

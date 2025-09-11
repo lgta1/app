@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Eye, Heart } from "lucide-react";
 
 import { LoadingSpinner } from "~/components/loading-spinner";

@@ -20,17 +20,20 @@ import type { MangaType } from "~/database/models/manga.model";
 export const meta: MetaFunction = ({ data }: any) => {
   if (!data?.genre) {
     return [
-      { title: "Thể loại truyện | WuxiaWorld" },
-      { name: "description", content: "Khám phá các thể loại truyện tại WuxiaWorld" },
+      { title: "Thể loại truyện | Vinahentai" },
+      {
+        name: "description",
+        content: "Khám phá các thể loại truyện tại Vinahentai",
+      },
     ];
   }
 
   return [
-    { title: `${data.genre.name} | WuxiaWorld` },
+    { title: `${data.genre.name} | Vinahentai` },
     {
       name: "description",
       content:
-        data.genre.description || `Khám phá thể loại ${data.genre.name} tại WuxiaWorld`,
+        data.genre.description || `Khám phá thể loại ${data.genre.name} tại Vinahentai`,
     },
   ];
 };
@@ -142,7 +145,7 @@ export default function Genres() {
       </div>
 
       {/* Manga list */}
-      <div className="flex w-full flex-wrap gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {manga.map((item) => (
           <MangaCard key={item.id} manga={item} />
         ))}

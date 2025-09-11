@@ -1,0 +1,33 @@
+app/components/manga-detail.tsx:379:                        to={`/genres/${slug}`}
+app/components/footer.tsx:112:              <Link to="/genres/ahegao" className="text-pink-500 hover:text-pink-400 hover:underline">đọc hentai online</Link>, trải nghiệm
+app/components/footer.tsx:114:              <Link to="/genres/anal" className="text-pink-500 hover:text-pink-400 hover:underline">đọc truyện hentai 18+</Link>,{" "}
+app/components/footer.tsx:115:              <Link to="/genres/big-ass" className="text-pink-500 hover:text-pink-400 hover:underline">Đọc truyện tranh Hentai</Link> cho đến
+app/components/footer.tsx:116:              những tuyển tập <Link to="/genres/big-boobs" className="text-pink-500 hover:text-pink-400 hover:underline">Truyện Hentai</Link>,
+app/components/footer.tsx:118:              <Link to="/genres/blowjobs" className="text-pink-500 hover:text-pink-400 hover:underline">truyện hentaiz</Link>, tất cả đều được
+app/components/footer.tsx:120:              bộ <Link to="/genres/cosplay" className="text-pink-500 hover:text-pink-400 hover:underline">hentai vietsub</Link>, những tuyển
+app/components/footer.tsx:121:              tập <Link to="/genres/doujinshi" className="text-pink-500 hover:text-pink-400 hover:underline">truyện hentai vietsub full</Link>{" "}
+app/components/footer.tsx:123:              <Link to="/genres/ecchi" className="text-pink-500 hover:text-pink-400 hover:underline">vietsub không che</Link>, giúp người đọc
+app/components/footer.tsx:125:              <Link to="/genres/full-color" className="text-pink-500 hover:text-pink-400 hover:underline">hentai không che</Link> hay muốn
+app/components/footer.tsx:127:              <Link to="/genres/harem" className="text-pink-500 hover:text-pink-400 hover:underline">manhwa không che</Link>, chắc chắn sẽ tìm
+app/components/footer.tsx:133:              <Link to="/genres/soft-incest" className="text-pink-500 hover:text-pink-400 hover:underline">anime hentai</Link>,{" "}
+app/components/footer.tsx:134:              <Link to="/genres/milf" className="text-pink-500 hover:text-pink-400 hover:underline">anime</Link> hay các chủ đề{" "}
+app/components/footer.tsx:135:              <Link to="/genres/ntr" className="text-pink-500 hover:text-pink-400 hover:underline">Anime manga hentai Nhật Bản</Link>. Với các
+app/components/footer.tsx:136:              fan <Link to="/genres/romance" className="text-pink-500 hover:text-pink-400 hover:underline">manhwa hentai</Link>, chúng tôi có
+app/components/footer.tsx:137:              đầy đủ <Link to="/genres/schoolgirl" className="text-pink-500 hover:text-pink-400 hover:underline">manhwa</Link>, từ{" "}
+app/components/footer.tsx:138:              <Link to="/genres/vanilla" className="text-pink-500 hover:text-pink-400 hover:underline">manhwa 18+</Link>,{" "}
+app/components/footer.tsx:139:              <Link to="/genres/3d-hentai" className="text-pink-500 hover:text-pink-400 hover:underline">hentai Manhwa</Link>, cho tới{" "}
+app/components/footer.tsx:140:              <Link to="/genres/bdsm" className="text-pink-500 hover:text-pink-400 hover:underline">Truyện Manhwa 18+</Link> để thỏa mãn nhu
+app/components/footer.tsx:142:              như <Link to="/genres/elf" className="text-pink-500 hover:text-pink-400 hover:underline">hentai doujinshi</Link>,{" "}
+app/components/footer.tsx:143:              <Link to="/genres/fantasy" className="text-pink-500 hover:text-pink-400 hover:underline">hentai JAV</Link>, hay cả{" "}
+app/components/footer.tsx:144:              <Link to="/genres/horror" className="text-pink-500 hover:text-pink-400 hover:underline">
+app/components/footer.tsx:154:              <Link to="/genres/isekai" className="text-pink-500 hover:text-pink-400 hover:underline">HentaiVN</Link>,{" "}
+app/components/footer.tsx:155:              <Link to="/genres/maids" className="text-pink-500 hover:text-pink-400 hover:underline">VinaHentai 18+</Link>, hay cả biến thể
+app/components/footer.tsx:156:              tìm kiếm phổ biến như <Link to="/genres/manhwa" className="text-pink-500 hover:text-pink-400 hover:underline">hentaivnx</Link>,
+app/components/footer.tsx:159:              <Link to="/genres/mind-break" className="text-pink-500 hover:text-pink-400 hover:underline">hentai full màu</Link>, siêu phẩm{" "}
+app/components/footer.tsx:160:              <Link to="/genres/nun" className="text-pink-500 hover:text-pink-400 hover:underline">hentai mới nhất 2025</Link>, các tuyển tập{" "}
+app/components/footer.tsx:161:              <Link to="/genres/nurse" className="text-pink-500 hover:text-pink-400 hover:underline">hentai 18+ hot</Link> cũng như{" "}
+app/components/footer.tsx:162:              <Link to="/genres/pregnant" className="text-pink-500 hover:text-pink-400 hover:underline">hentai miễn phí</Link> để ai cũng có
+app/components/footer.tsx:164:              <Link to="/genres/quan-tat" className="text-pink-500 hover:text-pink-400 hover:underline">Hentai Nhật Bản</Link>, đây chính là
+app/components/header-genres.tsx:81:                        to={`/genres/${genre.slug}`}
+app/components/header-genres.tsx:108:                        to={`/genres/${genre.slug}`}
+app/components/header-genres.tsx:155:                          to={`/genres/${genre.slug}`}

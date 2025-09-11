@@ -6,7 +6,7 @@ import {
   Link,
   type LoaderFunctionArgs,
   type MetaFunction,
-} from "react-router";
+} from "react-router-dom";
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Search, Trash2, Upload } from "lucide-react";
 

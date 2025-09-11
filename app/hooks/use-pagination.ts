@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
+import { useFetcher } from "react-router-dom";
 
 interface UsePaginationProps {
   apiUrl: string;

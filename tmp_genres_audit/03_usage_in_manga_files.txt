@@ -1,0 +1,5 @@
+app/.server/queries/manga.query.ts
+app/components/header-search-item.tsx
+app/routes/admin.manga._index.tsx
+app/routes/manga.create.tsx
+app/routes/manga.edit.$id.tsx

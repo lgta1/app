@@ -1,0 +1,26 @@
+app/components/manga-detail.tsx:22: * - outlineSubtle: viền mờ cho "Thể loại" (secondary)
+app/components/manga-detail.tsx:41:  /** Viền mờ: dành cho "Thể loại", không chiếm nổi bật */
+app/components/manga-detail.tsx:369:            <div className="text-txt-secondary w-28 text-base font-medium">Thể loại:</div>
+app/components/footer.tsx:124:              dễ dàng thưởng thức. Nếu bạn yêu thích thể loại{" "}
+app/components/footer.tsx:141:              cầu giải trí. Trang web cũng đa dạng với nhiều thể loại phong phú
+app/components/footer.tsx:163:              thể tiếp cận. Với các fan của thể loại{" "}
+app/components/header-genres.tsx:17:  // Nhóm thể loại theo category
+app/components/header-genres.tsx:29:  // Chia thể loại thành các cột
+app/components/header-genres.tsx:58:            Thể loại
+app/components/header-genres.tsx:96:          {/* Thể loại khác */}
+app/components/header-genres.tsx:100:                Thể loại khác
+app/constants/header.ts:17:    label: "Thể loại",
+app/routes/_index.tsx:75:        "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!",
+app/routes/genres.$slug.tsx:23:      { title: "Thể loại truyện | Vinahentai" },
+app/routes/genres.$slug.tsx:26:        content: "Khám phá các thể loại truyện tại Vinahentai",
+app/routes/genres.$slug.tsx:37:        `Khám phá thể loại ${data.genre.name} tại Vinahentai`,
+app/routes/genres.$slug.tsx:52:    throw new Response("Không tìm thấy thể loại", { status: 404 });
+app/routes/manga.edit.$id.tsx:304:          {/* Thể loại */}
+app/routes/manga.edit.$id.tsx:309:                Thể loại
+app/routes/manga.edit.$id.tsx:316:              {/* Thể loại khác */}
+app/routes/manga.edit.$id.tsx:317:              {renderGenreSection("Thể loại khác", otherGenres)}
+app/routes/manga.preview.$id.tsx:256:                Thể loại:
+app/routes/manga.create.tsx:315:          {/* Thể loại */}
+app/routes/manga.create.tsx:320:                Thể loại
+app/routes/manga.create.tsx:325:              {renderGenreSection("Thể loại khác", otherGenres)}
+app/routes/admin.manga._index.tsx:284:                Thể loại

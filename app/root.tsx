@@ -6,9 +6,9 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
-  useNavigate,
   useLocation, // << ADDED
-} from "react-router";
+  useNavigate,
+} from "react-router-dom";
 
 import { getAllGenres } from "@/queries/genres.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
@@ -22,7 +22,7 @@ import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
 import { isAdmin } from "~/helpers/user.helper";
 
-// C?u hình th?i gian check ban status (phút)
+// C?u hï¿½nh th?i gian check ban status (phï¿½t)
 const BAN_CHECK_INTERVAL_MINUTES = 1;
 const BAN_CHECK_INTERVAL_MS = BAN_CHECK_INTERVAL_MINUTES * 60 * 1000;
 const LAST_BAN_CHECK_KEY = "lastBanCheck";
@@ -48,16 +48,16 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-// ? META m?c d?nh cho toàn site
+// ? META m?c d?nh cho toï¿½n site
 export function meta({}: Route.MetaArgs) {
   return [
     {
-      title: "Vinahentai - Ð?c hentai 18+ ÍT QU?NG CÁO hot nh?t 2025",
+      title: "Vinahentai - ï¿½?c hentai 18+ ï¿½T QU?NG Cï¿½O hot nh?t 2025",
     },
     {
       name: "description",
       content:
-        "Vinahentai - Trang d?c truy?n hentai, manhwa 18+ vietsub, hentaiVN không che. Ít qu?ng cáo, c?p nh?t nhanh, da d?ng th? lo?i hot nh?t 2025. Tr?i nghi?m ngay!",
+        "Vinahentai - Trang d?c truy?n hentai, manhwa 18+ vietsub, hentaiVN khï¿½ng che. ï¿½t qu?ng cï¿½o, c?p nh?t nhanh, da d?ng th? lo?i hot nh?t 2025. Tr?i nghi?m ngay!",
     },
 
     // (Tu? ch?n) Open Graph / Twitter d? hi?n th? d?p khi share
@@ -65,12 +65,12 @@ export function meta({}: Route.MetaArgs) {
     { property: "og:site_name", content: "Vinahentai" },
     {
       property: "og:title",
-      content: "Vinahentai - Hentai 18+ ít qu?ng cáo 2025",
+      content: "Vinahentai - Hentai 18+ ï¿½t qu?ng cï¿½o 2025",
     },
     {
       property: "og:description",
       content:
-        "Trang d?c hentai/manhwa 18+ vietsub, c?p nh?t nhanh, ít qu?ng cáo. Tr?i nghi?m ngay!",
+        "Trang d?c hentai/manhwa 18+ vietsub, c?p nh?t nhanh, ï¿½t qu?ng cï¿½o. Tr?i nghi?m ngay!",
     },
     { name: "twitter:card", content: "summary_large_image" },
   ];
@@ -117,11 +117,11 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation(); // << ADDED
 
-  // ?n Footer n?u dang ? trang tri?u h?i (bao ph? /waifu/summon và m?i nhánh con)
+  // ?n Footer n?u dang ? trang tri?u h?i (bao ph? /waifu/summon vï¿½ m?i nhï¿½nh con)
   const hideFooter = location.pathname.startsWith("/waifu/summon"); // << ADDED
 
   useEffect(() => {
-    // Ch? ch?y logic này n?u user dã dang nh?p
+    // Ch? ch?y logic nï¿½y n?u user dï¿½ dang nh?p
     if (!user) return;
 
     const checkUserBanStatus = async () => {
@@ -169,7 +169,8 @@ export default function App() {
     <>
       <Header isAdmin={isAdmin} user={user} genres={genres} />
       <Outlet />
-      {!hideFooter && <Footer />}{/* << CHANGED: ch? render Footer khi không ? summon */}
+      {!hideFooter && <Footer />}
+      {/* << CHANGED: ch? render Footer khi khï¿½ng ? summon */}
     </>
   );
 }

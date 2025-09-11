@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { ActionFunctionArgs } from "react-router";
-import { NavLink, useFetcher, useLoaderData } from "react-router";
+import type { ActionFunctionArgs } from "react-router-dom";
+import { NavLink, useFetcher, useLoaderData } from "react-router-dom";
 import { Edit, Save, X } from "lucide-react";
 
 import { requireAdminOrModLogin } from "@/services/auth.server";

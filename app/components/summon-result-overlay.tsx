@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CircleArrowOutUpRight, SkipForward } from "lucide-react";
 
 import { SummonCard } from "./summon-card";
+
 import "../styles/summon.css"; // desktop auto-fit & mobile styles
 
 interface SummonItem {
@@ -89,9 +90,9 @@ export function SummonResultOverlay({
     return (
       <>
         {/* ===== MOBILE (3–4–3) ===== */}
-        <div className="sm:hidden relative z-10">
+        <div className="relative z-10 sm:hidden">
           {/* Hàng 1: 3 thẻ */}
-          <div className="flex items-center justify-center gap-3 mb-3">
+          <div className="mb-3 flex items-center justify-center gap-3">
             {results.slice(0, 3).map((item, index) => (
               <SummonCard
                 key={index}
@@ -107,7 +108,7 @@ export function SummonResultOverlay({
           </div>
 
           {/* Hàng 2: 4 thẻ */}
-          <div className="flex items-center justify-center gap-3 mb-3">
+          <div className="mb-3 flex items-center justify-center gap-3">
             {results.slice(3, 7).map((item, i) => {
               const index = 3 + i;
               return (
@@ -146,7 +147,7 @@ export function SummonResultOverlay({
         </div>
 
         {/* ===== DESKTOP (5+5, auto-fit) ===== */}
-        <div className="hidden sm:block summon-desktop-fit-wrap">
+        <div className="summon-desktop-fit-wrap hidden sm:block">
           <div className="summon-desktop-fit">
             <div className="relative z-10 flex w-full max-w-7xl flex-col items-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
               {/* First row */}

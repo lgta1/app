@@ -6,7 +6,7 @@ import {
   NavLink,
   useLoaderData,
   useSubmit,
-} from "react-router";
+} from "react-router-dom";
 import { Plus } from "lucide-react";
 
 import { deleteWaifu } from "@/mutations/waifu.mutation";

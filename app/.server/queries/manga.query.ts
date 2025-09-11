@@ -11,7 +11,11 @@ export const getNewManga = async (page: number = 1, limit: number = 10) => {
   };
 
   const [manga, totalCount] = await Promise.all([
-    MangaModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    MangaModel.find(filter)
+      .sort({ updatedAt: -1, lastChapterAt: -1, latestChapterAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
     MangaModel.countDocuments(filter),
   ]);
 
@@ -68,7 +72,7 @@ export const getAllMangaAdmin = async (
   const skip = (page - 1) * limit;
   const filter = status !== undefined ? { status } : {};
   return await MangaModel.find(filter)
-    .sort({ createdAt: -1 })
+    .sort({ updatedAt: -1, lastChapterAt: -1, latestChapterAt: -1, createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .lean();

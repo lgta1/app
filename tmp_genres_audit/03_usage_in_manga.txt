@@ -1,0 +1,6 @@
+app/components/header-search-item.tsx:30:            {manga.genres.join(", ")}
+app/routes/manga.edit.$id.tsx:131:    genres: manga.genres,
+app/routes/admin.manga._index.tsx:343:                      {manga.genres.join(", ")}
+app/routes/admin.manga._index.tsx:392:                    {manga.genres.join(", ")}
+app/routes/manga.create.tsx:114:    genres: [],
+app/.server/queries/manga.query.ts:147:      { genres: { $in: manga.genres } },

@@ -1,0 +1,3 @@
+app/components/footer.tsx
+app/components/header-genres.tsx
+app/components/manga-detail.tsx

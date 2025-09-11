@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "react-hot-toast";
-import { useFetcher } from "react-router";
+import { useFetcher } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Star, X } from "lucide-react";
 

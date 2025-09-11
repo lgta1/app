@@ -97,16 +97,16 @@ export const clientAction = async ({ serverAction }: ClientActionFunctionArgs) =
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.manga) {
     return [
-      { title: "Không tìm thấy truyện | WuxiaWorld" },
+      { title: "Không tìm thấy truyện | VinaHentai" },
       { name: "description", content: "Trang truyện không tồn tại" },
     ];
   }
 
   return [
-    { title: `${data.manga.title} | WuxiaWorld` },
+    { title: `${data.manga.title} | VinaHentai` },
     {
       name: "description",
-      content: data.manga.description || `Preview ${data.manga.title} tại WuxiaWorld`,
+      content: data.manga.description || `Preview ${data.manga.title} tại VinaHentai`,
     },
   ];
 }

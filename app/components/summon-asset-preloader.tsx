@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 
 /**
- * Preload assets sau khi trang /waifu/summon/[id] dã load:
+ * Preload assets sau khi trang /waifu/summon/[id] dï¿½ load:
  * - Video: mobile -> /videos/summon.webm, desktop -> /videos/summon.mp4 (kh?p player)
- * - Background sau video: webp theo viewport (+ png fallback tùy ch?n)
- * - Card back (?nh chua l?t): webp theo viewport (+ png fallback tùy ch?n)
- * LUU Ý: KHÔNG preload ?nh waifu d?ng.
+ * - Background sau video: webp theo viewport (+ png fallback tï¿½y ch?n)
+ * - Card back (?nh chua l?t): webp theo viewport (+ png fallback tï¿½y ch?n)
+ * LUU ï¿½: KHï¿½NG preload ?nh waifu d?ng.
  */
 export default function SummonAssetPreloader() {
   useEffect(() => {
@@ -13,9 +13,10 @@ export default function SummonAssetPreloader() {
       // requestIdleCallback polyfill
       const ric: (cb: IdleRequestCallback) => number =
         // @ts-ignore
-        window.requestIdleCallback || ((cb: IdleRequestCallback) => window.setTimeout(cb as any, 0));
+        window.requestIdleCallback ||
+        ((cb: IdleRequestCallback) => window.setTimeout(cb as any, 0));
 
-      // Tôn tr?ng Data Saver
+      // Tï¿½n tr?ng Data Saver
       // @ts-ignore
       if (navigator?.connection?.saveData) return;
 
@@ -29,18 +30,18 @@ export default function SummonAssetPreloader() {
             ? [{ href: "/videos/summon.webm", type: "video/webm" }]
             : [{ href: "/videos/summon.mp4", type: "video/mp4" }];
 
-          // ===== BACKGROUND sau khi video k?t thúc =====
+          // ===== BACKGROUND sau khi video k?t thï¿½c =====
           const BG_TARGETS = isMobile
             ? [{ href: "/videos/background.mobile.webp", as: "image" }]
             : [{ href: "/videos/background.webp", as: "image" }];
-          // (tùy ch?n) PNG fallback:
+          // (tï¿½y ch?n) PNG fallback:
           const BG_FALLBACK = [{ href: "/videos/background.png", as: "image" }];
 
           // ===== CARD BACK (?nh chua l?t) =====
           const CARD_TARGETS = isMobile
             ? [{ href: "/images/waifu/card.mobile.webp", as: "image" }]
             : [{ href: "/images/waifu/card.webp", as: "image" }];
-          // (tùy ch?n) PNG fallback:
+          // (tï¿½y ch?n) PNG fallback:
           const CARD_FALLBACK = [{ href: "/images/waifu/card.png", as: "image" }];
 
           // 1) Warm network cache b?ng <link rel="preload">
@@ -51,7 +52,7 @@ export default function SummonAssetPreloader() {
             link.as = as;
             link.href = href;
             if (type) link.type = type;
-            // N?u có CORS: link.crossOrigin = "anonymous";
+            // N?u cï¿½ CORS: link.crossOrigin = "anonymous";
             document.head.appendChild(link);
             links.push(link);
           };
@@ -59,7 +60,7 @@ export default function SummonAssetPreloader() {
           for (const v of VIDEO_TARGETS) addPreload(v.href, "video", v.type);
           for (const i of BG_TARGETS) addPreload(i.href, "image");
           for (const i of CARD_TARGETS) addPreload(i.href, "image");
-          // (tùy ch?n) fallback PNG — comment hai dòng du?i n?u mu?n ti?t ki?m bang thông
+          // (tï¿½y ch?n) fallback PNG ï¿½ comment hai dï¿½ng du?i n?u mu?n ti?t ki?m bang thï¿½ng
           for (const i of BG_FALLBACK) addPreload(i.href, "image");
           for (const i of CARD_FALLBACK) addPreload(i.href, "image");
 
@@ -76,16 +77,20 @@ export default function SummonAssetPreloader() {
           };
 
           await Promise.all([
-            decodeImage(isMobile ? "/videos/background.mobile.webp" : "/videos/background.webp"),
-            decodeImage(isMobile ? "/images/waifu/card.mobile.webp" : "/images/waifu/card.webp"),
+            decodeImage(
+              isMobile ? "/videos/background.mobile.webp" : "/videos/background.webp",
+            ),
+            decodeImage(
+              isMobile ? "/images/waifu/card.mobile.webp" : "/images/waifu/card.webp",
+            ),
           ]);
 
-          // Cleanup khi unmount (không b?t bu?c)
+          // Cleanup khi unmount (khï¿½ng b?t bu?c)
           return () => {
             links.forEach((l) => l.parentNode?.removeChild(l));
           };
         } catch {
-          // an toàn: không crash UI n?u preload fail
+          // an toï¿½n: khï¿½ng crash UI n?u preload fail
         }
       });
     };

@@ -59,7 +59,7 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
     <div className="fixed inset-0 z-10 flex touch-none items-center justify-center bg-black">
       {/* Skip button - chỉ hiện khi video chưa ended */}
       {!hasVideoEnded && (
-        <div className="absolute right-2 top-2 z-10 lg:right-4 lg:top-4">
+        <div className="absolute top-2 right-2 z-10 lg:top-4 lg:right-4">
           <button
             onClick={handleSkipVideo}
             className="to-lav-500 flex cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-3 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"

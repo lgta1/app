@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import { useFetcher } from "react-router-dom";
 import { Bell } from "lucide-react";
 
 import { NotificationPopup } from "./notification-popup";

@@ -1,0 +1,2 @@
+app/components/manga-detail.tsx:370:            {/* BEGIN <feature> GENRES_CHIP_OUTLINE_SUBTLE_NO_STRETCH */}
+app/components/manga-detail.tsx:390:            {/* END <feature> GENRES_CHIP_OUTLINE_SUBTLE_NO_STRETCH */}

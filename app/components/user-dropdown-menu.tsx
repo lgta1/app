@@ -1,4 +1,4 @@
-import { NavLink } from "react-router";
+import { NavLink } from "react-router-dom";
 import { Power } from "lucide-react";
 
 export function UserDropdownMenu({

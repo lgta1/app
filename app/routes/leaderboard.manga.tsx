@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type MetaFunction, NavLink, useLoaderData } from "react-router";
+import { type MetaFunction, NavLink, useLoaderData } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 
 import { getLeaderboard } from "@/queries/leaderboad.query";
@@ -10,10 +10,10 @@ import type { MangaType } from "~/database/models/manga.model";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Bảng xếp hạng truyện | WuxiaWorld" },
+    { title: "Bảng xếp hạng truyện | VinaHentai" },
     {
       name: "description",
-      content: "Xem bảng xếp hạng truyện phổ biến nhất tại WuxiaWorld",
+      content: "Xem bảng xếp hạng truyện phổ biến nhất tại VinaHentai",
     },
   ];
 };

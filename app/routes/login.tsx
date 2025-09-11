@@ -7,7 +7,7 @@ import {
   useActionData,
   useNavigation,
   useSearchParams,
-} from "react-router";
+} from "react-router-dom";
 
 import { login } from "@/services/auth.server";
 import { getUserInfoFromSession } from "@/services/session.svc";

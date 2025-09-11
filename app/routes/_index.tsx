@@ -1,3 +1,5 @@
+// BEGIN <feature> HOT_SECTION_AUTOSCROLL_IMPORTS
+import { useEffect, useRef } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 
 import { getLeaderboard } from "@/queries/leaderboad.query";
@@ -15,6 +17,29 @@ import RatingItemUser from "~/components/rating-item-user";
 import { TopBanner } from "~/components/top-banner";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
+
+/**
+ * Tìm phần tử scrollable đầu tiên trong cây con
+ */
+function findScrollable(el: HTMLElement | null): HTMLElement | null {
+  if (!el) return null;
+  const stack: HTMLElement[] = [el];
+  while (stack.length) {
+    const node = stack.shift()!;
+    const sw = node.scrollWidth;
+    const cw = node.clientWidth;
+    const sh = node.scrollHeight;
+    const ch = node.clientHeight;
+    if ((sw > cw || sh > ch) && getComputedStyle(node).overflowX !== "visible") {
+      return node;
+    }
+    for (const child of Array.from(node.children)) {
+      stack.push(child as HTMLElement);
+    }
+  }
+  return null;
+}
+// END <feature> HOT_SECTION_AUTOSCROLL_IMPORTS
 
 export async function loader() {
   const [
@@ -43,7 +68,11 @@ export async function loader() {
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Vinahentai - Đọc hentai 18+ ÍT QUẢNG CÁO hot nhất 2025" },
-    { name: "description", content: "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!" },
+    {
+      name: "description",
+      content:
+        "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!",
+    },
   ];
 }
 
@@ -67,22 +96,118 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     limit: 20,
   });
 
-  return (
-  <div className="container-ad mx-auto px-4 py-6">
-    <DialogWarningAdultContent />
+  // BEGIN <feature> HOT_SECTION_AUTOSCROLL_LOGIC
+  const hotWrapRef = useRef<HTMLDivElement | null>(null);
 
-    <h1 className="sr-only">
-      Vinahentai – Đọc hentai 18+ vietsub, ít quảng cáo hot nhất 2025
-    </h1>
+  useEffect(() => {
+    const mql =
+      typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)") : null;
+    if (!mql || !mql.matches) return;
 
-    <TopBanner
-      bannerItems={
-        dailyLeaderboard.length > 0
-          ? (dailyLeaderboard as MangaType[]).filter((manga) => !!manga)
-          : (weeklyLeaderboard as MangaType[]).filter((manga) => !!manga)
+    const wrap = hotWrapRef.current;
+    if (!wrap) return;
+
+    const scroller = findScrollable(wrap);
+    if (!scroller) return;
+
+    let raf = 0;
+    let paused = false;
+    const speedPxPerFrame = 0.6;
+
+    const tick = () => {
+      if (!paused) {
+        const max = scroller.scrollWidth - scroller.clientWidth;
+        if (max > 0) {
+          if (scroller.scrollLeft >= max - 1) {
+            scroller.scrollLeft = 0;
+          } else {
+            scroller.scrollLeft += speedPxPerFrame;
+          }
+        }
       }
-    />
-      <img className="pt-10" src="/images/home/vnht.svg" alt="Vinahentai - banner trang chủ" />
+      raf = requestAnimationFrame(tick);
+    };
+
+    const onEnter = () => (paused = true);
+    const onLeave = () => (paused = false);
+    const onVisibility = () => {
+      paused = document.hidden || !mql.matches;
+    };
+
+    scroller.addEventListener("mouseenter", onEnter);
+    scroller.addEventListener("mouseleave", onLeave);
+    document.addEventListener("visibilitychange", onVisibility);
+    onVisibility();
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      scroller.removeEventListener("mouseenter", onEnter);
+      scroller.removeEventListener("mouseleave", onLeave);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+  // END <feature> HOT_SECTION_AUTOSCROLL_LOGIC
+
+  return (
+    <div className="container-ad mx-auto px-4 py-6">
+      <DialogWarningAdultContent />
+
+      {/* Giữ cho SEO nhưng ẩn hoàn toàn */}
+      <h1 className="sr-only">
+        Vinahentai – Đọc hentai 18+ vietsub, ít quảng cáo hot nhất 2025
+      </h1>
+
+      {/* BEGIN <feature> HOT_SECTION_MINW0_VIEWPORT + DESKTOP_5COLUMNS_AUTOSCROLL */}
+      <section className="min-w-0">
+        {/* Mobile/Tablet: giữ nguyên TopBanner cũ */}
+        <div className="lg:hidden">
+          <div className="mx-auto w-full">
+            <TopBanner
+              bannerItems={
+                dailyLeaderboard.length > 0
+                  ? (dailyLeaderboard as MangaType[]).filter((m) => !!m)
+                  : (weeklyLeaderboard as MangaType[]).filter((m) => !!m)
+              }
+            />
+          </div>
+        </div>
+
+        {/* Desktop: ép 5 ô/viewport + auto-scroll (pause khi hover) */}
+        <div ref={hotWrapRef} className="hidden lg:block">
+          <div className="overflow-x-hidden">
+            <div className="hot-rail">
+              <TopBanner
+                bannerItems={
+                  dailyLeaderboard.length > 0
+                    ? (dailyLeaderboard as MangaType[]).filter((m) => !!m)
+                    : (weeklyLeaderboard as MangaType[]).filter((m) => !!m)
+                }
+              />
+            </div>
+          </div>
+
+          <style>{`
+            @media (min-width: 1024px) {
+              .hot-rail > * { min-width: 0; }
+              .hot-rail > * > * {
+                flex: 0 0 calc(100% / 5);
+                max-width: calc(100% / 5);
+              }
+            }
+          `}</style>
+        </div>
+      </section>
+      {/* END <feature> HOT_SECTION_MINW0_VIEWPORT + DESKTOP_5COLUMNS_AUTOSCROLL */}
+
+      {/* BEGIN <feature> HIDE_VINAHENTAI_BANNER */}
+      {/* Ẩn banner tím "vinahentai" ở mọi nơi để không còn hiển thị, 
+          vẫn giữ <h1 sr-only> cho SEO. Không ảnh hưởng layout khác. */}
+      <div className="hidden" aria-hidden="true">
+        {/* (trước đây là <img className="pt-10" src="/images/home/vnht.svg" alt="..."/>)
+            Nếu muốn giữ khoảng cách cũ, có thể thêm <div className="pt-10" /> */}
+      </div>
+      {/* END <feature> HIDE_VINAHENTAI_BANNER */}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
         {/* Section truyện mới cập nhật */}
@@ -108,11 +233,12 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             </div>
           ) : (
             <>
-              <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-                {mangaList?.map((manga) => <MangaCard key={manga.id} manga={manga} />)}
+              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+                {mangaList?.map((manga) => (
+                  <MangaCard key={manga.id} manga={manga} />
+                ))}
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="mt-8 flex justify-center">
                   <Pagination
@@ -146,7 +272,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
               <div className="bg-bgc-layer1 border-bd-default overflow-hidden rounded-2xl border p-0">
                 <Tabs.Root defaultValue="weekly" className="w-full">
-                  {/* Tab Navigation */}
                   <Tabs.List className="border-bd-default flex border-b">
                     <Tabs.Trigger
                       value="weekly"
@@ -162,7 +287,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                     </Tabs.Trigger>
                   </Tabs.List>
 
-                  {/* Ranking Lists */}
                   <Tabs.Content value="weekly" className="space-y-0 pb-4">
                     {weeklyLeaderboard.map(
                       (manga, index) =>
