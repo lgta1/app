@@ -1,4 +1,7 @@
+// app/root.tsx
 import { useEffect } from "react";
+
+// 👉 SSR primitives + data hooks lấy từ "react-router"
 import {
   Links,
   Meta,
@@ -6,41 +9,43 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
-  useLocation, // << ADDED
-  useNavigate,
-} from "react-router-dom";
+} from "react-router";
 
-import { getAllGenres } from "@/queries/genres.query";
-import { getUserInfoFromSession } from "@/services/session.svc";
+// 👉 Client-only hooks từ "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom";
 
 import type { Route } from "./+types/root";
 
-import "./app.css";
-
+import { getAllGenres } from "@/queries/genres.query";
+import { getUserInfoFromSession } from "@/services/session.svc";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
 import { isAdmin } from "~/helpers/user.helper";
 
-// C?u h�nh th?i gian check ban status (ph�t)
+// 🔧 NẠP CSS qua links() cho SSR
+import appStylesheetUrl from "./app.css?url";
+
+// Cấu hình check "ban" định kỳ
 const BAN_CHECK_INTERVAL_MINUTES = 1;
 const BAN_CHECK_INTERVAL_MS = BAN_CHECK_INTERVAL_MINUTES * 60 * 1000;
 const LAST_BAN_CHECK_KEY = "lastBanCheck";
 
+// Liên kết stylesheet + fonts
 export const links: Route.LinksFunction = () => [
+  { rel: "stylesheet", href: appStylesheetUrl },
+
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
+    rel: "stylesheet",
+    href:
+      "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap",
+    href:
+      "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap",
   },
   {
     rel: "stylesheet",
@@ -48,34 +53,28 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-// ? META m?c d?nh cho to�n site
+// META mặc định
 export function meta({}: Route.MetaArgs) {
   return [
-    {
-      title: "Vinahentai - �?c hentai 18+ �T QU?NG C�O hot nh?t 2025",
-    },
+    { title: "Vinahentai -  Đọc hentai 18+ ít quảng cáo hot nhất 2025" },
     {
       name: "description",
       content:
-        "Vinahentai - Trang d?c truy?n hentai, manhwa 18+ vietsub, hentaiVN kh�ng che. �t qu?ng c�o, c?p nh?t nhanh, da d?ng th? lo?i hot nh?t 2025. Tr?i nghi?m ngay!",
+        "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!",
     },
-
-    // (Tu? ch?n) Open Graph / Twitter d? hi?n th? d?p khi share
     { property: "og:type", content: "website" },
     { property: "og:site_name", content: "Vinahentai" },
-    {
-      property: "og:title",
-      content: "Vinahentai - Hentai 18+ �t qu?ng c�o 2025",
-    },
+    { property: "og:title", content: "Vinahentai - Hentai 18+ ít quảng cáo 2025" },
     {
       property: "og:description",
       content:
-        "Trang d?c hentai/manhwa 18+ vietsub, c?p nh?t nhanh, �t qu?ng c�o. Tr?i nghi?m ngay!",
+        "Trang đọc hentai/manhwa 18+ vietsub, cập nhật nhanh, ít quảng cáo. Trải nghiệm ngay!",
     },
     { name: "twitter:card", content: "summary_large_image" },
   ];
 }
 
+// Layout SSR chuẩn
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
@@ -94,43 +93,42 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Loader: lấy user + genres từ DB
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUserInfoFromSession(request);
   const genres = await getAllGenres();
 
-  if (user) {
-    return {
-      isAdmin: isAdmin(user.role),
-      user,
-      genres,
-    };
-  }
+  // Log chẩn đoán
+  try {
+    const count = Array.isArray(genres) ? genres.length : (genres as any)?.length || 0;
+    const hasBondage = Array.isArray(genres) && genres.some((g: any) => g?.slug === "bondage");
+    const hasSlave = Array.isArray(genres) && genres.some((g: any) => g?.slug === "slave");
+    console.log("[loader:root] genres count =", count, "| bondage:", hasBondage, "| slave:", hasSlave);
+  } catch {}
 
-  return {
-    isAdmin: false,
-    genres,
-  };
+  if (user) {
+    return { isAdmin: isAdmin(user.role), user, genres };
+  }
+  return { isAdmin: false, genres };
 }
 
+// App: truyền genres vào Header để hiển thị menu thể loại
 export default function App() {
   const { isAdmin, user, genres } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
-  const location = useLocation(); // << ADDED
+  const location = useLocation();
 
-  // ?n Footer n?u dang ? trang tri?u h?i (bao ph? /waifu/summon v� m?i nh�nh con)
-  const hideFooter = location.pathname.startsWith("/waifu/summon"); // << ADDED
+  // Ẩn Footer nếu đang ở trang triệu hồi
+  const hideFooter = location.pathname.startsWith("/waifu/summon");
 
   useEffect(() => {
-    // Ch? ch?y logic n�y n?u user d� dang nh?p
     if (!user) return;
 
     const checkUserBanStatus = async () => {
       try {
         const response = await fetch("/api/user");
         const data = await response.json();
-
         if (data.success && data.data && data.data.isBanned) {
-          // User b? ban, th?c hi?n logout
           navigate("/logout");
         }
       } catch (error) {
@@ -141,9 +139,8 @@ export default function App() {
     const shouldCheckNow = () => {
       const lastCheck = localStorage.getItem(LAST_BAN_CHECK_KEY);
       if (!lastCheck) return true;
-
-      const timeSinceLastCheck = Date.now() - parseInt(lastCheck, 10);
-      return timeSinceLastCheck >= BAN_CHECK_INTERVAL_MS;
+      const diff = Date.now() - parseInt(lastCheck, 10);
+      return diff >= BAN_CHECK_INTERVAL_MS;
     };
 
     const performBanCheck = () => {
@@ -153,16 +150,9 @@ export default function App() {
       }
     };
 
-    // Check ngay l?p t?c n?u c?n
     performBanCheck();
-
-    // Setup interval d? check d?nh k?
-    const intervalId = setInterval(performBanCheck, BAN_CHECK_INTERVAL_MS);
-
-    // Cleanup interval khi component unmount
-    return () => {
-      clearInterval(intervalId);
-    };
+    const id = setInterval(performBanCheck, BAN_CHECK_INTERVAL_MS);
+    return () => clearInterval(id);
   }, [user, navigate]);
 
   return (
@@ -170,11 +160,11 @@ export default function App() {
       <Header isAdmin={isAdmin} user={user} genres={genres} />
       <Outlet />
       {!hideFooter && <Footer />}
-      {/* << CHANGED: ch? render Footer khi kh�ng ? summon */}
     </>
   );
 }
 
+// Error boundary
 export function ErrorBoundary() {
   return <CustomErrorBoundary />;
 }

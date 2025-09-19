@@ -7,7 +7,7 @@ import {
   useSubmit,
 } from "react-router-dom";
 import { useActionData, useLoaderData, useNavigation } from "react-router-dom";
-import { Camera, FileText, Mail, User } from "lucide-react";
+import { Camera, FileText, Mail, User, AlertTriangle, Coins } from "lucide-react";
 
 import { updateUserProfile } from "~/.server/mutations/user.mutation";
 import { requireLogin } from "~/.server/services/auth.server";
@@ -19,6 +19,7 @@ import {
 import { ImageUploader } from "~/components/image-uploader";
 import { UserModel } from "~/database/models/user.model";
 import { useFileOperations } from "~/hooks/use-file-operations";
+import { validateUsername, USERNAME_CHANGE_COST } from "~/utils/username-validator";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await requireLogin(request);
@@ -105,7 +106,16 @@ export default function ProfileEdit() {
   const [avatarPreview, setAvatarPreview] = useState<string>(user.avatar || "");
   const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string>(user.avatar || "");
 
+  // State for username validation
+  const [username, setUsername] = useState<string>(user.name);
+  const [usernameError, setUsernameError] = useState<string>("");
+  const [showUsernameCostWarning, setShowUsernameCostWarning] = useState<boolean>(false);
+
   const isSubmitting = navigation.state === "submitting";
+
+  // Check if username has changed from original
+  const usernameChanged = username !== user.name;
+  const hasEnoughGold = user.gold >= USERNAME_CHANGE_COST;
 
   // Cleanup object URL khi component unmount
   useEffect(() => {
@@ -134,6 +144,23 @@ export default function ProfileEdit() {
     setSelectedFile(null);
     setAvatarPreview("");
     setUploadedAvatarUrl("");
+  };
+
+  // Handle username change and validation
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    
+    // Real-time validation
+    const validation = validateUsername(value);
+    if (!validation.isValid) {
+      setUsernameError(validation.error || "Username không hợp lệ");
+    } else {
+      setUsernameError("");
+    }
+
+    // Show cost warning if username changed from original
+    const changed = value !== user.name;
+    setShowUsernameCostWarning(changed);
   };
 
   // Helper function để submit form
@@ -204,20 +231,59 @@ export default function ProfileEdit() {
             className="flex flex-col gap-6"
           >
             {/* Username Field */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-fit items-center gap-1.5">
                 <User className="text-txt-secondary h-4 w-4" />
                 <label className="text-txt-primary font-sans text-base font-semibold">
                   Username
                 </label>
               </div>
-              <div className="w-full sm:w-[680px]">
+              <div className="w-full sm:w-[680px] space-y-2">
                 <input
                   type="text"
                   name="name"
-                  defaultValue={user.name}
-                  className="bg-bgc-layer2 border-bd-default text-txt-primary focus:border-lav-500 w-full rounded-xl border px-3 py-2.5 font-sans text-base font-medium outline-none"
+                  value={username}
+                  onChange={(e) => handleUsernameChange(e.target.value)}
+                  className={`bg-bgc-layer2 border-bd-default text-txt-primary focus:border-lav-500 w-full rounded-xl border px-3 py-2.5 font-sans text-base font-medium outline-none ${
+                    usernameError ? "border-red-500 focus:border-red-500" : ""
+                  }`}
+                  placeholder="6-15 ký tự, chỉ chữ cái và số"
                 />
+                
+                {/* Username validation error */}
+                {usernameError && (
+                  <div className="flex items-center gap-2 text-red-500 text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>{usernameError}</span>
+                  </div>
+                )}
+
+                {/* Username change cost warning */}
+                {showUsernameCostWarning && !usernameError && (
+                  <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
+                    hasEnoughGold 
+                      ? "bg-yellow-500/10 border-yellow-500 text-yellow-600" 
+                      : "bg-red-500/10 border-red-500 text-red-600"
+                  }`}>
+                    <Coins className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">
+                        Đổi username sẽ tốn {USERNAME_CHANGE_COST.toLocaleString()} Ngọc
+                      </div>
+                      <div className="text-xs opacity-80">
+                        Hiện tại bạn có {user.gold.toLocaleString()} Ngọc
+                        {!hasEnoughGold && " (không đủ)"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Username format hint */}
+                {!showUsernameCostWarning && !usernameError && (
+                  <div className="text-txt-secondary text-xs">
+                    6-15 ký tự, chỉ được sử dụng chữ cái (a-z, A-Z) và số (0-9)
+                  </div>
+                )}
               </div>
             </div>
 
@@ -297,13 +363,25 @@ export default function ProfileEdit() {
         <button
           type="submit"
           form="profile-form"
-          disabled={isSubmitting || isUploading}
+          disabled={
+            isSubmitting || 
+            isUploading || 
+            (usernameError !== "") || 
+            (usernameChanged && !hasEnoughGold)
+          }
           className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-opacity disabled:opacity-50 sm:w-52"
         >
           <span className="text-center font-sans text-sm font-semibold text-black">
             {isUploading ? "Đang upload..." : isSubmitting ? "Đang lưu..." : "Lưu"}
           </span>
         </button>
+        
+        {/* Error message for insufficient gold */}
+        {usernameChanged && !hasEnoughGold && (
+          <div className="text-red-600 text-sm text-center">
+            Bạn cần {USERNAME_CHANGE_COST.toLocaleString()} Ngọc để đổi username
+          </div>
+        )}
       </div>
 
       {/* Success Message */}

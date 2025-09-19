@@ -2,7 +2,7 @@ import { type LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 
 import { ProfileInfo } from "~/components/profile-info";
-import { ProfileMangaManagement } from "~/components/profile-manga-management";
+import { ProfileMangaUploadedPublic } from "~/components/profile-manga-uploaded-public";
 import { UserModel } from "~/database/models/user.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
@@ -76,7 +76,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <ProfileMangaManagement userId={user.id} />
+      <ProfileMangaUploadedPublic userId={user.id} />
     </div>
   );
 }

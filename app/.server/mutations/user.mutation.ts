@@ -7,6 +7,12 @@ import { ROLES } from "~/constants/user";
 import { UserModel, type UserType } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
+import {
+  validateUsernameComplete,
+  validateUsernameChangeCost,
+  sanitizeUsername,
+  USERNAME_CHANGE_COST,
+} from "~/utils/username-validator";
 
 export const promoteToAdmin = async (request: Request, userId: string) => {
   const currentUserInfo = await getUserInfoFromSession(request);
@@ -199,10 +205,55 @@ export const updateUserProfile = async (
     throw new BusinessError("ID người dùng không hợp lệ");
   }
 
-  await UserModel.findByIdAndUpdate(userId, { $set: data });
+  // Lấy thông tin user hiện tại
+  const currentUser = await UserModel.findById(userId).lean();
+  if (!currentUser) {
+    throw new BusinessError("Không tìm thấy thông tin người dùng");
+  }
+
+  const updatedData: Partial<UserType> = { ...data };
+  let goldDeduction = 0;
+  let usernameChanged = false;
+
+  // Kiểm tra nếu có thay đổi username (name field)
+  if (data.name && data.name !== currentUser.name) {
+    usernameChanged = true;
+    
+    // Sanitize username để đảm bảo an toàn
+    const sanitizedUsername = sanitizeUsername(data.name);
+    updatedData.name = sanitizedUsername;
+
+    // Validate username constraints và uniqueness
+    const usernameValidation = await validateUsernameComplete(
+      sanitizedUsername,
+      userId,
+    );
+    
+    if (!usernameValidation.isValid) {
+      throw new BusinessError(usernameValidation.error || "Username không hợp lệ");
+    }
+
+    // Kiểm tra user có đủ gold để đổi username không
+    const goldValidation = validateUsernameChangeCost(currentUser.gold);
+    if (!goldValidation.isValid) {
+      throw new BusinessError(goldValidation.error || "Không đủ Ngọc để đổi username");
+    }
+
+    goldDeduction = USERNAME_CHANGE_COST;
+  }
+
+  // Thực hiện cập nhật
+  const updateQuery: any = { $set: updatedData };
+  
+  if (goldDeduction > 0) {
+    updateQuery.$inc = { gold: -goldDeduction };
+  }
+
+  await UserModel.findByIdAndUpdate(userId, updateQuery);
 
   return {
     success: true,
     message: "Cập nhật thành công",
+    goldDeducted: goldDeduction,
   };
 };

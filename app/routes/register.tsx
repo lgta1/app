@@ -8,6 +8,7 @@ import {
   useNavigation,
   useSubmit,
 } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 
 import { register } from "@/services/auth.server";
 import { getUserInfoFromSession } from "@/services/session.svc";
@@ -17,6 +18,7 @@ import type { Route } from "./+types/register";
 import { FactionSelectionDialog } from "~/components/dialog-faction-selection";
 import { GenderSelectionDialog } from "~/components/dialog-gender-selection";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
+import { validateUsername } from "~/utils/username-validator";
 
 export const meta: MetaFunction = () => {
   return [
@@ -58,6 +60,10 @@ export default function Register() {
   const [showFactionDialog, setShowFactionDialog] = useState(false);
   const [showGenderDialog, setShowGenderDialog] = useState(false);
   const [selectedFaction, setSelectedFaction] = useState<number | null>(null);
+  
+  // Username validation state
+  const [usernameError, setUsernameError] = useState<string>("");
+  
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
 
@@ -65,8 +71,28 @@ export default function Register() {
 
   const submit = useSubmit();
 
+  // Handle username validation
+  const handleUsernameChange = (value: string) => {
+    setName(value);
+    
+    // Real-time validation
+    const validation = validateUsername(value);
+    if (!validation.isValid) {
+      setUsernameError(validation.error || "Username không hợp lệ");
+    } else {
+      setUsernameError("");
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Validate username before proceeding
+    const usernameValidation = validateUsername(name);
+    if (!usernameValidation.isValid) {
+      setUsernameError(usernameValidation.error || "Username không hợp lệ");
+      return;
+    }
 
     // Kiểm tra mật khẩu trước khi hiển thị dialog
     if (password !== confirmPassword) {
@@ -138,27 +164,44 @@ export default function Register() {
               )}
 
               {/* Tên */}
-              <div className="flex w-full flex-col">
+              <div className="flex w-full flex-col gap-2">
                 <div className="flex items-center gap-[10px] pb-3">
                   <label
                     htmlFor="name"
                     className="text-txt-primary text-xs leading-4 font-semibold"
                   >
-                    Tên
+                    Username
                   </label>
                 </div>
-                <div className="bg-bgc-layer2 border-bd-default flex w-full items-center rounded-xl border px-3 py-[10px]">
+                <div className={`bg-bgc-layer2 border-bd-default flex w-full items-center rounded-xl border px-3 py-[10px] ${
+                  usernameError ? "border-red-500" : ""
+                }`}>
                   <input
                     type="text"
                     id="name"
                     name="name"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Nhập tên của bạn"
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    placeholder="6-15 ký tự, chỉ chữ cái và số"
                     className="text-txt-secondary w-full bg-transparent text-base leading-6 font-medium outline-none"
                     required
                   />
                 </div>
+                
+                {/* Username validation error */}
+                {usernameError && (
+                  <div className="flex items-center gap-2 text-red-500 text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>{usernameError}</span>
+                  </div>
+                )}
+                
+                {/* Username format hint */}
+                {!usernameError && (
+                  <div className="text-txt-secondary text-xs">
+                    6-15 ký tự, chỉ được sử dụng chữ cái (a-z, A-Z) và số (0-9)
+                  </div>
+                )}
               </div>
 
               {/* Email */}
@@ -249,7 +292,7 @@ export default function Register() {
               {/* Nút đăng ký */}
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || usernameError !== ""}
                 className="to-lav-500 h-11 w-full rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-3 text-sm leading-5 font-semibold text-black shadow-[0px_4px_8.9px_rgba(196,69,255,0.25)] disabled:opacity-70"
               >
                 {isSubmitting ? "Đang xử lý..." : "Đăng ký"}

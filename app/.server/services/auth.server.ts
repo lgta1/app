@@ -148,6 +148,16 @@ export async function register({ request }: { request: Request }) {
     throw new BusinessError("Mật khẩu không khớp");
   }
 
+  // Validate username with new constraints
+  const { validateUsernameComplete, sanitizeUsername } = await import("~/utils/username-validator");
+  
+  const sanitizedUsername = sanitizeUsername(name);
+  const usernameValidation = await validateUsernameComplete(sanitizedUsername);
+  
+  if (!usernameValidation.isValid) {
+    throw new BusinessError(usernameValidation.error || "Username không hợp lệ");
+  }
+
   const existingUser = await UserModel.findOne({ email }).lean();
   if (existingUser) {
     throw new BusinessError("Tài khoản đã tồn tại");
@@ -165,7 +175,7 @@ export async function register({ request }: { request: Request }) {
   const hashedPassword = hashPassword(password, salt);
 
   await UserModel.create({
-    name,
+    name: sanitizedUsername,
     email,
     password: hashedPassword,
     salt,

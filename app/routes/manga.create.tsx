@@ -35,7 +35,7 @@ import { useFileOperations } from "~/hooks/use-file-operations";
 export const meta: MetaFunction = () => {
   return [
     { title: "Đăng Truyện - WW" },
-    { name: "description", content: "Đăng truyện mới lên WW!" },
+    { name: "description", content: "Đăng truyện mới lên VinaHentai!" },
   ];
 };
 

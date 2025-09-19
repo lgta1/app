@@ -39,7 +39,7 @@ export function MangaCard({ manga }: Props) {
       prefetch="intent"
       className="group bg-bgc-layer1 relative block overflow-hidden rounded-xl border border-white/5 transition-colors hover:border-white/10"
     >
-      {/* Ảnh */}
+      {/* Ảnh (giữ khung 2:3 như cũ) */}
       <div className="relative aspect-[2/3] w-full overflow-hidden">
         <img
           src={poster}
@@ -49,12 +49,24 @@ export function MangaCard({ manga }: Props) {
         />
       </div>
 
+      {/* ===================== BEGIN <feature> TOP_3_4_COVER ===================== */}
+      {/* Ảnh 3:4 bám TOP, chiếm full chiều ngang; phủ lên ảnh nền để không crop */}
+      <div className="absolute inset-x-0 top-0 z-[1]">
+        <img
+          src={poster}
+          alt={title}
+          className="w-full h-auto aspect-[3/4] object-contain pointer-events-none select-none"
+          loading="lazy"
+        />
+      </div>
+      {/* ====================== END <feature> TOP_3_4_COVER ====================== */}
+
       {/* ===================== BEGIN <feature> BOTTOM_OVERLAY_30P ===================== */}
-      {/* Overlay đáy ~30% chiều cao để làm nền cho tiêu đề + meta */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[25%] min-h-[72px] bg-gradient-to-t from-black/85 via-black/60 to-transparent backdrop-blur-[1px]" />
+      {/* Overlay đáy ~50% chiều cao để làm nền cho tiêu đề + meta */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 min-h-[72px] bg-gradient-to-t from-black/70 via-black/50 to-transparent backdrop-blur-[1px]" />
 
       {/* Nội dung phủ trên overlay (không bo góc tiêu đề) */}
-      <div className="absolute inset-x-0 bottom-0 p-2">
+      <div className="absolute inset-x-0 bottom-0 z-[2] p-2">
         {/* Tiêu đề — 1 dòng, giữ font/cỡ như cũ */}
         <h3
           className="truncate text-sm leading-5 font-semibold text-white/95"

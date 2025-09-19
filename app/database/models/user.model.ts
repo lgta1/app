@@ -56,6 +56,9 @@ const UserSchema = new Schema<UserType>(
 
 UserSchema.index({ email: 1 }, { unique: true });
 
+// Unique index cho name (username) - case insensitive
+UserSchema.index({ name: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
+
 // Index cho leaderboard - query: { role, isDeleted, isBanned } + sort { exp: -1 }
 UserSchema.index({ role: 1, isDeleted: 1, isBanned: 1, exp: -1 });
 

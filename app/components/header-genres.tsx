@@ -24,6 +24,22 @@ function normalizeVN(s: string) {
 export function HeaderGenres({ genres }: HeaderGenresProps) {
   const [open, setOpen] = useState(false);
 
+  // 🔎 DEBUG: in ra TV (Header) đang nhận bao nhiêu kênh từ đài + có bondage/slave không
+  // (Không ảnh hưởng logic; chỉ hỗ trợ kiểm tra)
+  try {
+    // eslint-disable-next-line no-console
+    console.log(
+      "[ui:header] genres =",
+      Array.isArray(genres) ? genres.length : 0,
+      "| bondage:",
+      Array.isArray(genres) && genres.some((g: any) => g?.slug === "bondage"),
+      "| slave:",
+      Array.isArray(genres) && genres.some((g: any) => g?.slug === "slave")
+    );
+  } catch (_) {
+    // ignore
+  }
+
   // BEGIN <feature> GENRES_AZ_FLAT_PIN_ONESHOT_HEADER
   const sorted = useMemo(() => {
     // tạo bản sao mảng, tránh mutate props
@@ -41,8 +57,8 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
 
     // Sắp xếp: Oneshot đứng đầu, phần còn lại A–Z (khử dấu)
     arr.sort((a, b) => {
-      const aIsOne = normalizeVN(a.name) === "oneshot" || a.slug === "oneshot";
-      const bIsOne = normalizeVN(b.name) === "oneshot" || b.slug === "oneshot";
+      const aIsOne = normalizeVN(a.name) === "oneshot" || (a as any).slug === "oneshot";
+      const bIsOne = normalizeVN(b.name) === "oneshot" || (b as any).slug === "oneshot";
       if (aIsOne && !bIsOne) return -1;
       if (!aIsOne && bIsOne) return 1;
 
@@ -82,13 +98,17 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
             <div className="grid grid-cols-3 gap-x-4 gap-y-2 sm:[grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
               {sorted.map((genre) => (
                 <Link
-                  key={genre._id?.toString?.() || (genre as any).id || genre.slug}
-                  to={`/genres/${genre.slug}`}
+                  key={
+                    (genre as any)._id?.toString?.() ||
+                    (genre as any).id ||
+                    (genre as any).slug
+                  }
+                  to={`/genres/${(genre as any).slug}`}
                   className="block break-inside-avoid py-1"
                   onClick={() => setOpen(false)}
                 >
                   <div className="text-txt-primary hover:text-txt-focus text-xs font-medium">
-                    {genre.name}
+                    {(genre as any).name}
                   </div>
                 </Link>
               ))}

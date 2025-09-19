@@ -36,8 +36,9 @@ for (let i = 0; i < instances; i++) {
       MINIO_USE_SSL: "true",
       MINIO_ACCESS_KEY: "64b16b6572f535527f4a0cee30d9059f",
       MINIO_SECRET_KEY:
-        "5236b7d902ce7aed759d6ae165d9ab629e234825fa2e30cff3dc80b1583ae1c0",
+        "998ed84b06d72dd98502a68e19d84881bf71bb89812b1e4e5a8247087e7b4448",
       MINIO_DEFAULT_BUCKET: "vnht-images",
+      MONGO_URL: "mongodb://admin:yourpassword@localhost:27017/?authSource=admin&maxPoolSize=100&minPoolSize=10&retryWrites=true&retryReads=true&w=majority&readPreference=primaryPreferred&serverSelectionTimeoutMS=5000&connectTimeoutMS=10000"
     },
   });
 }
