@@ -96,9 +96,9 @@ export function Header({ user, isAdmin = false, genres = [] }: HeaderProps) {
           <div className="flex items-center">
             <Link to="/">
               <img
-                src="/images/logo.png"
+                src="/images/logo2.png"
                 alt="VinaHentai Logo"
-                className="h-auto w-30 cursor-pointer"
+                className="h-auto w-50 cursor-pointer"
               />
             </Link>
           </div>
@@ -138,7 +138,7 @@ export function Header({ user, isAdmin = false, genres = [] }: HeaderProps) {
             <img
               src="/images/logo.png"
               alt="VinaHentai Logo"
-              className="h-9 w-auto cursor-pointer"
+              className="h-10 w-auto cursor-pointer"
             />
           </Link>
 

@@ -50,18 +50,9 @@ export async function action({ request }: ActionFunctionArgs) {
     const formData = await request.formData();
     const userInfo = await requireLogin(request);
 
-    // BEGIN <feature> MANGACREATE_DESCRIPTION_FALLBACK
-    // Cho phép mô tả trống: fallback "..." để downstream luôn có chuỗi an toàn
-    const rawDescription = formData.get("description");
-    const safeDescription =
-      typeof rawDescription === "string" && rawDescription.trim()
-        ? rawDescription
-        : "...";
-    // END <feature> MANGACREATE_DESCRIPTION_FALLBACK
-
     const mangaData = {
       title: formData.get("title") as string,
-      description: safeDescription, // <- dùng fallback
+      description: formData.get("description") as string,
       author: formData.get("author") as string, // giữ contract cũ: chuỗi tên
       keywords: formData.get("keywords") as string,
       userStatus: Number(formData.get("userStatus")),
@@ -108,15 +99,6 @@ interface FormDataShape {
   genres: string[];
   poster: File | null;
 }
-
-// Khử dấu cho VN
-const foldVN = (s: string) =>
-  (s || "")
-    .normalize("NFD")
-    .replace(/\p{M}+/gu, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase();
 
 export default function CreateStory() {
   const { genres } = useLoaderData<typeof loader>();
@@ -179,28 +161,11 @@ export default function CreateStory() {
     setPosterUrl("");
   };
 
-  // BEGIN <feature> MANGACREATE_DESCRIPTION_OPTIONAL
-  /**
-   * BỎ BẮT BUỘC mô tả: chỉ yêu cầu Title, Poster, Author.
-   * Đồng thời, trước khi submit native, loại bỏ thuộc tính required trên textarea nếu có.
-   */
-  const ensureDescriptionNotRequired = () => {
-    const el = formRef.current?.querySelector<HTMLTextAreaElement>('textarea[name="description"]');
-    if (el) {
-      el.removeAttribute("required");
-    }
-  };
-  // END <feature> MANGACREATE_DESCRIPTION_OPTIONAL
-
   const handleContinueClick = async () => {
-    // BEGIN <feature> MANGACREATE_DESCRIPTION_OPTIONAL
-    if (!formData.title.trim()) {
-      toast.error("Vui lòng nhập tên truyện");
+    if (!formData.title.trim() || !formData.description.trim()) {
+      toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
-    // (mô tả được phép trống)
-    // END <feature> MANGACREATE_DESCRIPTION_OPTIONAL
-
     if (!formData.poster) {
       toast.error("Vui lòng chọn ảnh bìa");
       return;
@@ -228,11 +193,6 @@ export default function CreateStory() {
       setPosterUrl(posterData.url);
       setIsUploading(false);
 
-      // Loại bỏ required ở textarea (nếu còn) rồi submit native để nhận redirect
-      // BEGIN <feature> MANGACREATE_DESCRIPTION_OPTIONAL
-      ensureDescriptionNotRequired();
-      // END <feature> MANGACREATE_DESCRIPTION_OPTIONAL
-
       // Native submit để Router điều hướng theo redirect từ action
       formRef.current?.requestSubmit();
     } catch (error) {
@@ -244,11 +204,16 @@ export default function CreateStory() {
 
   // BEGIN <feature> GENRES_CREATE_ALL_AZ_SCROLL
   /**
-   * Thay danh sách phẳng bằng nhóm A–Z + Search (lọc theo CHỮ ĐẦU),
-   * và lưới CỐ ĐỊNH 3 cột. Không đổi payload submit (mảng slug).
+   * Thay thế phân nhóm cũ bằng danh sách phẳng, sort A–Z (fold dấu),
+   * hiển thị toàn bộ trong khung cuộn dọc. Không đổi payload submit.
    */
-  const [genreQuery, setGenreQuery] = useState("");
-  const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  const fold = (s: string) =>
+    (s || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
 
   const sortedGenres: GenresType[] = useMemo(() => {
     const list = Array.isArray(genres) ? genres.slice() : [];
@@ -258,61 +223,17 @@ export default function CreateStory() {
       if (!uniq.has(g.slug)) uniq.set(g.slug, g);
     }
     return Array.from(uniq.values()).sort((a, b) => {
-      const aa = foldVN(a.name);
-      const bb = foldVN(b.name);
+      const aa = fold(a.name);
+      const bb = fold(b.name);
       if (aa < bb) return -1;
       if (aa > bb) return 1;
       return 0;
     });
   }, [genres]);
-
-  // Search theo CHỮ CÁI ĐẦU (không phải "chứa")
-  const filteredByFirst = useMemo(() => {
-    const letter = foldVN(genreQuery).charAt(0);
-    if (!letter) return sortedGenres;
-    return sortedGenres.filter((g) => foldVN(g.name).charAt(0) === letter);
-  }, [sortedGenres, genreQuery]);
-
-  // Gom nhóm A–Z; nhóm khác rơi vào '#', và đưa '#' lên đầu cho dễ thấy
-  const groupedGenres = useMemo(() => {
-    const map: Record<string, GenresType[]> = {};
-    for (const g of filteredByFirst) {
-      const first = (foldVN(g.name)[0] || "#").toUpperCase();
-      const key = AZ.includes(first) ? first : "#";
-      (map[key] ||= []).push(g);
-    }
-    const out: Array<[string, GenresType[]]> = [];
-    if (map["#"]?.length) out.push(["#", map["#"]]);
-    for (const L of AZ) if (map[L]?.length) out.push([L, map[L]]);
-    return out;
-  }, [filteredByFirst]);
   // END <feature> GENRES_CREATE_ALL_AZ_SCROLL
 
   // actionData sẽ có lỗi (nếu có) sau navigation submit
   const responseData = actionData;
-
-  // BEGIN <feature> MANGACREATE_POSTER_DND_HEADER
-  // Kéo-thả cho ảnh bìa (không đổi tên field, không đổi flow upload)
-  const [posterDragOver, setPosterDragOver] = useState(false);
-  const onPosterDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setPosterDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const f = files[0];
-      handleFileSelect(f);
-    }
-  };
-  const onPosterDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!posterDragOver) setPosterDragOver(true);
-  };
-  const onPosterDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setPosterDragOver(false);
-  };
-  // END <feature> MANGACREATE_POSTER_DND_HEADER
 
   return (
     <div className="mx-auto flex w-full max-w-[950px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-0">
@@ -381,64 +302,37 @@ export default function CreateStory() {
             {/* BEGIN <feature> GENRES_CREATE_ALL_AZ_SCROLL */}
             <div className="flex w-full flex-col gap-3 sm:w-[680px]">
               <div className="text-txt-secondary text-xs">
-                Chia nhóm A–Z, lưới 3 cột. Tìm theo <b>chữ cái đầu</b>.
+                Sắp xếp A–Z. Tích để chọn nhiều thể loại.
               </div>
 
-              {/* Search theo chữ đầu */}
-              <label className="relative w-full max-w-[360px]">
-                <input
-                  value={genreQuery}
-                  onChange={(e) => setGenreQuery(e.target.value)}
-                  placeholder="vd: a, b, c..."
-                  className="w-full rounded-md border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </label>
-
               <div className="max-h-[360px] overflow-y-auto rounded-lg border border-white/10 p-3 pr-1 [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]">
-                <div className="space-y-4">
-                  {groupedGenres.map(([letter, items]) => (
-                    <div key={letter}>
-                      <div className="mb-2 flex items-center gap-2">
-                        <div className="text-sm font-bold text-txt-focus">{letter}</div>
-                        <div className="h-px flex-1 bg-bd-default/60" />
-                      </div>
-
-                      {/* Lưới CỐ ĐỊNH 3 cột */}
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-2">
-                        {items.map((genre) => {
-                          const checked = formData.genres.includes(genre.slug);
-                          return (
-                            <label
-                              key={genre.slug}
-                              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 select-none hover:bg-white/5"
-                            >
-                              <div className="relative">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => handleGenreToggle(genre.slug)}
-                                  className="bg-bgc-layer2 border-bd-default checked:bg-lav-500 checked:border-lav-500 h-4 w-4 cursor-pointer appearance-none rounded border"
-                                />
-                                {checked && (
-                                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                                    <Check className="text-txt-primary h-3 w-3" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="text-txt-primary line-clamp-1 font-sans text-xs font-medium">
-                                <span className="font-bold">{genre.name.slice(0, 1)}</span>
-                                {genre.name.slice(1)}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-
-                  {groupedGenres.length === 0 && (
-                    <div className="text-sm text-txt-secondary">Không có thể loại phù hợp.</div>
-                  )}
+                <div className="grid [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))] gap-2">
+                  {sortedGenres.map((genre) => {
+                    const checked = formData.genres.includes(genre.slug);
+                    return (
+                      <label
+                        key={genre.slug}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 select-none hover:bg-white/5"
+                      >
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => handleGenreToggle(genre.slug)}
+                            className="bg-bgc-layer2 border-bd-default checked:bg-lav-500 checked:border-lav-500 h-4 w-4 cursor-pointer appearance-none rounded border"
+                          />
+                          {checked && (
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                              <Check className="text-txt-primary h-3 w-3" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-txt-primary line-clamp-1 font-sans text-xs font-medium">
+                          {genre.name}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -458,9 +352,10 @@ export default function CreateStory() {
                 name="description"
                 value={formData.description}
                 onChange={(e) => handleInputChange("description", e.target.value)}
-                placeholder="Nhập nội dung giới thiệu (có cũng được, không có cũng được)"
+                placeholder="Nhập nội dung giới thiệu"
                 rows={8}
                 className="bg-bgc-layer2 border-bd-default text-txt-secondary focus:border-lav-500 focus:text-txt-primary w-full resize-none rounded-xl border px-3 py-2.5 font-sans text-base font-medium focus:outline-none"
+                required
               />
             </div>
           </div>
@@ -475,28 +370,14 @@ export default function CreateStory() {
             </div>
             <div className="flex w-full flex-row items-start gap-4 sm:w-[680px] sm:gap-9">
               <div className="min-h-64 min-w-44">
-                {/* BEGIN <feature> MANGACREATE_POSTER_DND */}
-                <div
-                  onDrop={onPosterDrop}
-                  onDragOver={onPosterDragOver}
-                  onDragLeave={onPosterDragLeave}
-                  className={[
-                    "rounded-xl transition",
-                    posterDragOver ? "ring-2 ring-lav-500 ring-offset-0" : "",
-                  ].join(" ")}
-                  aria-label="Kéo ảnh vào vùng này hoặc bấm để chọn"
-                  title="Kéo ảnh vào đây hoặc bấm để chọn"
-                >
-                  <ImageUploader
-                    onFileSelect={handleFileSelect}
-                    onClear={clearPosterImage}
-                    preview={posterPreview}
-                    uploadText="Tải ảnh lên (kéo-thả được)"
-                    required
-                    aspectRatio="poster"
-                  />
-                </div>
-                {/* END <feature> MANGACREATE_POSTER_DND */}
+                <ImageUploader
+                  onFileSelect={handleFileSelect}
+                  onClear={clearPosterImage}
+                  preview={posterPreview}
+                  uploadText="Tải ảnh lên"
+                  required
+                  aspectRatio="poster"
+                />
               </div>
               <div className="flex h-64 flex-col justify-center gap-4 p-4">
                 <p className="text-txt-secondary font-sans text-base font-medium">
@@ -510,22 +391,36 @@ export default function CreateStory() {
           </div>
 
           {/* Từ khóa */}
-          {/* BEGIN <feature> MANGACREATE_KEYWORDS_TOGGLE */}
-          {/* Ẩn UI từ khóa nếu vô dụng; giữ hidden input rỗng để payload không vỡ */}
-          <input type="hidden" name="keywords" value="" />
-          {/* END <feature> MANGACREATE_KEYWORDS_TOGGLE */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-fit items-center gap-1.5">
+              <Book className="text-txt-secondary h-4 w-4" />
+              <label className="text-txt-primary font-sans text-base font-semibold">
+                Từ khóa
+              </label>
+            </div>
+            <div className="w-full sm:w-[680px]">
+              <input
+                type="text"
+                name="keywords"
+                value={formData.keywords}
+                onChange={(e) => handleInputChange("keywords", e.target.value)}
+                placeholder="Mỗi từ khóa cách nhau bằng dấu phẩy"
+                className="bg-bgc-layer2 border-bd-default text-txt-secondary focus:border-lav-500 focus:text-txt-primary w-full rounded-xl border px-3 py-2.5 font-sans text-base font-medium focus:outline-none"
+              />
+            </div>
+          </div>
 
           {/* Tác giả — dùng AuthorSelect (giữ contract cũ: author là chuỗi) */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-fit items-center gap-1.5">
               <User className="text-txt-secondary h-4 w-4" />
               <label className="text-txt-primary font-sans text-base font-semibold">
-                Tác giả/Dịch giả
+                Tác giả
               </label>
             </div>
             <div className="w-full sm:w-[680px]">
               <AuthorSelect
-                placeholder="Thêm tác giả, dịch giả…"
+                placeholder="Thêm tác giả…"
                 initialAuthors={[]}
                 pinCreateOnTop
                 onChange={(authors: AuthorLite[], orderIds: string[]) => {

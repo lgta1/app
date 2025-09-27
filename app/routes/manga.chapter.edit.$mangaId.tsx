@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"; 
 import { toast, Toaster } from "react-hot-toast";
 import {
   Link,
@@ -131,31 +131,59 @@ export default function EditChapter() {
   const formRef = useRef<HTMLFormElement>(null);
   const { uploadMultipleFiles } = useFileOperations();
 
+  // Dropzone highlight
+  const [dragOver, setDragOver] = useState(false);
+
+  // Card drag-sort states
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  // === helper: move item in array ===
+  const move = <T,>(arr: T[], from: number, to: number) => {
+    const a = arr.slice();
+    const [it] = a.splice(from, 1);
+    a.splice(to, 0, it);
+    return a;
+  };
+
   // Initialize form data when editing
   useEffect(() => {
     setTitle(chapter.title);
 
-    // Convert existing content URLs to preview images
+    // Convert existing content URLs to preview images (giữ thứ tự chương hiện tại)
     const existingImages: PreviewImage[] = chapter.contentUrls.map((url, index) => ({
       url,
       id: `existing-${index}`,
       isExisting: true,
     }));
     setPreviewImages(existingImages);
+
+    // Reset danh sách file mới
+    setContents([]);
   }, [chapter]);
 
-  const handlePagesChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  // ---- unified add files (input change & drag-drop)
+  const addFiles = async (filesLike: FileList | File[], source: "input" | "drop" = "input") => {
+    let list = Array.from(filesLike);
+    if (list.length === 0) return;
 
-    const newFiles = Array.from(files);
+    // Heuristic: Chrome đôi khi đảo thứ tự khi kéo-thả nhiều file
+    if (source === "drop" && list.length >= 2) {
+      const first = list[0];
+      const last = list[list.length - 1];
+      const looksReversedByName =
+        first.name.localeCompare(last.name, undefined, { numeric: true, sensitivity: "base" }) > 0;
+      const looksReversedByTime = first.lastModified > last.lastModified;
+      if (looksReversedByName && looksReversedByTime) {
+        list = list.reverse();
+      }
+    }
 
     // Validate files first
     try {
-      newFiles.forEach((file) => validateImageFile(file));
+      list.forEach((file) => validateImageFile(file));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "File không hợp lệ");
-      event.target.value = "";
       return;
     }
 
@@ -163,7 +191,7 @@ export default function EditChapter() {
     setCompressionProgress({
       isCompressing: true,
       current: 0,
-      total: newFiles.length,
+      total: list.length,
     });
 
     try {
@@ -171,7 +199,7 @@ export default function EditChapter() {
 
       // Compress images with progress callback
       const compressionResults = await compressMultipleImages(
-        newFiles,
+        list,
         (current, total) => {
           setCompressionProgress({
             isCompressing: true,
@@ -183,6 +211,8 @@ export default function EditChapter() {
 
       // Update files and preview images
       const compressedFiles = compressionResults.map((result) => result.compressedFile);
+
+      // Append vào contents (chỉ chứa file mới)
       setContents((prev) => [...prev, ...compressedFiles]);
 
       // Create preview images with compression info
@@ -199,6 +229,7 @@ export default function EditChapter() {
         };
       });
 
+      // Thêm vào sau danh sách đang có (giữ thứ tự)
       setPreviewImages((prev) => [...prev, ...newPreviewImages]);
 
       // Calculate total savings
@@ -214,7 +245,7 @@ export default function EditChapter() {
         ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100;
 
       toast.success(
-        `Đã nén ${newFiles.length} ảnh thành công! Tiết kiệm ${formatFileSize(totalOriginalSize - totalCompressedSize)} (${Math.round(totalSavings)}%)`,
+        `Đã nén ${list.length} ảnh thành công! Tiết kiệm ${formatFileSize(totalOriginalSize - totalCompressedSize)} (${Math.round(totalSavings)}%)`,
         { id: "compression" },
       );
     } catch (error) {
@@ -232,8 +263,14 @@ export default function EditChapter() {
         total: 0,
       });
     }
+  };
 
-    // Reset input value to allow selecting the same files again
+  // File input change -> addFiles("input")
+  const handlePagesChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    await addFiles(files, "input");
+    // Reset input to allow re-select same files
     event.target.value = "";
   };
 
@@ -241,8 +278,8 @@ export default function EditChapter() {
     setPreviewImages((prev) => {
       const imageToRemove = prev.find((img) => img.id === id);
       if (imageToRemove && imageToRemove.file) {
+        // ảnh mới: thu hồi objectURL và bỏ khỏi contents
         URL.revokeObjectURL(imageToRemove.url);
-        // Also remove from contents array
         setContents((prevContents) =>
           prevContents.filter((file) => file !== imageToRemove.file),
         );
@@ -280,38 +317,38 @@ export default function EditChapter() {
     setIsSubmitting(true);
 
     try {
-      let contentUrls = previewImages.map((img) => img.url);
+      // Upload CHỈ các ảnh mới (contents)
+      const filesToUpload = contents.map((file) => ({
+        file,
+        options: { prefixPath: "manga-images" as const },
+      }));
 
-      // Only upload content files if there are new files
-      const filesToUpload: Array<{
-        file: File;
-        options: {
-          prefixPath: string;
-        };
-      }> = [];
-
-      // Upload new content pages
-      contents.forEach((file) => {
-        filesToUpload.push({
-          file,
-          options: {
-            prefixPath: "manga-images",
-          },
-        });
-      });
-
+      let fileToUrl = new Map<File, string>();
       if (filesToUpload.length > 0) {
         const uploadResults = await uploadMultipleFiles(filesToUpload);
-
-        // Update content URLs with new uploaded files
-        const newContentUrls = [
-          ...previewImages.filter((img) => img.isExisting).map((img) => img.url),
-        ];
-        const newUploadedUrls = uploadResults.map((result) => result.url);
-        contentUrls = [...newContentUrls, ...newUploadedUrls];
+        // Map theo đúng thứ tự input -> output
+        uploadResults.forEach((res, idx) => {
+          const file = filesToUpload[idx].file;
+          fileToUrl.set(file, res.url);
+        });
       }
 
-      // Submit form with updated URLs
+      // Duyệt theo previewImages (thứ tự UI) để dựng contentUrls
+      const contentUrls = previewImages.map((img) => {
+        if (img.isExisting) return img.url;
+        if (img.file) {
+          const url = fileToUrl.get(img.file);
+          if (!url) {
+            // Trường hợp hiếm: có ảnh mới nhưng không tìm thấy URL upload
+            throw new Error("Thiếu URL upload cho một ảnh mới");
+          }
+          return url;
+        }
+        // Fallback cho chắc
+        return img.url;
+      });
+
+      // Submit form với URLs đúng thứ tự
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("contentUrls", JSON.stringify(contentUrls));
@@ -321,7 +358,8 @@ export default function EditChapter() {
 
       fetcher.submit(formData, { method: "POST", action: submitUrl });
     } catch (error) {
-      toast.error("Có lỗi xảy ra khi upload file");
+      console.error(error);
+      toast.error("Có lỗi xảy ra khi upload/ghép dữ liệu");
       setIsSubmitting(false);
     }
   };
@@ -355,6 +393,79 @@ export default function EditChapter() {
 
   const handleBackToEdit = () => {
     setIsPreviewMode(false);
+  };
+
+  // Drag & Drop for dropzone (thêm ảnh)
+  const onDropZoneDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    if (compressionProgress.isCompressing) {
+      toast.error("Đang nén ảnh, vui lòng chờ...");
+      return;
+    }
+    const { files } = e.dataTransfer;
+    if (files && files.length > 0) {
+      await addFiles(files, "drop");
+    }
+  };
+  const onDropZoneDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!dragOver) setDragOver(true);
+  };
+  const onDropZoneDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOver(false);
+  };
+
+  // Drag-sort handlers for thumbnails (đổi vị trí)
+  const onCardDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    if (compressionProgress.isCompressing) {
+      e.preventDefault();
+      toast.error("Đang nén ảnh, vui lòng chờ...");
+      return;
+    }
+    setDraggingIndex(index);
+    setOverIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const onCardDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.preventDefault(); // allow drop
+    if (overIndex !== index) setOverIndex(index);
+  };
+
+  const onCardDrop = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.preventDefault();
+    const from =
+      draggingIndex !== null ? draggingIndex : parseInt(e.dataTransfer.getData("text/plain"), 10);
+    const to = index;
+    if (isNaN(from) || from === to) {
+      setDraggingIndex(null);
+      setOverIndex(null);
+      return;
+    }
+
+    setPreviewImages((prev) => {
+      const reordered = move(prev, from, to);
+
+      // Đồng bộ contents theo previewImages (chỉ ảnh mới)
+      const newContents = reordered
+        .filter((p) => !p.isExisting && p.file)
+        .map((p) => p.file!) as File[];
+      setContents(newContents);
+
+      return reordered;
+    });
+
+    setDraggingIndex(null);
+    setOverIndex(null);
+  };
+
+  const onCardDragEnd = () => {
+    setDraggingIndex(null);
+    setOverIndex(null);
   };
 
   // Create preview data for ChapterDetail component
@@ -485,7 +596,16 @@ export default function EditChapter() {
             </div>
 
             <div className="relative flex w-full flex-col items-start justify-center gap-2 lg:w-[680px]">
-              <div className="bg-bgc-layer2 border-bd-default relative flex h-full min-h-[240px] w-full flex-1 items-center justify-center rounded-xl border border-dashed px-3 py-2.5 lg:items-start lg:justify-start">
+              <div
+                className={[
+                  "bg-bgc-layer2 border-bd-default relative flex h-full min-h-[240px] w-full flex-1 items-center justify-center rounded-xl border border-dashed px-3 py-2.5 lg:items-start lg:justify-start",
+                  dragOver ? "ring-2 ring-lav-500 ring-offset-0 border-lav-500/60" : "",
+                ].join(" ")}
+                onDrop={onDropZoneDrop}
+                onDragOver={onDropZoneDragOver}
+                onDragLeave={onDropZoneDragLeave}
+                aria-label="Khu vực kéo-thả ảnh"
+              >
                 {/* Hidden file input */}
                 <input
                   ref={fileInputRef}
@@ -519,12 +639,12 @@ export default function EditChapter() {
                   <span className="text-txt-primary text-center text-sm font-medium">
                     {compressionProgress.isCompressing
                       ? "Đang xử lý ảnh..."
-                      : `Click để ${previewImages.length > 0 ? "thêm ảnh mới" : "tải ảnh lên"}`}
+                      : `Click hoặc kéo-thả ảnh vào vùng này`}
                   </span>
                 </div>
 
                 {/* Upload Button and Text - Desktop only: Absolutely positioned in center */}
-                <div className="absolute top-[72px] left-[277px] hidden w-32 flex-col items-center justify-center gap-3 lg:flex">
+                <div className="absolute top-[72px] left-[277px] hidden w-40 flex-col items-center justify-center gap-3 lg:flex">
                   <button
                     type="button"
                     onClick={triggerFileInput}
@@ -543,7 +663,7 @@ export default function EditChapter() {
                   <span className="text-txt-primary text-center text-sm font-medium">
                     {compressionProgress.isCompressing
                       ? "Đang xử lý ảnh..."
-                      : `Click để ${previewImages.length > 0 ? "thêm ảnh mới" : "tải ảnh lên"}`}
+                      : `Click chọn ảnh hoặc kéo-thả ảnh vào vùng này`}
                   </span>
                 </div>
               </div>
@@ -561,13 +681,25 @@ export default function EditChapter() {
               {previewImages.length > 0 && (
                 <div className="mt-4 w-full">
                   <div className="flex flex-wrap gap-4">
-                    {previewImages.map((image) => (
-                      <div key={image.id} className="group relative">
+                    {previewImages.map((image, idx) => (
+                      <div
+                        key={image.id}
+                        className={[
+                          "group relative select-none", // prevent text select while dragging
+                          overIndex === idx ? "outline outline-2 outline-lav-500 rounded-lg" : "",
+                          draggingIndex === idx ? "opacity-70" : "",
+                        ].join(" ")}
+                        draggable
+                        onDragStart={(e) => onCardDragStart(e, idx)}
+                        onDragOver={(e) => onCardDragOver(e, idx)}
+                        onDrop={(e) => onCardDrop(e, idx)}
+                        onDragEnd={onCardDragEnd}
+                      >
                         <div className="bg-bgc-layer1 border-bd-default h-32 w-32 overflow-hidden rounded-lg border">
                           <img
                             src={image.url}
-                            alt="Preview"
-                            className="h-full w-full object-cover object-top"
+                            alt={image.file?.name || "Preview"}
+                            className="h-full w-full object-cover object-top pointer-events-none"
                           />
                         </div>
 
@@ -576,38 +708,44 @@ export default function EditChapter() {
                           type="button"
                           onClick={() => removePreviewImage(image.id)}
                           className="absolute -top-2 -right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-gray-600 bg-gray-800 transition-colors hover:bg-gray-700"
+                          aria-label="Xoá ảnh này"
+                          title="Xoá ảnh này"
                         >
                           <X className="text-txt-primary h-4 w-4" />
                         </button>
 
-                        {/* File info */}
-                        <div className="text-txt-primary absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-xs">
-                          {image.file ? (
-                            <div>
-                              <div>{formatFileSize(image.file.size)}</div>
-                              {image.originalSize &&
-                                image.compressedSize &&
-                                image.originalSize !== image.compressedSize && (
-                                  <div className="text-lav-300">
-                                    -{Math.round(image.compressionRatio || 0)}%
-                                  </div>
-                                )}
-                            </div>
-                          ) : (
-                            <div>Hiện tại</div>
-                          )}
+                        {/* Badges: format + size (xếp dọc, góc trái trên) */}
+                        <div className="absolute top-1 left-1 flex flex-col items-start gap-1">
+                          <div className={image.isExisting ? "bg-lav-400 rounded px-1 py-0.5 text-xs text-white" : "bg-lav-500 rounded px-1 py-0.5 text-xs text-white"}>
+                            {image.isExisting ? "Gốc" : "WebP"}
+                          </div>
+                          <div className="rounded bg-black/70 px-1 py-0.5 text-[11px] leading-none text-white">
+                            {image.file
+                              ? formatFileSize(image.file.size)
+                              : "Hiện tại"}
+                            {image.file &&
+                              image.originalSize &&
+                              image.compressedSize &&
+                              image.originalSize !== image.compressedSize && (
+                                <span className="ml-1 text-lav-300">
+                                  -{Math.round(image.compressionRatio || 0)}%
+                                </span>
+                              )}
+                          </div>
                         </div>
 
-                        {/* Format indicator */}
-                        {image.isExisting ? (
-                          <div className="bg-lav-400 absolute top-1 left-1 rounded px-1 py-0.5 text-xs text-white">
-                            Gốc
+                        {/* position + filename under thumbnail */}
+                        <div className="mt-1 w-32">
+                          <div className="text-txt-primary text-xs font-semibold">
+                            #{idx + 1}
                           </div>
-                        ) : (
-                          <div className="bg-lav-500 absolute top-1 left-1 rounded px-1 py-0.5 text-xs text-white">
-                            WebP
+                          <div
+                            className="text-txt-secondary text-[11px] leading-tight truncate"
+                            title={image.file?.name || image.url}
+                          >
+                            {image.file?.name || image.url.split("/").pop()}
                           </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>

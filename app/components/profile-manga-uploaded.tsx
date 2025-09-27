@@ -110,7 +110,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
             className="flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-sm font-semibold text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all hover:opacity-90"
           >
             <Plus className="h-5 w-5" />
-            Đăng truyện
+            Tạo truyện mới
           </Link>
         )}
       </div>
@@ -168,9 +168,13 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                 </div>
                 {!userId && (
                   <div className="flex items-center gap-2">
-                    <Link to={`/manga/preview/${manga.id}`}>
-                      <Edit className="h-5 w-5 cursor-pointer text-[#25EBAC] transition-colors hover:text-[#25EBAC]/80" />
-                    </Link>
+                    <Link
+  to={`/manga/preview/${manga.id}`}
+  className="flex items-center gap-1.5 rounded-lg border border-[#25EBAC] px-2.5 py-1.5 text-sm font-medium text-[#25EBAC] transition-colors hover:bg-[#25EBAC]/10"
+>
+  <Edit className="h-4 w-4" />
+  <span>Chỉnh sửa/Thêm chương mới</span>
+</Link>
                     <Trash2
                       className={`h-5 w-5 cursor-pointer transition-colors ${
                         deleteFetcher.state === "submitting"

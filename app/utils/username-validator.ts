@@ -24,18 +24,23 @@ export function validateUsername(username: string): UsernameValidationResult {
     return { isValid: false, error: 'Username phải có ít nhất 6 ký tự' };
   }
 
-  if (trimmedUsername.length > 15) {
-    return { isValid: false, error: 'Username không được vượt quá 15 ký tự' };
+  if (trimmedUsername.length > 18) {
+    return { isValid: false, error: 'Username không được vượt quá 18 ký tự' };
   }
 
-  // Check character constraints - only alphanumeric characters
-  const validCharactersRegex = /^[a-zA-Z0-9]+$/;
+  // BEGIN <feature:username-unicode-space>
+  // Check character constraints - allow Unicode letters, numbers and spaces
+  // Sử dụng \p{L} cho "letter" (mọi bảng chữ cái), \p{N} cho "number", và khoảng trắng ' '
+  // Cần cờ 'u' để kích hoạt xử lý Unicode trong RegExp của JS.
+  const validCharactersRegex = /^[\p{L}\p{N} ]+$/u;
   if (!validCharactersRegex.test(trimmedUsername)) {
     return {
       isValid: false,
-      error: 'Username chỉ được chứa chữ cái (a-z, A-Z) và số (0-9)',
+      // Cập nhật thông báo để phản ánh quy tắc mới: cho phép chữ, số và khoảng trắng
+      error: 'Username chỉ được chứa chữ cái, số và khoảng trắng',
     };
   }
+  // END <feature:username-unicode-space>
 
   // Additional security checks - prevent potentially dangerous strings
   const dangerousPatterns = [
@@ -77,10 +82,16 @@ export async function checkUsernameUniqueness(
   excludeUserId?: string,
 ): Promise<UsernameValidationResult> {
   try {
-    const trimmedUsername = username.trim();
+    // BEGIN <feature:username-unicode-space>
+    // Chuẩn hoá & làm sạch nhẹ để so sánh thống nhất (giữ chữ có dấu và khoảng trắng hợp lệ)
+    const trimmedUsername = sanitizeUsername(username);
+    // END <feature:username-unicode-space>
     
     const query: any = { 
-      name: { $regex: new RegExp(`^${trimmedUsername}$`, 'i') }, // Case-insensitive exact match
+      // BEGIN <feature:username-unicode-space>
+      // Dùng cờ 'u' để hỗ trợ Unicode đúng; vẫn exact match theo chuỗi sau khi sanitize
+      name: { $regex: new RegExp(`^${trimmedUsername}$`, 'iu') }, // Case-insensitive + Unicode
+      // END <feature:username-unicode-space>
       isDeleted: false 
     };
 
@@ -148,5 +159,17 @@ export function validateUsernameChangeCost(userGold: number): UsernameValidation
  * Sanitizes username to prevent any potential security issues
  */
 export function sanitizeUsername(username: string): string {
-  return username.trim().replace(/[^a-zA-Z0-9]/g, '');
+  // BEGIN <feature:username-unicode-space>
+  // Giữ nguyên ý: "sanitize" chỉ loại ký tự ngoài phạm vi cho phép,
+  // nhưng bây giờ cho phép chữ (Unicode), số và khoảng trắng.
+  // - Chuẩn hoá Unicode về NFC (tránh 2 cách mã hoá dấu)
+  // - Loại ký tự không phải \p{L} (letter), \p{N} (number) hoặc space
+  // - Gộp nhiều khoảng trắng liên tiếp thành 1 khoảng trắng
+  // - Trim đầu/cuối
+  return username
+    .normalize('NFC')
+    .replace(/[^\p{L}\p{N} ]+/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // END <feature:username-unicode-space>
 }

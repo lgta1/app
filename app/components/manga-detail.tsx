@@ -61,6 +61,10 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
     userStatus,
     ownerId,
   } = manga;
+  // === Hiển thị mô tả: chỉ render khi khác "..." và không rỗng ===
+  const safeDesc = typeof description === "string" ? description.trim() : "";
+  const shouldShowDesc = !!(safeDesc && safeDesc !== "...");
+
 
   const [isFollowing, setIsFollowing] = useState(false);
   const [followCount, setFollowCount] = useState(followNumber || 0);
@@ -333,7 +337,7 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
             </Link>
             {/* END <feature> UPLOADER_CHIP_SURFACE_BLEND_NO_STRETCH */}
 
-            <div className="text-txt-secondary w-28 text-base font-medium">Tác giả:</div>
+            <div className="text-txt-secondary w-28 text-base font-medium">Tác giả/Dịch giả:</div>
             {/* BEGIN <feature> AUTHORS_CHIP_BRAND_TINT_NO_STRETCH */}
             <div className="flex flex-wrap gap-2 justify-self-start">
               {String(author || "")
@@ -451,25 +455,27 @@ export function MangaDetail({ manga, chapters }: MangaDetailProps) {
       </div>
 
       {/* Phần nội dung */}
-      <div className="mt-8 flex flex-col gap-6">
-        <div className="border-bd-default flex items-center gap-3 border-b pb-3">
-          <div className="relative h-[15px] w-[15px]">
-            <img
-              src="/images/icons/multi-star.svg"
-              alt=""
-              className="absolute top-0 left-[4.62px] h-4"
-            />
+      {shouldShowDesc && (
+        <div className="mt-8 flex flex-col gap-6">
+          <div className="border-bd-default flex items-center gap-3 border-b pb-3">
+            <div className="relative h-[15px] w-[15px]">
+              <img
+                src="/images/icons/multi-star.svg"
+                alt=""
+                className="absolute top-0 left-[4.62px] h-4"
+              />
+            </div>
+          </div>
+
+          <div className="text-txt-primary text-base leading-normal font-medium">
+            {safeDesc.split("\n").map((paragraph, index) => (
+              <p key={index} className={index > 0 ? "mt-4" : ""}>
+                {paragraph}
+              </p>
+            ))}
           </div>
         </div>
-
-        <div className="text-txt-primary text-base leading-normal font-medium">
-          {description.split("\n").map((paragraph, index) => (
-            <p key={index} className={index > 0 ? "mt-4" : ""}>
-              {paragraph}
-            </p>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Danh sách chapter */}
       <div className="mt-8 flex flex-col gap-6">

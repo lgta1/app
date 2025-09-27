@@ -27,6 +27,10 @@ export function ChapterDetail({
   isEnableClaimReward: isEnableClaimGold = false,
   relatedManga = [],
 }: ChapterDetailProps) {
+// --- display title: nếu backend/FE đặt placeholder "..." thì hiển thị "Chương {number}"
+const isPlaceholderTitle = (t?: string) => (t ?? "").trim() === "...";
+const displayTitle = isPlaceholderTitle(chapter.title) ? `Chương ${chapter.chapterNumber}` : chapter.title;
+
   const [_, setSearchParams] = useSearchParams();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [hasClaimedThisChapter, setHasClaimedThisChapter] = useState(false);
@@ -56,11 +60,20 @@ export function ChapterDetail({
     if (chaptersFetcher.data) {
       const response = chaptersFetcher.data as {
         success: boolean;
-        chapters?: Array<{ value: number; label: string }>;
+        chapters?: Array<any>;
         error?: string;
       };
       if (response.success && response.chapters) {
-        setChapters(response.chapters);
+        // BEGIN feature: chapter dropdown UX
+        // Giữ nguyên {value,label}, nhưng nếu API có tiêu đề (title/name/chapterTitle) thì nối thêm vào object
+        const normalized = response.chapters.map((c: any) => ({
+          value: c.value,
+          label: c.label,
+          // chấp nhận nhiều khóa phổ biến từ API:
+          __title: c.title ?? c.name ?? c.chapterTitle ?? "",
+        }));
+        setChapters(normalized);
+        // END feature: chapter dropdown UX
       }
     }
   }, [chaptersFetcher.data]);
@@ -146,13 +159,11 @@ export function ChapterDetail({
 
     // Đảm bảo user đã đọc ít nhất 1 phút
     if (readingDuration < minimumReadingTime) {
-      // Delay để đợi đủ thời gian đọc tối thiểu
       const remainingTime = minimumReadingTime - readingDuration;
       completionTimeoutRef.current = setTimeout(() => {
         submitReadingExp();
       }, remainingTime);
     } else {
-      // Delay thêm 2-3 giây để đảm bảo user thực sự đọc xong
       completionTimeoutRef.current = setTimeout(
         () => {
           submitReadingExp();
@@ -180,7 +191,6 @@ export function ChapterDetail({
     const viewFormData = new FormData();
     viewFormData.append("story_id", chapter.mangaId);
     viewFormData.append("type", "view");
-    // Note: userId sẽ được lấy từ session trong API
 
     fetch("/api/interactions", {
       method: "POST",
@@ -226,7 +236,6 @@ export function ChapterDetail({
         remainingExp?: number;
       };
 
-      // Chỉ hiển thị error nếu không phải lỗi rate limit hoặc đã đủ exp
       if (
         response.error &&
         !response.error.includes("Vui lòng chờ") &&
@@ -260,17 +269,55 @@ export function ChapterDetail({
     });
   };
 
+  // BEGIN feature: chapter dropdown UX
+  // - Nút chỉ hiển thị "Chương {số}"
+  const buttonLabel = `Chương ${chapter.chapterNumber}`;
+
+  // - Mỗi option trong MENU: "Chương {số} — {tiêu đề}" nếu có tiêu đề, không thì "Chương {số}"
+  const renderChapterOption = (opt: any) => {
+    const base = `Chương ${opt.value}`;
+    const titleFromApi =
+      (opt && (opt.__title ?? opt.title ?? opt.name ?? opt.chapterTitle)) || "";
+const titleTrim = String(titleFromApi).trim();
+    const raw = (opt.label || "").trim();
+
+    // Ưu tiên tiêu đề từ API nếu có và không phải placeholder "..."
+    if (titleTrim && titleTrim !== "...") {
+      return `${base} — ${titleTrim}`;
+    }
+
+    // Nếu đã là "Chương N — Tiêu đề" / "Chương N - Tiêu đề" → chuẩn hóa dấu "—"
+    if (/^Chương\s+\d+\s*(—|-)\s*/i.test(raw)) {
+      return raw.replace(/^Chương\s+(\d+)\s*(?:—|-)\s*/i, (_, n) => `Chương ${n} — `);
+    }
+
+    // Nếu chỉ có số chương hoặc rỗng → "Chương N"
+    if (raw === base || /^Chương\s+\d+$/i.test(raw) || raw === "") {
+      return base;
+    }
+
+    // Mặc định: xem phần còn lại là tiêu đề
+    return `${base} — ${raw.replace(/^Chương\s+\d+\s*(—|-)?\s*/i, "")}`;
+  };
+  // END feature: chapter dropdown UX
+
   return (
     <>
       <Toaster position="bottom-right" />
-      <div className="bg-bgc-layer1 border-bd-default mx-auto flex w-full max-w-[1080px] flex-col gap-4 rounded-xl border p-4 sm:p-6">
+      <div
+        className="bg-bgc-layer1 border-bd-default mx-auto flex w-full max-w-[1080px] flex-col gap-4 rounded-xl border p-4 sm:p-6
+        // BEGIN feature: discord visibility (stacking context for the whole card)
+        isolate
+        // END feature: discord visibility
+        "
+      >
         {/* Header Section */}
         <div className="flex flex-col gap-2">
           <div className="text-txt-focus font-sans text-base leading-normal font-medium">
             {chapter.breadcrumb}
           </div>
           <div className="text-txt-primary font-sans text-2xl leading-loose font-semibold">
-            {chapter.title}
+            {displayTitle}
           </div>
           <div className="text-txt-secondary font-sans text-base leading-normal font-medium">
             Cập nhật lúc {formatTime(chapter.updatedAt)} {formatDate(chapter.updatedAt)}
@@ -280,25 +327,16 @@ export function ChapterDetail({
         {/* Divider */}
         <div className="border-bd-default h-0 border-t"></div>
 
-        {/* Error Report Section */}
-        <div className="flex flex-col items-start justify-start gap-4 sm:flex-row sm:items-center">
-          <div className="text-txt-secondary font-sans text-base leading-normal font-medium">
-            Nếu bạn không đọc được truyện/chương lỗi, hãy ấn nút Báo Lỗi
-          </div>
-          <button
-            className="border-lav-500 hover:bg-bgc-layer-semi-purple flex cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 transition-colors"
-            onClick={() => setIsReportDialogOpen(true)}
-          >
-            <span className="text-txt-focus font-sans text-sm leading-tight font-medium">
-              Báo lỗi
-            </span>
-          </button>
-        </div>
-
-        {/* Info Section */}
-        <div className="bg-bgc-layer2 flex flex-col items-center gap-2 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Error Report Section (Discord CTA nằm trong đây) */}
+        <div
+          className="bg-bgc-layer2 flex flex-col items-center gap-2 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between
+          // BEGIN feature: discord visibility (raise Discord above)
+          relative z-20
+          // END feature: discord visibility
+          "
+        >
           <div className="text-txt-primary font-sans text-base leading-normal font-medium">
-            Nhận thông tin mới, chém gió cùng mọi người, liên hệ dịch giả:
+            Nhận thông tin mới, chém gió, thảo luận, liên hệ dịch giả, báo lỗi :
           </div>
           <a
             href="https://discord.gg/rFwBnNAJk5"
@@ -319,8 +357,14 @@ export function ChapterDetail({
           </a>
         </div>
 
-        {/* Navigation Controls */}
-        <div className="flex items-center justify-center gap-3">
+        {/* Navigation Controls (TOP) */}
+        <div
+          className="flex items-center justify-center gap-3
+          // BEGIN feature: discord visibility (neutralize stacking so it won't cover Discord)
+          relative z-0
+          // END feature: discord visibility
+          "
+        >
           {/* Previous Button */}
           <button
             className={`flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] p-3 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all ${
@@ -344,13 +388,18 @@ export function ChapterDetail({
           </button>
 
           {/* Chapter Selector */}
+          {/* BEGIN feature: chapter dropdown UX */}
           <Dropdown
             options={chapters}
             value={chapter.chapterNumber}
             placeholder="Chọn chương"
             onSelect={handleChapterSelect}
             className="min-w-[140px]"
+            buttonLabel={buttonLabel}
+            renderOptionLabel={(o) => renderChapterOption(o as any)}
+            menuWidthMultiplier={2}
           />
+          {/* END feature: chapter dropdown UX */}
 
           {/* Next Button */}
           <button
@@ -377,7 +426,13 @@ export function ChapterDetail({
       </div>
 
       {/* Content Section */}
-      <div className="-mx-4 my-6 flex flex-col items-center justify-center sm:mx-0 sm:my-8">
+      <div
+        className="-mx-4 my-6 flex flex-col items-center justify-center sm:mx-0 sm:my-8
+        // BEGIN feature: discord visibility (ensure content won't overlay Discord)
+        relative z-0
+        // END feature: discord visibility
+        "
+      >
         {chapter.contentUrls.map((url, index) => {
           const isLastImage = index === chapter.contentUrls.length - 1;
           return (
@@ -391,7 +446,6 @@ export function ChapterDetail({
               onLoad={() => handleImageLoad(url)}
               onError={() => {
                 console.error(`Failed to load image: ${url}`);
-                // Still mark as "loaded" to prevent blocking completion
                 handleImageLoad(url);
               }}
             />
@@ -399,8 +453,14 @@ export function ChapterDetail({
         })}
       </div>
 
-      {/* Navigation Controls */}
-      <div className="mb-6 flex items-center justify-center gap-3 sm:mb-8">
+      {/* Navigation Controls (BOTTOM) */}
+      <div
+        className="mb-6 flex items-center justify-center gap-3 sm:mb-8
+        // BEGIN feature: discord visibility (neutral layer)
+        relative z-0
+        // END feature: discord visibility
+        "
+      >
         {/* Previous Button */}
         <button
           className={`flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] p-3 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all ${
@@ -424,13 +484,18 @@ export function ChapterDetail({
         </button>
 
         {/* Chapter Selector */}
+        {/* BEGIN feature: chapter dropdown UX */}
         <Dropdown
           options={chapters}
           value={chapter.chapterNumber}
           placeholder="Chọn chương"
           onSelect={handleChapterSelect}
           className="min-w-[140px]"
+          buttonLabel={buttonLabel}
+          renderOptionLabel={(o) => renderChapterOption(o as any)}
+          menuWidthMultiplier={2}
         />
+        {/* END feature: chapter dropdown UX */}
 
         {/* Next Button */}
         <button

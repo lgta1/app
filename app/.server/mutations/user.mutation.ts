@@ -13,6 +13,7 @@ import {
   sanitizeUsername,
   USERNAME_CHANGE_COST,
 } from "~/utils/username-validator";
+import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
 
 export const promoteToAdmin = async (request: Request, userId: string) => {
   const currentUserInfo = await getUserInfoFromSession(request);
@@ -101,6 +102,8 @@ export const deleteUser = async (request: Request, userId: string) => {
     { _id: userId, role: { $ne: ROLES.ADMIN } },
     { $set: { isDeleted: true } },
   );
+
+  await UserWaifuLeaderboardModel.deleteOne({ userId });
 
   return {
     success: true,

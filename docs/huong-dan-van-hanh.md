@@ -211,8 +211,8 @@ npm install
 # 3. Build
 npm run build
 
-# 4. Restart PM2
-./manage.sh restart
+# 4. Start PM2 để nhận code mới
+./manage.sh start
 
 # 5. Kiểm tra
 ./manage.sh status

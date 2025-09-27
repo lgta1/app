@@ -11,9 +11,9 @@ export function Footer() {
             <div className="flex w-full flex-col gap-4 md:w-60">
               {/* Logo */}
               <img
-                src="/images/logo.png"
+                src="/images/logo2.png"
                 alt="Vinahentai Logo"
-                className="h-8 w-24 md:h-10 md:w-32"
+                className="h-8 w-36 md:h-10 md:w-45"
               />
 
               {/* Links */}

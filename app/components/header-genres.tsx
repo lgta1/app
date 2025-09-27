@@ -57,8 +57,10 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
 
     // Sắp xếp: Oneshot đứng đầu, phần còn lại A–Z (khử dấu)
     arr.sort((a, b) => {
-      const aIsOne = normalizeVN(a.name) === "oneshot" || (a as any).slug === "oneshot";
-      const bIsOne = normalizeVN(b.name) === "oneshot" || (b as any).slug === "oneshot";
+      const aIsOne =
+        normalizeVN(a.name) === "oneshot" || (a as any).slug === "oneshot";
+      const bIsOne =
+        normalizeVN(b.name) === "oneshot" || (b as any).slug === "oneshot";
       if (aIsOne && !bIsOne) return -1;
       if (!aIsOne && bIsOne) return 1;
 
@@ -69,6 +71,54 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
 
     return arr;
   }, [genres]);
+
+  // Ô tìm kiếm: chỉ lọc theo CHỮ CÁI ĐẦU TIÊN (không phải "chứa chuỗi")
+  const [q, setQ] = useState("");
+
+  // Lọc theo chữ cái đầu (đã khử dấu). Nếu không nhập gì -> trả về toàn bộ.
+  const filteredByFirstLetter = useMemo(() => {
+    const letter = normalizeVN(q).trim().charAt(0); // lấy ký tự đầu
+    if (!letter) return sorted;
+    return sorted.filter((g) => {
+      const first = normalizeVN((g as any).name || "").charAt(0);
+      return first === letter;
+    });
+  }, [sorted, q]);
+
+  // Danh sách tên cần ép vào nhóm '#'
+  const forceHash = useMemo(() => {
+    return new Set([
+      "full color",
+      "oneshot",
+      "3d hentai",
+    ]);
+  }, []);
+
+  // Gom nhóm theo chữ cái đầu để render
+  // Yêu cầu: nhóm '#' đứng đầu và BA mục trên nằm trong '#' KHI q rỗng (không đang tìm kiếm).
+  const grouped: Array<[string, GenresType[]]> = useMemo(() => {
+    const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+    const map: Record<string, GenresType[]> = {};
+
+    for (const g of filteredByFirstLetter) {
+      const name = (g as any).name || "";
+      const normalized = normalizeVN(name);
+      const first = (normalized[0] || "#").toUpperCase();
+
+      // Khi không nhập tìm kiếm: ép vào '#'
+      const useHash = !q && forceHash.has(normalized);
+
+      const key = useHash ? "#" : (AZ.includes(first) ? first : "#");
+      (map[key] ||= []).push(g);
+    }
+
+    const ordered: Array<[string, GenresType[]]> = [];
+    // Đặt '#' lên đầu trước
+    if (map["#"]?.length) ordered.push(["#", map["#"]]);
+    // Sau đó mới tới A-Z
+    for (const L of AZ) if (map[L]?.length) ordered.push([L, map[L]]);
+    return ordered;
+  }, [filteredByFirstLetter, q, forceHash]);
   // END <feature> GENRES_AZ_FLAT_PIN_ONESHOT_HEADER
 
   return (
@@ -89,29 +139,74 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
           align="center"
         >
           {/* BEGIN <feature> GENRES_AZ_FLAT_PIN_ONESHOT_BODY */}
-          <div className="text-txt-focus mb-3 font-sans text-base font-semibold">
-            Thể loại
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="text-txt-focus font-sans text-base font-semibold">
+              Thể loại
+            </div>
+
+            {/* Ô tìm kiếm (lọc theo chữ cái đầu tiên, khử dấu) */}
+            <label className="relative w-full max-w-[360px]">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-70"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Nhập chữ cái đầu… (vd: a, b, c)"
+                className="w-full rounded-md border border-bd-default bg-bgc-layer2 pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </label>
           </div>
 
-          {/* Danh sách: mobile 3 cột cố định; từ sm trở lên auto-fit; có scroll để không bị cắt số lượng */}
+          {/* Danh sách: cố định 3 cột ở mọi breakpoint */}
           <div className="max-h-[70vh] overflow-y-auto pr-2">
-            <div className="grid grid-cols-3 gap-x-4 gap-y-2 sm:[grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
-              {sorted.map((genre) => (
-                <Link
-                  key={
-                    (genre as any)._id?.toString?.() ||
-                    (genre as any).id ||
-                    (genre as any).slug
-                  }
-                  to={`/genres/${(genre as any).slug}`}
-                  className="block break-inside-avoid py-1"
-                  onClick={() => setOpen(false)}
-                >
-                  <div className="text-txt-primary hover:text-txt-focus text-xs font-medium">
-                    {(genre as any).name}
+            <div className="space-y-4">
+              {grouped.map(([letter, items]) => (
+                <div key={letter}>
+                  {/* header nhóm */}
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="text-sm font-bold text-txt-focus">{letter}</div>
+                    <div className="h-px flex-1 bg-bd-default/60" />
                   </div>
-                </Link>
+
+                  {/* Lưới CỐ ĐỊNH 3 cột (không auto-fit) */}
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+                    {items.map((genre) => {
+                      const name = (genre as any).name as string;
+                      return (
+                        <Link
+                          key={
+                            (genre as any)._id?.toString?.() ||
+                            (genre as any).id ||
+                            (genre as any).slug
+                          }
+                          to={`/genres/${(genre as any).slug}`}
+                          className="block break-inside-avoid py-1"
+                          onClick={() => setOpen(false)}
+                        >
+                          <div className="text-txt-primary hover:text-txt-focus text-xs font-medium">
+                            <span className="font-bold">{name.slice(0, 1)}</span>
+                            {name.slice(1)}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
+
+              {/* Không có kết quả */}
+              {grouped.length === 0 && (
+                <div className="text-sm text-txt-secondary">Không có thể loại phù hợp.</div>
+              )}
             </div>
           </div>
           {/* END <feature> GENRES_AZ_FLAT_PIN_ONESHOT_BODY */}

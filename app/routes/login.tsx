@@ -66,7 +66,7 @@ export default function Login() {
         <img
           src="/images/logo.png"
           alt="Logo Vinahentai"
-          className="h-[75px] w-[240px]"
+          className="h-[75px] w-[340px]"
         />
 
         {/* Form đăng nhập */}
