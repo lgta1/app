@@ -1,10 +1,51 @@
 html,
 body {
   color: #ffffff;
-  background: radial-gradient(
+  /* Mobile-first: enable glow (center alpha ~0.3) */
+  background-color: #0B0C1D; /* theme(colors.bgc.layer1) */
+  background-image: radial-gradient(
     ellipse at top center,
-    #191758 0%,
-    #09101A 40%,
-    #09101A 100%
+    rgba(25, 23, 88, 0.3) 0%,  /* center glow for mobile */
+    rgba(11, 12, 29, 0.00) 45%, /* fade into base */
+    rgba(11, 12, 29, 0.00) 100%
   );
+  background-repeat: no-repeat;
+  background-size: 120% 100%;
+}
+
+/* Stable CSS variables to avoid layout shift during SSR hydration.
+   --site-header-height: reserve space for the fixed header.
+   --site-banner-height: reserve space for the fixed top banner (if any).
+   These values are conservative defaults; adjust if your header/banner
+   CSS changes. Using CSS vars ensures SSR and client render match. */
+:root {
+  /* increase header defaults slightly to match fixed header actual height
+     so the page content sits below the header and doesn't overlap */
+  /* bump mobile header height by +8px to push main content further down on small screens */
+  /* mobile default increased earlier; include the extra 4px offset here */
+  --site-header-height: 100px; /* mobile default (96 + 4) */
+  --site-banner-height: 36px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    /* desktop default - increased to ensure spacer covers both rows
+       include the extra 4px offset here */
+    --site-header-height: 124px; /* desktop default (120 + 4) */
+    --site-banner-height: 48px;
+  }
+
+  /* Desktop/Tablet: stronger but still soft glow (center alpha ~0.3) */
+  html,
+  body {
+    background-color: #0B0C1D; /* base */
+    background-image: radial-gradient(
+      ellipse at top center,
+      rgba(25, 23, 88, 0.3) 0%,  /* desktop/tablet center glow */
+      rgba(11, 12, 29, 0.00) 45%, /* fade into base */
+      rgba(11, 12, 29, 0.00) 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 120% 100%;
+  }
 }
