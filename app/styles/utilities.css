@@ -16,6 +16,13 @@
   padding-right: 1rem;
 }
 
+/* Reduce side padding by 1/5 for main content containers that also use Tailwind `px-4`. */
+.container-ad.px-4,
+.container-page.px-4 {
+  padding-left: calc(1rem * 0.8);
+  padding-right: calc(1rem * 0.8);
+}
+
 @media (min-width: 640px) {
   .container-ad {
     max-width: 540px;

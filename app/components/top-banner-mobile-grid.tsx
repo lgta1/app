@@ -71,15 +71,15 @@ export default function TopBannerMobileGrid({
         [data-mobile-hot-grid] {
           --hot-grid-gap-x: ${spaceX}px;
           --hot-grid-gap-y: ${spaceY}px;
-          --hot-grid-col-width: calc((100vw - var(--hot-grid-gap-x)) / 2);
+          --hot-grid-col-width: calc((100% - var(--hot-grid-gap-x)) / 2);
           --hot-grid-card-height: calc(var(--hot-grid-col-width) * 1.5); /* poster 2:3 */
           --hot-grid-slide-height: calc(var(--hot-grid-card-height) * 2 + var(--hot-grid-gap-y));
         }
         @media (min-width: 640px) {
-          [data-mobile-hot-grid] { --hot-grid-col-width: calc((100vw - var(--hot-grid-gap-x)) / 3); }
+          [data-mobile-hot-grid] { --hot-grid-col-width: calc((100% - var(--hot-grid-gap-x)) / 3); }
         }
         @media (min-width: 768px) {
-          [data-mobile-hot-grid] { --hot-grid-col-width: calc((100vw - var(--hot-grid-gap-x)) / 4); }
+          [data-mobile-hot-grid] { --hot-grid-col-width: calc((100% - var(--hot-grid-gap-x)) / 4); }
         }
         [data-mobile-hot-grid] .hot-grid-slide { min-height: var(--hot-grid-slide-height); }
       `}</style>
@@ -116,7 +116,7 @@ export default function TopBannerMobileGrid({
 
   // Each slide = 1 column => 5 slides => 5 bullets. Autoplay moves 1 column.
   return (
-    <div className="relative w-full" data-mobile-hot-grid>
+    <div className="relative w-full overflow-hidden" data-mobile-hot-grid>
   {/* No extra keyframes: HOT badge uses static gradient (no shimmer) */}
       <Swiper
         onSwiper={(instance) => {
@@ -209,16 +209,6 @@ export default function TopBannerMobileGrid({
       </Swiper>
       <GridStyle />
       <style>{`
-        .swiper_columns .swiper-slide { width: 50%; } /* enforce two columns fit full width */
-        @media (min-width: 640px) {
-          .swiper_columns .swiper-slide { width: 33.3333%; } /* optional: show more columns on wider viewports */
-        }
-        @media (min-width: 768px) {
-          .swiper_columns .swiper-slide { width: 25%; }
-        }
-        @media (min-width: 1024px) {
-          .swiper_columns .swiper-slide { width: 20%; } /* show all 5 columns simultaneously */
-        }
         /* Use Swiper CSS variables for arrow and bullets */
         .swiper_columns {
           --swiper-navigation-color: rgba(255,255,255,0.9); /* arrow icon white for contrast */
@@ -226,8 +216,11 @@ export default function TopBannerMobileGrid({
           --swiper-pagination-color: rgba(168,85,247,0.85); /* active bullet opacity +5% (from 0.80 to 0.85) */
           --swiper-pagination-bullet-inactive-color: rgba(168,85,247,1); /* base purple */
           --swiper-pagination-bullet-inactive-opacity: 0.30; /* inactive reduced by 10% (from 0.40 to 0.30) */
-          overflow: visible; /* allow pagination dots to sit below without affecting layout */
+          overflow: hidden; /* prevent horizontal overflow on mobile */
+          padding-bottom: 22px; /* reserve room for pagination dots inside */
         }
+        .swiper_columns, .swiper_columns .swiper-wrapper { width: 100%; max-width: 100%; }
+        .swiper_columns .swiper-slide { box-sizing: border-box; }
         .swiper_columns .swiper-button-next, .swiper_columns .swiper-button-prev {
           width: 33px; /* half the previous touch area */
           height: 33px;
@@ -243,7 +236,7 @@ export default function TopBannerMobileGrid({
         }
         .swiper_columns .swiper-button-disabled { opacity: 0.35; }
         .swiper_columns .swiper-pagination {
-          bottom: -18px; /* move dots down a bit */
+          bottom: 6px;
           transform: none;
         }
 

@@ -94,6 +94,37 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
   const [isHome, setIsHome] = useState(false);
   const bannerName = (user as any)?.displayName || (user as any)?.username || (user as any)?.name || "";
 
+  // Keep CSS var in sync with actual fixed header height so main content never gets covered.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!isFixed) {
+      try {
+        root.style.setProperty("--site-header-height", "0px");
+      } catch {}
+      return;
+    }
+    const el = fixedRef.current;
+    if (!el) return;
+    const setHeightVar = () => {
+      const rect = el.getBoundingClientRect();
+      const height = Math.max(0, Math.ceil(rect.height));
+      root.style.setProperty("--site-header-height", `${height}px`);
+    };
+
+    setHeightVar();
+    let ro: ResizeObserver | null = null;
+    if (typeof window !== "undefined" && "ResizeObserver" in window) {
+      ro = new ResizeObserver(() => setHeightVar());
+      ro.observe(el);
+    }
+    window.addEventListener("resize", setHeightVar);
+
+    return () => {
+      window.removeEventListener("resize", setHeightVar);
+      ro?.disconnect();
+    };
+  }, [isFixed]);
+
   // Headroom-like behavior
   useEffect(() => {
     if (disableAutoHide || !isFixed) {
@@ -165,6 +196,44 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
       setIsHome(path === "/" || path === "/index");
     } catch {}
   }, []);
+
+  // Keep main content below the fixed header by setting a CSS variable.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const root = document.documentElement;
+
+    if (!isFixed) {
+      try {
+        root.style.setProperty("--site-header-height", "0px");
+      } catch {}
+      return;
+    }
+
+    const el = fixedRef.current;
+    if (!el) return;
+
+    const update = () => {
+      try {
+        const h = Math.ceil(el.getBoundingClientRect().height || 0);
+        root.style.setProperty("--site-header-height", `${h}px`);
+      } catch {}
+    };
+
+    update();
+    window.addEventListener("resize", update);
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => update());
+      ro.observe(el);
+    }
+
+    return () => {
+      window.removeEventListener("resize", update);
+      ro?.disconnect();
+    };
+  }, [isFixed]);
 
   return (
     <header className="flex w-full flex-col">
@@ -274,7 +343,7 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
       </div>
 
       {/* Spacer for fixed header */}
-      {isFixed ? <div style={{ height: `var(--site-header-height)` }} /> : null}
+      {isFixed ? <div style={{ height: `var(--site-header-height, 96px)` }} /> : null}
     </header>
   );
 }
