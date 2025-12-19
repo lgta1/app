@@ -1,7 +1,5 @@
 // app/root.tsx
 import { useEffect } from "react";
-
-// 👉 SSR primitives + data hooks lấy từ "react-router"
 import {
   Links,
   Meta,
@@ -10,31 +8,32 @@ import {
   ScrollRestoration,
   useLoaderData,
 } from "react-router";
-
-// 👉 Client-only hooks từ "react-router-dom"
 import { useLocation, useNavigate } from "react-router-dom";
 
 import type { Route } from "./+types/root";
 
 import { getAllGenres } from "@/queries/genres.query";
+import { countUnreadNotifications, pruneNotificationsForUser } from "~/.server/queries/notification.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
+import { NotificationsProvider } from "~/context/notifications-context";
+import { DEFAULT_SHARE_IMAGE } from "~/constants/share-images";
 import { isAdmin } from "~/helpers/user.helper";
+import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
+import { json } from "~/utils/json.server";
 
-// 🔧 NẠP CSS qua links() cho SSR
 import appStylesheetUrl from "./app.css?url";
 
-// Cấu hình check "ban" định kỳ
 const BAN_CHECK_INTERVAL_MINUTES = 1;
 const BAN_CHECK_INTERVAL_MS = BAN_CHECK_INTERVAL_MINUTES * 60 * 1000;
 const LAST_BAN_CHECK_KEY = "lastBanCheck";
 
-// Liên kết stylesheet + fonts
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: appStylesheetUrl },
-
+  { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+  { rel: "shortcut icon", href: "/favicon.ico" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
@@ -53,36 +52,131 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-// META mặc định
 export function meta({}: Route.MetaArgs) {
+  const baseTitle = "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO";
+  const description =
+    "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN,... KHÔNG QUẢNG CÁO, cập nhật nhanh, đa dạng thể loại. Trải nghiệm ngay!";
+  const origin = "https://vinahentai.com";
+  const image = DEFAULT_SHARE_IMAGE;
   return [
-    { title: "Vinahentai -  Đọc hentai 18+ ít quảng cáo hot nhất 2025" },
-    {
-      name: "description",
-      content:
-        "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN không che. Ít quảng cáo, cập nhật nhanh, đa dạng thể loại hot nhất 2025. Trải nghiệm ngay!",
-    },
+    { title: baseTitle },
+    { name: "description", content: description },
     { property: "og:type", content: "website" },
     { property: "og:site_name", content: "Vinahentai" },
-    { property: "og:title", content: "Vinahentai - Hentai 18+ ít quảng cáo 2025" },
-    {
-      property: "og:description",
-      content:
-        "Trang đọc hentai/manhwa 18+ vietsub, cập nhật nhanh, ít quảng cáo. Trải nghiệm ngay!",
-    },
+    { property: "og:title", content: baseTitle },
+    { property: "og:description", content: description },
+    { property: "og:url", content: origin },
+    { property: "og:image", content: image },
     { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: baseTitle },
+    { name: "twitter:description", content: description },
+    { name: "twitter:image", content: image },
+    { name: "twitter:url", content: origin },
   ];
 }
 
-// Layout SSR chuẩn
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Early toggle: allow disabling external Google Fonts via ?nofonts=1 or localStorage */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                try{
+                  var qs = location.search || '';
+                  var nofonts = /(?:^|[?&])nofonts=1(?:&|$)/.test(qs) || localStorage.getItem('vh_nofonts')==='1';
+                  if(nofonts){
+                    localStorage.setItem('vh_nofonts','1');
+                    document.documentElement.setAttribute('data-nofonts','1');
+                  }
+                }catch(_){}
+              })();
+            `,
+          }}
+        />
+        {/* Critical inline CSS: đảm bảo khung ảnh ổn định trước khi Tailwind tải xong */}
+        <style data-critical-img>{`
+          .aspect-\\[2\\/3\\]{aspect-ratio:2/3}
+          .aspect-\\[3\\/4\\]{aspect-ratio:3/4}
+          .w-full{width:100%}
+          .h-full{height:100%}
+          .object-cover{object-fit:cover}
+        `}</style>
         <Meta />
         <Links />
+        {/* If nofonts is enabled, strip Google Fonts <link> to avoid OTS errors on some Chrome installs */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                try{
+                  if(document.documentElement.getAttribute('data-nofonts')==='1'){
+                    var ls = document.querySelectorAll('link[rel="preconnect"][href*="fonts."] , link[rel="stylesheet"][href*="fonts."]');
+                    for(var i=0;i<ls.length;i++){ var n = ls[i]; n.parentNode && n.parentNode.removeChild(n); }
+                  }
+                }catch(_){ }
+              })();
+            `,
+          }}
+        />
+        {/* Lightweight runtime diagnostics (opt-in via ?debug=1 or localStorage.vh_debug_overlay=1) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                var debugOn = false;
+                try{
+                  var qs = location.search || '';
+                  debugOn = /(?:^|[?&])debug=1(?:&|$)/.test(qs) || localStorage.getItem('vh_debug_overlay')==='1';
+                }catch(_){ debugOn = false; }
+                if(!debugOn) return;
+
+                var installed = false;
+                var hideTimer = null;
+                function show(msg){
+                  try{
+                    var id = 'vh-boot-error';
+                    var el = document.getElementById(id);
+                    if(!el){
+                      el = document.createElement('div');
+                      el.id = id;
+                      el.style.position = 'fixed';
+                      el.style.left = '12px';
+                      el.style.bottom = '12px';
+                      el.style.zIndex = '999999';
+                      el.style.background = 'rgba(190,40,255,.12)';
+                      el.style.border = '1px solid rgba(190,40,255,.35)';
+                      el.style.color = '#fff';
+                      el.style.padding = '8px 10px';
+                      el.style.borderRadius = '8px';
+                      el.style.font = '12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+                      el.style.maxWidth = '90vw';
+                      el.style.cursor = 'pointer';
+                      el.title = 'Nhấn để đóng';
+                      el.addEventListener('click', function(){ try{ el.remove(); }catch(_){ } });
+                      document.body.appendChild(el);
+                    }
+                    el.textContent = 'Boot error: ' + msg;
+                    if(hideTimer) { try{ clearTimeout(hideTimer); }catch(_){} }
+                    hideTimer = setTimeout(function(){ try{ el && el.remove(); }catch(_){ } }, 12000);
+                  }catch(e){}
+                }
+                if(!installed){
+                  installed = true;
+                  window.addEventListener('error', function(e){ show(e && e.message ? e.message : 'unknown error'); });
+                  window.addEventListener('unhandledrejection', function(e){
+                    try{ show((e&&e.reason&&e.reason.message)||String(e.reason)); }
+                    catch(_){ show('unhandled rejection'); }
+                  });
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body>
         {children}
@@ -93,33 +187,69 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Loader: lấy user + genres từ DB
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await getUserInfoFromSession(request);
-  const genres = await getAllGenres();
+  const { sharedTtlCache } = await import("~/.server/utils/ttl-cache");
+  const { isbot } = await import("isbot");
 
-  // Log chẩn đoán
-  try {
-    const count = Array.isArray(genres) ? genres.length : (genres as any)?.length || 0;
-    const hasBondage = Array.isArray(genres) && genres.some((g: any) => g?.slug === "bondage");
-    const hasSlave = Array.isArray(genres) && genres.some((g: any) => g?.slug === "slave");
-    console.log("[loader:root] genres count =", count, "| bondage:", hasBondage, "| slave:", hasSlave);
-  } catch {}
+  const userAgent = request.headers.get("user-agent") ?? "";
+  const isBot = userAgent ? isbot(userAgent) : false;
+
+  const cookieHeader = request.headers.get("Cookie") ?? "";
+  const ageVerified = /(?:^|;\s*)age_verified=1(?:;|$)/.test(cookieHeader);
+
+  const user = await getUserInfoFromSession(request);
+  const genres = await sharedTtlCache.getOrSet("genres:all", 5 * 60 * 1000, () => getAllGenres());
+
+  const responseHeaders = new Headers();
+  // Prevent CDN/Cloudflare from caching HTML/data responses and serving stale asset-hash refs
+  responseHeaders.set("Cache-Control", "private, no-store, max-age=0");
+  responseHeaders.set("Vary", "Cookie");
 
   if (user) {
-    return { isAdmin: isAdmin(user.role), user, genres };
+    let unreadCount = 0;
+    try {
+      await pruneNotificationsForUser(user.id);
+      unreadCount = await countUnreadNotifications(user.id);
+    } catch {}
+    return json(
+      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified },
+      { headers: responseHeaders },
+    );
   }
-  return { isAdmin: false, genres };
+  return json({ isAdmin: false, genres, isBot, ageVerified }, { headers: responseHeaders });
 }
 
-// App: truyền genres vào Header để hiển thị menu thể loại
 export default function App() {
-  const { isAdmin, user, genres } = useLoaderData<typeof loader>();
+  const { isAdmin, user, genres, unreadCount, isBot, ageVerified } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Ẩn Footer nếu đang ở trang triệu hồi
-  const hideFooter = location.pathname.startsWith("/waifu/summon");
+  // Đặt cờ hydration CHÍNH XÁC sau khi toàn bộ cây đã hydrate (effects chạy)
+  useEffect(() => {
+    try {
+      (window as any).__APP_HYDRATED__ = true;
+      // eslint-disable-next-line no-console
+      console.debug("[client] hydration HOÀN TẤT tại", performance.now(), "ms");
+    } catch {}
+  }, []);
+
+  // ✅ Quy ước hiển thị
+  const isHome = location.pathname === "/";
+  const isSummon = location.pathname.startsWith("/waifu/summon");
+  const isChapter = location.pathname.includes("/chapter/");
+  const isMangaDetail = /^\/manga\/[^/]+$/.test(location.pathname);
+
+  // 18+ warning overlay should only appear on pillar entry pages.
+  const normalizedPath = (location.pathname.replace(/\/+$/, "") || "/") as string;
+  const isAdultWarningPillar =
+    normalizedPath === "/gioi-thieu" ||
+    normalizedPath === "/truyen-hentai" ||
+    normalizedPath === "/genres";
+
+  // Banner chỉ hiện ở trang chủ
+  const hideBanner = !isHome;
+  // Footer giờ chỉ hiển thị tại trang chủ
+  const hideFooter = !isHome;
 
   useEffect(() => {
     if (!user) return;
@@ -131,6 +261,13 @@ export default function App() {
         if (data.success && data.data && data.data.isBanned) {
           navigate("/logout");
         }
+        // Sync blacklist tags to localStorage for client components (e.g., MangaCard)
+        try {
+          const list = (data?.data?.blacklistTags || []) as string[];
+          if (Array.isArray(list)) {
+            localStorage.setItem("vh_blacklist_tags", JSON.stringify(list));
+          }
+        } catch {}
       } catch (error) {
         console.error("Error checking user ban status:", error);
       }
@@ -155,16 +292,79 @@ export default function App() {
     return () => clearInterval(id);
   }, [user, navigate]);
 
+  // Fallback vá lỗi: nếu click vào link nội bộ mà SPA không điều hướng, ép điều hướng full page
+  useEffect(() => {
+    const handler = (ev: MouseEvent) => {
+      try {
+        if (ev.defaultPrevented) return;
+        if (ev.button !== 0) return; // chỉ chuột trái
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return; // có phím bổ trợ thì bỏ
+
+        const target = ev.target as Element | null;
+        if (!target || typeof (target as any).closest !== "function") return;
+        const anchor = (target as Element).closest("a[href]") as HTMLAnchorElement | null;
+        if (!anchor) return;
+        if (anchor.hasAttribute("download")) return;
+        const tgt = anchor.getAttribute("target");
+        if (tgt && tgt.toLowerCase() !== "_self") return; // mở tab khác thì bỏ
+
+        const hrefAttr = anchor.getAttribute("href");
+        if (!hrefAttr) return;
+        let url: URL;
+        try {
+          url = new URL(hrefAttr, window.location.origin);
+        } catch {
+          return;
+        }
+        // Chỉ xử lý link nội bộ
+        if (url.origin !== window.location.origin) return;
+
+        const before = window.location.pathname + window.location.search + window.location.hash;
+        const next = url.pathname + url.search + url.hash;
+        if (next === before) return; // link tới chính trang hiện tại — không cần ép
+
+        // Sau 1 microtask, nếu router không đổi URL thì ép điều hướng
+        queueMicrotask(() => {
+          const after = window.location.pathname + window.location.search + window.location.hash;
+          if (after === before) {
+            window.location.assign(url.toString());
+          }
+        });
+      } catch {
+        /* ignore */
+      }
+    };
+
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
+  }, []);
+
   return (
-    <>
-      <Header isAdmin={isAdmin} user={user} genres={genres} />
+    <NotificationsProvider
+      key={user ? user.id : "guest"}
+      initialUnreadCount={typeof unreadCount === "number" ? unreadCount : 0}
+      autoPrefetchOnMount={Boolean(user) && isHome}
+    >
+      <DialogWarningAdultContent
+        enabled={isAdultWarningPillar}
+        defaultOpen={isAdultWarningPillar && !ageVerified}
+        disabled={Boolean(ageVerified)}
+      />
+      <Header
+        isAdmin={isAdmin}
+        user={user}
+        genres={genres}
+        hideBanner={hideBanner}
+        disableAutoHide={isSummon}
+        isFixed={!isSummon}
+        autoPrefetchNotifications={Boolean(user) && isHome}
+      />
       <Outlet />
       {!hideFooter && <Footer />}
-    </>
+    </NotificationsProvider>
   );
 }
 
-// Error boundary
 export function ErrorBoundary() {
   return <CustomErrorBoundary />;
 }

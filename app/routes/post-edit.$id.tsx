@@ -9,6 +9,12 @@ import type { Route } from "./+types/post-edit.$id";
 
 import { useFileOperations } from "~/hooks/use-file-operations";
 
+import { POSTS_ENABLED } from "~/constants/feature-flags";
+
+const notFoundHeaders = {
+  "X-Robots-Tag": "noindex, nofollow, noarchive",
+} as const;
+
 interface Tag {
   id: string;
   name: string;
@@ -22,6 +28,9 @@ interface PreviewImage {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
+  if (!POSTS_ENABLED) {
+    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+  }
   const { id } = params;
 
   try {

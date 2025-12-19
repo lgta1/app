@@ -1,80 +1,59 @@
-import { useEffect, useState } from "react";
-import { useFetcher } from "react-router-dom";
+import { useRef, useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 
 import { NotificationPopup } from "./notification-popup";
-
+import { useNotificationsContext } from "~/context/notifications-context";
 import type { NotificationType } from "~/database/models/notification.model";
 
-export function NotificationBell() {
+export function NotificationBell({ autoPrefetch = false }: { autoPrefetch?: boolean }) {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    hasLoaded,
+    error,
+    loadNotifications,
+    markNotificationsRead,
+  } = useNotificationsContext();
+  const prefetchedRef = useRef(false);
 
-  const fetcher = useFetcher<{ success: boolean; data: NotificationType[] }>();
-  const deleteFetcher = useFetcher();
-  const readFetcher = useFetcher();
-
-  // Fetch notifications khi component mount
   useEffect(() => {
-    fetcher.load("/api/notifications");
-  }, []);
+    if (!autoPrefetch) return;
+    if (prefetchedRef.current) return;
+    if (hasLoaded) return;
+    prefetchedRef.current = true;
+    loadNotifications({ force: true });
+  }, [autoPrefetch, hasLoaded, loadNotifications]);
 
-  // Tính số lượng thông báo chưa đọc
-  useEffect(() => {
-    if (fetcher.data?.data) {
-      const unreadCount = fetcher.data.data.filter(
-        (notification) => !notification.isRead,
-      ).length;
-      setUnreadCount(unreadCount);
-    }
-  }, [fetcher.data]);
-
-  const handleDeleteNotification = (notificationId: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa thông báo này không?")) {
-      deleteFetcher.submit(
-        { action: "delete", notificationId },
-        { method: "post", action: "/api/notifications" },
-      );
-    }
-  };
-
-  // Refresh lại danh sách sau khi delete thành công
-  useEffect(() => {
-    if (deleteFetcher.data?.success) {
-      fetcher.load("/api/notifications");
-    }
-  }, [deleteFetcher.data]);
-
-  // Hàm refresh dữ liệu
-  const handleRefresh = () => {
-    fetcher.load("/api/notifications");
-  };
-
-  // Xử lý khi mở popup
   const handleOpenChange = (open: boolean) => {
     setIsNotificationOpen(open);
+    if (open) {
+      loadNotifications();
+      return;
+    }
 
-    if (!open && fetcher.data?.data) {
-      // Lấy danh sách ID của các notification chưa đọc
-      const unreadNotificationIds = fetcher.data.data
-        .filter((notification) => !notification.isRead)
-        .map((notification) => notification.id);
-
-      // Nếu có notification chưa đọc thì gọi API để đánh dấu đã đọc
-      if (unreadNotificationIds.length > 0) {
-        readFetcher.submit(
-          {
-            action: "read",
-            notificationIds: JSON.stringify(unreadNotificationIds),
-          },
-          { method: "post", action: "/api/notifications" },
-        );
-      }
+    if (!hasLoaded) return;
+    const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id);
+    if (unreadIds.length > 0) {
+      void markNotificationsRead(unreadIds);
     }
   };
 
-  const notifications = fetcher.data?.data || [];
-  const isLoading = fetcher.state === "loading";
+  const handleNavigateNotification = (notification: NotificationType) => {
+    setIsNotificationOpen(false);
+    if (!notification.isRead) {
+      void markNotificationsRead([notification.id]);
+    }
+  };
+
+  const handleRetry = () => {
+    loadNotifications({ force: true });
+  };
+
+  const handlePointerIntent = () => {
+    loadNotifications();
+  };
 
   return (
     <NotificationPopup
@@ -82,17 +61,24 @@ export function NotificationBell() {
       onOpenChange={handleOpenChange}
       notifications={notifications}
       isLoading={isLoading}
-      onDeleteNotification={handleDeleteNotification}
-      onRefresh={handleRefresh}
+      errorMessage={error}
+      onNavigate={handleNavigateNotification}
+      onRetry={handleRetry}
     >
-      <div className="relative cursor-pointer">
+      <button
+        type="button"
+        className="relative cursor-pointer bg-transparent outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D373FF] focus-visible:outline-offset-2"
+        onPointerEnter={handlePointerIntent}
+        onFocus={handlePointerIntent}
+        aria-label="Thông báo"
+      >
         <Bell className="text-txt-primary h-6 w-6" />
         {unreadCount > 0 && (
           <div className="text-txt-primary absolute top-[-5px] right-[-5px] rounded-lg bg-[#E03F46] px-1 py-[2px] text-[8px] font-semibold">
             {unreadCount}
           </div>
         )}
-      </div>
+      </button>
     </NotificationPopup>
   );
 }

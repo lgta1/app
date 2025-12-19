@@ -1,70 +1,153 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useFetcher } from "react-router-dom";
 import * as Popover from "@radix-ui/react-popover";
 import { Search } from "lucide-react";
 
 import { SearchItem } from "./header-search-item";
 
-import { LoadingSpinner } from "~/components/loading-spinner";
-import type { MangaType } from "~/database/models/manga.model";
+import { DEFAULT_SCOPE, SCOPE_OPTIONS, type SearchScope } from "~/utils/text-normalize";
+import type { SmartSearchHit, SmartSearchResponse as SearchResponse } from "~/types/search";
 
-interface SearchResponse {
-  manga: MangaType[];
-  hasMore: boolean;
-  nextPage: number;
-  total: number;
-}
+const RESULT_LIMIT = 10;
+const SEARCH_DEBOUNCE_MS = 1000;
+const SCOPE_STORAGE_KEY = "ww:search-scope";
+const STATUS_MIN_VISIBLE_MS = 600;
 
 export function HeaderSearch() {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [results, setResults] = useState<MangaType[]>([]);
-  const [page, setPage] = useState(1);
+  const [results, setResults] = useState<SmartSearchHit[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingVisible, setIsLoadingVisible] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [scope, setScope] = useState<SearchScope>(DEFAULT_SCOPE);
 
   const fetcher = useFetcher<SearchResponse>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const loadingVisibilityTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const loadingStartedAtRef = useRef<number>(0);
+  const scopeRef = useRef<SearchScope>(DEFAULT_SCOPE);
+  const trimmedQuery = query.trim();
+
+  const resetResults = useCallback(() => {
+    setResults([]);
+    setHasMore(false);
+    setIsOpen(false);
+    setIsLoading(false);
+    setIsLoadingVisible(false);
+    setOffset(0);
+    loadingStartedAtRef.current = 0;
+    if (loadingVisibilityTimeoutRef.current) {
+      clearTimeout(loadingVisibilityTimeoutRef.current);
+      loadingVisibilityTimeoutRef.current = undefined;
+    }
+  }, []);
+
+  const showLoadingStatus = useCallback(() => {
+    if (loadingVisibilityTimeoutRef.current) {
+      clearTimeout(loadingVisibilityTimeoutRef.current);
+      loadingVisibilityTimeoutRef.current = undefined;
+    }
+    loadingStartedAtRef.current = Date.now();
+    setIsLoadingVisible(true);
+  }, []);
+
+  const hideLoadingStatus = useCallback(() => {
+    const elapsed = Date.now() - loadingStartedAtRef.current;
+    const remaining = Math.max(STATUS_MIN_VISIBLE_MS - elapsed, 0);
+    if (loadingVisibilityTimeoutRef.current) {
+      clearTimeout(loadingVisibilityTimeoutRef.current);
+    }
+    loadingVisibilityTimeoutRef.current = setTimeout(() => {
+      setIsLoadingVisible(false);
+      loadingStartedAtRef.current = 0;
+      loadingVisibilityTimeoutRef.current = undefined;
+    }, remaining);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (loadingVisibilityTimeoutRef.current) {
+        clearTimeout(loadingVisibilityTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    scopeRef.current = scope;
+  }, [scope]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(SCOPE_STORAGE_KEY) as SearchScope | null;
+    if (stored && SCOPE_OPTIONS.some((option) => option.value === stored)) {
+      setScope(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SCOPE_STORAGE_KEY, scope);
+  }, [scope]);
 
   const searchManga = useCallback(
-    (searchQuery: string, pageNum: number = 1) => {
-      if (!searchQuery.trim()) {
-        setResults([]);
-        setIsOpen(false);
-        setHasMore(false);
+    (searchQuery: string, nextOffset: number = 0, overrideScope?: SearchScope) => {
+      const trimmedQuery = searchQuery.trim();
+      if (!trimmedQuery) {
+        resetResults();
         return;
       }
 
+      const activeScope = overrideScope ?? scopeRef.current;
       setIsLoading(true);
-      fetcher.load(
-        `/api/manga/search?q=${encodeURIComponent(searchQuery)}&page=${pageNum}&limit=10`,
-      );
+      showLoadingStatus();
+      setIsOpen(true);
+      const params = new URLSearchParams({
+        q: trimmedQuery,
+        scope: activeScope,
+        limit: String(RESULT_LIMIT),
+        offset: String(nextOffset),
+      });
+      fetcher.load(`/api/search?${params.toString()}`);
     },
-    [fetcher],
+    [fetcher, resetResults, showLoadingStatus],
   );
 
   useEffect(() => {
-    if (fetcher.data) {
-      const data = fetcher.data;
-
-      if (page === 1) {
-        setResults(data.manga);
-      } else {
-        setResults((prev) => [...prev, ...data.manga]);
-      }
-
-      setHasMore(data.hasMore);
-      setIsLoading(false);
-
-      if (data.manga.length > 0 || Boolean(query.trim())) {
-        setIsOpen(true);
-      } else {
-        setIsOpen(false);
-      }
+    const data = fetcher.data;
+    if (!data) return;
+    if (data.scope !== scopeRef.current) {
+      return;
     }
-  }, [fetcher.data, page, query]);
+
+    if (data.resolvedQuery !== trimmedQuery) {
+      return;
+    }
+
+    setHasMore(data.hasMore);
+    setIsLoading(false);
+  hideLoadingStatus();
+    setOffset(data.nextOffset);
+
+    if (data.requestedOffset === 0) {
+      setResults(data.items);
+    } else {
+      setResults((prev) => {
+        const existing = new Set(prev.map((item) => item.id));
+        const merged = data.items.filter((item) => !existing.has(item.id));
+        return [...prev, ...merged];
+      });
+    }
+
+    if (data.items.length > 0 || Boolean(trimmedQuery)) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [fetcher.data, trimmedQuery]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -72,37 +155,23 @@ export function HeaderSearch() {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      if (Boolean(query.trim())) {
-        setPage(1);
-        setResults([]);
-        setHasMore(false);
-        searchManga(query, 1);
+      if (Boolean(trimmedQuery)) {
+        searchManga(query, 0);
       } else {
-        setResults([]);
-        setIsOpen(false);
-        setHasMore(false);
-        setIsLoading(false);
+        resetResults();
       }
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [query]);
-
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
+  }, [query, resetResults, searchManga, trimmedQuery]);
 
   const handleScroll = useCallback(() => {
     const scrollElement = scrollRef.current;
-    if (!scrollElement || !hasMore || isLoading || !query.trim()) {
+    if (!scrollElement || !hasMore || isLoading || !trimmedQuery) {
       return;
     }
 
@@ -110,11 +179,9 @@ export function HeaderSearch() {
     const scrollThreshold = scrollHeight - clientHeight - 10;
 
     if (scrollTop >= scrollThreshold) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      searchManga(query, nextPage);
+      searchManga(query, offset);
     }
-  }, [hasMore, isLoading, page, query, searchManga]);
+  }, [hasMore, isLoading, offset, query, searchManga, trimmedQuery]);
 
   useEffect(() => {
     const scrollElement = scrollRef.current;
@@ -124,60 +191,107 @@ export function HeaderSearch() {
     }
   }, [handleScroll]);
 
-  const shouldShowDropdown = Boolean(query.trim()) && (results.length > 0 || isLoading);
+  const shouldShowDropdown = Boolean(trimmedQuery) && (results.length > 0 || isLoadingVisible || isLoading);
+
+  const statusMessage = useMemo(() => {
+    if (!trimmedQuery) return "";
+    if (isLoadingVisible) {
+      return "Nhấn lại \"kính lúp\" để hiển thị kết quả mới";
+    }
+    if (!isLoading && results.length === 0) {
+      return "Không tìm thấy truyện nào";
+    }
+    return "";
+  }, [isLoading, isLoadingVisible, results.length, trimmedQuery]);
+
+  const hasStatusMessage = Boolean(statusMessage);
+
+  const handleScopeChange = (value: string) => {
+    if (value === scope) return;
+    const nextScope = value as SearchScope;
+    setScope(nextScope);
+    if (trimmedQuery) {
+      searchManga(query, 0, nextScope);
+    }
+  };
 
   return (
-    <Popover.Root open={shouldShowDropdown && isOpen} onOpenChange={setIsOpen}>
-      <Popover.Trigger asChild>
-        <div className="bg-bgc-layer2 absolute left-1/2 flex w-60 -translate-x-1/2 transform items-center justify-start gap-2 rounded-xl px-3 py-1.5 lg:w-96">
-          <Search className="text-txt-secondary h-5 w-5 flex-shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Tìm truyện"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => {
-              if (results.length > 0 && Boolean(query.trim())) {
-                setIsOpen(true);
-              }
-            }}
-            className="text-txt-secondary placeholder:text-txt-secondary focus:text-txt-primary flex-1 bg-transparent leading-normal font-medium outline-none focus:outline-none"
-          />
-        </div>
-      </Popover.Trigger>
-
-      <Popover.Portal>
-        <Popover.Content
-          className="bg-bgc-layer1 border-bd-default data-[state=open]:data-[side=top]:animate-slideDownAndFade data-[state=open]:data-[side=right]:animate-slideLeftAndFade data-[state=open]:data-[side=bottom]:animate-slideUpAndFade data-[state=open]:data-[side=left]:animate-slideRightAndFade z-[99999] max-h-96 w-80 overflow-hidden rounded-xl border shadow-lg will-change-[transform,opacity] md:w-96 lg:w-[384px]"
-          sideOffset={8}
-          align="center"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <div
-            ref={scrollRef}
-            className="scrollbar-thin scrollbar-thumb-bd-default scrollbar-track-transparent max-h-96 overflow-y-auto"
-          >
-            {results.map((manga, index) => (
-              <SearchItem key={manga.id} manga={manga} isFirst={index === 0} />
-            ))}
-
-            {isLoading && <LoadingSpinner />}
-
-            {!hasMore && results.length > 0 && !isLoading && (
-              <div className="text-txt-secondary py-4 text-center text-sm">
-                Không còn kết quả
-              </div>
-            )}
-
-            {results.length === 0 && query.trim() && !isLoading && (
-              <div className="text-txt-secondary py-8 text-center">
-                Không tìm thấy truyện nào
-              </div>
-            )}
+    <div className="absolute left-1/2 flex w-full max-w-[calc(100vw-1rem)] -translate-x-1/2 transform items-center gap-2 px-2 sm:max-w-[520px] sm:px-0 lg:gap-3">
+      <Popover.Root open={shouldShowDropdown && isOpen} onOpenChange={setIsOpen}>
+        <Popover.Trigger asChild>
+          <div className="group bg-bgc-layer2 flex w-full items-center gap-2 rounded-xl px-3 py-1.5 sm:px-4">
+            <Search className="text-txt-secondary h-5 w-5 flex-shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Tìm truyện..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => {
+                if (results.length > 0 && Boolean(trimmedQuery)) {
+                  setIsOpen(true);
+                }
+              }}
+              className="text-txt-secondary placeholder:text-txt-secondary focus:text-txt-primary flex-1 bg-transparent leading-normal font-medium outline-none focus:outline-none"
+            />
+            <select
+              aria-label="Lọc theo"
+              value={scope}
+              onChange={(event) => handleScopeChange(event.target.value)}
+              className="text-txt-secondary bg-bgc-layer1 rounded-lg border border-transparent px-2 py-1 text-xs font-semibold focus:border-lav-500 focus:outline-none"
+            >
+              {SCOPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+        </Popover.Trigger>
+
+        <Popover.Portal>
+          <Popover.Content
+            className="bg-bgc-layer1 border-bd-default data-[state=open]:data-[side=top]:animate-slideDownAndFade data-[state=open]:data-[side=right]:animate-slideLeftAndFade data-[state=open]:data-[side=bottom]:animate-slideUpAndFade data-[state=open]:data-[side=left]:animate-slideRightAndFade z-[99999] max-h-96 w-80 overflow-hidden rounded-xl border shadow-lg will-change-[transform,opacity] md:w-96 lg:w-[384px]"
+            sideOffset={8}
+            align="center"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            <div
+              ref={scrollRef}
+              className="scrollbar-thin scrollbar-thumb-bd-default scrollbar-track-transparent max-h-96 overflow-y-auto"
+            >
+              <div className="border-b border-bd-default px-3" aria-live="polite">
+                <p
+                  className={`py-3 text-center text-sm transition-opacity duration-200 ${hasStatusMessage ? "text-txt-secondary opacity-100" : "opacity-0"}`}
+                  aria-hidden={!hasStatusMessage}
+                >
+                  {hasStatusMessage ? statusMessage : "\u00A0"}
+                </p>
+              </div>
+
+              {results.map((item, index) => (
+                <SearchItem key={item.id} result={item} isFirst={index === 0} />
+              ))}
+
+              {!hasMore && results.length > 0 && !isLoading && (
+                <div className="text-txt-secondary py-4 text-center text-sm">
+                  Không còn kết quả
+                </div>
+              )}
+
+            </div>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+
+      <Link
+        to={{ pathname: "/search/advanced", search: trimmedQuery ? `?q=${encodeURIComponent(trimmedQuery)}` : "" } as unknown as string}
+        className="inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-[#C084FC] bg-bgc-layer2/80 px-3 py-1.5 text-xs font-semibold text-[#E0B2FF] transition hover:bg-bgc-layer2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C084FC]"
+        aria-label="Mở tìm kiếm nâng cao"
+      >
+        <Search className="h-4 w-4 text-[#C084FC]" strokeWidth={2.5} />
+        <span>Nâng cao</span>
+      </Link>
+    </div>
   );
 }

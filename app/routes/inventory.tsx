@@ -31,6 +31,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const maxExp = userData?.level === 9 ? "Tối đa" : getMaxExp(userData?.level || 1);
 
+  // DB đã lưu exp-in-level trực tiếp; không cần chuyển đổi
+
   const chaptersRead = await UserReadChapterModel.countDocuments({
     userId: userSession.id,
   });

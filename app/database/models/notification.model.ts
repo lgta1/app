@@ -9,6 +9,11 @@ export type NotificationType = {
   subtitle: string;
   imgUrl: string;
   isRead: boolean;
+  type?: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  targetSlug?: string | null;
+  targetUrl?: string | null;
 };
 
 const NotificationSchema = new Schema<NotificationType>(
@@ -18,6 +23,11 @@ const NotificationSchema = new Schema<NotificationType>(
     subtitle: { type: String },
     imgUrl: { type: String, required: true },
     isRead: { type: Boolean, default: false },
+    type: { type: String, default: "default" },
+    targetType: { type: String, default: null },
+    targetId: { type: String, default: null },
+    targetSlug: { type: String, default: null },
+    targetUrl: { type: String, default: null },
   },
   { timestamps: true },
 );

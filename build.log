@@ -1,0 +1,258 @@
+
+> build
+> react-router build
+
+vite v6.3.5 building for production...
+transforming...
+app/components/dialog-inventory-sacrifice.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1991 modules transformed.
+Generated an empty chunk: "api.waifu.simulate-milestone".
+Generated an empty chunk: "api.leaderboard.calculate".
+Generated an empty chunk: "api.waifu.milestone-claim".
+Generated an empty chunk: "api.debug.leaderboard".
+Generated an empty chunk: "api.waifu.leaderboard".
+Generated an empty chunk: "api.waifu.sacrifice".
+Generated an empty chunk: "api.authors.create".
+Generated an empty chunk: "api.authors.search".
+Generated an empty chunk: "api.files.download".
+Generated an empty chunk: "api.manga-progress".
+Generated an empty chunk: "api.reading-reward".
+Generated an empty chunk: "api.summon.history".
+Generated an empty chunk: "api.chapters.list".
+Generated an empty chunk: "api.daily-checkin".
+Generated an empty chunk: "api.notifications".
+Generated an empty chunk: "api.user-comments".
+Generated an empty chunk: "api.chapter-view".
+Generated an empty chunk: "api.files.delete".
+Generated an empty chunk: "api.files.upload".
+Generated an empty chunk: "api.genres.debug".
+Generated an empty chunk: "api.interactions".
+Generated an empty chunk: "api.manga-follow".
+Generated an empty chunk: "api.manga-rating".
+Generated an empty chunk: "api.files.list".
+Generated an empty chunk: "api.manga-like".
+Generated an empty chunk: "api.user-waifu".
+Generated an empty chunk: "api.comments".
+Generated an empty chunk: "api.comments.recent".
+Generated an empty chunk: "waifu.summon".
+Generated an empty chunk: "api.banners".
+Generated an empty chunk: "api.chapter".
+Generated an empty chunk: "api.chapter.update-status".
+Generated an empty chunk: "api.reports".
+Generated an empty chunk: "api.manga".
+Generated an empty chunk: "api.manga.recent-read".
+Generated an empty chunk: "api.manga.following".
+Generated an empty chunk: "api.manga.uploaded".
+Generated an empty chunk: "api.manga.latest".
+Generated an empty chunk: "api.manga.search".
+Generated an empty chunk: "api.pity".
+Generated an empty chunk: "api.post".
+Generated an empty chunk: "api.user".
+rendering chunks...
+computing gzip size...
+build/client/.vite/manifest.json                                  56.15 kB │ gzip:   5.38 kB
+build/client/assets/waifu.summon-DKd-t4lf.css                      0.31 kB │ gzip:   0.22 kB
+build/client/assets/app-BCdioZxu.css                             103.00 kB │ gzip:  16.80 kB
+build/client/assets/api.waifu.simulate-milestone-l0sNRNKZ.js       0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.leaderboard.calculate-l0sNRNKZ.js          0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.waifu.milestone-claim-l0sNRNKZ.js          0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.debug.leaderboard-l0sNRNKZ.js              0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.waifu.leaderboard-l0sNRNKZ.js              0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.waifu.sacrifice-l0sNRNKZ.js                0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.authors.create-l0sNRNKZ.js                 0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.authors.search-l0sNRNKZ.js                 0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.files.download-l0sNRNKZ.js                 0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga-progress-l0sNRNKZ.js                 0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.reading-reward-l0sNRNKZ.js                 0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.summon.history-l0sNRNKZ.js                 0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.chapters.list-l0sNRNKZ.js                  0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.daily-checkin-l0sNRNKZ.js                  0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.notifications-l0sNRNKZ.js                  0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.user-comments-l0sNRNKZ.js                  0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.chapter-view-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.files.delete-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.files.upload-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.genres.debug-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.interactions-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga-follow-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga-rating-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.files.list-l0sNRNKZ.js                     0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga-like-l0sNRNKZ.js                     0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.user-waifu-l0sNRNKZ.js                     0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.comments-l0sNRNKZ.js                       0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.comments.recent-l0sNRNKZ.js                0.00 kB │ gzip:   0.02 kB
+build/client/assets/waifu.summon-l0sNRNKZ.js                       0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.banners-l0sNRNKZ.js                        0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.chapter-l0sNRNKZ.js                        0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.chapter.update-status-l0sNRNKZ.js          0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.reports-l0sNRNKZ.js                        0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga-l0sNRNKZ.js                          0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga.recent-read-l0sNRNKZ.js              0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga.following-l0sNRNKZ.js                0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga.uploaded-l0sNRNKZ.js                 0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga.latest-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.manga.search-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.pity-l0sNRNKZ.js                           0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.post-l0sNRNKZ.js                           0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.user-l0sNRNKZ.js                           0.00 kB │ gzip:   0.02 kB
+build/client/assets/report-D3QnjeRr.js                             0.06 kB │ gzip:   0.07 kB
+build/client/assets/chapter-Cs0Z_IUe.js                            0.06 kB │ gzip:   0.08 kB
+build/client/assets/manga-yoVnWl5i.js                              0.09 kB │ gzip:   0.10 kB
+build/client/assets/manga._mangaId.bulk-upload-urls-BbYlxrbX.js    0.11 kB │ gzip:   0.12 kB
+build/client/assets/logout-OY4eX6lo.js                             0.12 kB │ gzip:   0.12 kB
+build/client/assets/admin-CwaQnpJQ.js                              0.12 kB │ gzip:   0.14 kB
+build/client/assets/admin.statistic-B7PzLel-.js                    0.28 kB │ gzip:   0.25 kB
+build/client/assets/admin.waifu-BNEnXwTP.js                        0.29 kB │ gzip:   0.26 kB
+build/client/assets/check-COkw-foZ.js                              0.30 kB │ gzip:   0.25 kB
+build/client/assets/chevron-down-o9rZMLHX.js                       0.31 kB │ gzip:   0.25 kB
+build/client/assets/leaderboard-BDDZpAiY.js                        0.33 kB │ gzip:   0.28 kB
+build/client/assets/message-circle-BUhxs_jQ.js                     0.33 kB │ gzip:   0.27 kB
+build/client/assets/plus-CSQ13ZN7.js                               0.34 kB │ gzip:   0.26 kB
+build/client/assets/x-BB6RVIov.js                                  0.34 kB │ gzip:   0.26 kB
+build/client/assets/search-B8fu3_zr.js                             0.35 kB │ gzip:   0.28 kB
+build/client/assets/clock-ByN23dfx.js                              0.36 kB │ gzip:   0.28 kB
+build/client/assets/message-square-DQeEo3i4.js                     0.36 kB │ gzip:   0.28 kB
+build/client/assets/menu-tdw56aEG.js                               0.37 kB │ gzip:   0.27 kB
+build/client/assets/user-G6HNfB8U.js                               0.38 kB │ gzip:   0.29 kB
+build/client/assets/upload-DxkMei7v.js                             0.41 kB │ gzip:   0.30 kB
+build/client/assets/heart-CmtUXVAp.js                              0.42 kB │ gzip:   0.32 kB
+build/client/assets/eye-zg6t-MBJ.js                                0.44 kB │ gzip:   0.31 kB
+build/client/assets/calendar-CwDjEUq3.js                           0.44 kB │ gzip:   0.31 kB
+build/client/assets/triangle-alert-B9jlCR6v.js                     0.45 kB │ gzip:   0.32 kB
+build/client/assets/image-BNJT_4s-.js                              0.45 kB │ gzip:   0.33 kB
+build/client/assets/pen-line-CJhlP5hD.js                           0.46 kB │ gzip:   0.33 kB
+build/client/assets/book-open-CjZ4-Ja5.js                          0.46 kB │ gzip:   0.32 kB
+build/client/assets/users-DC6JiWGH.js                              0.49 kB │ gzip:   0.33 kB
+build/client/assets/square-pen-CisJpdFn.js                         0.50 kB │ gzip:   0.35 kB
+build/client/assets/tag-DaGAGYtO.js                                0.51 kB │ gzip:   0.35 kB
+build/client/assets/file-text-C9Ceq73l.js                          0.52 kB │ gzip:   0.33 kB
+build/client/assets/loading-spinner-BK_JHgQm.js                    0.52 kB │ gzip:   0.31 kB
+build/client/assets/gift-BxkOHjrh.js                               0.54 kB │ gzip:   0.36 kB
+build/client/assets/trash-2-Bo22CUJN.js                            0.54 kB │ gzip:   0.36 kB
+build/client/assets/toast.helper-BXaR-wm6.js                       0.59 kB │ gzip:   0.41 kB
+build/client/assets/star-4yKJ4cAm.js                               0.66 kB │ gzip:   0.41 kB
+build/client/assets/username-validator.client-CAvuYg7u.js          0.72 kB │ gzip:   0.43 kB
+build/client/assets/user.helper-BH7l8X_P.js                        0.72 kB │ gzip:   0.37 kB
+build/client/assets/jsx-runtime-D_zvdyIk.js                        0.73 kB │ gzip:   0.46 kB
+build/client/assets/date.utils-0rDbL384.js                         0.92 kB │ gzip:   0.42 kB
+build/client/assets/button-group-form-DzJyayLQ.js                  1.19 kB │ gzip:   0.61 kB
+build/client/assets/settings-CdnPzATJ.js                           1.23 kB │ gzip:   0.53 kB
+build/client/assets/authors._slug-P4P0IYR4.js                      1.37 kB │ gzip:   0.78 kB
+build/client/assets/post-creation-sidebar-BUkoRHXe.js              1.49 kB │ gzip:   0.79 kB
+build/client/assets/image-uploader-Ds-TMW57.js                     1.54 kB │ gzip:   0.84 kB
+build/client/assets/chapter.utils-Cq4_V2zA.js                      1.60 kB │ gzip:   0.76 kB
+build/client/assets/manga.chapter._mangaId-CuSih23x.js             1.60 kB │ gzip:   0.85 kB
+build/client/assets/rating-item-UYdBHfUQ.js                        1.70 kB │ gzip:   0.69 kB
+build/client/assets/summon-navigation-bar-B1MZWz5Z.js              1.79 kB │ gzip:   0.74 kB
+build/client/assets/waifu.leaderboard-DbF4-jrL.js                  1.83 kB │ gzip:   0.89 kB
+build/client/assets/createLucideIcon-C2A-mbiR.js                   1.87 kB │ gzip:   0.81 kB
+build/client/assets/rating-item-user-DGJS6kHC.js                   2.02 kB │ gzip:   0.88 kB
+build/client/assets/genres._slug-DyxMISB-.js                       2.08 kB │ gzip:   1.05 kB
+build/client/assets/use-pagination-BLjAZIyu.js                     2.12 kB │ gzip:   0.99 kB
+build/client/assets/leaderboard.member-Bg3KHty4.js                 2.19 kB │ gzip:   0.86 kB
+build/client/assets/manga.uploaded._id-DcwVYXIJ.js                 2.20 kB │ gzip:   1.03 kB
+build/client/assets/manga-card-T47FV3Pm.js                         2.85 kB │ gzip:   1.17 kB
+build/client/assets/profile._id-NXuuQeoo.js                        2.95 kB │ gzip:   1.37 kB
+build/client/assets/leaderboard.waifu-Dfy4MiKg.js                  3.09 kB │ gzip:   1.10 kB
+build/client/assets/pagination-CEvcdKQ0.js                         3.19 kB │ gzip:   1.10 kB
+build/client/assets/use-file-operations-B5ir0O-S.js                3.34 kB │ gzip:   1.25 kB
+build/client/assets/dropdown-CRysmEjq.js                           3.37 kB │ gzip:   1.57 kB
+build/client/assets/login-DdJgoT4C.js                              3.57 kB │ gzip:   1.42 kB
+build/client/assets/admin.statistic.member-eqCkzooN.js             3.63 kB │ gzip:   1.06 kB
+build/client/assets/leaderboard.manga-Cnh07dxH.js                  3.78 kB │ gzip:   1.14 kB
+build/client/assets/dialog-warning-action-BxSW6bd8.js              3.83 kB │ gzip:   1.10 kB
+build/client/assets/index-DWZ0pNvx.js                              3.95 kB │ gzip:   1.56 kB
+build/client/assets/leaderboard-user-waifu-item-M-6Dexa0.js        4.18 kB │ gzip:   1.27 kB
+build/client/assets/leaderboard.revenue-UeOWHM2O.js                4.42 kB │ gzip:   1.40 kB
+build/client/assets/admin.waifu.index-MOSC6ZUD.js                  4.88 kB │ gzip:   1.82 kB
+build/client/assets/admin.statistic.manga-Dv3wBg07.js              4.92 kB │ gzip:   1.44 kB
+build/client/assets/profile-info-BkhZqzyL.js                       5.00 kB │ gzip:   1.44 kB
+build/client/assets/change-password-CRLrxs4J.js                    5.10 kB │ gzip:   1.46 kB
+build/client/assets/index-Dhq7FBAM.js                              5.30 kB │ gzip:   2.04 kB
+build/client/assets/posts-DldvwyXp.js                              5.45 kB │ gzip:   1.97 kB
+build/client/assets/admin.manga.upload-revenue-BQ2e_mxD.js         5.58 kB │ gzip:   2.30 kB
+build/client/assets/secure-files-tKpjEwKO.js                       5.67 kB │ gzip:   2.30 kB
+build/client/assets/api.reading-exp-BSECc0Qx.js                    5.73 kB │ gzip:   1.95 kB
+build/client/assets/register-DKDl7EGK.js                           5.99 kB │ gzip:   2.01 kB
+build/client/assets/index-BQQSF9Wo.js                              6.85 kB │ gzip:   2.79 kB
+build/client/assets/post._id-Bo-V4874.js                           6.88 kB │ gzip:   2.33 kB
+build/client/assets/admin.report-DF9Ymx9x.js                       7.00 kB │ gzip:   2.24 kB
+build/client/assets/index-DE_pKlQR.js                              7.26 kB │ gzip:   2.87 kB
+build/client/assets/admin.waifu.banner-DXVTbLOp.js                 7.35 kB │ gzip:   2.64 kB
+build/client/assets/profile-edit-Du1kyqCg.js                       8.07 kB │ gzip:   2.96 kB
+build/client/assets/admin.waifu.pity-aWbAiULF.js                   8.40 kB │ gzip:   1.95 kB
+build/client/assets/admin.waifu.create-waifu-CsX18r8S.js           8.97 kB │ gzip:   2.34 kB
+build/client/assets/admin.manga._index-B7r9cmjZ.js                 9.20 kB │ gzip:   2.52 kB
+build/client/assets/post-create-BfedrZ3R.js                        9.39 kB │ gzip:   3.04 kB
+build/client/assets/manga.edit._id-LhWHEVXX.js                     9.68 kB │ gzip:   3.09 kB
+build/client/assets/post-edit._id-2A-vd_85.js                     10.21 kB │ gzip:   3.28 kB
+build/client/assets/index-Cwh7LkWV.js                             11.95 kB │ gzip:   4.79 kB
+build/client/assets/admin.waifu.create-banner-sDvt_RQo.js         13.86 kB │ gzip:   2.73 kB
+build/client/assets/chapter-detail-Bt-7ZaL5.js                    14.23 kB │ gzip:   4.43 kB
+build/client/assets/admin.waifu.edit-banner._id-DKHOL_yD.js       14.40 kB │ gzip:   2.94 kB
+build/client/assets/manga.chapter.edit._mangaId-D9FDbsRf.js       15.27 kB │ gzip:   5.12 kB
+build/client/assets/profile._index-COh1-T5Y.js                    17.26 kB │ gzip:   4.13 kB
+build/client/assets/manga.create-Bv2Cb2Hv.js                      17.67 kB │ gzip:   6.22 kB
+build/client/assets/manga.chapter.create._mangaId-AeHq0nqi.js     18.07 kB │ gzip:   5.80 kB
+build/client/assets/manga.preview._id-BPXij9Qt.js                 18.12 kB │ gzip:   6.05 kB
+build/client/assets/inventory-It_u6E91.js                         19.08 kB │ gzip:   5.73 kB
+build/client/assets/Combination-DRUG7dDY.js                       20.62 kB │ gzip:   7.42 kB
+build/client/assets/admin.member-D9Vax1Wg.js                      20.67 kB │ gzip:   4.08 kB
+build/client/assets/manga._id-Cc6KHP2Z.js                         21.42 kB │ gzip:   6.68 kB
+build/client/assets/comment-detail-DeuIOhMe.js                    26.52 kB │ gzip:   6.97 kB
+build/client/assets/_index-CJXLotBT.js                            29.98 kB │ gzip:   9.03 kB
+build/client/assets/lib-DEhrjmf2.js                               35.77 kB │ gzip:  13.56 kB
+build/client/assets/waifu.summon._id-D4ZraDp-.js                  36.53 kB │ gzip:   9.24 kB
+build/client/assets/image-compression.utils-B1YNrGqB.js           55.60 kB │ gzip:  22.08 kB
+build/client/assets/root-sF0X-PgF.js                              74.58 kB │ gzip:  23.76 kB
+build/client/assets/chunk-PVWAREVJ-B0-jUo3g.js                   117.98 kB │ gzip:  39.88 kB
+build/client/assets/entry.client-DmIGYMRe.js                     182.77 kB │ gzip:  58.27 kB
+build/client/assets/browser.umd-DbOm3exm.js                      588.34 kB │ gzip: 167.29 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 10.25s
+vite v6.3.5 building SSR bundle for production...
+transforming...
+app/components/dialog-inventory-sacrifice.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+"default" is imported from external module "react" but never used in "app/routes/post-create.tsx", "app/routes/register.tsx", "app/routes/login.tsx", "app/routes/manga.chapter.edit.$mangaId.tsx", "app/routes/change-password.tsx", "app/routes/admin.waifu.edit-banner.$id.tsx", "app/routes/admin.waifu.create-banner.tsx", "app/routes/admin.manga._index.tsx", "app/routes/manga.edit.$id.tsx", "app/components/chapter-status-dropdown.tsx", "app/routes/manga.preview.$id.tsx", "app/routes/admin.waifu.create-waifu.tsx", "app/components/inventory-card.tsx", "app/hooks/use-client-pagination.ts", "app/components/dialog-inventory-sacrifice.tsx", "app/components/inventory-daily-reward.tsx", "app/routes/inventory.tsx", "app/components/manga-detail.tsx", "app/hooks/use-file-operations.ts", "app/hooks/use-pagination.ts", "app/routes/profile.$id.tsx", "app/routes/posts.tsx", "app/routes/admin.waifu.index.tsx", "app/components/dropdown.tsx", "app/routes/admin.manga.upload-revenue.tsx", "app/components/author-select.tsx", "app/routes/manga.create.tsx", "app/routes/admin.waifu.pity.tsx", "app/components/dialog-ban-member.tsx", "app/components/dialog-reward-gold.tsx", "app/components/file-manager.tsx", "app/routes/admin.member.tsx", "app/routes/profile-edit.tsx", "app/components/dialog-warning-adult-content.tsx", "app/components/latest-updates.tsx", "app/components/dialog-warning-device-rotation.tsx", "app/components/summon-asset-preloader.tsx", "app/components/summon-video-player.tsx", "app/routes/post.$id.tsx", "app/components/dialog-milestone-claim.tsx", "app/components/top-banner-mobile-grid.tsx", "app/components/recent-comments-feed.tsx", "app/components/dialog-report.tsx", "app/components/chapter-detail.tsx", "app/routes/manga.chapter.create.$mangaId.tsx", "app/components/mobile-menu-public.tsx", "app/components/header-genres.tsx", "app/components/mobile-search.tsx", "app/components/comment-detail.tsx", "app/components/profile-manga-follow.tsx", "app/components/profile-manga-uploaded.tsx", "app/routes/profile._index.tsx", "app/routes/post-edit.$id.tsx", "app/components/summon-card.tsx", "app/components/summon-result-overlay.tsx", "app/routes/waifu.summon.$id.tsx", "app/components/top-banner-item.tsx", "app/components/top-banner.tsx", "app/routes/_index.tsx", "app/components/header-search.tsx", "app/components/notification-bell.tsx", "app/components/user-menu.tsx", "app/components/header.tsx" and "app/root.tsx".
+✓ 256 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /home/devuser/ww-new/app/helpers/errors.helper.ts is dynamically imported by /home/devuser/ww-new/app/routes/waifu.summon.$id.tsx but also statically imported by /home/devuser/ww-new/app/.server/mutations/banner.mutation.ts, /home/devuser/ww-new/app/.server/mutations/chapter.mutation.ts, /home/devuser/ww-new/app/.server/mutations/comment.mutation.ts, /home/devuser/ww-new/app/.server/mutations/manga-revenue.mutation.ts, /home/devuser/ww-new/app/.server/mutations/manga.mutation.ts, /home/devuser/ww-new/app/.server/mutations/post.mutation.ts, /home/devuser/ww-new/app/.server/mutations/report.mutation.ts, /home/devuser/ww-new/app/.server/mutations/user.mutation.ts, /home/devuser/ww-new/app/.server/mutations/waifu.mutation.ts, /home/devuser/ww-new/app/.server/queries/report.query.ts, /home/devuser/ww-new/app/.server/services/auth.server.ts, /home/devuser/ww-new/app/.server/services/leaderboard.svc.ts, /home/devuser/ww-new/app/.server/services/summon.svc.ts, /home/devuser/ww-new/app/hooks/use-file-operations.ts, /home/devuser/ww-new/app/routes/admin.waifu.create-banner.tsx, /home/devuser/ww-new/app/routes/admin.waifu.create-waifu.tsx, /home/devuser/ww-new/app/routes/admin.waifu.edit-banner.$id.tsx, /home/devuser/ww-new/app/routes/admin.waifu.index.tsx, /home/devuser/ww-new/app/routes/api.chapter.ts, /home/devuser/ww-new/app/routes/api.chapter.update-status.ts, /home/devuser/ww-new/app/routes/api.comments.ts, /home/devuser/ww-new/app/routes/api.files.upload.ts, /home/devuser/ww-new/app/routes/api.manga-follow.ts, /home/devuser/ww-new/app/routes/api.manga-like.ts, /home/devuser/ww-new/app/routes/api.manga-progress.ts, /home/devuser/ww-new/app/routes/api.manga-rating.ts, /home/devuser/ww-new/app/routes/api.post.ts, /home/devuser/ww-new/app/routes/api.waifu.milestone-claim.ts, /home/devuser/ww-new/app/routes/login.tsx, /home/devuser/ww-new/app/routes/manga.$id.tsx, /home/devuser/ww-new/app/routes/manga.$mangaId.bulk-upload-urls.ts, /home/devuser/ww-new/app/routes/manga.chapter.create.$mangaId.tsx, /home/devuser/ww-new/app/routes/manga.chapter.edit.$mangaId.tsx, /home/devuser/ww-new/app/routes/manga.create.tsx, /home/devuser/ww-new/app/routes/manga.edit.$id.tsx, /home/devuser/ww-new/app/routes/manga.preview.$id.tsx, /home/devuser/ww-new/app/routes/register.tsx, /home/devuser/ww-new/app/utils/minio.utils.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /home/devuser/ww-new/app/.server/services/session.svc.ts is dynamically imported by /home/devuser/ww-new/app/routes/waifu.summon.$id.tsx but also statically imported by /home/devuser/ww-new/app/.server/mutations/banner.mutation.ts, /home/devuser/ww-new/app/.server/mutations/chapter.mutation.ts, /home/devuser/ww-new/app/.server/mutations/comment.mutation.ts, /home/devuser/ww-new/app/.server/mutations/manga.mutation.ts, /home/devuser/ww-new/app/.server/mutations/post.mutation.ts, /home/devuser/ww-new/app/.server/mutations/user.mutation.ts, /home/devuser/ww-new/app/.server/mutations/waifu.mutation.ts, /home/devuser/ww-new/app/.server/services/auth.server.ts, /home/devuser/ww-new/app/.server/services/summon.svc.ts, /home/devuser/ww-new/app/root.tsx, /home/devuser/ww-new/app/routes/api.comments.ts, /home/devuser/ww-new/app/routes/api.daily-checkin.ts, /home/devuser/ww-new/app/routes/api.files.delete.ts, /home/devuser/ww-new/app/routes/api.files.download.ts, /home/devuser/ww-new/app/routes/api.files.upload.ts, /home/devuser/ww-new/app/routes/api.interactions.ts, /home/devuser/ww-new/app/routes/api.manga-follow.ts, /home/devuser/ww-new/app/routes/api.manga-like.ts, /home/devuser/ww-new/app/routes/api.manga-progress.ts, /home/devuser/ww-new/app/routes/api.manga-rating.ts, /home/devuser/ww-new/app/routes/api.manga.following.ts, /home/devuser/ww-new/app/routes/api.manga.recent-read.ts, /home/devuser/ww-new/app/routes/api.manga.ts, /home/devuser/ww-new/app/routes/api.manga.uploaded.ts, /home/devuser/ww-new/app/routes/api.notifications.ts, /home/devuser/ww-new/app/routes/api.post.ts, /home/devuser/ww-new/app/routes/api.reading-exp.ts, /home/devuser/ww-new/app/routes/api.reading-reward.ts, /home/devuser/ww-new/app/routes/api.user-comments.ts, /home/devuser/ww-new/app/routes/api.user.ts, /home/devuser/ww-new/app/routes/api.waifu.milestone-claim.ts, /home/devuser/ww-new/app/routes/api.waifu.sacrifice.ts, /home/devuser/ww-new/app/routes/login.tsx, /home/devuser/ww-new/app/routes/manga.$id.tsx, /home/devuser/ww-new/app/routes/manga.chapter.$mangaId.tsx, /home/devuser/ww-new/app/routes/manga.chapter.edit.$mangaId.tsx, /home/devuser/ww-new/app/routes/post.$id.tsx, /home/devuser/ww-new/app/routes/profile-edit.tsx, /home/devuser/ww-new/app/routes/register.tsx, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /home/devuser/ww-new/app/database/models/user.model.ts is dynamically imported by /home/devuser/ww-new/app/routes/waifu.summon.$id.tsx but also statically imported by /home/devuser/ww-new/app/.server/mutations/banner.mutation.ts, /home/devuser/ww-new/app/.server/mutations/comment.mutation.ts, /home/devuser/ww-new/app/.server/mutations/manga.mutation.ts, /home/devuser/ww-new/app/.server/mutations/system-ban.direct.ts, /home/devuser/ww-new/app/.server/mutations/user-waifu-leaderboard.ts, /home/devuser/ww-new/app/.server/mutations/user.mutation.ts, /home/devuser/ww-new/app/.server/queries/statistic.query.ts, /home/devuser/ww-new/app/.server/queries/user.query.ts, /home/devuser/ww-new/app/.server/services/auth.server.ts, /home/devuser/ww-new/app/.server/services/summon.svc.ts, /home/devuser/ww-new/app/routes/api.comments.ts, /home/devuser/ww-new/app/routes/api.daily-checkin.ts, /home/devuser/ww-new/app/routes/api.manga.ts, /home/devuser/ww-new/app/routes/api.reading-exp.ts, /home/devuser/ww-new/app/routes/api.reading-reward.ts, /home/devuser/ww-new/app/routes/api.user-waifu.ts, /home/devuser/ww-new/app/routes/api.user.ts, /home/devuser/ww-new/app/routes/api.waifu.milestone-claim.ts, /home/devuser/ww-new/app/routes/api.waifu.sacrifice.ts, /home/devuser/ww-new/app/routes/api.waifu.simulate-milestone.ts, /home/devuser/ww-new/app/routes/change-password.tsx, /home/devuser/ww-new/app/routes/inventory.tsx, /home/devuser/ww-new/app/routes/manga.$id.tsx, /home/devuser/ww-new/app/routes/manga.create.tsx, /home/devuser/ww-new/app/routes/profile-edit.tsx, /home/devuser/ww-new/app/routes/profile.$id.tsx, /home/devuser/ww-new/app/routes/profile._index.tsx, /home/devuser/ww-new/app/utils/username-validator.server.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /home/devuser/ww-new/app/.server/services/auth.server.ts is dynamically imported by /home/devuser/ww-new/app/routes/waifu.summon.$id.tsx but also statically imported by /home/devuser/ww-new/app/routes/admin.manga._index.tsx, /home/devuser/ww-new/app/routes/admin.manga.upload-revenue.tsx, /home/devuser/ww-new/app/routes/admin.member.tsx, /home/devuser/ww-new/app/routes/admin.report.tsx, /home/devuser/ww-new/app/routes/admin.tsx, /home/devuser/ww-new/app/routes/admin.waifu.create-banner.tsx, /home/devuser/ww-new/app/routes/admin.waifu.create-waifu.tsx, /home/devuser/ww-new/app/routes/admin.waifu.edit-banner.$id.tsx, /home/devuser/ww-new/app/routes/admin.waifu.pity.tsx, /home/devuser/ww-new/app/routes/api.chapter.ts, /home/devuser/ww-new/app/routes/api.chapter.update-status.ts, /home/devuser/ww-new/app/routes/api.files.list.ts, /home/devuser/ww-new/app/routes/api.leaderboard.calculate.ts, /home/devuser/ww-new/app/routes/api.reports.ts, /home/devuser/ww-new/app/routes/api.summon.history.ts, /home/devuser/ww-new/app/routes/api.waifu.milestone-claim.ts, /home/devuser/ww-new/app/routes/api.waifu.simulate-milestone.ts, /home/devuser/ww-new/app/routes/change-password.tsx, /home/devuser/ww-new/app/routes/inventory.tsx, /home/devuser/ww-new/app/routes/login.tsx, /home/devuser/ww-new/app/routes/logout.tsx, /home/devuser/ww-new/app/routes/manga.$mangaId.bulk-upload-urls.ts, /home/devuser/ww-new/app/routes/manga.chapter.create.$mangaId.tsx, /home/devuser/ww-new/app/routes/manga.create.tsx, /home/devuser/ww-new/app/routes/manga.edit.$id.tsx, /home/devuser/ww-new/app/routes/manga.preview.$id.tsx, /home/devuser/ww-new/app/routes/profile-edit.tsx, /home/devuser/ww-new/app/routes/profile._index.tsx, /home/devuser/ww-new/app/routes/register.tsx, /home/devuser/ww-new/app/routes/secure-files.tsx, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /home/devuser/ww-new/app/database/models/banner.model.ts is dynamically imported by /home/devuser/ww-new/app/routes/waifu.summon.$id.tsx but also statically imported by /home/devuser/ww-new/app/.server/mutations/banner.mutation.ts, /home/devuser/ww-new/app/.server/queries/banner.query.ts, /home/devuser/ww-new/app/.server/services/summon.svc.ts, /home/devuser/ww-new/app/components/waifu-banner-item.tsx, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /home/devuser/ww-new/app/.server/mutations/banner.mutation.ts is dynamically imported by /home/devuser/ww-new/app/routes/waifu.summon.$id.tsx but also statically imported by /home/devuser/ww-new/app/routes/admin.waifu.banner.tsx, /home/devuser/ww-new/app/routes/admin.waifu.create-banner.tsx, /home/devuser/ww-new/app/routes/admin.waifu.edit-banner.$id.tsx, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /home/devuser/ww-new/app/database/models/pity-cumulative.model.ts is dynamically imported by /home/devuser/ww-new/app/routes/waifu.summon.$id.tsx but also statically imported by /home/devuser/ww-new/app/.server/services/summon.svc.ts, /home/devuser/ww-new/app/routes/admin.waifu.pity.tsx, dynamic import will not move module into another chunk.
+
+build/server/.vite/manifest.json                            1.45 kB
+build/server/assets/server-build-DKd-t4lf.css               0.31 kB
+build/server/assets/app-BCdioZxu.css                      103.00 kB
+build/server/index.js                                       0.90 kB
+build/server/assets/user-waifu-leaderboard-CkehrZwK.js      2.24 kB
+build/server/assets/summon.svc-S_yMB7El.js                  4.88 kB
+build/server/assets/server-build-LETSv4zT.js            1,220.78 kB
+
+✓ 2 assets cleaned from React Router server build.
+build/client/assets/app-BCdioZxu.css
+build/server/assets/server-build-DKd-t4lf.css
+✓ 1 asset moved from React Router server build to client assets.
+build/client/assets/server-build-DKd-t4lf.css
+
+✓ built in 2.69s

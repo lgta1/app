@@ -1,14 +1,11 @@
-import { useEffect, useState } from "react";
 import { redirect, useLoaderData } from "react-router";
 
 import { getAllOpenedBanners } from "@/queries/banner.query";
 
-import { LeaderboardTopUserWaifu } from "~/components/leaderboard-top-user-waifu";
 import LeaderboardUserWaifuItem from "~/components/leaderboard-user-waifu-item";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { Pagination } from "~/components/pagination";
 import { SummonNavigationBar } from "~/components/summon-navigation-bar";
-import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { usePagination } from "~/hooks/use-pagination";
 
 export async function loader() {
@@ -40,7 +37,6 @@ export async function loader() {
 
 export default function WaifuSummon() {
   const { navItems } = useLoaderData<typeof loader>();
-  const [top3Users, setTop3Users] = useState<UserWaifuLeaderboardType[]>([]);
 
   const {
     data: leaderboardData,
@@ -49,16 +45,10 @@ export default function WaifuSummon() {
     isLoading,
     error,
     goToPage,
-  } = usePagination<UserWaifuLeaderboardType>({
+  } = usePagination({
     apiUrl: "/api/waifu/leaderboard",
     limit: 5,
   });
-
-  useEffect(() => {
-    if (currentPage === 1 && leaderboardData.length > 0) {
-      setTop3Users(leaderboardData.slice(0, 3));
-    }
-  }, [currentPage, leaderboardData]);
 
   return (
     <div className="relative w-full">
@@ -70,128 +60,7 @@ export default function WaifuSummon() {
         BẢNG XẾP HẠNG
       </h1>
 
-      {/* Top 3 Members */}
-      {top3Users.length > 0 && (
-        <div className="hidden w-full flex-row items-center justify-center overflow-x-auto lg:flex">
-          {/* #2 */}
-          {top3Users[1] && (
-            <div className="relative m-8">
-              <LeaderboardTopUserWaifu
-                leaderboard={top3Users[1]}
-                gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(234.16,_234.16,_234.16,_0.30)_0%,_rgba(42.91,_42.79,_42.08,_0.30)_69%)]"
-                borderColor="outline-gray-400"
-                shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(163,175,186,0.22)]"
-              />
-              <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
-                <img
-                  src="/images/leaderboard/2.svg"
-                  alt="Rank 2"
-                  className="h-14 w-auto"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* #1 */}
-          {top3Users[0] && (
-            <div className="relative m-8">
-              <LeaderboardTopUserWaifu
-                leaderboard={top3Users[0]}
-                gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_224.67,_51.49,_0.30)_0%,_rgba(34.33,_30.05,_5.61,_0.30)_69%)]"
-                borderColor="outline-yellow-300"
-                shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
-              />
-              <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
-                <img
-                  src="/images/leaderboard/1.svg"
-                  alt="Rank 1"
-                  className="h-14 w-auto"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* #3 */}
-          {top3Users[2] && (
-            <div className="relative m-8">
-              <LeaderboardTopUserWaifu
-                leaderboard={top3Users[2]}
-                gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_112.54,_51.49,_0.30)_0%,_rgba(34.33,_12.31,_5.61,_0.30)_69%)]"
-                borderColor="outline-red-400"
-                shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
-              />
-              <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
-                <img
-                  src="/images/leaderboard/3.svg"
-                  alt="Rank 3"
-                  className="h-14 w-auto"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {top3Users.length > 0 && (
-        <div className="flex w-full flex-col items-center justify-center overflow-x-auto lg:hidden">
-          {/* #1 */}
-          {top3Users[0] && (
-            <div className="relative m-8">
-              <LeaderboardTopUserWaifu
-                leaderboard={top3Users[0]}
-                gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_224.67,_51.49,_0.30)_0%,_rgba(34.33,_30.05,_5.61,_0.30)_69%)]"
-                borderColor="outline-yellow-300"
-                shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
-              />
-              <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
-                <img
-                  src="/images/leaderboard/1.svg"
-                  alt="Rank 1"
-                  className="h-14 w-auto"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* #2 */}
-          {top3Users[1] && (
-            <div className="relative m-8">
-              <LeaderboardTopUserWaifu
-                leaderboard={top3Users[1]}
-                gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(234.16,_234.16,_234.16,_0.30)_0%,_rgba(42.91,_42.79,_42.08,_0.30)_69%)]"
-                borderColor="outline-gray-400"
-                shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(163,175,186,0.22)]"
-              />
-              <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
-                <img
-                  src="/images/leaderboard/2.svg"
-                  alt="Rank 2"
-                  className="h-14 w-auto"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* #3 */}
-          {top3Users[2] && (
-            <div className="relative m-8">
-              <LeaderboardTopUserWaifu
-                leaderboard={top3Users[2]}
-                gradientStyle="bg-[radial-gradient(ellipse_125.31%_134.25%_at_9.92%_4.55%,_rgba(255,_112.54,_51.49,_0.30)_0%,_rgba(34.33,_12.31,_5.61,_0.30)_69%)]"
-                borderColor="outline-red-400"
-                shadowColor="shadow-[0px_0px_44.20000076293945px_0px_rgba(255,225,51,0.22)]"
-              />
-              <div className="absolute top-0 left-0 flex -translate-1/2 items-center justify-center">
-                <img
-                  src="/images/leaderboard/3.svg"
-                  alt="Rank 3"
-                  className="h-14 w-auto"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Bỏ phần Top 3 Waifu để giao diện gọn nhẹ */}
 
       {/* Other Members List */}
       <div className="bg-bgc-layer1 mx-auto flex w-full max-w-[750px] flex-col gap-4 space-y-0 overflow-hidden rounded-2xl px-4 py-4">

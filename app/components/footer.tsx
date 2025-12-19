@@ -11,7 +11,7 @@ export function Footer() {
             <div className="flex w-full flex-col gap-4 md:w-60">
               {/* Logo */}
               <img
-                src="/images/logo2.png"
+                src="/images/logo2.webp"
                 alt="Vinahentai Logo"
                 className="h-8 w-36 md:h-10 md:w-45"
               />
@@ -151,7 +151,7 @@ export function Footer() {
               , tất cả đều được cập nhật đầy đủ và nhanh chóng. Chúng tôi đặc biệt mang
               đến các bộ{" "}
               <Link
-                to="/genres/cosplay"
+                to="/genres/anh-cosplay"
                 className="text-pink-500 hover:text-pink-400 hover:underline"
               >
                 hentai vietsub

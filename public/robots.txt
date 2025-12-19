@@ -1,3 +1,10 @@
 User-agent: *
 Allow: /
+
+# Posts are currently disabled (treat as non-existent)
+Disallow: /post
+Disallow: /posts
+Disallow: /post-create
+Disallow: /post-edit
+Disallow: /api/post
 Sitemap: https://vinahentai.net/sitemap.xml

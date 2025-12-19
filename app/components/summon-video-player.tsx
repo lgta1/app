@@ -7,9 +7,10 @@ import { LoadingSpinner } from "~/components/loading-spinner";
 interface SummonVideoPlayerProps {
   isPlaying: boolean;
   onVideoEnd: () => void;
+  forceShowBackground?: boolean; // Khi bỏ qua video, vẫn hiển thị ảnh nền
 }
 
-export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerProps) {
+export function SummonVideoPlayer({ isPlaying, onVideoEnd, forceShowBackground = false }: SummonVideoPlayerProps) {
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasVideoEnded, setHasVideoEnded] = useState(false);
@@ -53,12 +54,13 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
     onVideoEnd();
   };
 
-  if (!isPlaying) return null;
+  // Nếu không phát video và cũng không ép hiện nền thì không render gì
+  if (!isPlaying && !forceShowBackground) return null;
 
   return (
     <div className="fixed inset-0 z-10 flex touch-none items-center justify-center bg-black">
       {/* Skip button - chỉ hiện khi video chưa ended */}
-      {!hasVideoEnded && (
+      {isPlaying && !hasVideoEnded && (
         <div className="absolute top-2 right-2 z-10 lg:top-4 lg:right-4">
           <button
             onClick={handleSkipVideo}
@@ -70,7 +72,7 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
       )}
 
       {/* Hiển thị video hoặc background image */}
-      {hasVideoEnded ? (
+      {hasVideoEnded || (!isPlaying && forceShowBackground) ? (
         // ⬇️ Quan trọng: cho <picture> full màn hình, tránh viền đen
         <picture className="absolute inset-0 block h-full w-full">
           {/* Mobile ưu tiên bản nhẹ */}
@@ -106,7 +108,7 @@ export function SummonVideoPlayer({ isPlaying, onVideoEnd }: SummonVideoPlayerPr
       )}
 
       {/* Loading spinner */}
-      {isLoading && (
+      {isPlaying && isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
           <LoadingSpinner />
         </div>

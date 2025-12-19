@@ -57,6 +57,7 @@ export async function action({ request }: ActionFunctionArgs) {
         targetId,
         mangaId: mangaId || undefined,
         postId: postId || undefined,
+        reporterId: user.id,
       });
 
       return Response.json({

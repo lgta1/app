@@ -28,7 +28,7 @@ export default function AdminStatistic() {
 
   const tabs = [
     { key: "manga" as const, label: "Top Truyện tranh" },
-    { key: "member" as const, label: "Top Thành viên" },
+    { key: "member" as const, label: "Thánh Lọ Bảng" },
   ];
 
   if (!data) {
@@ -105,7 +105,7 @@ export default function AdminStatistic() {
         </div>
 
         <div className="text-txt-primary w-full text-center font-sans text-2xl leading-10 font-semibold md:text-4xl">
-          TOP THÀNH VIÊN
+          Thánh Lọ Bảng
         </div>
       </div>
 

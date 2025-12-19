@@ -5,6 +5,7 @@ import { Pagination } from "./pagination";
 
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { usePagination } from "~/hooks/use-pagination";
+import { buildMangaUrl } from "~/utils/manga-url.utils";
 import { formatDistanceToNow } from "~/utils/date.utils";
 
 interface UserComment {
@@ -12,6 +13,7 @@ interface UserComment {
   content: string;
   mangaId: {
     _id: string;
+    slug?: string;
     title: string;
     poster: string;
   };
@@ -90,7 +92,7 @@ export function ProfileRecentComment({ className }: ProfileRecentCommentProps) {
               {comments.map((comment) => (
                 <Link
                   key={comment._id}
-                  to={`/manga/${comment.mangaId._id}`}
+                  to={buildMangaUrl(comment.mangaId as any)}
                   className="bg-bgc-layer1 border-bd-default inline-flex items-start justify-between self-stretch rounded-xl border p-3"
                 >
                   <div className="flex flex-1 items-start justify-start gap-3 sm:w-[522px]">

@@ -1,9 +1,23 @@
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Form, useNavigate } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { FileText, MessageSquare, Plus, Tag, Upload, X } from "lucide-react";
 
 import { useFileOperations } from "~/hooks/use-file-operations";
+
+import { POSTS_ENABLED } from "~/constants/feature-flags";
+
+const notFoundHeaders = {
+  "X-Robots-Tag": "noindex, nofollow, noarchive",
+} as const;
+
+export async function loader(_args: LoaderFunctionArgs) {
+  if (!POSTS_ENABLED) {
+    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+  }
+  return null;
+}
 
 interface Tag {
   id: string;

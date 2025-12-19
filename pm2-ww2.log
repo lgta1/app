@@ -1,0 +1,405 @@
+[TAILING] Tailing last 200 lines for [ww-2] process (change the value with --lines option)
+/home/devuser/ww-new/logs/ww-2-error.log last 200 lines:
+1|ww-2     | 2025-11-06T15:20:05:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:20:08: BusinessError: Không tìm thấy truyện
+1|ww-2     | 2025-11-06T15:20:08:     at loader$l (file:///home/devuser/ww-new/build/server/assets/server-build-RiGIFCFZ.js:20993:21)
+1|ww-2     | 2025-11-06T15:20:08:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:20:08:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:20:08:     at commonRoute.loader (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:658:19)
+1|ww-2     | 2025-11-06T15:20:08:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:20:08:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:20:08:     at async Promise.all (index 1)
+1|ww-2     | 2025-11-06T15:20:08:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:20:08:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:20:08:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:20:08: BusinessError: Không tìm thấy truyện
+1|ww-2     | 2025-11-06T15:20:08:     at loader$l (file:///home/devuser/ww-new/build/server/assets/server-build-RiGIFCFZ.js:20993:21)
+1|ww-2     | 2025-11-06T15:20:08:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:20:08:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:20:08:     at commonRoute.loader (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:658:19)
+1|ww-2     | 2025-11-06T15:20:08:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:20:08:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:20:08:     at async Promise.all (index 1)
+1|ww-2     | 2025-11-06T15:20:08:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:20:08:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:20:08:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:20:23: BusinessError: Không tìm thấy truyện
+1|ww-2     | 2025-11-06T15:20:23:     at loader$l (file:///home/devuser/ww-new/build/server/assets/server-build-RiGIFCFZ.js:20993:21)
+1|ww-2     | 2025-11-06T15:20:23:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:20:23:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:20:23:     at commonRoute.loader (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:658:19)
+1|ww-2     | 2025-11-06T15:20:23:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:20:23:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:20:23:     at async Promise.all (index 1)
+1|ww-2     | 2025-11-06T15:20:23:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:20:23:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:20:23:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:22:27: 
+1|ww-2     | 2025-11-06T15:24:00: [register] unexpected error: TypeError: sanitizeUsername2 is not a function
+1|ww-2     | 2025-11-06T15:24:00:     at register$1 (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2688:31)
+1|ww-2     | 2025-11-06T15:24:00:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:24:00:     at action$b (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:21886:12)
+1|ww-2     | 2025-11-06T15:24:00:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:24:00:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:24:00:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:24:00:     at async Promise.all (index 0)
+1|ww-2     | 2025-11-06T15:24:00:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:24:00:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:24:00:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:24:08: [register] unexpected error: TypeError: sanitizeUsername2 is not a function
+1|ww-2     | 2025-11-06T15:24:08:     at register$1 (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2688:31)
+1|ww-2     | 2025-11-06T15:24:08:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:24:08:     at action$b (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:21886:12)
+1|ww-2     | 2025-11-06T15:24:08:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:24:08:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:24:08:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:24:08:     at async Promise.all (index 0)
+1|ww-2     | 2025-11-06T15:24:08:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:24:08:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:24:08:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:24:38: [register] unexpected error: TypeError: sanitizeUsername2 is not a function
+1|ww-2     | 2025-11-06T15:24:38:     at register$1 (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2688:31)
+1|ww-2     | 2025-11-06T15:24:38:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:24:38:     at action$b (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:21886:12)
+1|ww-2     | 2025-11-06T15:24:38:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:24:38:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:24:38:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:24:38:     at async Promise.all (index 0)
+1|ww-2     | 2025-11-06T15:24:38:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:24:38:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:24:38:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:36:12: [register] unexpected error: TypeError: sanitizeUsername2 is not a function
+1|ww-2     | 2025-11-06T15:36:12:     at register$1 (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2688:31)
+1|ww-2     | 2025-11-06T15:36:12:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:36:12:     at action$b (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:21886:12)
+1|ww-2     | 2025-11-06T15:36:12:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:36:12:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:36:12:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:36:12:     at async Promise.all (index 0)
+1|ww-2     | 2025-11-06T15:36:12:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:36:12:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:36:12:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:50:30: Error: No route matches URL "/assets/loading-spinner-CKdlFhKZ.js"
+1|ww-2     | 2025-11-06T15:50:30:     at getInternalRouterError (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4633:5)
+1|ww-2     | 2025-11-06T15:50:30:     at Object.query (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:2789:19)
+1|ww-2     | 2025-11-06T15:50:30:     at handleDocumentRequest (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1303:38)
+1|ww-2     | 2025-11-06T15:50:30:     at requestHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1218:24)
+1|ww-2     | 2025-11-06T15:50:30:     at file:///home/devuser/ww-new/node_modules/@react-router/express/dist/index.mjs:28:28
+1|ww-2     | 2025-11-06T15:50:30: No routes matched location "/assets/loading-spinner-CKdlFhKZ.js" 
+1|ww-2     | 2025-11-06T15:50:30: Error: No route matches URL "/assets/heart-DtX7t07X.js"
+1|ww-2     | 2025-11-06T15:50:30:     at getInternalRouterError (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4633:5)
+1|ww-2     | 2025-11-06T15:50:30:     at Object.query (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:2789:19)
+1|ww-2     | 2025-11-06T15:50:30:     at handleDocumentRequest (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1303:38)
+1|ww-2     | 2025-11-06T15:50:30:     at requestHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1218:24)
+1|ww-2     | 2025-11-06T15:50:30:     at file:///home/devuser/ww-new/node_modules/@react-router/express/dist/index.mjs:28:28
+1|ww-2     | 2025-11-06T15:50:30: No routes matched location "/assets/heart-DtX7t07X.js" 
+1|ww-2     | 2025-11-06T15:51:28: [register] unexpected error: TypeError: sanitizeUsername2 is not a function
+1|ww-2     | 2025-11-06T15:51:28:     at register$1 (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2688:31)
+1|ww-2     | 2025-11-06T15:51:28:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T15:51:28:     at action$b (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:21886:12)
+1|ww-2     | 2025-11-06T15:51:28:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T15:51:28:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T15:51:28:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T15:51:28:     at async Promise.all (index 0)
+1|ww-2     | 2025-11-06T15:51:28:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T15:51:28:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T15:51:28:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T15:59:24: Error: No route matches URL "/assets/app-DsHud1-A.css"
+1|ww-2     | 2025-11-06T15:59:24:     at getInternalRouterError (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4633:5)
+1|ww-2     | 2025-11-06T15:59:24:     at Object.query (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:2789:19)
+1|ww-2     | 2025-11-06T15:59:24:     at handleDocumentRequest (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1303:38)
+1|ww-2     | 2025-11-06T15:59:24:     at requestHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1218:24)
+1|ww-2     | 2025-11-06T15:59:24:     at file:///home/devuser/ww-new/node_modules/@react-router/express/dist/index.mjs:28:28
+1|ww-2     | 2025-11-06T15:59:24: No routes matched location "/assets/app-DsHud1-A.css" 
+1|ww-2     | 2025-11-06T16:02:56: Error: No route matches URL "/apple-touch-icon.png"
+1|ww-2     | 2025-11-06T16:02:56:     at getInternalRouterError (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4633:5)
+1|ww-2     | 2025-11-06T16:02:56:     at Object.query (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:2789:19)
+1|ww-2     | 2025-11-06T16:02:56:     at handleDocumentRequest (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1303:38)
+1|ww-2     | 2025-11-06T16:02:56:     at requestHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:1218:24)
+1|ww-2     | 2025-11-06T16:02:56:     at file:///home/devuser/ww-new/node_modules/@react-router/express/dist/index.mjs:28:28
+1|ww-2     | 2025-11-06T16:02:56: No routes matched location "/apple-touch-icon.png" 
+1|ww-2     | 2025-11-06T16:04:59: [register] unexpected error: TypeError: sanitizeUsername2 is not a function
+1|ww-2     | 2025-11-06T16:04:59:     at register$1 (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2688:31)
+1|ww-2     | 2025-11-06T16:04:59:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T16:04:59:     at action$b (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:21886:12)
+1|ww-2     | 2025-11-06T16:04:59:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T16:04:59:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T16:04:59:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T16:04:59:     at async Promise.all (index 0)
+1|ww-2     | 2025-11-06T16:04:59:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T16:04:59:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T16:04:59:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T16:16:57: CastError: Cast to ObjectId failed for value "undefined" (type string) at path "_id" for model "Manga"
+1|ww-2     | 2025-11-06T16:16:57:     at SchemaObjectId.cast (/home/devuser/ww-new/node_modules/mongoose/lib/schema/objectId.js:251:11)
+1|ww-2     | 2025-11-06T16:16:57:     at SchemaObjectId.SchemaType.applySetters (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1258:12)
+1|ww-2     | 2025-11-06T16:16:57:     at SchemaObjectId.SchemaType.castForQuery (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1694:17)
+1|ww-2     | 2025-11-06T16:16:57:     at cast (/home/devuser/ww-new/node_modules/mongoose/lib/cast.js:390:32)
+1|ww-2     | 2025-11-06T16:16:57:     at model.Query.Query.cast (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:5060:12)
+1|ww-2     | 2025-11-06T16:16:57:     at model.Query.Query._castConditions (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2374:10)
+1|ww-2     | 2025-11-06T16:16:57:     at model.Query._findOne (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2697:8)
+1|ww-2     | 2025-11-06T16:16:57:     at model.Query.exec (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:4627:80)
+1|ww-2     | 2025-11-06T16:16:57:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T16:16:57:     at getMangaPublishedById (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2904:17) {
+1|ww-2     | 2025-11-06T16:16:57:   stringValue: '"undefined"',
+1|ww-2     | 2025-11-06T16:16:57:   messageFormat: undefined,
+1|ww-2     | 2025-11-06T16:16:57:   kind: 'ObjectId',
+1|ww-2     | 2025-11-06T16:16:57:   value: 'undefined',
+1|ww-2     | 2025-11-06T16:16:57:   path: '_id',
+1|ww-2     | 2025-11-06T16:16:57:   reason: BSONError: input must be a 24 character hex string, 12 byte Uint8Array, or an integer
+1|ww-2     | 2025-11-06T16:16:57:       at new ObjectId (/home/devuser/ww-new/node_modules/bson/src/objectid.ts:120:15)
+1|ww-2     | 2025-11-06T16:16:57:       at castObjectId (/home/devuser/ww-new/node_modules/mongoose/lib/cast/objectid.js:25:12)
+1|ww-2     | 2025-11-06T16:16:57:       at SchemaObjectId.cast (/home/devuser/ww-new/node_modules/mongoose/lib/schema/objectId.js:249:12)
+1|ww-2     | 2025-11-06T16:16:57:       at SchemaObjectId.SchemaType.applySetters (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1258:12)
+1|ww-2     | 2025-11-06T16:16:57:       at SchemaObjectId.SchemaType.castForQuery (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1694:17)
+1|ww-2     | 2025-11-06T16:16:57:       at cast (/home/devuser/ww-new/node_modules/mongoose/lib/cast.js:390:32)
+1|ww-2     | 2025-11-06T16:16:57:       at model.Query.Query.cast (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:5060:12)
+1|ww-2     | 2025-11-06T16:16:57:       at model.Query.Query._castConditions (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2374:10)
+1|ww-2     | 2025-11-06T16:16:57:       at model.Query._findOne (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2697:8)
+1|ww-2     | 2025-11-06T16:16:57:       at model.Query.exec (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:4627:80),
+1|ww-2     | 2025-11-06T16:16:57:   valueType: 'string'
+1|ww-2     | 2025-11-06T16:16:57: }
+1|ww-2     | 2025-11-06T16:17:01: CastError: Cast to ObjectId failed for value "undefined" (type string) at path "_id" for model "Manga"
+1|ww-2     | 2025-11-06T16:17:01:     at SchemaObjectId.cast (/home/devuser/ww-new/node_modules/mongoose/lib/schema/objectId.js:251:11)
+1|ww-2     | 2025-11-06T16:17:01:     at SchemaObjectId.SchemaType.applySetters (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1258:12)
+1|ww-2     | 2025-11-06T16:17:01:     at SchemaObjectId.SchemaType.castForQuery (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1694:17)
+1|ww-2     | 2025-11-06T16:17:01:     at cast (/home/devuser/ww-new/node_modules/mongoose/lib/cast.js:390:32)
+1|ww-2     | 2025-11-06T16:17:01:     at model.Query.Query.cast (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:5060:12)
+1|ww-2     | 2025-11-06T16:17:01:     at model.Query.Query._castConditions (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2374:10)
+1|ww-2     | 2025-11-06T16:17:01:     at model.Query._findOne (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2697:8)
+1|ww-2     | 2025-11-06T16:17:01:     at model.Query.exec (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:4627:80)
+1|ww-2     | 2025-11-06T16:17:01:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T16:17:01:     at getMangaPublishedById (file:///home/devuser/ww-new/build/server/assets/server-build-Bu07Dpxf.js:2904:17) {
+1|ww-2     | 2025-11-06T16:17:01:   stringValue: '"undefined"',
+1|ww-2     | 2025-11-06T16:17:01:   messageFormat: undefined,
+1|ww-2     | 2025-11-06T16:17:01:   kind: 'ObjectId',
+1|ww-2     | 2025-11-06T16:17:01:   value: 'undefined',
+1|ww-2     | 2025-11-06T16:17:01:   path: '_id',
+1|ww-2     | 2025-11-06T16:17:01:   reason: BSONError: input must be a 24 character hex string, 12 byte Uint8Array, or an integer
+1|ww-2     | 2025-11-06T16:17:01:       at new ObjectId (/home/devuser/ww-new/node_modules/bson/src/objectid.ts:120:15)
+1|ww-2     | 2025-11-06T16:17:01:       at castObjectId (/home/devuser/ww-new/node_modules/mongoose/lib/cast/objectid.js:25:12)
+1|ww-2     | 2025-11-06T16:17:01:       at SchemaObjectId.cast (/home/devuser/ww-new/node_modules/mongoose/lib/schema/objectId.js:249:12)
+1|ww-2     | 2025-11-06T16:17:01:       at SchemaObjectId.SchemaType.applySetters (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1258:12)
+1|ww-2     | 2025-11-06T16:17:01:       at SchemaObjectId.SchemaType.castForQuery (/home/devuser/ww-new/node_modules/mongoose/lib/schemaType.js:1694:17)
+1|ww-2     | 2025-11-06T16:17:01:       at cast (/home/devuser/ww-new/node_modules/mongoose/lib/cast.js:390:32)
+1|ww-2     | 2025-11-06T16:17:01:       at model.Query.Query.cast (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:5060:12)
+1|ww-2     | 2025-11-06T16:17:01:       at model.Query.Query._castConditions (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2374:10)
+1|ww-2     | 2025-11-06T16:17:01:       at model.Query._findOne (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:2697:8)
+1|ww-2     | 2025-11-06T16:17:01:       at model.Query.exec (/home/devuser/ww-new/node_modules/mongoose/lib/query.js:4627:80),
+1|ww-2     | 2025-11-06T16:17:01:   valueType: 'string'
+1|ww-2     | 2025-11-06T16:17:01: }
+1|ww-2     | 2025-11-06T16:21:03: 
+1|ww-2     | 2025-11-06T16:23:13: [register] unexpected error: TypeError: sanitizeUsername is not a function
+1|ww-2     | 2025-11-06T16:23:13:     at register$1 (file:///home/devuser/ww-new/build/server/assets/server-build-BshjUMY-.js:2719:31)
+1|ww-2     | 2025-11-06T16:23:13:     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|ww-2     | 2025-11-06T16:23:13:     at action$b (file:///home/devuser/ww-new/build/server/assets/server-build-BshjUMY-.js:21877:12)
+1|ww-2     | 2025-11-06T16:23:13:     at callRouteHandler (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-5UALIXAM.mjs:509:16)
+1|ww-2     | 2025-11-06T16:23:13:     at file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4259:19
+1|ww-2     | 2025-11-06T16:23:13:     at callLoaderOrAction (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4311:16)
+1|ww-2     | 2025-11-06T16:23:13:     at async Promise.all (index 0)
+1|ww-2     | 2025-11-06T16:23:13:     at defaultDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3965:17)
+1|ww-2     | 2025-11-06T16:23:13:     at callDataStrategyImpl (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:4207:17)
+1|ww-2     | 2025-11-06T16:23:13:     at callDataStrategy (file:///home/devuser/ww-new/node_modules/react-router/dist/development/chunk-PVWAREVJ.mjs:3298:19)
+1|ww-2     | 2025-11-06T16:32:12: 
+
+/home/devuser/ww-new/logs/ww-2-out.log last 200 lines:
+1|ww-2     | 2025-11-06T16:30:30: GET /api/manga-like?mangaId=690874f9939dd9e3d09d13e7 200 - - 2.318 ms
+1|ww-2     | 2025-11-06T16:30:30: GET /api/manga-rating?mangaId=690874f9939dd9e3d09d13e7 200 - - 6.444 ms
+1|ww-2     | 2025-11-06T16:30:30: GET /api/comments?page=1&limit=5&mangaId=690874f9939dd9e3d09d13e7 200 - - 5.697 ms
+1|ww-2     | 2025-11-06T16:30:31: POST /api/manga-progress 401 - - 2.932 ms
+1|ww-2     | 2025-11-06T16:30:33: POST /api/chapter-view 200 - - 11.646 ms
+1|ww-2     | 2025-11-06T16:30:33: Đã ghi interaction: view cho manga 68dc23654cc992ac383d7114
+1|ww-2     | 2025-11-06T16:30:34: GET /api/comments?page=1&limit=5&mangaId=690874f9939dd9e3d09d13e7 200 - - 6.332 ms
+1|ww-2     | 2025-11-06T16:30:34: GET /api/chapters/list.data?mangaId=690874f9939dd9e3d09d13e7&_routes=routes%2Fapi.chapters.list 200 - - 3.909 ms
+1|ww-2     | 2025-11-06T16:30:35: POST /api/reading-exp.data 401 - - 3.786 ms
+1|ww-2     | 2025-11-06T16:30:38: POST /api/manga-progress 401 - - 3.669 ms
+1|ww-2     | 2025-11-06T16:30:50: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:30:50: GET /manga/690cb776971033dc8db60d31.data 200 - - 37.716 ms
+1|ww-2     | 2025-11-06T16:30:52: POST /api/manga-progress 401 - - 3.356 ms
+1|ww-2     | 2025-11-06T16:30:53: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:30:53: GET /genres/3d-hentai.data 200 - - 19.462 ms
+1|ww-2     | 2025-11-06T16:30:54: GET /__manifest?p=%2Fchinh-sach-bao-mat&p=%2Fdieu-khoan&p=%2Fgenres%2F3d-hentai&p=%2Fgenres%2Fahegao&p=%2Fgenres%2Fanal&p=%2Fgenres%2Fbdsm&p=%2Fgenres%2Fbig-ass&p=%2Fgenres%2Fbig-boobs&p=%2Fgenres%2Fblowjobs&p=%2Fgenres%2Fcosplay&p=%2Fgenres%2Fdoujinshi&p=%2Fgenres%2Fecchi&p=%2Fgenres%2Felf&p=%2Fgenres%2Ffantasy&p=%2Fgenres%2Ffull-color&p=%2Fgenres%2Fharem&p=%2Fgenres%2Fhorror&p=%2Fgenres%2Fisekai&p=%2Fgenres%2Fmaids&p=%2Fgenres%2Fmanhwa&p=%2Fgenres%2Fmilf&p=%2Fgenres%2Fmind-break&p=%2Fgenres%2Fntr&p=%2Fgenres%2Fnun&p=%2Fgenres%2Fnurse&p=%2Fgenres%2Fpregnant&p=%2Fgenres%2Fquan-tat&p=%2Fgenres%2Fromance&p=%2Fgenres%2Fschoolgirl&p=%2Fgenres%2Fsoft-incest&p=%2Fgenres%2Fvanilla&p=%2Fgioi-thieu&p=%2Flien-he&p=%2Fmanga%2F68cda671374e2828c73268b3&p=%2Fmanga%2F68dc23654cc992ac383d7114&p=%2Fmanga%2F68de6e39f8d13a5aa7678cf3&p=%2Fmanga%2F68de75f33b97dd27758e52c5&p=%2Fmanga%2F68e2ea7c8a205502ed9928fe&p=%2Fmanga%2F68fe4a35fb6f20cf361687d1&p=%2Fmanga%2F68ff84abfb6f20cf3616a3a2&p=%2Fmanga%2F690490788875a84766ba2b97&p=%2Fmanga%2F6908740f41fe4d473a6654bc&p=%2Fmanga%2F690874f9939dd9e3d09d13e7&p=%2Fmanga%2F6908c801206ef6c57464f438&p=%2Fmanga%2F690cb3f931ea0e89ab2407a2&version=19c1149e 200 - - 25.926 ms
+1|ww-2     | 2025-11-06T16:30:56: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:30:56: GET /manga/6908c801206ef6c57464f438.data 200 - - 27.536 ms
+1|ww-2     | 2025-11-06T16:30:57: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:30:57: GET /manga/68ff84abfb6f20cf3616a3a2.data 200 - - 34.940 ms
+1|ww-2     | 2025-11-06T16:31:03: POST /api/reading-reward.data 401 - - 2.789 ms
+1|ww-2     | 2025-11-06T16:31:04: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:04: GET /manga/690874f9939dd9e3d09d13e7.data 200 - - 36.474 ms
+1|ww-2     | 2025-11-06T16:31:05: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:05: GET /manga/690874f9939dd9e3d09d13e7.data 200 - - 70.918 ms
+1|ww-2     | 2025-11-06T16:31:05: GET /api/manga-follow?mangaId=690874f9939dd9e3d09d13e7 200 - - 2.497 ms
+1|ww-2     | 2025-11-06T16:31:05: GET /api/manga-rating?mangaId=690874f9939dd9e3d09d13e7 200 - - 6.066 ms
+1|ww-2     | 2025-11-06T16:31:05: GET /__manifest?p=%2Fauthors%2Fdich-sau-oi&p=%2Fgenres%2F3d-hentai&p=%2Fgenres%2Fmilf&p=%2Fgenres%2Fntr&p=%2Fmanga%2F68cda671374e2828c73268b3&p=%2Fmanga%2F68d1de203d7760ae19644145&p=%2Fmanga%2F68dc23654cc992ac383d7114&p=%2Fmanga%2F68e2ea7c8a205502ed9928fe&p=%2Fmanga%2F68fe4a35fb6f20cf361687d1&p=%2Fmanga%2F6907582371314a3e981742d2&p=%2Fmanga%2F690874f9939dd9e3d09d13e7&p=%2Fmanga%2F6908c801206ef6c57464f438&p=%2Fmanga%2F6908f239581fb9798a2c8da1&p=%2Fmanga%2F690a116f2535c325815abf53&p=%2Fmanga%2F690cb3f931ea0e89ab2407a2&p=%2Fmanga%2F690cb59631ea0e89ab240832&p=%2Fmanga%2F690cb646971033dc8db60b4d&p=%2Fmanga%2F690cb776971033dc8db60d31&p=%2Fmanga%2F690cb87d971033dc8db60dff&p=%2Fmanga%2F690cbe6fd57faf007f7d44ae&p=%2Fmanga%2Fchapter%2F690874f9939dd9e3d09d13e7&version=19c1149e 200 - - 15.268 ms
+1|ww-2     | 2025-11-06T16:31:05: GET /api/comments?page=1&limit=5&mangaId=690874f9939dd9e3d09d13e7 200 - - 8.338 ms
+1|ww-2     | 2025-11-06T16:31:08: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:08: GET /manga/chapter/690874f9939dd9e3d09d13e7?chapterNumber=5 200 - - 48.008 ms
+1|ww-2     | 2025-11-06T16:31:09: GET /__manifest?p=%2Fapi%2Fchapters%2Flist&version=19c1149e 200 - - 2.598 ms
+1|ww-2     | 2025-11-06T16:31:09: GET /api/chapters/list.data?mangaId=690874f9939dd9e3d09d13e7&_routes=routes%2Fapi.chapters.list 200 - - 4.085 ms
+1|ww-2     | 2025-11-06T16:31:11: POST /api/manga-progress 401 - - 1.797 ms
+1|ww-2     | 2025-11-06T16:31:12: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:12: GET /manga/690874f9939dd9e3d09d13e7.data 200 - - 34.587 ms
+1|ww-2     | 2025-11-06T16:31:12: GET /api/manga-like?mangaId=690874f9939dd9e3d09d13e7 200 - - 1.677 ms
+1|ww-2     | 2025-11-06T16:31:12: GET /api/manga-rating?mangaId=690874f9939dd9e3d09d13e7 200 - - 3.844 ms
+1|ww-2     | 2025-11-06T16:31:13: GET /api/manga-like?mangaId=690874f9939dd9e3d09d13e7 200 - - 1.741 ms
+1|ww-2     | 2025-11-06T16:31:13: GET /__manifest?p=%2Fauthors%2Fdich-sau-oi&p=%2Fmanga%2F68d1de203d7760ae19644145&p=%2Fmanga%2F6907582371314a3e981742d2&p=%2Fmanga%2F6908f239581fb9798a2c8da1&p=%2Fmanga%2F690a116f2535c325815abf53&p=%2Fmanga%2F690cb59631ea0e89ab240832&p=%2Fmanga%2F690cb646971033dc8db60b4d&p=%2Fmanga%2F690cb776971033dc8db60d31&p=%2Fmanga%2F690cb87d971033dc8db60dff&p=%2Fmanga%2F690cbe6fd57faf007f7d44ae&p=%2Fmanga%2Fchapter%2F690874f9939dd9e3d09d13e7&version=19c1149e 200 - - 8.253 ms
+1|ww-2     | 2025-11-06T16:31:13: GET /api/manga-rating?mangaId=690874f9939dd9e3d09d13e7 200 - - 3.267 ms
+1|ww-2     | 2025-11-06T16:31:16: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:16: GET /manga/690cbe6fd57faf007f7d44ae.data 200 - - 26.493 ms
+1|ww-2     | 2025-11-06T16:31:18: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:18: GET /manga/690cb3f931ea0e89ab2407a2.data 200 - - 26.726 ms
+1|ww-2     | 2025-11-06T16:31:19: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:19: GET /manga/690b8597d80a9447bfdb5583.data 200 - - 27.586 ms
+1|ww-2     | 2025-11-06T16:31:29: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:29: GET /manga/68cda671374e2828c73268b3.data 200 - - 43.625 ms
+1|ww-2     | 2025-11-06T16:31:29: GET /api/manga-like?mangaId=68cda671374e2828c73268b3 200 - - 2.562 ms
+1|ww-2     | 2025-11-06T16:31:29: GET /api/manga-rating?mangaId=68cda671374e2828c73268b3 200 - - 3.906 ms
+1|ww-2     | 2025-11-06T16:31:30: GET /api/manga-progress?mangaId=68cda671374e2828c73268b3 401 - - 3.336 ms
+1|ww-2     | 2025-11-06T16:31:30: GET /__manifest?p=%2Fprofile%2F68fe4931fb6f20cf361687b8&p=%2Fprofile%2F6905f6190ac189bf95fe33b0&version=19c1149e 200 - - 3.294 ms
+1|ww-2     | 2025-11-06T16:31:32: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:32: GET /manga/chapter/68cda671374e2828c73268b3?chapterNumber=6 200 - - 32.403 ms
+1|ww-2     | 2025-11-06T16:31:33: GET /api/comments?page=1&limit=5&mangaId=68cda671374e2828c73268b3 200 - - 11.873 ms
+1|ww-2     | 2025-11-06T16:31:33: GET /api/chapters/list.data?mangaId=68cda671374e2828c73268b3&_routes=routes%2Fapi.chapters.list 200 - - 6.491 ms
+1|ww-2     | 2025-11-06T16:31:38: POST /api/reading-reward.data 401 - - 3.685 ms
+1|ww-2     | 2025-11-06T16:31:54: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:54: GET /manga/690cb87d971033dc8db60dff.data 200 - - 34.349 ms
+1|ww-2     | 2025-11-06T16:31:57: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:31:57: GET /manga/690cb646971033dc8db60b4d.data 200 - - 29.372 ms
+1|ww-2     | 2025-11-06T16:32:01: POST /api/manga-progress 401 - - 2.161 ms
+1|ww-2     | 2025-11-06T16:32:05: GET /__manifest?p=%2Fgenres%2Ffull-color&version=19c1149e 200 - - 4.491 ms
+1|ww-2     | 2025-11-06T16:32:06: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:06: GET /manga/690490788875a84766ba2b97.data 200 - - 37.222 ms
+1|ww-2     | 2025-11-06T16:32:09: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:09: GET /manga/chapter/68d1de203d7760ae19644145.data?chapterNumber=14 200 - - 19.289 ms
+1|ww-2     | 2025-11-06T16:32:09: POST /api/manga-progress 401 - - 3.503 ms
+1|ww-2     | 2025-11-06T16:32:11: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:11: GET /manga/68cda671374e2828c73268b3.data 200 - - 33.902 ms
+1|ww-2     | 2025-11-06T16:32:12: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:12: GET /manga/690a3307a690724f0a3a2f16.data 200 - - 24.213 ms
+1|ww-2     | 2025-11-06T16:32:18: 
+1|ww-2     | 2025-11-06T16:32:18: > start
+1|ww-2     | 2025-11-06T16:32:18: > react-router-serve ./build/server/index.js
+1|ww-2     | 2025-11-06T16:32:18: 
+1|ww-2     | 2025-11-06T16:32:18: Connecting to MongoDB...
+1|ww-2     | 2025-11-06T16:32:18: [react-router-serve] http://localhost:3002 (http://72.60.40.17:3002)
+1|ww-2     | 2025-11-06T16:32:18: Connected to MongoDB!
+1|ww-2     | 2025-11-06T16:32:21: GET /__manifest?p=%2F&version=19c1149e 200 - - 21.753 ms
+1|ww-2     | 2025-11-06T16:32:25: GET /api/manga-progress?mangaId=68dc23654cc992ac383d7114 401 - - 5.986 ms
+1|ww-2     | 2025-11-06T16:32:25: GET /api/manga-like?mangaId=68dc23654cc992ac383d7114 200 - - 5.611 ms
+1|ww-2     | 2025-11-06T16:32:29: POST /api/manga-progress 401 - - 7.515 ms
+1|ww-2     | 2025-11-06T16:32:34: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:34: GET /manga/690874f9939dd9e3d09d13e7.data 200 - - 61.205 ms
+1|ww-2     | 2025-11-06T16:32:41: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:42: GET /manga/690874f9939dd9e3d09d13e7 200 - - 121.131 ms
+1|ww-2     | 2025-11-06T16:32:52: GET /api/manga-like?mangaId=68cda671374e2828c73268b3 200 - - 8.252 ms
+1|ww-2     | 2025-11-06T16:32:52: GET /api/manga-follow?mangaId=68cda671374e2828c73268b3 200 - - 5.002 ms
+1|ww-2     | 2025-11-06T16:32:52: GET /api/manga-rating?mangaId=68cda671374e2828c73268b3 200 - - 7.666 ms
+1|ww-2     | 2025-11-06T16:32:53: GET /__manifest?p=%2Fprofile%2F68fe4931fb6f20cf361687b8&p=%2Fprofile%2F6905f6190ac189bf95fe33b0&version=19c1149e 200 - - 5.041 ms
+1|ww-2     | 2025-11-06T16:32:56: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:56: GET /genres/3d-hentai 200 - - 64.687 ms
+1|ww-2     | 2025-11-06T16:32:56: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:56: GET /genres/3d-hentai.data 200 - - 25.727 ms
+1|ww-2     | 2025-11-06T16:32:57: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:57: GET /manga/690874f9939dd9e3d09d13e7.data 200 - - 46.834 ms
+1|ww-2     | 2025-11-06T16:32:58: GET /api/manga-follow?mangaId=690874f9939dd9e3d09d13e7 200 - - 2.185 ms
+1|ww-2     | 2025-11-06T16:32:58: GET /api/manga-progress?mangaId=690874f9939dd9e3d09d13e7 401 - - 1.288 ms
+1|ww-2     | 2025-11-06T16:32:58: GET /api/comments?page=1&limit=5&mangaId=690874f9939dd9e3d09d13e7 200 - - 5.247 ms
+1|ww-2     | 2025-11-06T16:32:58: GET /api/manga-like?mangaId=690874f9939dd9e3d09d13e7 200 - - 2.807 ms
+1|ww-2     | 2025-11-06T16:32:59: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:32:59: GET /genres/3d-hentai.data 200 - - 20.969 ms
+1|ww-2     | 2025-11-06T16:33:00: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:33:00: GET /manga/chapter/690874f9939dd9e3d09d13e7?chapterNumber=4 200 - - 90.584 ms
+1|ww-2     | 2025-11-06T16:33:01: GET /api/comments?page=1&limit=5&mangaId=690874f9939dd9e3d09d13e7 200 - - 12.487 ms
+1|ww-2     | 2025-11-06T16:33:01: GET /api/chapters/list.data?mangaId=690874f9939dd9e3d09d13e7&_routes=routes%2Fapi.chapters.list 200 - - 6.332 ms
+1|ww-2     | 2025-11-06T16:33:16: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:33:17: GET /manga/chapter/68e1b14b1d73ad33622dc4ff?chapterNumber=52 200 - - 62.278 ms
+1|ww-2     | 2025-11-06T16:33:23: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:33:23: GET /manga/chapter/690874f9939dd9e3d09d13e7.data?chapterNumber=5 200 - - 26.968 ms
+1|ww-2     | 2025-11-06T16:33:29: POST /api/reading-reward.data 401 - - 4.159 ms
+1|ww-2     | 2025-11-06T16:33:31: POST /api/chapter-view 200 - - 16.196 ms
+1|ww-2     | 2025-11-06T16:33:31: Đã ghi interaction: view cho manga 690874f9939dd9e3d09d13e7
+1|ww-2     | 2025-11-06T16:34:00: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:00: GET /manga/690874f9939dd9e3d09d13e7.data 200 - - 47.998 ms
+1|ww-2     | 2025-11-06T16:34:05: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:05: GET /manga/68dc23654cc992ac383d7114.data 200 - - 44.321 ms
+1|ww-2     | 2025-11-06T16:34:07: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:08: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:08: GET /manga/690cb87d971033dc8db60dff.data 200 - - 89.992 ms
+1|ww-2     | 2025-11-06T16:34:08: GET /manga/690cb87d971033dc8db60dff 200 - - 78.786 ms
+1|ww-2     | 2025-11-06T16:34:08: GET /api/manga-rating?mangaId=690cb87d971033dc8db60dff 200 - - 8.717 ms
+1|ww-2     | 2025-11-06T16:34:08: GET /__manifest?p=%2Fauthors%2Fnhom-dichblogsolo-ers&p=%2Fauthors%2Fsian&p=%2Fgenres%2Fbig-boobs&p=%2Fgenres%2Fbondage&p=%2Fgenres%2Felf&p=%2Fgenres%2Foneshot&p=%2Fgenres%2Fslave&p=%2Fmanga%2F68cda671374e2828c73268b3&p=%2Fmanga%2F68d1de203d7760ae19644145&p=%2Fmanga%2F68dc23654cc992ac383d7114&p=%2Fmanga%2F68e2ea7c8a205502ed9928fe&p=%2Fmanga%2F68fe4a35fb6f20cf361687d1&p=%2Fmanga%2F6907582371314a3e981742d2&p=%2Fmanga%2F690874f9939dd9e3d09d13e7&p=%2Fmanga%2F6908c801206ef6c57464f438&p=%2Fmanga%2F6908f239581fb9798a2c8da1&p=%2Fmanga%2F690a116f2535c325815abf53&p=%2Fmanga%2F690b8cf1f78aec280531e46d&p=%2Fmanga%2F690cb3f931ea0e89ab2407a2&p=%2Fmanga%2F690cb59631ea0e89ab240832&p=%2Fmanga%2F690cb646971033dc8db60b4d&p=%2Fmanga%2F690cb776971033dc8db60d31&p=%2Fmanga%2F690cbe6fd57faf007f7d44ae&p=%2Fmanga%2Fchapter%2F690cb87d971033dc8db60dff&version=19c1149e 200 - - 21.844 ms
+1|ww-2     | 2025-11-06T16:34:11: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:11: GET /manga/690cb776971033dc8db60d31 200 - - 57.381 ms
+1|ww-2     | 2025-11-06T16:34:11: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:11: GET /manga/690cb776971033dc8db60d31.data 200 - - 26.394 ms
+1|ww-2     | 2025-11-06T16:34:11: GET /api/manga-rating?mangaId=690cb776971033dc8db60d31 200 - - 6.585 ms
+1|ww-2     | 2025-11-06T16:34:11: GET /api/manga-progress?mangaId=690cb776971033dc8db60d31 401 - - 1.204 ms
+1|ww-2     | 2025-11-06T16:34:11: GET /__manifest?p=%2Fauthors%2Fsian&p=%2Fgenres%2Fahegao&p=%2Fgenres%2Fbig-ass&p=%2Fgenres%2Fbig-boobs&p=%2Fgenres%2Fbig-penis&p=%2Fgenres%2Fbondage&p=%2Fgenres%2Foneshot&p=%2Fgenres%2Frape&p=%2Fmanga%2F68cda671374e2828c73268b3&p=%2Fmanga%2F68d1de203d7760ae19644145&p=%2Fmanga%2F68dc23654cc992ac383d7114&p=%2Fmanga%2F68e2ea7c8a205502ed9928fe&p=%2Fmanga%2F68fe4a35fb6f20cf361687d1&p=%2Fmanga%2F6907582371314a3e981742d2&p=%2Fmanga%2F690874f9939dd9e3d09d13e7&p=%2Fmanga%2F6908c801206ef6c57464f438&p=%2Fmanga%2F6908f239581fb9798a2c8da1&p=%2Fmanga%2F690a116f2535c325815abf53&p=%2Fmanga%2F690b8cf1f78aec280531e46d&p=%2Fmanga%2F690cb3f931ea0e89ab2407a2&p=%2Fmanga%2F690cb59631ea0e89ab240832&p=%2Fmanga%2F690cb646971033dc8db60b4d&p=%2Fmanga%2F690cb87d971033dc8db60dff&p=%2Fmanga%2F690cbe6fd57faf007f7d44ae&p=%2Fmanga%2Fchapter%2F690cb776971033dc8db60d31&version=19c1149e 200 - - 13.168 ms
+1|ww-2     | 2025-11-06T16:34:11: GET /api/comments?page=1&limit=5&mangaId=690cb776971033dc8db60d31 200 - - 4.987 ms
+1|ww-2     | 2025-11-06T16:34:14: GET /__manifest?p=%2Fmanga%2F690b8cf1f78aec280531e46d&p=%2Fmanga%2F690cb3f931ea0e89ab2407a2&p=%2Fmanga%2F690cb59631ea0e89ab240832&p=%2Fmanga%2F690cb646971033dc8db60b4d&p=%2Fmanga%2F690cb776971033dc8db60d31&p=%2Fmanga%2F690cb87d971033dc8db60dff&p=%2Fmanga%2F690cbe6fd57faf007f7d44ae&version=19c1149e 200 - - 7.007 ms
+1|ww-2     | 2025-11-06T16:34:14: GET /api/comments?page=1&limit=5&mangaId=690cb776971033dc8db60d31 200 - - 14.647 ms
+1|ww-2     | 2025-11-06T16:34:22: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:22: GET /manga/68dc23654cc992ac383d7114.data 200 - - 46.330 ms
+1|ww-2     | 2025-11-06T16:34:23: GET /api/manga-rating?mangaId=68dc23654cc992ac383d7114 200 - - 4.042 ms
+1|ww-2     | 2025-11-06T16:34:23: GET /api/manga-progress?mangaId=68dc23654cc992ac383d7114 401 - - 3.589 ms
+1|ww-2     | 2025-11-06T16:34:24: GET /__manifest?p=%2Fapi%2Freading-reward&version=19c1149e 200 - - 1.508 ms
+1|ww-2     | 2025-11-06T16:34:25: POST /api/reading-reward.data 401 - - 2.564 ms
+1|ww-2     | 2025-11-06T16:34:25: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:25: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:25: GET /manga/chapter/68dc23654cc992ac383d7114.data?chapterNumber=7 200 - - 62.856 ms
+1|ww-2     | 2025-11-06T16:34:25: GET /manga/chapter/68dc23654cc992ac383d7114?chapterNumber=7 200 - - 48.347 ms
+1|ww-2     | 2025-11-06T16:34:26: POST /api/manga-progress 401 - - 3.544 ms
+1|ww-2     | 2025-11-06T16:34:27: POST /api/manga-progress 401 - - 2.118 ms
+1|ww-2     | 2025-11-06T16:34:27: GET /api/comments?page=1&limit=5&mangaId=690cb776971033dc8db60d31 200 - - 7.912 ms
+1|ww-2     | 2025-11-06T16:34:29: GET /api/manga-progress?mangaId=690cb87d971033dc8db60dff 401 - - 1.478 ms
+1|ww-2     | 2025-11-06T16:34:29: GET /api/manga-like?mangaId=690cb87d971033dc8db60dff 200 - - 1.258 ms
+1|ww-2     | 2025-11-06T16:34:29: GET /api/comments?page=1&limit=5&mangaId=690cb87d971033dc8db60dff 200 - - 9.215 ms
+1|ww-2     | 2025-11-06T16:34:36: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:36: GET /_root.data 200 - - 42.156 ms
+1|ww-2     | 2025-11-06T16:34:36: GET /__manifest?p=%2Fchinh-sach-bao-mat&p=%2Fdieu-khoan&p=%2Fgenres%2F3d-hentai&p=%2Fgenres%2Fahegao&p=%2Fgenres%2Fanal&p=%2Fgenres%2Fbdsm&p=%2Fgenres%2Fbig-ass&p=%2Fgenres%2Fblowjobs&p=%2Fgenres%2Fcosplay&p=%2Fgenres%2Fdoujinshi&p=%2Fgenres%2Fecchi&p=%2Fgenres%2Ffantasy&p=%2Fgenres%2Ffull-color&p=%2Fgenres%2Fharem&p=%2Fgenres%2Fhorror&p=%2Fgenres%2Fisekai&p=%2Fgenres%2Fmaids&p=%2Fgenres%2Fmanhwa&p=%2Fgenres%2Fmilf&p=%2Fgenres%2Fmind-break&p=%2Fgenres%2Fntr&p=%2Fgenres%2Fnun&p=%2Fgenres%2Fnurse&p=%2Fgenres%2Fpregnant&p=%2Fgenres%2Fquan-tat&p=%2Fgenres%2Fromance&p=%2Fgenres%2Fschoolgirl&p=%2Fgenres%2Fsoft-incest&p=%2Fgenres%2Fvanilla&p=%2Fgioi-thieu&p=%2Flien-he&p=%2Fmanga%2F68e3d3e3d61d9ee0433abd6c&p=%2Fmanga%2F68e3db2bd61d9ee0433abfa3&p=%2Fmanga%2F690490788875a84766ba2b97&p=%2Fmanga%2F6904911a8875a84766ba2c56&p=%2Fmanga%2F6908773041fe4d473a6656f8&p=%2Fmanga%2F690a10812535c325815abefd&p=%2Fmanga%2F690b60db6a7a5567bb751100&p=%2Fmanga%2F690b62fd6da36d5ac7521dbc&p=%2Fmanga%2F690b650d6da36d5ac7523425&p=%2Fmanga%2F690b66a36da36d5ac7523569&p=%2Fmanga%2F690b6b216da36d5ac75236d5&p=%2Fmanga%2F690b7c095c91edabbe7cb70b&p=%2Fmanga%2F690b8597d80a9447bfdb5583&p=%2Fmanga%2F690b8762f78aec280531dcd4&p=%2Fmanga%2F690cb87d971033dc8db60dff&p=%2Fmanga%2Fundefined&p=%2Fprofile%2F68bef98d72ac3e881f540754&p=%2Fprofile%2F68d194674272c9c883eae04d&p=%2Fprofile%2F68ead29dfec25e45bedabade&p=%2Fprofile%2F68efcd72872b245c29aaadca&p=%2Fprofile%2F68fe4931fb6f20cf361687b8&p=%2Fprofile%2F69004ecad12de330c48f1f3b&p=%2Fprofile%2F690248a8d12de330c4903a6a&p=%2Fprofile%2F6902d0d148e3570c57a6f053&p=%2Fprofile%2F6902d44150c22e85424ce15b&p=%2Fprofile%2F6904632d7793d07d250b80bf&version=19c1149e 200 - - 31.298 ms
+1|ww-2     | 2025-11-06T16:34:37: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:37: GET /manga/690cb776971033dc8db60d31.data 200 - - 43.076 ms
+1|ww-2     | 2025-11-06T16:34:37: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:37: GET /manga/690cb776971033dc8db60d31.data 200 - - 27.516 ms
+1|ww-2     | 2025-11-06T16:34:37: GET /api/manga-like?mangaId=690cb776971033dc8db60d31 200 - - 3.098 ms
+1|ww-2     | 2025-11-06T16:34:37: GET /api/manga-rating?mangaId=690cb776971033dc8db60d31 200 - - 3.710 ms
+1|ww-2     | 2025-11-06T16:34:37: GET /api/comments?page=1&limit=5&mangaId=690cb776971033dc8db60d31 200 - - 7.616 ms
+1|ww-2     | 2025-11-06T16:34:43: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:43: GET /manga/chapter/690cb776971033dc8db60d31?chapterNumber=1 200 - - 40.378 ms
+1|ww-2     | 2025-11-06T16:34:43: GET /api/comments?page=1&limit=5&mangaId=690cb776971033dc8db60d31 200 - - 5.338 ms
+1|ww-2     | 2025-11-06T16:34:49: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:49: GET /manga/chapter/68d1de203d7760ae19644145.data?chapterNumber=15 200 - - 21.132 ms
+1|ww-2     | 2025-11-06T16:34:50: POST /api/manga-progress 401 - - 2.936 ms
+1|ww-2     | 2025-11-06T16:34:50: GET /api/comments?page=1&limit=5&mangaId=68dc23654cc992ac383d7114 200 - - 9.404 ms
+1|ww-2     | 2025-11-06T16:34:51: GET /api/manga-follow?mangaId=68cda671374e2828c73268b3 200 - - 2.264 ms
+1|ww-2     | 2025-11-06T16:34:51: GET /api/manga-like?mangaId=68cda671374e2828c73268b3 200 - - 1.863 ms
+1|ww-2     | 2025-11-06T16:34:51: GET /__manifest?p=%2Fauthors%2Fkhong-ro&p=%2Fauthors%2Frosaria&p=%2Fgenres%2F3d-hentai&p=%2Fgenres%2Faction&p=%2Fgenres%2Fadult&p=%2Fgenres%2Fbdsm&p=%2Fgenres%2Fbig-penis&p=%2Fgenres%2Fsex-toys&p=%2Fgenres%2Fx-ray&p=%2Fmanga%2F68cda671374e2828c73268b3&p=%2Fmanga%2F68d1de203d7760ae19644145&p=%2Fmanga%2F68dc23654cc992ac383d7114&p=%2Fmanga%2F68e2ea7c8a205502ed9928fe&p=%2Fmanga%2F68fe4a35fb6f20cf361687d1&p=%2Fmanga%2F6907582371314a3e981742d2&p=%2Fmanga%2F690874f9939dd9e3d09d13e7&p=%2Fmanga%2F6908c801206ef6c57464f438&p=%2Fmanga%2F6908f239581fb9798a2c8da1&p=%2Fmanga%2F690a116f2535c325815abf53&p=%2Fmanga%2F690cb3f931ea0e89ab2407a2&p=%2Fmanga%2F690cb59631ea0e89ab240832&p=%2Fmanga%2F690cb646971033dc8db60b4d&p=%2Fmanga%2F690cb776971033dc8db60d31&p=%2Fmanga%2F690cb87d971033dc8db60dff&p=%2Fmanga%2F690cbe6fd57faf007f7d44ae&p=%2Fmanga%2Fchapter%2F68cda671374e2828c73268b3&version=19c1149e 200 - - 14.611 ms
+1|ww-2     | 2025-11-06T16:34:54: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:54: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:54: GET /manga/68dc23654cc992ac383d7114.data 200 - - 37.753 ms
+1|ww-2     | 2025-11-06T16:34:54: GET /manga/68dc23654cc992ac383d7114 200 - - 61.850 ms
+1|ww-2     | 2025-11-06T16:34:54: GET /api/manga-progress?mangaId=68dc23654cc992ac383d7114 401 - - 3.077 ms
+1|ww-2     | 2025-11-06T16:34:54: GET /api/manga-like?mangaId=68dc23654cc992ac383d7114 200 - - 4.950 ms
+1|ww-2     | 2025-11-06T16:34:59: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:34:59: GET /manga/chapter/68dc23654cc992ac383d7114.data?chapterNumber=9 200 - - 27.302 ms
+1|ww-2     | 2025-11-06T16:34:59: GET /api/comments?page=1&limit=5&mangaId=68dc23654cc992ac383d7114 200 - - 9.420 ms
+1|ww-2     | 2025-11-06T16:35:08: GET /api/manga-like?mangaId=68dc23654cc992ac383d7114 200 - - 1.656 ms
+1|ww-2     | 2025-11-06T16:35:08: GET /api/manga-progress?mangaId=68dc23654cc992ac383d7114 401 - - 1.577 ms
+1|ww-2     | 2025-11-06T16:35:08: GET /api/manga-rating?mangaId=68dc23654cc992ac383d7114 200 - - 6.249 ms
+1|ww-2     | 2025-11-06T16:35:10: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:35:10: GET /manga/chapter/68dc23654cc992ac383d7114?chapterNumber=8 200 - - 81.632 ms
+1|ww-2     | 2025-11-06T16:35:10: POST /api/manga-progress 401 - - 2.179 ms
+1|ww-2     | 2025-11-06T16:35:10: GET /api/chapters/list.data?mangaId=68dc23654cc992ac383d7114&_routes=routes%2Fapi.chapters.list 200 - - 5.370 ms
+1|ww-2     | 2025-11-06T16:35:13: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:35:13: GET /manga/chapter/68e1b14b1d73ad33622dc4ff?chapterNumber=31 200 - - 40.662 ms
+1|ww-2     | 2025-11-06T16:35:13: POST /api/chapter-view 200 - - 12.106 ms
+1|ww-2     | 2025-11-06T16:35:13: Đã ghi interaction: view cho manga 690cb776971033dc8db60d31
+1|ww-2     | 2025-11-06T16:35:14: GET /api/chapters/list.data?mangaId=68dc23654cc992ac383d7114&_routes=routes%2Fapi.chapters.list 200 - - 3.697 ms
+1|ww-2     | 2025-11-06T16:35:15: [loader:root] genres count = 142
+1|ww-2     | 2025-11-06T16:35:15: GET /manga/68dc23654cc992ac383d7114.data 200 - - 31.992 ms
+1|ww-2     | 2025-11-06T16:35:15: GET /api/manga-like?mangaId=68dc23654cc992ac383d7114 200 - - 2.637 ms
+1|ww-2     | 2025-11-06T16:35:15: GET /api/manga-progress?mangaId=68dc23654cc992ac383d7114 401 - - 1.794 ms
+1|ww-2     | 2025-11-06T16:35:15: GET /api/comments?page=1&limit=5&mangaId=68dc23654cc992ac383d7114 200 - - 8.234 ms
+1|ww-2     | 2025-11-06T16:35:17: GET /api/manga-follow?mangaId=68cda671374e2828c73268b3 200 - - 1.670 ms
+1|ww-2     | 2025-11-06T16:35:17: GET /api/manga-like?mangaId=68cda671374e2828c73268b3 200 - - 2.147 ms
+1|ww-2     | 2025-11-06T16:35:17: GET /api/comments?page=1&limit=5&mangaId=68cda671374e2828c73268b3 200 - - 9.973 ms
+

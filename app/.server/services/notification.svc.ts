@@ -23,6 +23,8 @@ export const notifyNewChapter = async (chapter: ChapterType, manga: MangaType) =
   const usersFollowManga = await UserFollowMangaModel.find({
     mangaId: chapter.mangaId,
   }).lean();
+  const targetMangaId = String(chapter.mangaId);
+  const targetSlug = manga.slug ?? null;
 
   await notifyToUsers(
     usersFollowManga.map((user) => user.userId),
@@ -30,6 +32,11 @@ export const notifyNewChapter = async (chapter: ChapterType, manga: MangaType) =
       title: manga.title,
       subtitle: "đã ra chương mới",
       imgUrl: manga.poster,
+      type: "chapter-release",
+      targetType: "manga",
+      targetId: targetMangaId,
+      targetSlug,
+      targetUrl: targetSlug ? `/truyen-hentai/${targetSlug}` : `/truyen-hentai/${targetMangaId}`,
     },
   );
 };

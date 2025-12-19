@@ -50,6 +50,14 @@ module.exports = [
   },
   { name: "Angel", slug: "angel", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   { name: "Ảnh động", slug: "anh-dong", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
+  {
+    name: "Ảnh Cosplay",
+    slug: "anh-cosplay",
+    category: "general",
+    description: "Bộ ảnh cosplay sexy, gợi cảm của coser – tập trung vào trang phục và thần thái hấp dẫn.",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
   { name: "Animal", slug: "animal", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   {
     name: "Animal Girl",
@@ -85,6 +93,14 @@ module.exports = [
     category: "general",
     description:
       'Nội dung hentai được chuyển thể từ game người lớn. Có thể giữ nguyên tạo hình, tình huống và bối cảnh của game gốc.',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    name: "Bestiality",
+    slug: "bestiality",
+    category: "general",
+    description: "Quan hệ tình dục giữa con người và động vật thật, mang yếu tố cấm kỵ, gây tranh cãi mạnh.",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -234,6 +250,14 @@ module.exports = [
     updatedAt: new Date(),
   },
   { name: "Cousin", slug: "cousin", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
+  {
+    name: "Cross-dressing",
+    slug: "cross-dressing",
+    category: "general",
+    description: "Nhân vật mặc trang phục khác giới (nam giả nữ hoặc nữ giả nam), tạo tình huống bất ngờ, gợi cảm.",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
   {
     name: "Crotch Tattoo",
     slug: "crotch-tattoo",
@@ -389,7 +413,15 @@ module.exports = [
   },
   { name: "Không che", slug: "khong-che", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   { name: "Kimono", slug: "kimono", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
-  { name: "Loli", slug: "loli", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
+  {
+    name: "Loli",
+    slug: "loli",
+    category: "general",
+    description:
+      "Nhân vật nữ có ngoại hình nhỏ tuổi, dễ thương, thường xuất hiện trong anime, manga, game, hoặc cosplay.",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
   { name: "Maids", slug: "maids", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   { name: "Manhua", slug: "manhua", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   {
@@ -443,6 +475,31 @@ module.exports = [
   },
   { name: "Nun", slug: "nun", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   { name: "Nurse", slug: "nurse", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
+  {
+    name: "Office Lady",
+    slug: "office-lady",
+    category: "general",
+    description:
+      "Nhân vật nữ công sở mặc váy bút chì, áo sơ mi, vest – phong thái trưởng thành, quyến rũ nơi văn phòng.",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    name: "Pantyhose",
+    slug: "pantyhose",
+    category: "general",
+    description: "Nhân vật mặc quần tất mỏng, tôn đôi chân; thường rách/kéo xuống để tăng sự gợi cảm.",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    name: "Police",
+    slug: "police",
+    category: "general",
+    description: "Nhân vật cảnh sát đồng phục, mang hình ảnh quyền lực, kiểm soát; đôi khi kết hợp yếu tố hành động.",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
   { name: "Pregnant", slug: "pregnant", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   { name: "Princess", slug: "princess", category: "general", description: "", createdAt: new Date(), updatedAt: new Date() },
   {

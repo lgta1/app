@@ -3,24 +3,54 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 const LOCAL_STORAGE_KEY = "adult_content_confirmed";
 
-/** Bật/tắt cảnh báo 18+ — để tắt hoàn toàn đặt = false */
-const ENABLE_ADULT_WARNING = false;
+const AGE_COOKIE_NAME = "age_verified";
+
+function hasAgeVerifiedCookie(): boolean {
+  try {
+    return /(?:^|;\s*)age_verified=1(?:;|$)/.test(document.cookie);
+  } catch {
+    return false;
+  }
+}
+
+function setAgeVerifiedCookie(days = 365) {
+  try {
+    const maxAge = Math.max(1, Math.floor(days)) * 24 * 60 * 60;
+    document.cookie = `${AGE_COOKIE_NAME}=1; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+  } catch {
+    // ignore
+  }
+}
 
 interface DialogWarningAdultContentProps {
+  enabled?: boolean;
+  disabled?: boolean;
+  /** If true, render as OPEN on the first paint (SSR-friendly). */
+  defaultOpen?: boolean;
   onConfirmed?: () => void;
 }
 
 export default function DialogWarningAdultContent({
+  enabled = true,
+  disabled = false,
+  defaultOpen = false,
   onConfirmed,
 }: DialogWarningAdultContentProps) {
-  // TẮT HOÀN TOÀN: không render, không chạy hook => nhẹ, không ảnh hưởng phần khác
-  if (!ENABLE_ADULT_WARNING) return null;
+  // Disabled = do not render and do not run hooks.
+  if (!enabled || disabled) return null;
 
-  const [isOpen, setIsOpen] = useState(false);
+  // SSR-friendly: allow server to render the overlay OPEN.
+  const [isOpen, setIsOpen] = useState<boolean>(() => Boolean(defaultOpen));
 
   useEffect(() => {
-    const isConfirmed = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!isConfirmed) setIsOpen(true);
+    try {
+      const confirmedByCookie = hasAgeVerifiedCookie();
+      const confirmedByStorage = localStorage.getItem(LOCAL_STORAGE_KEY) === "true";
+      const confirmed = confirmedByCookie || confirmedByStorage;
+      setIsOpen(!confirmed);
+    } catch {
+      // If storage access fails, keep whatever SSR decided.
+    }
   }, []);
 
   const handleExit = () => {
@@ -28,7 +58,10 @@ export default function DialogWarningAdultContent({
   };
 
   const handleContinue = () => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, "true");
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, "true");
+    } catch {}
+    setAgeVerifiedCookie(365);
     setIsOpen(false);
     onConfirmed?.();
   };

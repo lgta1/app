@@ -1,19 +1,12 @@
 import { createComment, deleteComment, likeComment } from "@/mutations/comment.mutation";
-import { getComments, getReplies } from "@/queries/comment.query";
+import { getComments, getReplies, getPageContainingComment } from "@/queries/comment.query";
 import { recordComment } from "@/services/interaction.svc";
-import {
-  commitUserSession,
-  getUserInfoFromSession,
-  getUserSession,
-  setUserDataToSession,
-} from "@/services/session.svc";
+import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/api.comments";
 
-import { CommentExpModel } from "~/database/models/comment-exp.model";
-import { UserModel, type UserType } from "~/database/models/user.model";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
-import { updateUserExp } from "~/helpers/user-level.helper";
+import { sharedTtlCache } from "~/.server/utils/ttl-cache";
 
 export async function loader({ request }: Route.LoaderArgs) {
   try {
@@ -23,13 +16,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     const parentId = url.searchParams.get("parentId");
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "5");
+    const focusCommentId = url.searchParams.get("focusCommentId");
 
     if (parentId) {
-      const replies = await getReplies(parentId);
-      return Response.json({
-        data: replies,
-        success: true,
-      });
+      const replies = await sharedTtlCache.getOrSet(
+        `api:comment-replies:${parentId}`,
+        10_000,
+        () => getReplies(parentId),
+      );
+      return Response.json({ data: replies, success: true });
     }
 
     if (!mangaId && !postId) {
@@ -46,11 +41,39 @@ export async function loader({ request }: Route.LoaderArgs) {
       );
     }
 
-    const commentsData = await getComments(
-      { mangaId: mangaId || undefined, postId: postId || undefined },
-      page,
-      limit,
-    );
+    let effectivePage = page;
+    if (focusCommentId && (mangaId || postId)) {
+      const pageInfo = await getPageContainingComment(
+        focusCommentId,
+        { mangaId: mangaId || undefined, postId: postId || undefined },
+        limit,
+      );
+      if (pageInfo?.page) {
+        effectivePage = pageInfo.page;
+      }
+    }
+
+    const baseKey = mangaId ? `manga:${mangaId}` : `post:${postId}`;
+    const cacheKey = focusCommentId
+      ? null
+      : `api:comments:${baseKey}:page:${effectivePage}:limit:${limit}`;
+
+    const commentsData = cacheKey
+      ? await sharedTtlCache.getOrSet(
+          cacheKey,
+          10_000,
+          () =>
+            getComments(
+              { mangaId: mangaId || undefined, postId: postId || undefined },
+              effectivePage,
+              limit,
+            ),
+        )
+      : await getComments(
+          { mangaId: mangaId || undefined, postId: postId || undefined },
+          effectivePage,
+          limit,
+        );
 
     return Response.json({
       data: commentsData.data,
@@ -65,113 +88,6 @@ export async function loader({ request }: Route.LoaderArgs) {
       { error: "Có lỗi xảy ra khi tải bình luận", success: false },
       { status: 500 },
     );
-  }
-}
-
-// Helper function để claim exp từ comment
-async function claimCommentExp(user: UserType, request: Request) {
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    const now = new Date();
-    const oneMinuteAgo = new Date(now.getTime() - 60000);
-    const userId = user.id;
-
-    // Check if user can claim exp (rate limiting + daily limit)
-    const currentExp = await CommentExpModel.findOne({
-      userId,
-      date: today,
-      $and: [
-        { totalExp: { $lt: 50 } },
-        {
-          $or: [{ updatedAt: { $lt: oneMinuteAgo } }, { updatedAt: { $exists: false } }],
-        },
-      ],
-    });
-
-    // If no valid record found, check if it's due to rate limit or daily limit
-    if (!currentExp) {
-      const existingRecord = await CommentExpModel.findOne({ userId, date: today });
-      if (existingRecord) {
-        if (existingRecord.totalExp >= 50) {
-          return { success: false, reason: "daily_limit" };
-        } else {
-          return { success: false, reason: "rate_limit" };
-        }
-      }
-    }
-
-    const currentCommentsPosted = currentExp?.commentsPosted || 0;
-    const currentTotalExp = currentExp?.totalExp || 0;
-
-    if (currentTotalExp >= 50) {
-      return { success: false, reason: "daily_limit" };
-    }
-
-    // Calculate exp to gain
-    let expToGain = currentCommentsPosted < 5 ? 5 : 1;
-    const maxPossibleExp = 50 - currentTotalExp;
-    expToGain = Math.min(expToGain, maxPossibleExp);
-
-    if (expToGain <= 0) {
-      return { success: false, reason: "daily_limit" };
-    }
-
-    // Atomic update
-    const updatedExp = await CommentExpModel.findOneAndUpdate(
-      { userId, date: today },
-      {
-        $inc: {
-          commentsPosted: 1,
-          totalExp: expToGain,
-        },
-      },
-      { upsert: true, new: true },
-    );
-
-    // Lấy thông tin user hiện tại trước khi update
-    const currentUser = await UserModel.findById(user.id).lean();
-    if (!currentUser) {
-      return { success: false, reason: "user_not_found" };
-    }
-
-    const { newExp, newLevel, didLevelUp } = updateUserExp(
-      currentUser as UserType,
-      expToGain,
-    );
-
-    let updatedSession = null;
-    if (didLevelUp) {
-      // Nếu level up, cập nhật cả exp và level
-      await UserModel.updateOne(
-        { _id: user.id },
-        { $set: { exp: newExp, level: newLevel } },
-      );
-
-      // Cập nhật session khi level thay đổi
-      const session = await getUserSession(request);
-      const updatedUser = { ...user, level: newLevel, exp: newExp };
-      setUserDataToSession(session, updatedUser);
-      updatedSession = session;
-    } else {
-      // Nếu không level up, chỉ tăng exp
-      await UserModel.updateOne({ _id: user.id }, { $inc: { exp: expToGain } });
-    }
-
-    const isFirstFiveComments = updatedExp.commentsPosted <= 5;
-
-    return {
-      success: true,
-      expGained: expToGain,
-      totalExp: updatedExp.totalExp,
-      commentsPosted: updatedExp.commentsPosted,
-      remainingExp: Math.max(0, 50 - updatedExp.totalExp),
-      isFirstFiveComments,
-      message: `Bạn nhận được ${expToGain} exp từ bình luận! (${isFirstFiveComments ? "5 comment đầu" : "comment thường"})`,
-      updatedSession,
-    };
-  } catch (error) {
-    console.error("Error claiming comment exp:", error);
-    return { success: false, reason: "error" };
   }
 }
 
@@ -253,31 +169,11 @@ export async function action({ request }: Route.ActionArgs) {
         });
       }
 
-      // Try to claim exp from comment (non-blocking)
-      const expResult = await claimCommentExp(user, request);
-
       const response = {
         success: true,
         comment,
-        expReward: expResult.success
-          ? {
-              expGained: expResult.expGained,
-              message: expResult.message,
-              totalExp: expResult.totalExp,
-              remainingExp: expResult.remainingExp,
-            }
-          : null,
       };
 
-      if (expResult.updatedSession) {
-        return Response.json(response, {
-          headers: {
-            "Set-Cookie": await commitUserSession(expResult.updatedSession),
-          },
-        });
-      }
-
-      // Return response with both comment and exp info
       return Response.json(response);
     }
 

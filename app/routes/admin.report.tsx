@@ -1,3 +1,4 @@
+import { useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   type ActionFunctionArgs,
@@ -10,13 +11,15 @@ import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Check, ChevronDown } from "lucide-react";
 
 import { deleteReport } from "@/mutations/report.mutation";
+import { rewardGoldUser } from "@/mutations/user.mutation";
 import { getReports } from "@/queries/report.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { Pagination } from "~/components/pagination";
 import { ReportCard } from "~/components/report.card";
+import { RewardGoldDialog } from "~/components/dialog-reward-gold";
 import { REPORT_TYPE } from "~/constants/report";
-import type { ReportType } from "~/database/models/report.model";
+import type { ReportWithMeta } from "~/types/report";
 
 export const meta: MetaFunction = () => {
   return [
@@ -27,7 +30,7 @@ export const meta: MetaFunction = () => {
 
 // Interface cho dữ liệu loader
 interface LoaderData {
-  reports: ReportType[];
+  reports: ReportWithMeta[];
   selectedTypes: string[];
   sortBy: string;
   total: number;
@@ -101,6 +104,40 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
+  if (action === "reward") {
+    const userId = formData.get("userId");
+    const amountRaw = formData.get("amount");
+    const message = formData.get("message");
+
+    if (typeof userId !== "string" || !userId) {
+      return { success: false, message: "Thiếu ID người nhận thưởng" };
+    }
+
+    const amount = Number(amountRaw);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { success: false, message: "Số dâm ngọc không hợp lệ" };
+    }
+
+    try {
+      await rewardGoldUser(
+        request,
+        userId,
+        Math.floor(amount),
+        typeof message === "string" && message.trim().length > 0
+          ? message.trim()
+          : "Thưởng vì báo cáo lỗi",
+      );
+      return { success: true, message: "Thưởng dâm ngọc thành công" };
+    } catch (error) {
+      console.error("Error rewarding reporter:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Có lỗi xảy ra khi thưởng dâm ngọc",
+      };
+    }
+  }
+
   return { success: false, message: "Hành động không hợp lệ" };
 }
 
@@ -142,6 +179,10 @@ export default function AdminReport() {
   const [searchParams] = useSearchParams();
   const submit = useSubmit();
   const navigate = useNavigate();
+  const [rewardDialog, setRewardDialog] = useState<{
+    open: boolean;
+    reporter: { id: string; email: string; name?: string } | null;
+  }>({ open: false, reporter: null });
 
   const handleTypeToggle = (type: string) => {
     const params = new URLSearchParams(searchParams);
@@ -185,12 +226,31 @@ export default function AdminReport() {
     submit(formData, { method: "post" });
   };
 
-  const handleViewClick = (report: ReportType) => {
+  const handleViewClick = (report: ReportWithMeta) => {
     if (report.mangaId) {
-      navigate(`/manga/${report.mangaId}`);
+      navigate(`/truyen-hentai/${report.mangaId}`);
     } else {
       navigate(`/post/${report.postId}`);
     }
+  };
+
+  const handleRewardClick = (report: ReportWithMeta) => {
+    const reporter = report.reporterUser;
+    if (!reporter?.id || !reporter.email) {
+      toast.error("Không tìm thấy thông tin người báo cáo để thưởng");
+      return;
+    }
+    setRewardDialog({ open: true, reporter });
+  };
+
+  const handleRewardConfirm = (amount: number, message: string) => {
+    if (!rewardDialog.reporter) return;
+    const formData = new FormData();
+    formData.append("action", "reward");
+    formData.append("userId", rewardDialog.reporter.id);
+    formData.append("amount", amount.toString());
+    formData.append("message", message || "Thưởng vì báo cáo lỗi");
+    submit(formData, { method: "post" });
   };
 
   return (
@@ -247,6 +307,7 @@ export default function AdminReport() {
                 report={report}
                 onDeleteClick={handleDeleteClick}
                 onViewClick={handleViewClick}
+                onRewardClick={handleRewardClick}
               />
             ))
           ) : (
@@ -269,6 +330,15 @@ export default function AdminReport() {
           </div>
         )}
       </div>
+
+      <RewardGoldDialog
+        member={rewardDialog.reporter}
+        open={rewardDialog.open && Boolean(rewardDialog.reporter)}
+        onOpenChange={(open) =>
+          setRewardDialog((prev) => ({ open, reporter: open ? prev.reporter : null }))
+        }
+        onConfirm={handleRewardConfirm}
+      />
     </div>
   );
 }

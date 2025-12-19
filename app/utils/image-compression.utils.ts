@@ -11,175 +11,220 @@ interface CompressionProgressCallback {
   (current: number, total: number): void;
 }
 
-interface CompressionTarget {
-  minSizeKB: number;
-  maxSizeKB: number;
-  initialQuality: number;
+type PosterAspect = "3:4" | "2:3" | "other";
+
+interface PosterNormalizationResult {
+  file: File;
+  width: number;
+  height: number;
+  steps: {
+    croppedToThreeFour: boolean;
+    resizedTo900: boolean;
+    convertedToWebP: boolean;
+    aspect: PosterAspect;
+  };
 }
 
+const POSTER_TARGET_WIDTH = 900;
+const POSTER_ASPECT_TOLERANCE = 0.01;
+const ASPECT_THREE_FOUR = 3 / 4;
+const ASPECT_TWO_THREE = 2 / 3;
+
 /**
- * Nén ảnh theo quy tắc quality-based:
- * A: ≤ 300KB: Giữ nguyên
- * B: 300KB-1MB: Nén về 250-350KB (quality khởi điểm 80)
- * C: 1MB-2MB: Nén về 350-500KB (quality khởi điểm 80)
- * D: >2MB: Nén về 500-700KB (quality khởi điểm 80)
+ * QUY TẮC NÉN (cập nhật theo yêu cầu 17/12/2025):
+ * 1) GIF
+ *    - Giữ nguyên, không nén, không đổi định dạng.
+ * 2) PNG
+ *    - LUÔN chuyển sang WEBP (quality 0.95), sau đó áp dụng quy tắc (3).
+ * 3) JPG / JPEG / WEBP / AVIF (và PNG sau khi convert)
+ *    - ≤ 1.8MB: giữ nguyên.
+ *    - > 1.8MB & ≤ 2.85MB: scale còn 75%.
+ *    - > 2.85MB & ≤ 3.5MB: scale còn 65%.
+ *    - > 3.5MB & ≤ 5MB: scale còn 55%.
+ *    - > 5MB & ≤ 7MB: scale còn 45%.
+ *    - > 7MB: scale còn 35%.
+ * 4) Khác
+ *    - Không chấp nhận → ném lỗi.
+ *
+ * Ghi chú:
+ * - "scale" nghĩa là giảm cả width & height theo tỷ lệ phần trăm.
+ * - Thước đo dung lượng dùng file.size (sau khi convert PNG→WEBP thì dùng size của file đã convert để quyết định scale tiếp).
+ * - Tỷ lệ nén (compressionRatio) vẫn tính dựa trên kích thước gốc ban đầu trước mọi xử lý.
  */
 export async function compressImageToWebP(file: File): Promise<CompressionResult> {
   const originalSize = file.size;
-  const isAlreadyWebP = file.type === "image/webp";
+  const type = file.type;
 
-  // Bước 1: Xử lý file để có được file WebP để đo dung lượng
-  let initialWebPFile: File;
-  if (isAlreadyWebP) {
-    // Nếu đã là WebP, sử dụng trực tiếp
-    initialWebPFile = file;
-  } else {
-    // Chuyển sang WebP với quality 100 để đo dung lượng
-    initialWebPFile = await convertToWebP(file);
-  }
+  const MB = 1024 * 1024;
 
-  const webpSizeKB = initialWebPFile.size / 1024;
-
-  // Phân nhóm dựa trên kích thước WebP
-  if (webpSizeKB <= 300) {
-    // Nhóm A: Giữ nguyên
+  // 3) GIF: giữ nguyên
+  if (type === "image/gif") {
     return {
-      compressedFile: initialWebPFile,
+      compressedFile: file,
       originalSize,
-      compressedSize: initialWebPFile.size,
-      compressionRatio: ((originalSize - initialWebPFile.size) / originalSize) * 100,
+      compressedSize: file.size,
+      compressionRatio: ((originalSize - file.size) / originalSize) * 100,
     };
   }
 
-  // Xác định target compression cho các nhóm B, C, D
-  let target: CompressionTarget;
-  if (webpSizeKB > 300 && webpSizeKB <= 1024) {
-    // Nhóm B: 300KB-1MB
-    target = { minSizeKB: 250, maxSizeKB: 350, initialQuality: 80 };
-  } else if (webpSizeKB > 1024 && webpSizeKB <= 2048) {
-    // Nhóm C: 1MB-2MB
-    target = { minSizeKB: 350, maxSizeKB: 500, initialQuality: 75 };
-  } else {
-    // Nhóm D: >2MB
-    target = { minSizeKB: 500, maxSizeKB: 700, initialQuality: 70 };
+  // Allowed base types in rule set
+  const isJpgLike = ["image/jpeg", "image/jpg"].includes(type);
+  const isWebp = type === "image/webp";
+  const isAvif = type === "image/avif";
+  const isPng = type === "image/png";
+
+  if (!isJpgLike && !isWebp && !isAvif && !isPng) {
+    throw new Error(`Định dạng không được chấp nhận: ${type || file.name}`);
   }
 
-  // Bước 2: Nén với quality adjustment
-  const finalFile = await compressWithQualityAdjustment(
-    initialWebPFile,
-    target,
-    isAlreadyWebP,
-  );
+  // 2) PNG: luôn convert sang WEBP (quality 0.95)
+  if (isPng) {
+    let converted: File;
+    try {
+      converted = await convertToWebP(file, 0.95);
+    } catch (e) {
+      console.error("PNG->WEBP convert error", e);
+      // fallback: giữ nguyên nếu thất bại convert
+      return {
+        compressedFile: file,
+        originalSize,
+        compressedSize: file.size,
+        compressionRatio: 0,
+      };
+    }
+    // Sau convert: áp quy tắc giống JPG/WebP/AVIF trên converted
+    return await scaleByRule(converted, originalSize);
+  }
 
-  return {
-    compressedFile: finalFile,
-    originalSize,
-    compressedSize: finalFile.size,
-    compressionRatio: ((originalSize - finalFile.size) / originalSize) * 100,
-  };
+  // 1) JPG / WEBP / AVIF: áp trực tiếp quy tắc
+  return await scaleByRule(file, originalSize);
 }
 
-/**
- * Chuyển ảnh sang WebP với quality 100 (chỉ đổi format)
- */
-async function convertToWebP(file: File): Promise<File> {
+/** Áp quy tắc cho JPG / WEBP / AVIF (và PNG đã convert sang WEBP). */
+async function scaleByRule(currentFile: File, originalSize: number): Promise<CompressionResult> {
+  const MB = 1024 * 1024;
+  const size = currentFile.size;
+
+  const tiers: Array<{ max: number; ratio: number }> = [
+    { max: 1.8 * MB, ratio: 1 },
+    { max: 2.85 * MB, ratio: 0.75 },
+    { max: 3.5 * MB, ratio: 0.65 },
+    { max: 5 * MB, ratio: 0.55 },
+    { max: 7 * MB, ratio: 0.45 },
+  ];
+
+  let scaleRatio = 0.35; // default for >7MB
+  const tier = tiers.find((t) => size <= t.max);
+  if (tier) {
+    if (tier.ratio === 1) {
+      return {
+        compressedFile: currentFile,
+        originalSize,
+        compressedSize: currentFile.size,
+        compressionRatio: ((originalSize - currentFile.size) / originalSize) * 100,
+      };
+    }
+    scaleRatio = tier.ratio;
+  }
+
+  try {
+    const { width, height } = await getImageDimensions(currentFile);
+    const maxDim = Math.max(width, height);
+    const targetMaxDim = Math.max(1, Math.floor(maxDim * scaleRatio));
+
+    const resized = await resizeKeepFormat(currentFile, { maxWidthOrHeight: targetMaxDim });
+    const chosen = resized.size < currentFile.size ? resized : currentFile;
+
+    return {
+      compressedFile: chosen,
+      originalSize,
+      compressedSize: chosen.size,
+      compressionRatio: ((originalSize - chosen.size) / originalSize) * 100,
+    };
+  } catch (e) {
+    console.error(`Resize failed for "${currentFile.name}":`, e);
+    return {
+      compressedFile: currentFile,
+      originalSize,
+      compressedSize: currentFile.size,
+      compressionRatio: ((originalSize - currentFile.size) / originalSize) * 100,
+    };
+  }
+}
+
+/** Chuyển bất kỳ File ảnh sang WEBP với quality (0..1). */
+async function convertToWebP(file: File, quality: number): Promise<File> {
   const options = {
     useWebWorker: true,
     fileType: "image/webp" as const,
-    initialQuality: 1, // Quality 100%
-    alwaysKeepResolution: true,
+    initialQuality: quality,
+    maxWidthOrHeight: await inferMaxDim(file),
     exifOrientation: 1,
   };
-
-  const convertedFile = await imageCompression(file, options);
-  const webpFileName = createWebPFileName(file.name);
-
-  return new File([convertedFile], webpFileName, {
-    type: "image/webp",
-    lastModified: Date.now(),
-  });
+  const blob = await imageCompression(file, options);
+  return new File([blob], createWebPFileName(file.name), { type: "image/webp", lastModified: Date.now() });
 }
 
-/**
- * Nén với điều chỉnh quality để đạt target size
- */
-async function compressWithQualityAdjustment(
-  file: File,
-  target: CompressionTarget,
-  isAlreadyWebP: boolean = false,
-): Promise<File> {
-  let quality = target.initialQuality;
-  let attempts = 0;
-  const maxAttempts = 5;
-  const qualityStep = 5;
-  const minQuality = 50;
-  const maxQuality = 95;
-
-  while (attempts < maxAttempts) {
-    const options = {
-      useWebWorker: true,
-      fileType: "image/webp" as const,
-      initialQuality: quality / 100, // Convert to 0-1 range
-      alwaysKeepResolution: true,
-      exifOrientation: 1,
-    };
-
-    try {
-      const compressedFile = await imageCompression(file, options);
-      const webpFileName = isAlreadyWebP ? file.name : createWebPFileName(file.name);
-      const finalFile = new File([compressedFile], webpFileName, {
-        type: "image/webp",
-        lastModified: Date.now(),
-      });
-
-      const resultSizeKB = finalFile.size / 1024;
-
-      // Kiểm tra giới hạn quality
-      if (quality <= minQuality || quality >= maxQuality) {
-        return finalFile;
-      }
-
-      // Kiểm tra nếu đạt target
-      if (resultSizeKB >= target.minSizeKB && resultSizeKB <= target.maxSizeKB) {
-        return finalFile;
-      }
-
-      // Điều chỉnh quality
-      if (resultSizeKB > target.maxSizeKB) {
-        // Quá lớn → giảm quality
-        quality = Math.max(minQuality, quality - qualityStep);
-      } else {
-        // Quá nhỏ → tăng quality
-        quality = Math.min(maxQuality, quality + qualityStep);
-      }
-
-      attempts++;
-    } catch (error) {
-      console.error(`Error at quality ${quality}:`, error);
-      break;
-    }
+async function inferMaxDim(file: File): Promise<number> {
+  try {
+    const { width, height } = await getImageDimensions(file);
+    return Math.max(width, height);
+  } catch {
+    return 99999; // fallback dữ liệu nếu lỗi đọc kích thước
   }
+}
 
-  // Fallback: trả về với quality cuối cùng
-  const fallbackOptions = {
-    useWebWorker: true,
-    fileType: "image/webp" as const,
-    initialQuality: quality / 100,
-    alwaysKeepResolution: true,
-    exifOrientation: 1,
-  };
+/** Lấy kích thước ảnh gốc (width/height) */
+async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  const dataUrl = await imageCompression.getDataUrlFromFile(file);
+  const img = await loadImage(dataUrl);
+  return { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
+}
 
-  const fallbackFile = await imageCompression(file, fallbackOptions);
-  const webpFileName = isAlreadyWebP ? file.name : createWebPFileName(file.name);
-
-  return new File([fallbackFile], webpFileName, {
-    type: "image/webp",
-    lastModified: Date.now(),
+/** Tạo đối tượng Image từ dataURL và chờ onload */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = (err) => reject(err);
+    img.src = src;
   });
 }
 
 /**
- * Nén nhiều ảnh với callback progress
+ * Resize bằng canvas nhưng GIỮ NGUYÊN MIME TYPE.
+ * - Nếu file là JPEG → xuất JPEG; PNG → xuất PNG; WebP → xuất WebP (tránh dùng cho GIF).
+ * - quality01 chỉ áp dụng nếu định dạng hỗ trợ (JPEG/WebP). PNG sẽ bỏ qua.
+ */
+function resizeKeepFormat(
+  file: File,
+  opts: { maxWidthOrHeight: number; quality01?: number },
+): Promise<File> {
+  const mime = file.type;
+  const shouldAttachQuality =
+    typeof opts.quality01 === "number" &&
+    Number.isFinite(opts.quality01) &&
+    opts.quality01 > 0 &&
+    opts.quality01 <= 1 &&
+    (mime === "image/jpeg" || mime === "image/jpg" || mime === "image/webp");
+
+  const options = {
+    useWebWorker: true,
+    maxWidthOrHeight: opts.maxWidthOrHeight,
+    alwaysKeepResolution: false,
+    exifOrientation: 1,
+    ...(shouldAttachQuality ? { initialQuality: opts.quality01 } : {}),
+  };
+  return imageCompression(file, options).then((blob) =>
+    new File([blob], file.name, { type: mime, lastModified: Date.now() }),
+  );
+}
+
+/**
+ * Nén nhiều ảnh với callback progress (API giữ nguyên).
+ * - Gọi onProgress(i, total) trước khi xử lý file thứ i.
+ * - Cuối cùng gọi onProgress(total, total).
+ * - Nếu 1 file lỗi, ném lỗi (hành vi cũ).
  */
 export async function compressMultipleImages(
   files: File[],
@@ -188,36 +233,136 @@ export async function compressMultipleImages(
   const results: CompressionResult[] = [];
 
   for (let i = 0; i < files.length; i++) {
+    if (onProgress) onProgress(i, files.length);
     const file = files[i];
-
-    // Update progress
-    if (onProgress) {
-      onProgress(i, files.length);
-    }
 
     try {
       const result = await compressImageToWebP(file);
       results.push(result);
     } catch (error) {
       console.error(`Error compressing file ${file.name}:`, error);
-      // Continue with other files, but throw error with specific file info
       throw new Error(
         `Không thể nén ảnh "${file.name}". Vui lòng kiểm tra định dạng file.`,
       );
     }
   }
 
-  // Final progress update
-  if (onProgress) {
-    onProgress(files.length, files.length);
-  }
-
+  if (onProgress) onProgress(files.length, files.length);
   return results;
 }
 
+type AvatarNormalizationResult = {
+  file: File;
+  width: number;
+  height: number;
+  steps: {
+    convertedToWebP: boolean;
+    croppedToSquare: boolean;
+    resizedTo300: boolean;
+    keptOriginalSize: boolean;
+  };
+};
+
+const cropCenterSquare = async (file: File): Promise<{ file: File; size: number }> => {
+  const dataUrl = await imageCompression.getDataUrlFromFile(file);
+  const img = await loadImage(dataUrl);
+  const size = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height);
+
+  if ((img.naturalWidth || img.width) === (img.naturalHeight || img.height)) {
+    return { file, size }; // đã là hình vuông
+  }
+
+  const sx = Math.floor(((img.naturalWidth || img.width) - size) / 2);
+  const sy = Math.floor(((img.naturalHeight || img.height) - size) / 2);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Không thể khởi tạo canvas context");
+  ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
+
+  const mime = file.type || "image/jpeg";
+  const squareFile = await canvasToFile(canvas, mime, file.name, mime === "image/webp" ? 0.99 : undefined);
+  return { file: squareFile, size };
+};
+
+const resizeSquareToTarget = async (file: File, targetSize: number): Promise<File> => {
+  const dataUrl = await imageCompression.getDataUrlFromFile(file);
+  const img = await loadImage(dataUrl);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetSize;
+  canvas.height = targetSize;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Không thể khởi tạo canvas context");
+  ctx.drawImage(img, 0, 0, targetSize, targetSize);
+
+  const mime = file.type || "image/jpeg";
+  const quality = mime === "image/webp" ? 0.99 : undefined;
+  const name = mime === "image/webp" ? createWebPFileName(file.name) : file.name;
+  return canvasToFile(canvas, mime, name, quality);
+};
+
 /**
- * Format file size để hiển thị
+ * Chuẩn hóa ảnh đại diện (avatar) theo chuẩn:
+ * - PNG -> chuyển WEBP (quality 0.99) trước, các định dạng JPG/WEBP giữ nguyên.
+ * - Center crop về hình vuông nếu chưa vuông.
+ * - Sau khi vuông: nếu cạnh > 300px -> resize về 300x300; nếu <= 300px giữ nguyên.
  */
+export async function normalizeAvatarImage(file: File): Promise<AvatarNormalizationResult> {
+  validateImageFile(file);
+
+  const targetSize = 300;
+  let working = file;
+  let convertedToWebP = false;
+
+  // PNG -> WEBP quality 0.99
+  if (working.type === "image/png") {
+    try {
+      working = await convertToWebP(working, 0.99);
+      convertedToWebP = true;
+    } catch (error) {
+      console.warn("PNG->WEBP avatar convert failed, giữ nguyên file gốc", error);
+    }
+  }
+
+  const baseDims = await getImageDimensions(working);
+  let croppedToSquare = false;
+  let resizedTo300 = false;
+  let keptOriginalSize = false;
+
+  let squareResult: { file: File; size: number } = { file: working, size: Math.min(baseDims.width, baseDims.height) };
+  if (baseDims.width !== baseDims.height) {
+    squareResult = await cropCenterSquare(working);
+    croppedToSquare = true;
+  }
+
+  let finalFile = squareResult.file;
+  let finalSize = squareResult.size;
+
+  if (finalSize > targetSize) {
+    finalFile = await resizeSquareToTarget(finalFile, targetSize);
+    finalSize = targetSize;
+    resizedTo300 = true;
+  } else {
+    keptOriginalSize = true;
+  }
+
+  return {
+    file: finalFile,
+    width: finalSize,
+    height: finalSize,
+    steps: {
+      convertedToWebP,
+      croppedToSquare,
+      resizedTo300,
+      keptOriginalSize,
+    },
+  };
+}
+
+/** Format file size để hiển thị */
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0B";
   const k = 1024;
@@ -226,29 +371,161 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
 }
 
-/**
- * Tạo tên file mới với extension .webp
- */
+/** Tạo tên file mới với extension .webp (giữ lại vì nơi khác có thể đang dùng) */
 export function createWebPFileName(originalName: string): string {
-  const nameWithoutExt =
-    originalName.substring(0, originalName.lastIndexOf(".")) || originalName;
+  const dot = originalName.lastIndexOf(".");
+  const nameWithoutExt = dot > 0 ? originalName.substring(0, dot) : originalName;
   return `${nameWithoutExt}.webp`;
 }
 
-/**
- * Validate image file
- */
+/** Validate image file (API giữ nguyên) */
 export function validateImageFile(file: File): boolean {
-  const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
-  const maxSize = 10 * 1024 * 1024; // 10MB
-
+  const validTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/avif",
+  ];
+  const maxSize = 10 * 1024 * 1024; // 10MB tổng giới hạn kiểm tra sơ bộ
   if (!validTypes.includes(file.type)) {
-    throw new Error(`File "${file.name}" không phải là định dạng ảnh hợp lệ.`);
+    throw new Error(`File "${file.name}" có định dạng không được chấp nhận.`);
   }
-
   if (file.size > maxSize) {
-    throw new Error(`File "${file.name}" quá lớn. Kích thước tối đa là 10MB.`);
+    throw new Error(`File "${file.name}" quá lớn. Tối đa 10MB.`);
+  }
+  return true;
+}
+
+const classifyPosterAspect = (ratio: number): PosterAspect => {
+  if (Math.abs(ratio - ASPECT_THREE_FOUR) <= POSTER_ASPECT_TOLERANCE) return "3:4";
+  if (Math.abs(ratio - ASPECT_TWO_THREE) <= POSTER_ASPECT_TOLERANCE) return "2:3";
+  return "other";
+};
+
+const canvasToFile = (canvas: HTMLCanvasElement, mime: string, name: string, quality?: number): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Không thể tạo blob từ canvas"));
+          return;
+        }
+        resolve(new File([blob], name, { type: mime, lastModified: Date.now() }));
+      },
+      mime,
+      quality,
+    );
+  });
+};
+
+const cropToThreeFour = async (file: File): Promise<{ file: File; width: number; height: number }> => {
+  const dataUrl = await imageCompression.getDataUrlFromFile(file);
+  const img = await loadImage(dataUrl);
+
+  const ratio = img.naturalWidth / img.naturalHeight;
+  if (classifyPosterAspect(ratio) !== "other") {
+    return { file, width: img.naturalWidth, height: img.naturalHeight };
   }
 
-  return true;
+  let cropWidth = img.naturalWidth;
+  let cropHeight = img.naturalHeight;
+  let sx = 0;
+  let sy = 0;
+
+  const targetRatio = ASPECT_THREE_FOUR;
+  if (ratio > targetRatio) {
+    cropWidth = Math.floor(img.naturalHeight * targetRatio);
+    sx = Math.floor((img.naturalWidth - cropWidth) / 2);
+  } else {
+    cropHeight = Math.floor(img.naturalWidth / targetRatio);
+    sy = Math.floor((img.naturalHeight - cropHeight) / 2);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = cropWidth;
+  canvas.height = cropHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Không thể khởi tạo canvas context");
+  ctx.drawImage(img, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+  const croppedFile = await canvasToFile(canvas, file.type || "image/jpeg", file.name);
+  return { file: croppedFile, width: cropWidth, height: cropHeight };
+};
+
+const resizePosterToWidth = async (file: File, targetWidth: number): Promise<{ file: File; width: number; height: number }> => {
+  const dataUrl = await imageCompression.getDataUrlFromFile(file);
+  const img = await loadImage(dataUrl);
+
+  const width = Math.min(targetWidth, img.naturalWidth || img.width || targetWidth);
+  const ratio = (img.naturalWidth || img.width || width) / (img.naturalHeight || img.height || width);
+  const height = Math.max(1, Math.round(width / ratio));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Không thể khởi tạo canvas context");
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const mime = file.type || "image/jpeg";
+  const isWebP = mime === "image/webp";
+  const nextFile = await canvasToFile(canvas, mime, isWebP ? createWebPFileName(file.name) : file.name, isWebP ? 0.95 : undefined);
+  return { file: nextFile, width, height };
+};
+
+/**
+ * Chuẩn hóa ảnh bìa (áp dụng cho upload mới):
+ * - Nhận 3:4 hoặc 2:3; nếu khác → crop center về 3:4.
+ * - PNG → WEBP quality 0.95, các định dạng khác giữ nguyên.
+ * - Nếu width >= 900px sau bước crop → resize width=900, height theo tỉ lệ.
+ */
+export async function normalizePosterImage(file: File): Promise<PosterNormalizationResult> {
+  const baseDims = await getImageDimensions(file);
+  const aspect = classifyPosterAspect(baseDims.width / baseDims.height);
+
+  let working = file;
+  let width = baseDims.width;
+  let height = baseDims.height;
+  let cropped = false;
+  let convertedToWebP = false;
+  let resized = false;
+
+  if (aspect === "other") {
+    const croppedResult = await cropToThreeFour(file);
+    working = croppedResult.file;
+    width = croppedResult.width;
+    height = croppedResult.height;
+    cropped = true;
+  }
+
+  if (working.type === "image/png") {
+    const converted = await convertToWebP(working, 0.95);
+    working = converted;
+    const dims = await getImageDimensions(working);
+    width = dims.width;
+    height = dims.height;
+    convertedToWebP = true;
+  }
+
+  if (width >= POSTER_TARGET_WIDTH) {
+    const resizedResult = await resizePosterToWidth(working, POSTER_TARGET_WIDTH);
+    working = resizedResult.file;
+    width = resizedResult.width;
+    height = resizedResult.height;
+    resized = true;
+  }
+
+  return {
+    file: working,
+    width,
+    height,
+    steps: {
+      croppedToThreeFour: cropped,
+      resizedTo900: resized,
+      convertedToWebP,
+      aspect: aspect === "other" ? "3:4" : aspect,
+    },
+  };
 }

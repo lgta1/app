@@ -146,5 +146,5 @@ export const incrementBannerRolls = async (bannerId: string, count: number = 1) 
 };
 
 export const resetSummon = async () => {
-  await UserModel.updateMany({}, { $set: { summonCount: 0 } });
+  await UserModel.updateMany({}, { $set: { summonCount: 0, claimedMilestones: [] } });
 };

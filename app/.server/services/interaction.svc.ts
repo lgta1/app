@@ -30,9 +30,11 @@ export const recordInteraction = async (data: InteractionData): Promise<void> =>
  * Ghi lại view cho manga (tự động khi user truy cập)
  */
 export const recordView = async (storyId: string, userId?: string): Promise<void> => {
-  await MangaModel.findByIdAndUpdate(storyId, {
-    $inc: { viewNumber: 1 },
-  });
+  await MangaModel.findByIdAndUpdate(
+    storyId,
+    { $inc: { viewNumber: 1, dailyViews: 1, weeklyViews: 1, monthlyViews: 1 } },
+    { timestamps: false },
+  );
 
   await recordInteraction({
     story_id: storyId,

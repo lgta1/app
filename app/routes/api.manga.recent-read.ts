@@ -39,7 +39,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         populate: {
           path: "mangaId",
           model: "Manga",
-          select: "title poster chapters viewNumber likeNumber followNumber",
+          select: "title poster slug chapters viewNumber likeNumber followNumber",
         },
       })
       .sort({ createdAt: -1 })
@@ -58,6 +58,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           mangaMap.set(mangaId, {
             ...manga.toObject(),
             id: mangaId,
+            slug: manga.slug,
             lastReadAt: readChapter.createdAt,
           });
         }

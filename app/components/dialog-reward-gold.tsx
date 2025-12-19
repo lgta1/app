@@ -2,10 +2,12 @@ import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Gift } from "lucide-react";
 
-import type { UserType } from "~/database/models/user.model";
-
 interface RewardGoldDialogProps {
-  member: UserType | null;
+  member: {
+    id: string;
+    email: string;
+    name?: string;
+  } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (amount: number, message: string) => void;
@@ -38,6 +40,8 @@ export function RewardGoldDialog({
     onOpenChange(false);
   };
 
+  const memberLabel = member.name ? `${member.name} (${member.email})` : member.email;
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -56,7 +60,7 @@ export function RewardGoldDialog({
                 </div>
                 <div className="text-txt-secondary self-stretch text-center text-sm leading-tight font-medium">
                   Thưởng dâm ngọc cho thành viên{" "}
-                  <span className="text-txt-primary font-semibold">{member.email}</span>
+                  <span className="text-txt-primary font-semibold">{memberLabel}</span>
                 </div>
                 <div className="flex flex-col items-start justify-start gap-1.5 self-stretch">
                   <div className="inline-flex items-center justify-start gap-1.5">

@@ -12,7 +12,7 @@ import {
   validateUsernameChangeCost,
   sanitizeUsername,
   USERNAME_CHANGE_COST,
-} from "~/utils/username-validator";
+} from "~/utils/username-validator.server";
 import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
 
 export const promoteToAdmin = async (request: Request, userId: string) => {

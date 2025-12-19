@@ -75,6 +75,11 @@
     "description": "Trói buộc, kiểm soát, đau đớn, phục tùng. Bao gồm từ nhẹ (bịt mắt, trói tay) đến nặng (đánh, tra tấn, điều khiển tâm lý)."
   },
   {
+    "slug": "beach",
+    "name": "Beach",
+    "description": "Bối cảnh diễn ra tại bãi biển hoặc hồ bơi, nơi nhân vật mặc bikini, đồ bơi hở hang, cơ thể ướt át. Thường mang không khí vui tươi, gợi cảm và tự do."
+  },
+  {
     "slug": "big-ass",
     "name": "Big Ass",
     "description": "Tập trung vào nhân vật nữ có vòng 3 to, tròn, căng mẩy, thường được nhấn mạnh qua các góc vẽ gợi cảm."
@@ -210,6 +215,11 @@
     "description": "Quan hệ tình cảm hoặc thể xác giữa anh chị em họ, mang cảm giác cấm kỵ nhẹ nhưng không liên quan huyết thống gần."
   },
   {
+    "slug": "creampie",
+    "name": "Creampie",
+    "description": "Quan hệ tình dục với hành động xuất tinh bên trong âm đạo, nhấn mạnh sự thân mật, khoái cảm trọn vẹn và cảm giác chiếm hữu."
+  },
+  {
     "slug": "crotch-tattoo",
     "name": "Crotch Tattoo",
     "description": "Hình xăm ở vùng kín hoặc gần đó, tạo cảm giác nổi loạn, dâm đãng, thường gắn với nhân vật chủ động và táo bạo."
@@ -310,6 +320,11 @@
     "description": "Nữ làm chủ, điều khiển và áp đảo nam giới trong quan hệ tình dục, thường sử dụng sự phục tùng hoặc trói buộc."
   },
   {
+    "slug": "fingering",
+    "name": "Fingering",
+    "description": "Kích thích âm đạo hoặc điểm G bằng tay, thường là màn dạo đầu gợi cảm, thể hiện sự khéo léo và phản ứng mãnh liệt của nhân vật."
+  },
+  {
     "slug": "footjob",
     "name": "Footjob",
     "description": "Kích thích dương vật bằng bàn chân, nhấn mạnh sự khéo léo và vẻ đẹp của đôi chân nhân vật."
@@ -335,6 +350,11 @@
     "description": "Một nhân vật bị nhiều người quan hệ cùng lúc, tạo cảm giác mãnh liệt, quá tải và cấm kỵ."
   },
   {
+    "slug": "gender-bender",
+    "name": "Gender Bender",
+    "description": "Nhân vật bị biến đổi giới tính (nam thành nữ hoặc ngược lại) qua phép thuật, thuốc hoặc công nghệ, tạo nên các tình huống hài hước và kích thích."
+  },
+  {
     "slug": "ghost",
     "name": "Ghost",
     "description": "Nhân vật là ma quỷ hoặc linh hồn, mang yếu tố siêu nhiên, kết hợp tình dục với sự bí ẩn và rùng rợn."
@@ -348,6 +368,11 @@
     "slug": "gothic-lolita",
     "name": "Gothic Lolita",
     "description": "Nhân vật mặc trang phục gothic lolita với váy ren, tất lưới, mang vẻ ngoài dễ thương nhưng gợi cảm và bí ẩn."
+  },
+  {
+    "slug": "group",
+    "name": "Group",
+    "description": "Cảnh quan hệ tình dục có từ ba người trở lên, tập trung vào tương tác chéo giữa các nhân vật, mang lại cảm giác mới lạ và mạnh mẽ."
   },
   {
     "slug": "guro",
@@ -400,6 +425,11 @@
     "description": "Nhân vật mặc kimono Nhật Bản, tôn lên vẻ đẹp truyền thống, gợi cảm trong bối cảnh cổ xưa hoặc hiện đại."
   },
   {
+    "slug": "lingerie",
+    "name": "Lingerie",
+    "description": "Nhân vật mặc đồ lót gợi cảm như áo ngực, quần lót ren, corset hoặc tất lưới. Tập trung vào yếu tố thị giác, quyến rũ và kích thích."
+  },
+  {
     "slug": "loli",
     "name": "Loli",
     "description": "Nhân vật nữ có ngoại hình nhỏ nhắn, trẻ trung, mang vẻ ngoài dễ thương nhưng tham gia vào các cảnh gợi cảm, tạo cảm giác cấm kỵ."
@@ -418,6 +448,11 @@
     "slug": "manhwa",
     "name": "Manhwa",
     "description": "Truyện tranh Hàn Quốc, nét vẽ mượt mà, cốt truyện hiện đại hoặc giả tưởng, kết hợp yếu tố tình dục hấp dẫn."
+  },
+  {
+    "slug": "masturbation",
+    "name": "Masturbation",
+    "description": "Nhân vật tự kích thích bản thân bằng tay hoặc đồ chơi tình dục, thể hiện sự tò mò, cô đơn hoặc ham muốn dồn nén."
   },
   {
     "slug": "milf",
@@ -510,9 +545,19 @@
     "description": "Nữ sinh trung học 16–18 tuổi, mặc đồng phục váy ngắn, sơ mi bó sát, tất cao, xuất hiện trong bối cảnh trường học, ký túc xá, thư viện."
   },
   {
+    "slug": "series",
+    "name": "Series",
+    "description": "Truyện dài kỳ gồm nhiều chương, phát triển cốt truyện và nhân vật qua thời gian. Kết hợp yếu tố tình dục với mạch truyện hấp dẫn."
+  },
+  {
     "slug": "sex-toys",
     "name": "Sex Toys",
     "description": "Sử dụng đồ chơi tình dục như máy rung, dây trói, hoặc thiết bị khác để tăng khoái cảm trong các cảnh nóng."
+  },
+  {
+    "slug": "short",
+    "name": "Short",
+    "description": "Truyện ngắn hoặc one-shot chỉ có một chương, tập trung vào một tình huống tình dục duy nhất, diễn biến nhanh và trực tiếp."
   },
   {
     "slug": "shota",
@@ -570,6 +615,16 @@
     "description": "Nhân vật mặc tất dài, tất lưới hoặc tất đùi, tôn lên đôi chân, tạo cảm giác gợi cảm và quyến rũ."
   },
   {
+    "slug": "succubus",
+    "name": "Succubus",
+    "description": "Nhân vật là nữ quỷ dâm dục chuyên quyến rũ đàn ông để hút sinh lực, mang vẻ đẹp ma mị, chủ động và tràn đầy dục vọng."
+  },
+  {
+    "slug": "supernatural",
+    "name": "Supernatural",
+    "description": "Kết hợp yếu tố siêu nhiên như ma quỷ, phép thuật, thần linh hoặc năng lực đặc biệt với tình dục, tạo không khí huyền bí và kích thích."
+  },
+  {
     "slug": "swimsuit",
     "name": "Swimsuit",
     "description": "Nhân vật mặc đồ bơi, thường là bikini hoặc đồ bơi một mảnh bó sát, xuất hiện ở hồ bơi, bãi biển, tạo sự gợi cảm trẻ trung."
@@ -583,6 +638,11 @@
     "slug": "tentacles",
     "name": "Tentacles",
     "description": "Quan hệ tình dục với các sinh vật có xúc tu, như bạch tuộc hoặc quái vật, mang yếu tố kỳ lạ và cấm kỵ."
+  },
+  {
+    "slug": "threesome",
+    "name": "Threesome",
+    "description": "Cảnh quan hệ giữa ba người (thường là hai nữ một nam hoặc ngược lại), nhấn mạnh cảm giác đa chiều, ghen tuông nhẹ và khoái cảm mạnh mẽ."
   },
   {
     "slug": "time-stop",
@@ -648,5 +708,66 @@
     "slug": "yuri",
     "name": "Yuri",
     "description": "Quan hệ tình dục giữa hai nữ nhân vật, nhấn mạnh sự lãng mạn, gợi cảm, hoặc tình yêu đồng giới, thường nhẹ nhàng hoặc mãnh liệt."
+  }
+  ,
+  {
+    "slug": "trap",
+    "name": "Trap",
+    "description": "Nhân vật nam ăn mặc hoặc thể hiện như nữ; ngoại hình và/hoặc tính cách nữ tính tạo nên sự nhập nhằng giới tính gợi cảm."
+  },
+  {
+    "slug": "paizuri",
+    "name": "Paizuri",
+    "description": "Quan hệ tình dục với ngực (ép dương vật giữa bầu ngực để kích thích và đạt cực khoái)."
+  },
+  {
+    "slug": "historical",
+    "name": "Historical",
+    "description": "Bối cảnh lịch sử, xa xưa; trang phục, phong tục và không gian cổ điển tạo nên sắc thái gợi cảm đặc trưng."
+  },
+  {
+    "slug": "hairy",
+    "name": "Hairy",
+    "description": "Nhân vật nữ có lông vùng kín rậm rạp, nhấn mạnh sự tự nhiên, trưởng thành và quyến rũ nguyên bản."
+  },
+  {
+    "slug": "exhibitionism",
+    "name": "Exhibitionism",
+    "description": "Lộ bộ phận nhạy cảm trước người khác; thường gắn với tình huống bị nhìn lén, rình trộm hoặc chủ động phô bày táo bạo."
+  },
+  {
+    "slug": "humiliation",
+    "name": "Humiliation",
+    "description": "Làm nhục, làm xấu hổ; mang tính ép buộc hoặc đặt nhân vật vào tình cảnh tiến thoái lưỡng nan không thể trốn tránh."
+  },
+  {
+    "slug": "miko",
+    "name": "Miko",
+    "description": "Vu nữ giữ đền với trang phục truyền thống, vẻ đẹp thanh khiết nhưng gợi cảm trong bối cảnh tâm linh Nhật Bản."
+  },
+  {
+    "slug": "kuudere",
+    "name": "Kuudere",
+    "description": "Kiểu nhân vật bề ngoài cực kỳ lạnh lùng để che giấu cảm xúc bên trong; chỉ mở lòng khi được chinh phục."
+  },
+  {
+    "slug": "ai-generated",
+    "name": "AI Generated",
+    "description": "Tác phẩm do AI tạo ra (nét vẽ, hình ảnh, truyện); nhấn mạnh phong cách, hiệu ứng và sự độc đáo của công cụ AI."
+  },
+  {
+    "slug": "transformation",
+    "name": "Transformation",
+    "description": "Nhân vật biến thân sang hình thể khác (ma thuật, công nghệ, lời nguyền...), mang đến trải nghiệm gợi cảm mới lạ."
+  },
+  {
+    "slug": "sweating",
+    "name": "Sweating",
+    "description": "Chảy mồ hôi nhiều; trong cảnh quan hệ nhấn mạnh cơ thể ướt át, hơi thở gấp và cao trào mãnh liệt."
+  },
+  {
+    "slug": "tall-girl",
+    "name": "Tall Girl",
+    "description": "Gái cao ráo, chân dài; thường có chiều cao vượt nam chính, tạo cảm giác áp đảo và quyến rũ."
   }
 ]

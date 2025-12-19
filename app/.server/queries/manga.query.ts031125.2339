@@ -1,0 +1,197 @@
+import { MANGA_STATUS } from "~/constants/manga";
+import { MangaModel, type MangaType } from "~/database/models/manga.model";
+import type { UserType } from "~/database/models/user.model";
+import { isAdmin } from "~/helpers/user.helper";
+
+export const getNewManga = async (page: number = 1, limit: number = 10) => {
+  const skip = (page - 1) * limit;
+
+  const filter = {
+    status: MANGA_STATUS.APPROVED,
+  };
+
+  // NOTE:
+  // - lastChapterAt/latestChapterAt không có trong schema hiện tại → loại khỏi sort để tránh mất index.
+  // - Ưu tiên sort theo updatedAt desc (fallback createdAt desc) và bảo đảm có index phù hợp.
+  const [manga, totalCount] = await Promise.all([
+    MangaModel.find(filter)
+      .select({
+        title: 1,
+        poster: 1,
+        chapters: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        genres: 1,
+        userStatus: 1,
+      })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    MangaModel.countDocuments(filter),
+  ]);
+
+  return {
+    manga,
+    totalCount,
+    totalPages: Math.ceil(totalCount / limit),
+    currentPage: page,
+  };
+};
+export const getTotalMangaCount = async ({
+  searchTerm,
+  query = {},
+}: {
+  searchTerm?: string;
+  query?: Record<string, any>;
+}) => {
+  if (searchTerm) {
+    return await MangaModel.countDocuments({
+      $text: { $search: searchTerm },
+      ...query,
+    });
+  }
+  return await MangaModel.countDocuments(query);
+};
+
+export const getTotalMangaCountAdmin = async ({
+  searchTerm,
+  status,
+  query = {},
+}: {
+  searchTerm?: string;
+  status?: number;
+  query?: Record<string, any>;
+}) => {
+  const filter: any = { ...query };
+
+  if (searchTerm) {
+    filter.$text = { $search: searchTerm };
+  }
+
+  if (status !== undefined) {
+    filter.status = status;
+  }
+
+  return await MangaModel.countDocuments(filter);
+};
+
+export const getAllMangaAdmin = async (
+  page: number = 1,
+  limit: number = 10,
+  status?: number,
+) => {
+  const skip = (page - 1) * limit;
+  const filter = status !== undefined ? { status } : {};
+  return await MangaModel.find(filter)
+    .sort({ updatedAt: -1, lastChapterAt: -1, latestChapterAt: -1, createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+};
+
+export const searchMangaWithPagination = async (
+  searchTerm: string,
+  page: number = 1,
+  limit: number = 10,
+  status?: number,
+) => {
+  const skip = (page - 1) * limit;
+  const filter: any = { $text: { $search: searchTerm } };
+  if (status !== undefined) {
+    filter.status = status;
+  }
+  return await MangaModel.find(filter, { score: { $meta: "textScore" } })
+    .sort({ score: { $meta: "textScore" } })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+};
+
+export const searchMangaApprovedWithPagination = async ({
+  keyword,
+  page,
+  limit,
+  query = {},
+  sort,
+}: {
+  keyword?: string;
+  page: number;
+  limit: number;
+  query?: Record<string, any>;
+  sort?: Record<string, 1 | -1>;
+}) => {
+  const skip = (page - 1) * limit;
+
+  if (keyword) {
+    const mangas = await MangaModel.find(
+      {
+        $text: { $search: keyword },
+        status: MANGA_STATUS.APPROVED,
+        ...query,
+      },
+      { score: { $meta: "textScore" } },
+    )
+      .sort({ score: { $meta: "textScore" } })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    if (mangas.length === 0 && Number.isInteger(Number(keyword))) {
+      return await MangaModel.find({
+        code: keyword,
+        status: MANGA_STATUS.APPROVED,
+      }).lean();
+    }
+
+    return mangas;
+  }
+
+  return await MangaModel.find({
+    status: MANGA_STATUS.APPROVED,
+    ...query,
+  })
+    .sort(sort ?? { createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+};
+
+export const getRelatedManga = async (manga: MangaType, limit: number = 10) => {
+  return await MangaModel.find({
+    $or: [
+      { genres: { $in: manga.genres } },
+      { ownerId: manga.ownerId },
+      { author: manga.author },
+    ],
+    status: MANGA_STATUS.APPROVED,
+    _id: { $ne: manga.id },
+  })
+    .limit(limit)
+    .lean();
+};
+
+export const getMangaPublishedById = async (id: string, user?: UserType) => {
+  const manga = await MangaModel.findById(id).lean();
+
+  if (manga?.status === MANGA_STATUS.APPROVED) {
+    return manga;
+  }
+
+  if (manga?.ownerId === user?.id || isAdmin(user?.role || "")) {
+    return manga;
+  }
+
+  return null;
+};
+
+export const getMangaByIdAndOwner = async (
+  id: string,
+  ownerId: string,
+  isAdmin: boolean = false,
+) => {
+  return await MangaModel.findOne({
+    _id: id,
+    ...(!isAdmin && { ownerId }),
+  }).lean();
+};

@@ -14,6 +14,10 @@ import { UserModel, type UserType } from "~/database/models/user.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
 import { updateUserExp } from "~/helpers/user-level.helper";
 
+const DAILY_READING_EXP_LIMIT = 50;
+const DAILY_READING_CHAPTER_LIMIT = 25;
+const EXP_PER_CHAPTER = 2;
+
 export async function action({ request }: ActionFunctionArgs) {
   try {
     const user = await getUserInfoFromSession(request);
@@ -40,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const now = new Date();
       const oneMinuteAgo = new Date(now.getTime() - 60000); // 1 phút trước
 
-      // Atomic check: chỉ cho phép claim nếu totalExp < 100 và updatedAt cách đây ít nhất 1 phút
+      // Atomic check: chỉ cho phép claim nếu totalExp < DAILY limit và updatedAt cách đây ít nhất 1 phút
       const currentExp = await ReadingExpModel.findOneAndUpdate(
         {
           userId: user.id,
@@ -48,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
           $and: [
             {
               $or: [
-                { totalExp: { $lt: 100 } }, // Chưa đủ 100 exp
+                { totalExp: { $lt: DAILY_READING_EXP_LIMIT } }, // Chưa đủ exp tối đa
                 { totalExp: { $exists: false } }, // Chưa có record
               ],
             },
@@ -73,19 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
         { upsert: true },
       );
 
-      const chapter = await ChapterModel.findByIdAndUpdate(
-        chapterId,
-        { $inc: { viewNumber: 1 } },
-        { timestamps: false },
-      ).lean();
-
-      await MangaModel.findByIdAndUpdate(
-        chapter?.mangaId,
-        { $inc: { viewNumber: 1 } },
-        { timestamps: false },
-      );
-
-      // Nếu không tìm thấy record phù hợp = bị rate limit hoặc đã đủ 100 exp
+      // Nếu không tìm thấy record phù hợp = bị rate limit hoặc đã đủ 50 exp
       if (!currentExp) {
         const existingRecord = await ReadingExpModel.findOne({
           userId: user.id,
@@ -93,10 +85,10 @@ export async function action({ request }: ActionFunctionArgs) {
         });
 
         if (existingRecord) {
-          if (existingRecord.totalExp >= 100) {
+          if (existingRecord.totalExp >= DAILY_READING_EXP_LIMIT) {
             return Response.json({
               success: false,
-              error: "Bạn đã nhận đủ 100 exp từ đọc truyện hôm nay!",
+              error: "Bạn đã nhận đủ 50 exp từ đọc truyện hôm nay!",
             });
           } else {
             // Rate limited
@@ -114,32 +106,30 @@ export async function action({ request }: ActionFunctionArgs) {
       const currentChaptersRead = currentExp?.chaptersRead || 0;
       const currentTotalExp = currentExp?.totalExp || 0;
 
-      // Double check giới hạn 100 exp/ngày
-      if (currentTotalExp >= 100) {
+      // Double check giới hạn exp/ngày
+      if (currentTotalExp >= DAILY_READING_EXP_LIMIT) {
         return Response.json({
           success: false,
-          error: "Bạn đã nhận đủ 100 exp từ đọc truyện hôm nay!",
+          error: "Bạn đã nhận đủ 50 exp từ đọc truyện hôm nay!",
         });
       }
 
       // Tính exp nhận được:
-      // - 10 chap đầu tiên: 5 exp/chap
-      // - Sau đó: 1 exp/chap
+      // - 25 chap đầu tiên mỗi ngày: 2 exp/chap
+      // - Sau đó: không nhận thêm exp
       let expToGain = 0;
-      if (currentChaptersRead < 10) {
-        expToGain = 5; // 10 chap đầu
-      } else {
-        expToGain = 1; // Các chap sau
+      if (currentChaptersRead < DAILY_READING_CHAPTER_LIMIT) {
+        expToGain = EXP_PER_CHAPTER;
       }
 
-      // Đảm bảo không vượt quá 100 exp
-      const maxPossibleExp = 100 - currentTotalExp;
+      // Đảm bảo không vượt quá giới hạn exp/ngày
+      const maxPossibleExp = DAILY_READING_EXP_LIMIT - currentTotalExp;
       expToGain = Math.min(expToGain, maxPossibleExp);
 
       if (expToGain <= 0) {
         return Response.json({
           success: false,
-          error: "Bạn đã nhận đủ 100 exp từ đọc truyện hôm nay!",
+          error: "Bạn đã nhận đủ 50 exp từ đọc truyện hôm nay!",
         });
       }
 
@@ -171,7 +161,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
       let updatedSession = null;
       if (didLevelUp) {
-        // Nếu level up, cập nhật cả exp và level
+        // Nếu level up, cập nhật exp-in-level (reset) và level
         await UserModel.updateOne(
           { _id: user.id },
           { $set: { exp: newExp, level: newLevel } },
@@ -183,21 +173,22 @@ export async function action({ request }: ActionFunctionArgs) {
         setUserDataToSession(session, updatedUser);
         updatedSession = session;
       } else {
-        // Nếu không level up, chỉ tăng exp
+        // Nếu không level up, chỉ tăng exp-in-level
         await UserModel.updateOne({ _id: user.id }, { $inc: { exp: expToGain } });
       }
 
-      const remainingExp = Math.max(0, 100 - updatedExp.totalExp);
-      const isFirstTenChapters = updatedExp.chaptersRead <= 10;
+      const remainingExp = Math.max(0, DAILY_READING_EXP_LIMIT - updatedExp.totalExp);
+      const isWithinDailyChapterLimit =
+        updatedExp.chaptersRead <= DAILY_READING_CHAPTER_LIMIT;
 
       const response = {
         success: true,
-        message: `Bạn nhận được ${expToGain} exp! (${isFirstTenChapters ? "10 chapter đầu" : "sau 10 chapter đầu"})`,
+        message: `Bạn nhận được ${expToGain} exp! (trong ${DAILY_READING_CHAPTER_LIMIT} chapter đầu mỗi ngày)`,
         expGained: expToGain,
         totalExp: updatedExp.totalExp,
         chaptersRead: updatedExp.chaptersRead,
         remainingExp,
-        isFirstTenChapters,
+        isFirstTenChapters: isWithinDailyChapterLimit,
       };
 
       if (updatedSession) {

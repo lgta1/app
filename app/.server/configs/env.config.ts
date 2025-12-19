@@ -20,7 +20,7 @@ export const ENV = {
     daily: {
       VIEW_WEIGHT: Number(process.env.DAILY_LEADERBOARD_VIEW_WEIGHT) || 1,
       LIKE_WEIGHT: Number(process.env.DAILY_LEADERBOARD_LIKE_WEIGHT) || 0,
-      COMMENT_WEIGHT: Number(process.env.DAILY_LEADERBOARD_COMMENT_WEIGHT) || 100,
+      COMMENT_WEIGHT: Number(process.env.DAILY_LEADERBOARD_COMMENT_WEIGHT) || 50,
     },
     weekly: {
       VIEW_WEIGHT: Number(process.env.WEEKLY_LEADERBOARD_VIEW_WEIGHT) || 1,

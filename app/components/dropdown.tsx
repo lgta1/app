@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 
@@ -20,11 +20,15 @@ interface DropdownProps {
   buttonLabel?: string;
 
   /** Tuỳ biến nhãn mỗi OPTION trong menu (ví dụ: "Chương {số} — {tiêu đề}") */
-  renderOptionLabel?: (option: DropdownOption) => JSX.Element | string;
+  renderOptionLabel?: (option: DropdownOption) => ReactNode;
 
   /** Hệ số rộng menu so với nút; mặc định = 2 để đạt “rộng gấp đôi nút”. */
   menuWidthMultiplier?: number;
   // END feature: chapter dropdown UX
+
+  // 👇 [EDIT] NEW PROP: điều khiển hướng bung menu
+  /** Hướng hiển thị menu: 'down' (mặc định) hoặc 'up' cho sticky bottom */
+  placement?: "down" | "up";
 }
 
 export function Dropdown({
@@ -39,6 +43,9 @@ export function Dropdown({
   renderOptionLabel,
   menuWidthMultiplier = 2,
   // END feature: chapter dropdown UX
+
+  // 👇 [EDIT] destructure prop mới
+  placement = "down",
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null); // detect click outside (button)
@@ -50,6 +57,9 @@ export function Dropdown({
     top: 0,
     width: 0,
   });
+  // NOTE: dùng state để trigger rerender khi portal root được tạo.
+  // Tránh race-condition: user click mở dropdown trước khi useEffect chạy.
+  const [menuPortalRoot, setMenuPortalRoot] = useState<HTMLDivElement | null>(null);
   const menuPortalRootRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -59,15 +69,17 @@ export function Dropdown({
     node.setAttribute("data-dropdown-portal", "true");
     document.body.appendChild(node);
     menuPortalRootRef.current = node;
+    setMenuPortalRoot(node);
     return () => {
       if (menuPortalRootRef.current) {
         document.body.removeChild(menuPortalRootRef.current);
         menuPortalRootRef.current = null;
       }
+      setMenuPortalRoot(null);
     };
   }, []);
 
-  // Tính tọa độ & width của menu khi mở; update on resize/scroll
+  // 👇 [EDIT] bổ sung logic xác định vị trí theo placement
   useEffect(() => {
     if (!isOpen) return;
     const calc = () => {
@@ -80,26 +92,34 @@ export function Dropdown({
           : 2;
       const width = Math.max(160, Math.floor(r.width * factor));
       const vw = window.innerWidth || document.documentElement.clientWidth;
-      let left = Math.floor(r.left); // căn trái với nút
-      // nếu tràn màn hình bên phải -> dịch trái cho vừa viewport
+      let left = Math.floor(r.left);
       if (left + width > vw - 8) {
         left = Math.max(8, vw - 8 - width);
       }
-      const top = Math.floor(r.bottom + 8); // giống mt-2
+
+      const GAP = 8;
+      let top: number;
+      if (placement === "up") {
+        // 👇 [EDIT] Nếu hướng lên: căn theo top của button
+        top = Math.floor(r.top - GAP);
+      } else {
+        // hướng xuống (mặc định)
+        top = Math.floor(r.bottom + GAP);
+      }
       setCoords({ left, top, width });
     };
+
     calc();
     window.addEventListener("resize", calc);
-    // listen cả scroll trong mọi container (capture)
     window.addEventListener("scroll", calc, true);
     return () => {
       window.removeEventListener("resize", calc);
       window.removeEventListener("scroll", calc, true);
     };
-  }, [isOpen, menuWidthMultiplier]);
+  }, [isOpen, menuWidthMultiplier, placement]);
   // END feature: portal
 
-  // Close dropdown khi click ngoài (kể cả ngoài menu portal)
+  // Close dropdown khi click ngoài
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
@@ -125,6 +145,21 @@ export function Dropdown({
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen]);
 
+  // 👇 [NEW] Khi mở menu, tự động cuộn để option đang chọn nằm giữa panel
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = menuRef.current;
+    if (!panel) return;
+    requestAnimationFrame(() => {
+      const current = panel.querySelector('[aria-selected="true"]') as HTMLElement | null;
+      if (!current) return;
+      const centerOffset =
+        current.offsetTop - (panel.clientHeight / 2 - current.offsetHeight / 2);
+      const maxScroll = Math.max(0, panel.scrollHeight - panel.clientHeight);
+      panel.scrollTop = Math.max(0, Math.min(centerOffset, maxScroll));
+    });
+  }, [isOpen, value]);
+
   const handleSelect = (optionValue: string | number) => {
     onSelect(optionValue);
     setIsOpen(false);
@@ -149,44 +184,69 @@ export function Dropdown({
         } `}
       >
         <span
-          className={selectedOption ? "text-txt-primary truncate" : "text-txt-secondary truncate"}
+          className={
+            selectedOption ? "text-txt-primary truncate" : "text-txt-secondary truncate"
+          }
         >
           {triggerText}
         </span>
         <ChevronDown
-          className={`text-txt-secondary h-6 w-6 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`text-txt-secondary h-6 w-6 transition-transform ${
+            isOpen && placement === "up" ? "rotate-180" : ""
+          }`}
         />
       </button>
 
       {/* BEGIN feature: portal */}
-      {isOpen && !disabled && menuPortalRootRef.current
+      {isOpen && !disabled && menuPortalRoot
         ? createPortal(
             <div
               ref={menuRef}
               role="listbox"
-              className="bg-bgc-layer2 border-bd-default fixed z-[999] max-h-60 overflow-y-auto rounded-xl border shadow-lg"
-              style={{ left: coords.left, top: coords.top, width: coords.width }}
+              className={`bg-bgc-layer2 border-bd-default fixed z-[999] overflow-y-auto rounded-xl border shadow-lg ${
+                placement === "up" ? "origin-bottom" : "origin-top"
+              }`}
+              style={{
+                left: coords.left,
+                top: coords.top,
+                width: coords.width,
+                // 👇 [EDIT] khi hướng lên, kéo menu lên trên nút
+                transform: placement === "up" ? "translateY(-100%)" : undefined,
+                maxHeight:
+                  placement === "up"
+                    ? Math.min(320, coords.top - 8)
+                    : Math.min(320, window.innerHeight - coords.top - 8),
+              }}
             >
-              {options.map((option) => (
-                <button
+              {options.length === 0 ? (
+                <div
                   role="option"
-                  aria-selected={value === option.value}
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleSelect(option.value)}
-                  className={`w-full px-3 py-2.5 text-left font-sans text-base font-medium transition-colors first:rounded-t-xl last:rounded-b-xl ${
-                    value === option.value
-                      ? "bg-bgc-layer-semi-purple text-txt-focus"
-                      : "text-txt-primary hover:bg-bgc-layer-semi-neutral"
-                  } `}
-                  title={typeof option.label === "string" ? option.label : undefined}
+                  aria-disabled="true"
+                  className="text-txt-secondary px-3 py-2.5 text-left font-sans text-base font-medium"
                 >
-                  {/* Cho phép hiển thị "Chương {số} — {tiêu đề}" nếu truyền renderOptionLabel */}
-                  {renderOptionLabel ? renderOptionLabel(option) : option.label}
-                </button>
-              ))}
+                  Đang tải…
+                </div>
+              ) : (
+                options.map((option) => (
+                  <button
+                    role="option"
+                    aria-selected={value === option.value}
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleSelect(option.value)}
+                    className={`w-full px-3 py-2.5 text-left font-sans text-base font-medium transition-colors first:rounded-t-xl last:rounded-b-xl ${
+                      value === option.value
+                        ? "bg-bgc-layer-semi-purple text-txt-focus"
+                        : "text-txt-primary hover:bg-bgc-layer-semi-neutral"
+                    } `}
+                    title={typeof option.label === "string" ? option.label : undefined}
+                  >
+                    {renderOptionLabel ? renderOptionLabel(option) : option.label}
+                  </button>
+                ))
+              )}
             </div>,
-            menuPortalRootRef.current,
+            menuPortalRoot,
           )
         : null}
       {/* END feature: portal */}

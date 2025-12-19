@@ -19,7 +19,8 @@ import {
 import { ImageUploader } from "~/components/image-uploader";
 import { UserModel } from "~/database/models/user.model";
 import { useFileOperations } from "~/hooks/use-file-operations";
-import { validateUsername, USERNAME_CHANGE_COST } from "~/utils/username-validator";
+import { normalizeAvatarImage } from "~/utils/image-compression.utils";
+import { validateUsername, USERNAME_CHANGE_COST } from "~/utils/username-validator.client";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await requireLogin(request);
@@ -127,12 +128,22 @@ export default function ProfileEdit() {
   }, [avatarPreview]);
 
   // Handle file selection - chỉ preview local, không upload ngay
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
+  const handleFileSelect = async (file: File) => {
+    try {
+      const normalized = await normalizeAvatarImage(file);
+      const processed = normalized.file;
 
-    // Tạo preview URL từ file local
-    const previewUrl = URL.createObjectURL(file);
-    setAvatarPreview(previewUrl);
+      if (avatarPreview && avatarPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+
+      setSelectedFile(processed);
+      const previewUrl = URL.createObjectURL(processed);
+      setAvatarPreview(previewUrl);
+    } catch (error) {
+      console.error("Avatar normalization failed", error);
+      toast.error("Không thể xử lý ảnh đại diện. Vui lòng thử ảnh khác.");
+    }
   };
 
   // Handle clear avatar
@@ -231,14 +242,12 @@ export default function ProfileEdit() {
             className="flex flex-col gap-6"
           >
             {/* Username Field */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-fit items-center gap-1.5">
+            <div className="grid gap-3 sm:grid-cols-12 sm:items-center">
+              <div className="flex items-center gap-1.5 sm:col-span-3">
                 <User className="text-txt-secondary h-4 w-4" />
-                <label className="text-txt-primary font-sans text-base font-semibold">
-                  Username
-                </label>
+                <label className="text-txt-primary font-sans text-base font-semibold">Username</label>
               </div>
-              <div className="w-full sm:w-[680px] space-y-2">
+              <div className="space-y-2 sm:col-span-9">
                 <input
                   type="text"
                   name="name"
@@ -288,14 +297,12 @@ export default function ProfileEdit() {
             </div>
 
             {/* Email Field */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-fit items-center gap-1.5">
+            <div className="grid gap-3 sm:grid-cols-12 sm:items-center">
+              <div className="flex items-center gap-1.5 sm:col-span-3">
                 <Mail className="text-txt-secondary h-4 w-4" />
-                <label className="text-txt-primary font-sans text-base font-semibold">
-                  Email
-                </label>
+                <label className="text-txt-primary font-sans text-base font-semibold">Email</label>
               </div>
-              <div className="w-full sm:w-[680px]">
+              <div className="sm:col-span-9">
                 <input
                   readOnly
                   type="email"
@@ -307,22 +314,20 @@ export default function ProfileEdit() {
             </div>
 
             {/* Avatar Field */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
-              <div className="flex min-w-fit items-center gap-1.5 sm:items-start">
+            <div className="grid gap-3 sm:grid-cols-12 sm:items-start">
+              <div className="flex items-start gap-1.5 sm:col-span-3">
                 <Camera className="text-txt-secondary h-4 w-4 sm:mt-0.5" />
-                <label className="text-txt-primary font-sans text-base font-semibold">
-                  Ảnh đại diện
-                </label>
+                <label className="text-txt-primary font-sans text-base font-semibold">Ảnh đại diện</label>
               </div>
-              <div className="flex w-full flex-col gap-4 sm:w-[680px]">
-                <div className="h-32 w-44">
+              <div className="flex w-full flex-col gap-4 sm:col-span-9">
+                <div className="h-32 w-32 sm:h-36 sm:w-36">
                   <ImageUploader
                     onFileSelect={handleFileSelect}
                     onClear={handleClearAvatar}
                     preview={avatarPreview}
                     uploadText="Chọn ảnh"
                     accept="image/*"
-                    aspectRatio="auto"
+                    aspectRatio="square"
                     className="h-full"
                   />
                 </div>
@@ -338,14 +343,12 @@ export default function ProfileEdit() {
             </div>
 
             {/* Bio Field */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
-              <div className="flex min-w-fit items-center gap-1.5 sm:items-start">
+            <div className="grid gap-3 sm:grid-cols-12 sm:items-start">
+              <div className="flex items-start gap-1.5 sm:col-span-3">
                 <FileText className="text-txt-secondary h-4 w-4 sm:mt-1" />
-                <label className="text-txt-primary font-sans text-base font-semibold">
-                  Giới thiệu
-                </label>
+                <label className="text-txt-primary font-sans text-base font-semibold">Giới thiệu</label>
               </div>
-              <div className="w-full sm:w-[681px]">
+              <div className="sm:col-span-9">
                 <textarea
                   name="bio"
                   defaultValue={user.bio}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Toaster } from "react-hot-toast";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData, useNavigate } from "react-router";
-import { Check, CircleUserRound, Edit, Heart, MessageCircle, Share2 } from "lucide-react";
+import { Check, User as UserIcon, Edit, Heart, MessageCircle, Share2 } from "lucide-react";
 
 import { getUserInfoFromSession } from "@/services/session.svc";
 
@@ -15,7 +15,16 @@ import { getTitleImgPath } from "~/helpers/user.helper";
 import { isAdmin } from "~/helpers/user.helper";
 import { formatDistanceToNow } from "~/utils/date.utils";
 
+import { POSTS_ENABLED } from "~/constants/feature-flags";
+
+const notFoundHeaders = {
+  "X-Robots-Tag": "noindex, nofollow, noarchive",
+} as const;
+
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
+  if (!POSTS_ENABLED) {
+    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+  }
   const { id } = params;
 
   if (!id) {
@@ -38,6 +47,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+  if (!POSTS_ENABLED) {
+    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+  }
   const { id } = params;
 
   if (!id) {
@@ -110,9 +122,12 @@ export default function PostDetail() {
                       className="h-10 w-10 flex-shrink-0 rounded-full object-cover sm:h-11 sm:w-11"
                       src={author.avatar}
                       alt={author.name}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
                     />
                   ) : (
-                    <CircleUserRound className="h-10 w-10 flex-shrink-0 rounded-full object-cover sm:h-11 sm:w-11" />
+                    <UserIcon className="h-10 w-10 flex-shrink-0 rounded-full object-cover sm:h-11 sm:w-11" />
                   )}
 
                   {/* User Info & Title */}

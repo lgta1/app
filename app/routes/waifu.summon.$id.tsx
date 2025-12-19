@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { BrowserView, MobileView } from "react-device-detect";
 import { Toaster } from "react-hot-toast";
 import {
@@ -11,33 +11,50 @@ import {
   useSubmit,
 } from "react-router";
 
-import { incrementBannerRolls } from "@/mutations/banner.mutation";
-import { requireLogin } from "@/services/auth.server";
-import { commitUserSession } from "@/services/session.svc";
-import { multiSummon, summon } from "@/services/summon.svc";
+import type { Route } from "./+types/waifu.summon.$id";
 
-import { SummonHistoryDialog } from "~/components/dialog-summon-history";
+// LƯU Ý: Không import module chỉ chạy server ở top-level để tránh bị bundle vào client
+
+const SummonHistoryDialog = lazy(() =>
+  import("~/components/dialog-summon-history").then((m) => ({ default: m.SummonHistoryDialog }))
+);
 import { WaifuGuideDialog } from "~/components/dialog-waifu-guide";
-import { WaifuListDialog } from "~/components/dialog-waifu-list";
 import { DeviceRotationWarningDialog } from "~/components/dialog-warning-device-rotation";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import SummonAssetPreloader from "~/components/summon-asset-preloader";
 import { SummonDesktopButtons, SummonMobileButtons } from "~/components/summon-buttons";
 import { SummonNavigationBar } from "~/components/summon-navigation-bar";
 import { SummonResultOverlay } from "~/components/summon-result-overlay";
-import {
-  SummonDesktopTopActionButtons,
-  SummonMobileTopActionButtons,
-} from "~/components/summon-top-action-buttons";
+// Đã bỏ thanh overlay top-action; thay bằng pill ở thanh điều hướng
 import { SummonVideoPlayer } from "~/components/summon-video-player";
 import { SummonWaifuCards } from "~/components/summon-waifu-cards";
 import { GOLD_COST_PER_SUMMON, GOLD_COST_PER_SUMMON_MULTI } from "~/constants/summon";
-import type { BannerType } from "~/database/models/banner.model";
-import { BannerModel } from "~/database/models/banner.model";
-import { PityCumulativeModel } from "~/database/models/pity-cumulative.model";
-import { UserModel } from "~/database/models/user.model";
-import { BusinessError } from "~/helpers/errors.helper";
 import { toastWarning } from "~/helpers/toast.helper";
+import { WAIFU_SUMMON_SHARE_IMAGE } from "~/constants/share-images";
+
+export function meta({ params }: Route.MetaArgs) {
+  const origin = "https://vinahentai.com";
+  const canonicalPath = params.id ? `/waifu/summon/${params.id}` : "/waifu/summon";
+  const canonicalUrl = `${origin}${canonicalPath}`;
+  const title = "VinaHentai – Triệu hồi Waifu";
+  const description = "Triệu hồi waifu yêu thích, sưu tầm SSR và khoe thành tích cùng cộng đồng VinaHentai.";
+  const image = WAIFU_SUMMON_SHARE_IMAGE;
+
+  return [
+    { title },
+    { name: "description", content: description },
+    { property: "og:type", content: "website" },
+    { property: "og:title", content: title },
+    { property: "og:description", content: description },
+    { property: "og:url", content: canonicalUrl },
+    { property: "og:image", content: image },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: title },
+    { name: "twitter:description", content: description },
+    { name: "twitter:image", content: image },
+    { name: "twitter:url", content: canonicalUrl },
+  ];
+}
 
 /* =================== LOADER / ACTION =================== */
 
@@ -58,10 +75,10 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
       throw redirect("/");
     }
 
-    const openedBanners = bannersResult.data as BannerType[];
+  const openedBanners = bannersResult.data as any[];
 
     const navItems = openedBanners.map((banner, index) => ({
-      label: banner.isRateUp ? `Banner rate up ${index + 1}` : "Banner thường",
+      label: "Banner thường",
       to: `/waifu/summon/${banner.id}`,
       id: banner.id,
     }));
@@ -94,6 +111,16 @@ export function HydrateFallback() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  // Import động các module server-only bên trong action để tránh lọt vào client bundle
+  const { requireLogin } = await import("@/services/auth.server");
+  const { commitUserSession } = await import("@/services/session.svc");
+  const { multiSummon, summon } = await import("@/services/summon.svc");
+  const { incrementBannerRolls } = await import("@/mutations/banner.mutation");
+  const { BannerModel } = await import("~/database/models/banner.model");
+  const { PityCumulativeModel } = await import("~/database/models/pity-cumulative.model");
+  const { UserModel } = await import("~/database/models/user.model");
+  const { BusinessError } = await import("~/helpers/errors.helper");
+
   const user = await requireLogin(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as "single" | "multi";
@@ -184,15 +211,20 @@ export default function WaifuSummon() {
   const { navItems, banner, user } = useLoaderData<typeof clientLoader>();
   const [isGuideDialogOpen, setIsGuideDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
-  const [isWaifuListDialogOpen, setIsWaifuListDialogOpen] = useState(false);
+  // Waifu list đã gộp vào dialog hướng dẫn
 
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [showSummonResult, setShowSummonResult] = useState(false);
   const [summonResult, setSummonResult] = useState<any>([]);
+  const [runId, setRunId] = useState<number | null>(null);
   const [isSummoning, setIsSummoning] = useState(false);
+  const [showSummonBackground, setShowSummonBackground] = useState(false);
+  // ĐÃ GỠ flow claim milestone qua popover: các state milestoneToClaim, isClaimDialogOpen, pendingMilestone, simulateEnabled
+  const [isPortrait, setIsPortrait] = useState(true);
 
   // Switch “bỏ qua video” (ghi nhớ localStorage)
   const [skipCinematic, setSkipCinematic] = useState(false);
+  const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const navigate = useNavigate();
   const submit = useSubmit();
@@ -205,12 +237,70 @@ export default function WaifuSummon() {
   }, [banner?.title]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const audio = new Audio("/audio/music-nen.mp3");
+    audio.loop = true;
+    audio.volume = 0.35;
+    backgroundAudioRef.current = audio;
+
+    let hasUnlocked = false;
+    let disposed = false;
+
+    const events: Array<{ target: Window | Document; type: string }> = [
+      { target: window, type: "pointerdown" },
+      { target: window, type: "touchstart" },
+      { target: window, type: "keydown" },
+      { target: window, type: "scroll" },
+    ];
+
+    function detach() {
+      events.forEach(({ target, type }) => target.removeEventListener(type, attemptPlay));
+    }
+
+    function attemptPlay() {
+      if (hasUnlocked || disposed) return;
+      audio
+        .play()
+        .then(() => {
+          if (disposed) return;
+          hasUnlocked = true;
+          detach();
+        })
+        .catch(() => {
+          // tiếp tục chờ tương tác của người dùng
+        });
+    }
+
+    events.forEach(({ target, type }) => target.addEventListener(type, attemptPlay));
+    attemptPlay();
+
+    return () => {
+      disposed = true;
+      detach();
+      audio.pause();
+      audio.src = "";
+      backgroundAudioRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     const v = localStorage.getItem("vh_skip_cinematic");
     setSkipCinematic(v === "1");
   }, []);
   useEffect(() => {
     localStorage.setItem("vh_skip_cinematic", skipCinematic ? "1" : "0");
   }, [skipCinematic]);
+  // Gỡ bỏ hiệu lực query simulate (?simulate=1) vì không còn dùng simulate milestone.
+  useEffect(() => {
+    try {
+      const mql = window.matchMedia("(orientation: portrait)");
+      const apply = () => setIsPortrait(mql.matches);
+      apply();
+      mql.addEventListener("change", apply);
+      return () => mql.removeEventListener("change", apply);
+    } catch {}
+  }, []);
 
   const handleSummon = (type: "single" | "multi") => {
     if (!banner?.id) return;
@@ -235,15 +325,31 @@ export default function WaifuSummon() {
     setIsSummoning(skipCinematic);
     submit(formData, { method: "post" });
 
-    if (skipCinematic) setIsVideoPlaying(false);
-    else setIsVideoPlaying(true);
+    if (skipCinematic) {
+      // Bỏ qua video nhưng vẫn hiển thị ảnh nền cinematic
+      setIsVideoPlaying(false);
+      setShowSummonBackground(true);
+    } else {
+      setShowSummonBackground(false);
+      setIsVideoPlaying(true);
+    }
   };
 
   useEffect(() => {
     if (!actionData) return;
+    // Debugging: log server action response to help trace why items may not be
+    // persisted into collection/leaderboard. Remove this after debugging.
+    try {
+      // eslint-disable-next-line no-console
+      console.log("[summon] actionData:", actionData);
+    } catch {}
     if (actionData?.success) {
       setSummonResult(actionData.data.items);
+      // update runId so SummonResultOverlay remounts and forces images to load
+      setRunId(Date.now());
       if (skipCinematic) setShowSummonResult(true);
+
+      // ĐÃ GỠ: logic thu thập milestoneReached để bật dialog claim.
     } else if (actionData?.message) {
       toastWarning(actionData.message || "Có lỗi xảy ra, vui lòng tải lại trang");
     }
@@ -255,23 +361,23 @@ export default function WaifuSummon() {
   const handleCloseSummonResult = () => {
     setShowSummonResult(false);
     setIsVideoPlaying(false);
+    setShowSummonBackground(false);
     setSummonResult([]);
   };
 
   return (
     <div className="relative w-full">
       <Toaster position="bottom-right" />
-      <SummonNavigationBar navItems={navItems} />
+      <SummonNavigationBar
+        navItems={navItems}
+        onGuideClick={() => setIsGuideDialogOpen(true)}
+        onHistoryClick={() => setIsHistoryDialogOpen(true)}
+        userGold={user?.gold}
+      />
 
       {/* Desktop */}
       <BrowserView>
         <div className="relative w-full">
-          <SummonDesktopTopActionButtons
-            onGuideClick={() => setIsGuideDialogOpen(true)}
-            onHistoryClick={() => setIsHistoryDialogOpen(true)}
-            onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
-            user={user}
-          />
           <img
             src={banner?.imageUrl}
             alt={banner?.title}
@@ -285,95 +391,150 @@ export default function WaifuSummon() {
           <SummonDesktopButtons isRateUp={banner?.isRateUp} onSummon={handleSummon} />
 
           {/* Switch bỏ qua video — nhỏ gọn, ngay dưới 2 nút */}
-          <button
-            onClick={() => setSkipCinematic((v) => !v)}
-            className="mt-1 flex items-center gap-2 text-xs text-white"
-            aria-pressed={skipCinematic}
-          >
-            <span>Bỏ qua video</span>
-            <span
-              className={[
-                "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
-                skipCinematic ? "bg-[#DD94FF]" : "bg-white/30",
-              ].join(" ")}
+          <div className="mt-1 flex items-center gap-2 text-xs text-white">
+            <button
+              onClick={() => setSkipCinematic((v: boolean) => !v)}
+              className="flex items-center gap-2"
+              aria-pressed={skipCinematic}
             >
+              <span>Bỏ qua video</span>
               <span
                 className={[
-                  "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
-                  skipCinematic ? "translate-x-3.5" : "translate-x-1",
+                  "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                  skipCinematic ? "bg-[#DD94FF]" : "bg-white/30",
                 ].join(" ")}
-              />
-            </span>
-          </button>
+              >
+                <span
+                  className={[
+                    "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                    skipCinematic ? "translate-x-3.5" : "translate-x-1",
+                  ].join(" ")}
+                />
+              </span>
+            </button>
+            <span className="text-white/70">• Trải nghiệm thị giác tốt nhất khi xoay ngang màn hình</span>
+          </div>
         </div>
       </BrowserView>
 
       {/* Mobile */}
       <MobileView>
-        <div className="relative w-full">
-          <SummonMobileTopActionButtons
-            onGuideClick={() => setIsGuideDialogOpen(true)}
-            onHistoryClick={() => setIsHistoryDialogOpen(true)}
-            onWaifuListClick={() => setIsWaifuListDialogOpen(true)}
-            user={user}
-          />
-          <img
-            src={banner?.mobileImageUrl}
-            alt={banner?.title}
-            className="w-full object-cover"
-          />
-        </div>
-
-        {/* 2 nút triệu hồi + switch (căn giữa theo cụm) */}
-        <div className="absolute bottom-9 left-1/2 flex w-[calc(100%-24px)] max-w-[460px] -translate-x-1/2 flex-col items-center gap-3">
-          <SummonMobileButtons isRateUp={banner?.isRateUp} onSummon={handleSummon} />
-
-          <button
-            onClick={() => setSkipCinematic((v) => !v)}
-            className="mt-1 flex items-center gap-2 text-xs text-white"
-            aria-pressed={skipCinematic}
-          >
-            <span>Bỏ qua video</span>
-            <span
-              className={[
-                "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
-                skipCinematic ? "bg-[#DD94FF]" : "bg-white/30",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
-                  skipCinematic ? "translate-x-3.5" : "translate-x-1",
-                ].join(" ")}
+        {isPortrait ? (
+          // Portrait: banner ở giữa, 2 nút phía dưới, không che banner
+          <div className="w-full flex flex-col items-center">
+            {/* Đã bỏ thanh overlay top-action trên mobile portrait */}
+            <div className="w-full flex justify-center">
+              <img
+                src={banner?.mobileImageUrl}
+                alt={banner?.title}
+                className="max-h-[55vh] w-auto object-contain"
               />
-            </span>
-          </button>
-        </div>
+            </div>
+            <div className="mt-3 w-full max-w-[460px] px-3 flex flex-col items-center gap-3">
+              <SummonMobileButtons isRateUp={banner?.isRateUp} onSummon={handleSummon} />
+              <div className="mt-1 flex items-center gap-2 text-xs text-white">
+                <button
+                  onClick={() => setSkipCinematic((v: boolean) => !v)}
+                  className="flex items-center gap-2"
+                  aria-pressed={skipCinematic}
+                >
+                  <span>Bỏ qua video</span>
+                  <span
+                    className={[
+                      "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                      skipCinematic ? "bg-[#DD94FF]" : "bg-white/30",
+                    ].join(" ")}
+                  >
+                    <span
+                      className={[
+                        "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                        skipCinematic ? "translate-x-3.5" : "translate-x-1",
+                      ].join(" ")}
+                    />
+                  </span>
+                </button>
+                <span className="text-white/70">• Trải nghiệm thị giác tốt nhất khi xoay ngang màn hình</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Landscape: giữ layout cũ chồng nút lên ảnh để thao tác nhanh
+          <>
+            <div className="relative w-full">
+              <img
+                src={banner?.mobileImageUrl}
+                alt={banner?.title}
+                className="w-full object-cover"
+              />
+            </div>
+            <div className="absolute bottom-9 left-1/2 flex w-[calc(100%-24px)] max-w-[460px] -translate-x-1/2 flex-col items-center gap-3">
+              <SummonMobileButtons isRateUp={banner?.isRateUp} onSummon={handleSummon} />
+              <div className="mt-1 flex items-center gap-2 text-xs text-white">
+                <button
+                  onClick={() => setSkipCinematic((v: boolean) => !v)}
+                  className="flex items-center gap-2"
+                  aria-pressed={skipCinematic}
+                >
+                  <span>Bỏ qua video</span>
+                  <span
+                    className={[
+                      "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                      skipCinematic ? "bg-[#DD94FF]" : "bg-white/30",
+                    ].join(" ")}
+                  >
+                    <span
+                      className={[
+                        "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                        skipCinematic ? "translate-x-3.5" : "translate-x-1",
+                      ].join(" ")}
+                    />
+                  </span>
+                </button>
+                <span className="text-white/70">• Trải nghiệm thị giác tốt nhất khi xoay ngang màn hình</span>
+              </div>
+            </div>
+          </>
+        )}
       </MobileView>
 
       {/* Video Player */}
-      <SummonVideoPlayer isPlaying={isVideoPlaying} onVideoEnd={handleVideoEnd} />
+      <SummonVideoPlayer
+        isPlaying={isVideoPlaying}
+        onVideoEnd={handleVideoEnd}
+        forceShowBackground={showSummonBackground}
+      />
+
+      {/* Dev: simulate milestone (only when ?simulate=1) */}
+      {/* ĐÃ GỠ: panel simulate milestone */}
 
       {/* Dialogs */}
-      <WaifuGuideDialog open={isGuideDialogOpen} onOpenChange={setIsGuideDialogOpen} />
-      <SummonHistoryDialog
-        open={isHistoryDialogOpen}
-        onOpenChange={setIsHistoryDialogOpen}
-        currentSummons={user?.summonCount}
-        bannerId={banner?.id}
-      />
-      <WaifuListDialog
-        open={isWaifuListDialogOpen}
-        onOpenChange={setIsWaifuListDialogOpen}
-        banner={banner}
-      />
+  <WaifuGuideDialog open={isGuideDialogOpen} onOpenChange={setIsGuideDialogOpen} banner={banner} />
+      <Suspense fallback={null}>
+        {isHistoryDialogOpen && (
+          <SummonHistoryDialog
+            open={isHistoryDialogOpen}
+            onOpenChange={setIsHistoryDialogOpen}
+            currentSummons={user?.summonCount}
+            bannerId={banner?.id}
+          />
+        )}
+      </Suspense>
+      {/* WaifuListDialog đã gộp vào WaifuGuideDialog */}
       <DeviceRotationWarningDialog />
 
       {/* Kết quả */}
       <SummonResultOverlay
+        key={runId ?? "initial"}
+        runId={runId}
         isVisible={showSummonResult}
         results={summonResult}
         onClose={handleCloseSummonResult}
+        onRepeatMulti={() => {
+          handleCloseSummonResult();
+          setTimeout(() => {
+            handleSummon("multi");
+          }, 0);
+        }}
       />
 
       {/* Preload video + background + card-back */}
@@ -385,6 +546,8 @@ export default function WaifuSummon() {
           <LoadingSpinner />
         </div>
       )}
+
+      {/* ĐÃ GỠ: MilestoneClaimDialog (flow claim qua popover) */}
     </div>
   );
 }

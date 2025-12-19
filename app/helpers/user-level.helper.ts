@@ -19,6 +19,18 @@ export const LEVEL_THRESHOLDS = [
 
 export const MAX_LEVEL = 9;
 
+export const LEVEL_TITLES: Record<number, string> = {
+  1: "Nhập Lọ",
+  2: "Luyện Lọ",
+  3: "Cuồng Lọ",
+  4: "Lọ Vương",
+  5: "Lọ Vương Bất Tử",
+  6: "Lọ Đế",
+  7: "Lọ Thánh",
+  8: "Lọ Thánh Chí Tôn",
+  9: "Thần Lọ Vĩnh Hằng",
+};
+
 /**
  * Tính toán cấp độ dựa trên kinh nghiệm
  * @param exp - Số kinh nghiệm hiện tại của người dùng
@@ -38,19 +50,11 @@ export function calculateLevel(exp: number): number {
  * @param currentExp - Số kinh nghiệm hiện tại
  * @returns Phần trăm tiến trình lên cấp (0-100)
  */
-export function levelProgressPercentage(currentExp: number): number {
-  const currentLevel = calculateLevel(currentExp);
-
-  if (currentLevel >= MAX_LEVEL) {
-    return 100; // Đã đạt cấp tối đa
-  }
-
-  const prevLevelThreshold = LEVEL_THRESHOLDS[currentLevel - 1];
-  const nextLevelThreshold = LEVEL_THRESHOLDS[currentLevel];
-  const expInCurrentLevel = currentExp - prevLevelThreshold;
-  const expRequiredForLevel = nextLevelThreshold - prevLevelThreshold;
-
-  return Math.floor((expInCurrentLevel / expRequiredForLevel) * 100);
+export function levelProgressPercentageFor(level: number, expInLevel: number): number {
+  if (level >= MAX_LEVEL) return 100;
+  const required = getMaxExp(level);
+  if (!isFinite(required) || required <= 0) return 100;
+  return Math.floor(Math.max(0, Math.min(1, (expInLevel || 0) / required)) * 100);
 }
 
 /**
@@ -63,34 +67,60 @@ export function updateUserExp(
   user: UserType,
   expToAdd: number,
 ): {
-  newExp: number;
+  newExp: number; // exp-in-level sau khi cộng
   oldLevel: number;
   newLevel: number;
   didLevelUp: boolean;
 } {
-  const oldExp = user.exp || 0;
-  const oldLevel = calculateLevel(oldExp);
-  const totalExp = oldExp + expToAdd;
-  const newLevel = calculateLevel(totalExp);
-  const didLevelUp = newLevel > oldLevel;
+  let oldLevel = user.level || 1;
+  let level = oldLevel;
+  let expInLevel = user.exp || 0; // DB lưu exp-in-level
+  let remaining = Math.max(0, expToAdd || 0);
+  let didLevelUp = false;
 
-  // Tính exp còn lại sau khi level up
-  let newExp = totalExp;
-  if (didLevelUp && newLevel <= MAX_LEVEL) {
-    // Lấy ngưỡng exp của level hiện tại
-    const currentLevelThreshold = LEVEL_THRESHOLDS[newLevel - 1];
-    // Tính exp còn lại sau khi trừ đi ngưỡng level hiện tại
-    newExp = totalExp - currentLevelThreshold;
+  while (remaining > 0 && level < MAX_LEVEL) {
+    const required = getMaxExp(level);
+    if (!isFinite(required) || required <= 0) break; // guard
+    const toNext = required - expInLevel;
+    if (remaining >= toNext) {
+      // level up
+      remaining -= toNext;
+      level += 1;
+      expInLevel = 0; // reset on level-up
+      didLevelUp = true;
+    } else {
+      expInLevel += remaining;
+      remaining = 0;
+    }
+  }
+
+  // Nếu đã max level, không cộng dồn thêm exp (giữ nguyên)
+  if (level >= MAX_LEVEL) {
+    level = MAX_LEVEL;
+    // expInLevel giữ nguyên (không vượt qua)
   }
 
   return {
-    newExp,
+    newExp: expInLevel,
     oldLevel,
-    newLevel,
+    newLevel: level,
     didLevelUp,
   };
 }
 
+/**
+ * Return the max exp for the given level (i.e. how much exp is needed while on this level)
+ * For example, for level=1 this returns (thresholdLevel2 - thresholdLevel1).
+ */
 export const getMaxExp = (level: number) => {
-  return LEVEL_THRESHOLDS[level];
+  const prev = LEVEL_THRESHOLDS[level - 1] ?? 0;
+  const next = LEVEL_THRESHOLDS[level] ?? Infinity;
+  if (!isFinite(next)) return Infinity; // max level
+  return next - prev; // exp cần để từ level -> level+1
 };
+
+export function getLevelTitle(level: number | null | undefined): string {
+  const normalized = Math.max(1, Math.min(MAX_LEVEL, Math.floor(level || 1)));
+  return LEVEL_TITLES[normalized] || "";
+}
+

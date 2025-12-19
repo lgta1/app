@@ -1,94 +1,14 @@
-import { Link, type LoaderFunctionArgs } from "react-router-dom";
-import { useLoaderData } from "react-router-dom";
-import { Eye } from "lucide-react";
+import { type LoaderFunctionArgs } from "react-router";
+import { redirect } from "react-router";
 
 import { requireLogin } from "@/services/auth.server";
 
-import { ProfileInfo } from "~/components/profile-info";
-import { ProfileMangaManagement } from "~/components/profile-manga-management";
-import { ProfileRecentComment } from "~/components/profile-recent-comment";
-import { UserModel } from "~/database/models/user.model";
-import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
-import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
-import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
-import { getMaxExp } from "~/helpers/user-level.helper";
-
 export async function loader({ request }: LoaderFunctionArgs) {
   const userSession = await requireLogin(request);
-  const userData = await UserModel.findById(userSession.id)
-    .select("name avatar createdAt level exp gold bio exp mangasCount faction gender")
-    .lean();
-
-  const maxExp = userData?.level === 9 ? "Tối đa" : getMaxExp(userData?.level || 1);
-
-  const chaptersRead = await UserReadChapterModel.countDocuments({
-    userId: userSession.id,
-  });
-
-  const mangasFollowing = await UserFollowMangaModel.countDocuments({
-    userId: userSession.id,
-  });
-
-  const userWaifuLeaderboard = await UserWaifuLeaderboardModel.findOne({
-    userId: userSession.id,
-  }).select("waifuCollection totalWaifu");
-
-  const waifuCollection =
-    userWaifuLeaderboard?.waifuCollection
-      .sort((a, b) => b.stars - a.stars)
-      .slice(0, 6)
-      .map((waifu) => waifu.image) || [];
-
-  const waifuCount = userWaifuLeaderboard?.totalWaifu || 0;
-
-  return {
-    ...userData,
-    waifuCollection,
-    waifuCount,
-    chaptersRead,
-    mangasFollowing,
-    maxExp,
-  };
+  throw redirect(`/profile/${userSession.id}`);
 }
 
 export default function Profile() {
-  const user = useLoaderData<typeof loader>();
-
-  return (
-    <div className="mx-auto flex w-full max-w-[968px] flex-col items-center gap-6 p-4 lg:py-8">
-      <ProfileInfo user={user} />
-
-      {/* Waifu Collection Section */}
-      <div className="flex w-full flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/images/icons/multi-star.svg" alt="star" />
-            <h2 className="text-xl font-semibold text-white uppercase">
-              bộ sưu tập waifu
-            </h2>
-          </div>
-          <Link to="/inventory">
-            <button className="border-lav-500 flex cursor-pointer items-center gap-1.5 rounded-xl border px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)]">
-              <Eye className="text-lav-500 h-5 w-5" />
-              <span className="text-txt-focus text-sm font-semibold">Xem tất cả</span>
-            </button>
-          </Link>
-        </div>
-        <div className="flex gap-4 md:overflow-x-hidden lg:gap-6">
-          {user.waifuCollection.map((image: string, index: number) => (
-            <img
-              key={index}
-              className="aspect-2/3 h-40 rounded-lg object-cover sm:h-48 lg:h-50"
-              src={image}
-              alt={`Waifu ${index + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-
-      <ProfileMangaManagement />
-
-      <ProfileRecentComment />
-    </div>
-  );
+  return null;
 }
+

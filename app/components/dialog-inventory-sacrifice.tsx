@@ -25,11 +25,11 @@ interface DialogInventorySacrificeProps {
   onSacrificeSuccess?: () => void;
 }
 
-// Bảng quy đổi theo cấp sao
+// Bảng quy đổi theo cấp sao (EXP nhận được - Dâm Ngọc tiêu tốn)
 const SACRIFICE_RATES = {
-  3: { exp: 50, gold: 10 },
-  4: { exp: 200, gold: 15 },
-  5: { exp: 1000, gold: 20 },
+  3: { exp: 30, gold: 1 },
+  4: { exp: 100, gold: 5 },
+  5: { exp: 500, gold: 10 },
 } as const;
 
 export function DialogInventorySacrifice({
@@ -195,24 +195,6 @@ export function DialogInventorySacrifice({
 
                 {/* Divider */}
                 <div className="border-bd-default h-px border-t" />
-
-                {!!waifu.expBuff && (
-                  <div className="text-sm">
-                    <span className="text-txt-focus font-medium">Buff Kinh nghiệm: </span>
-                    <span className="text-txt-primary font-medium">
-                      Ngẫu nhiên thêm {waifu.expBuff}% EXP sau khi đọc 1 chapter truyện
-                    </span>
-                  </div>
-                )}
-
-                {!!waifu.goldBuff && (
-                  <div className="text-sm">
-                    <span className="text-txt-focus font-medium">Buff Dâm Ngọc: </span>
-                    <span className="text-txt-primary font-medium">
-                      Ngẫu nhiên thêm {waifu.goldBuff}% Ngọc sau khi đọc 1 chapter truyện
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 

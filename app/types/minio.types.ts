@@ -12,6 +12,7 @@ export interface UploadOptions {
   contentType?: string;
   generateUniqueFileName?: boolean;
   tags?: Record<string, string>;
+  cacheControl?: string;
 }
 
 export interface DownloadOptions {

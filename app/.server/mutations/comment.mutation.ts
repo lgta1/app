@@ -2,11 +2,15 @@ import { isValidObjectId } from "mongoose";
 
 import { sanitizeCommentContent, validateCommentContent } from "@/services/comment.svc";
 import { getUserInfoFromSession } from "@/services/session.svc";
+import { createNotification } from "@/mutations/notification.mutation";
 
 import { CommentModel } from "~/database/models/comment.model";
 import { UserLikeCommentModel } from "~/database/models/user-like-comment.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
+import { MangaModel } from "~/database/models/manga.model";
+import { PostModel } from "~/database/models/post.model";
+import { UserModel } from "~/database/models/user.model";
 
 export const createComment = async (data: {
   content: string;
@@ -67,6 +71,9 @@ export const createComment = async (data: {
     if (parentComment.postId && !postId) {
       commentData.postId = parentComment.postId;
     }
+
+    // Lưu lại user của comment cha để xử lý notify sau khi lưu comment mới
+    (commentData as any)._parentUserId = String(parentComment.userId);
   }
 
   if (mangaId) {
@@ -82,9 +89,108 @@ export const createComment = async (data: {
   await comment.save();
 
   // Populate để trả về thông tin đầy đủ
-  return await CommentModel.findById(comment._id)
+  const saved = await CommentModel.findById(comment._id)
     .populate("userId", "name avatar gender level faction")
     .lean();
+
+  // ─────────────────────────────────────────────────────────────
+  // NOTIFICATIONS (non-blocking):
+  // - Nếu là bình luận cấp 1 trên manga/post → notify tác giả (owner/author)
+  // - Nếu là trả lời (có parentId) → notify người đã viết bình luận cha
+  // - Không notify chính người tự bình luận/trả lời mình
+  // ─────────────────────────────────────────────────────────────
+  try {
+    const populatedUser = saved?.userId;
+    const actorId =
+      populatedUser && typeof populatedUser === "object" && "_id" in populatedUser
+        ? String((populatedUser as { _id: string })._id)
+        : String(populatedUser ?? commentData.userId);
+    const actor = await UserModel.findById(actorId).select("name").lean();
+    const actorName = actor?.name ?? "Một người dùng";
+
+    // Helper gửi notify an toàn
+    const sendSafe = async (
+      targetUserId?: string | null,
+      payload?: {
+        title: string;
+        subtitle: string;
+        imgUrl: string;
+        type?: string;
+        targetType?: string;
+        targetId?: string;
+        targetUrl?: string;
+      },
+    ) => {
+      const to = targetUserId ? String(targetUserId) : null;
+      if (!to || to === actorId) return; // bỏ qua nếu không có người nhận hoặc tự nhận
+      await createNotification({ userId: to, ...payload });
+    };
+
+    // Nếu là trả lời comment
+    if (commentData.parentId) {
+      // Lấy thông tin context từ parent: ưu tiên manga
+      const parent = await CommentModel.findById(commentData.parentId)
+        .select("userId mangaId postId")
+        .lean();
+      if (parent) {
+        if (parent.mangaId) {
+          const manga = await MangaModel.findById(parent.mangaId).select("title poster ownerId slug").lean();
+          const targetSlug = manga?.slug ?? null;
+          await sendSafe(parent.userId as any, {
+            title: manga?.title ?? "Bình luận mới",
+            subtitle: `${actorName} đã trả lời bạn tại truyện ${manga?.title ?? ""}`.trim(),
+            imgUrl: manga?.poster ?? "/images/logo.webp",
+            type: "comment-reply",
+            targetType: "manga",
+            targetId: String(parent.mangaId),
+            targetSlug,
+            targetUrl: targetSlug ? `/truyen-hentai/${targetSlug}` : `/truyen-hentai/${String(parent.mangaId)}`,
+          });
+        } else if (parent.postId) {
+          const post = await PostModel.findById(parent.postId).select("title images authorId").lean();
+          await sendSafe(parent.userId as any, {
+            title: post?.title ?? "Bình luận mới",
+            subtitle: `${actorName} đã trả lời bạn trong bài viết ${post?.title ?? ""}`.trim(),
+            imgUrl: (post?.images && post.images[0]) || "/images/logo.webp",
+            type: "comment-reply",
+            targetType: "post",
+            targetId: String(parent.postId),
+            targetUrl: `/post/${String(parent.postId)}`,
+          });
+        }
+      }
+    } else {
+      // Bình luận cấp 1
+      if (commentData.mangaId) {
+        const manga = await MangaModel.findById(commentData.mangaId).select("title poster ownerId slug").lean();
+        const targetSlug = manga?.slug ?? null;
+        await sendSafe(manga?.ownerId, {
+          title: manga?.title ?? "Bình luận mới",
+          subtitle: `${actorName} đã bình luận về truyện của bạn`,
+          imgUrl: manga?.poster ?? "/images/logo.webp",
+          targetType: "manga",
+          targetId: String(commentData.mangaId),
+          targetSlug,
+          targetUrl: targetSlug ? `/truyen-hentai/${targetSlug}` : `/truyen-hentai/${String(commentData.mangaId)}`,
+        });
+      } else if (commentData.postId) {
+        const post = await PostModel.findById(commentData.postId).select("title images authorId").lean();
+        await sendSafe(post?.authorId, {
+          title: post?.title ?? "Bình luận mới",
+          subtitle: `${actorName} đã bình luận về bài viết của bạn`,
+          imgUrl: (post?.images && post.images[0]) || "/images/logo.webp",
+          targetType: "post",
+          targetId: String(commentData.postId),
+          targetUrl: `/post/${String(commentData.postId)}`,
+        });
+      }
+    }
+  } catch (err) {
+    // Không chặn flow khi notify lỗi
+    console.error("Notify on comment failed:", err);
+  }
+
+  return saved;
 };
 
 export const deleteComment = async (commentId: string, request: Request) => {

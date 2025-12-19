@@ -30,6 +30,39 @@ export default function InventoryDailyReward({
   const fetcher = useFetcher();
   const [dailyRewards, setDailyRewards] = useState<DailyRewardData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [claimed, setClaimed] = useState(false);
+  const [messageText, setMessageText] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
+
+  // Helper to present probability distribution for the UI
+  const getDistributionForStars = (stars: number | undefined) => {
+    const s = stars ?? 3;
+    if (s <= 3) {
+      return [
+        { value: 1, pct: 50 },
+        { value: 2, pct: 40 },
+        { value: 3, pct: 10 },
+      ];
+    }
+    if (s === 4) {
+      return [
+        { value: 1, pct: 10 },
+        { value: 2, pct: 30 },
+        { value: 3, pct: 40 },
+        { value: 4, pct: 20 },
+      ];
+    }
+    return [
+      { value: 1, pct: 0 },
+      { value: 2, pct: 10 },
+      { value: 3, pct: 20 },
+      { value: 4, pct: 30 },
+      { value: 5, pct: 20 },
+      { value: 6, pct: 10 },
+      { value: 7, pct: 5 },
+      { value: 8, pct: 5 },
+    ];
+  };
 
   // Fetch daily checkin data khi component mount
   useEffect(() => {
@@ -40,6 +73,13 @@ export default function InventoryDailyReward({
 
         if (result.success) {
           setDailyRewards(result.data.dailyRewards);
+          // determine whether today's reward has been completed
+          try {
+            const today = result.data.dailyRewards.find((d: DailyRewardData) => d.isToday);
+            setClaimed(!!today?.completed);
+          } catch (e) {
+            setClaimed(false);
+          }
         } else {
           console.error("Error fetching daily rewards:", result.error);
         }
@@ -62,6 +102,12 @@ export default function InventoryDailyReward({
 
     const formData = new FormData();
     formData.append("actionType", "checkin");
+
+  // Optimistically mark claimed (button should grey out immediately) and start opening animation
+  setClaimed(true);
+  setOpening(true);
+  // Show opening state; server will decide the real amount and return message
+  setMessageText(`Đang mở quà...`);
 
     fetcher.submit(formData, {
       method: "POST",
@@ -87,10 +133,22 @@ export default function InventoryDailyReward({
       };
 
       fetchDailyData();
+      // if server returned a message (with awarded amount), display it after a short "opening" animation
+      if (fetcher.data?.message) {
+        // keep the opening animation for a short time to simulate opening the gift
+        setTimeout(() => {
+          setMessageText(fetcher.data.message);
+          setOpening(false);
+        }, 800);
+      } else {
+        setOpening(false);
+      }
     }
 
     if (fetcher.data?.error) {
       toast.error(fetcher.data.error);
+      // if server-side error occurred, revert optimistic claim
+      setClaimed(false);
     }
 
     if (fetcher.data?.message) {
@@ -99,7 +157,7 @@ export default function InventoryDailyReward({
   }, [fetcher.data]);
 
   // Kiểm tra có thể check-in hôm nay không
-  const canCheckinToday = dailyRewards.some((reward) => reward.canClaim);
+  const canCheckinToday = dailyRewards.some((reward: DailyRewardData) => reward.canClaim);
 
   return (
     <div className={`flex flex-col gap-6 ${className}`}>
@@ -113,9 +171,9 @@ export default function InventoryDailyReward({
 
       {/* Main Content */}
       <div className="h-auto w-full max-w-[968px] rounded-xl">
-        <div className="flex flex-col gap-2.5 lg:flex-row">
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2">
           {/* Waifu Section */}
-          <div className="border-bd-default flex w-full flex-col gap-6 rounded-lg border bg-[radial-gradient(ellipse_100%_96.27%_at_50%_0%,_rgba(12,11,56,0.45)_0%,_black_77%)] p-4 lg:w-96">
+          <div className="border-bd-default flex w-full flex-col gap-6 rounded-lg border bg-[radial-gradient(ellipse_100%_96.27%_at_50%_0%,_rgba(12,11,56,0.45)_0%,_black_77%)] p-4">
             <div className="flex items-center gap-3">
               <Heart className="text-txt-focus h-5 w-5" />
               <h3 className="text-txt-primary font-sans text-xl font-semibold uppercase">
@@ -156,27 +214,7 @@ export default function InventoryDailyReward({
 
                   <div className="border-bd-default h-px border-t"></div>
 
-                  {!!currentWaifu.expBuff && (
-                    <div className="text-sm">
-                      <span className="text-txt-focus font-medium">
-                        Buff Kinh nghiệm:{" "}
-                      </span>
-                      <span className="text-txt-primary font-medium">
-                        Ngẫu nhiên thêm {currentWaifu.expBuff}% EXP sau khi đọc 1 chapter
-                        truyện
-                      </span>
-                    </div>
-                  )}
-
-                  {!!currentWaifu.goldBuff && (
-                    <div className="text-sm">
-                      <span className="text-txt-focus font-medium">Buff Dâm Ngọc: </span>
-                      <span className="text-txt-primary font-medium">
-                        Ngẫu nhiên thêm {currentWaifu.goldBuff}% Ngọc sau khi đọc 1
-                        chapter truyện
-                      </span>
-                    </div>
-                  )}
+                  {/* Removed buff display — buffs are no longer applied or shown */}
                 </div>
               </div>
             ) : (
@@ -215,87 +253,65 @@ export default function InventoryDailyReward({
                   hasCurrentWaifu ? "" : "blur-md"
                 }`}
               >
-                {/* Action Row */}
+                {/* Simple claim UI: single button + message (no multi-day calendar) */}
                 <div className="flex items-center justify-between gap-2 sm:gap-4">
                   <div className="max-w-72">
                     <span className="text-txt-primary text-sm font-medium">
-                      Điểm danh hàng ngày sẽ được kích hoạt khi bạn kích hoạt{" "}
-                    </span>
-                    <span className="text-txt-focus text-sm font-medium">
-                      Đồng hành cùng Waifu
+                      Nhấn nút để nhận thưởng hàng ngày.
                     </span>
                   </div>
+
                   <button
                     onClick={handleCheckin}
-                    disabled={!canCheckinToday || fetcher.state !== "idle"}
+                    disabled={!hasCurrentWaifu || claimed}
                     className={`min-w-28 rounded-xl px-3 py-1.5 text-sm font-semibold shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all ${
-                      canCheckinToday && fetcher.state === "idle"
-                        ? "bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-black hover:from-[#E0A1FF] hover:to-[#D680FF]"
-                        : "cursor-not-allowed bg-gray-500 text-gray-300"
+                      !hasCurrentWaifu || claimed
+                        ? "cursor-not-allowed bg-gray-500 text-gray-300"
+                        : "bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-black hover:from-[#E0A1FF] hover:to-[#D680FF]"
                     }`}
                   >
-                    {fetcher.state !== "idle"
-                      ? "Đang xử lý..."
-                      : canCheckinToday
-                        ? "Nhận thưởng"
-                        : "Nhận thưởng"}
+                    {fetcher.state !== "idle" ? (
+                      "Đang xử lý..."
+                    ) : claimed ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Check className="h-4 w-4" />Đã nhận
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <Gift className="h-5 w-5 text-yellow-300 animate-pulse" />
+                        Nhận quà
+                      </span>
+                    )}
                   </button>
                 </div>
 
-                {/* Calendar */}
-                <div className="relative">
-                  {/* Connecting Line Background */}
-                  <div className="bg-txt-tertiary absolute top-[46px] right-[calc(50%/7)] left-[calc(50%/7)] h-[6px]"></div>
+                <div className="mt-4">
+                  {messageText ? (
+                    <div className="rounded-md bg-green-800/40 p-3 text-sm text-green-200">
+                      {messageText}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-txt-secondary">
+                      {hasCurrentWaifu
+                        ? `Hàng ngày waifu đồng hành sẽ cố gắng kiếm dâm ngọc gửi cho bạn.`
+                        : "Vui lòng chọn Waifu để nhận thưởng hàng ngày."}
+                    </p>
+                  )}
 
-                  {/* Days Grid */}
-                  <div className="grid grid-cols-7 gap-0">
-                    {isLoading
-                      ? // Loading skeleton
-                        Array.from({ length: 7 }).map((_, index) => (
-                          <div key={index} className="flex flex-col items-center gap-3">
-                            <div className="h-6 w-12 animate-pulse rounded bg-gray-600"></div>
-                            <div className="h-7 w-7 animate-pulse rounded-full bg-gray-600"></div>
-                            <div className="h-5 w-8 animate-pulse rounded bg-gray-600"></div>
-                          </div>
-                        ))
-                      : dailyRewards.map((item: DailyRewardData, index: number) => (
-                          <div key={index} className="flex flex-col items-center gap-3">
-                            {/* Day Label */}
-                            <div className="flex h-6 items-center justify-center">
-                              <span className="text-txt-secondary text-sm font-medium">
-                                {item.day}
-                              </span>
-                            </div>
-
-                            {/* Dot */}
-                            <div className="bg-bgc-layer2 relative z-10 flex h-7 w-7 items-center justify-center rounded-full">
-                              <div
-                                className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                                  item.completed ? "bg-txt-focus" : "bg-txt-tertiary"
-                                }`}
-                              >
-                                {item.completed && (
-                                  <Check className="text-bgc-layer1 h-4 w-4" />
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Reward */}
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="flex items-center justify-center">
-                                <img
-                                  src="/images/icons/gold-icon.png"
-                                  alt="gold"
-                                  className="h-5 w-6"
-                                />
-                              </div>
-                              <span className="text-txt-primary text-sm font-medium">
-                                {item.reward}
-                              </span>
-                            </div>
-                          </div>
+                  {/* Probability breakdown */}
+                  {hasCurrentWaifu && (
+                    <div className="mt-3 rounded-md border border-gray-700 bg-bgc-layer1/60 p-3 text-sm">
+                      <div className="mb-2 font-semibold">Tỉ lệ nhận theo sao của waifu:</div>
+                      <ul className="grid grid-cols-2 gap-1">
+                        {getDistributionForStars(currentWaifu?.stars).map((d) => (
+                          <li key={d.value} className="flex justify-between">
+                            <span>{d.value} dâm ngọc</span>
+                            <span className="text-txt-secondary">{d.pct}%</span>
+                          </li>
                         ))}
-                  </div>
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

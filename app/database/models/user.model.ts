@@ -26,6 +26,12 @@ export type UserType = {
   warningsCount: number;
   bio: string;
   currentWaifu: string;
+  // Optional cached fields for quick UI (waifu in comments)
+  waifuFilename?: string | null;
+  currentWaifuName?: string | null;
+  claimedMilestones?: number[];
+  // User's hidden content preferences: list of genre slugs to hide/dim
+  blacklistTags?: string[];
 };
 
 const UserSchema = new Schema<UserType>(
@@ -50,6 +56,12 @@ const UserSchema = new Schema<UserType>(
     summonCount: { type: Number, default: 0 },
     bio: { type: String, default: "" },
     currentWaifu: { type: String, ref: "Waifu", default: null },
+    // Cached fields for UI: static still image filename and name of current waifu
+    waifuFilename: { type: String, default: null },
+    currentWaifuName: { type: String, default: null },
+    claimedMilestones: { type: [Number], default: [] },
+    // Blacklist tags (genre slugs) that the user doesn't want to see
+    blacklistTags: { type: [String], default: [] },
   },
   { timestamps: true },
 );

@@ -15,10 +15,9 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import type { Route } from "./+types/register";
 
-import { FactionSelectionDialog } from "~/components/dialog-faction-selection";
-import { GenderSelectionDialog } from "~/components/dialog-gender-selection";
+// import { FactionSelectionDialog } from "~/components/dialog-faction-selection";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
-import { validateUsername } from "~/utils/username-validator";
+import { validateUsername } from "~/utils/username-validator.client";
 
 export const meta: MetaFunction = () => {
   return [
@@ -57,24 +56,24 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showFactionDialog, setShowFactionDialog] = useState(false);
-  const [showGenderDialog, setShowGenderDialog] = useState(false);
-  const [selectedFaction, setSelectedFaction] = useState<number | null>(null);
-  
+
+  // ⚠️ Mặc định mọi user đăng ký mới sẽ thuộc phe 1 (UI chọn phe đã ẩn)
+  const DEFAULT_GENDER_ID = 1; // 0=female, 1=male
+  const DEFAULT_FACTION_ID = 1; // mặc định phe 1 (đổi thành 2 nếu cần)
+
   // Username validation state
   const [usernameError, setUsernameError] = useState<string>("");
-  
+
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
 
   const isSubmitting = navigation.state === "submitting";
-
   const submit = useSubmit();
 
   // Handle username validation
   const handleUsernameChange = (value: string) => {
     setName(value);
-    
+
     // Real-time validation
     const validation = validateUsername(value);
     if (!validation.isValid) {
@@ -87,60 +86,53 @@ export default function Register() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Validate username before proceeding
+    console.log("[register:client] handleSubmit", { name, email });
+
+    // Validate username trước khi submit
     const usernameValidation = validateUsername(name);
     if (!usernameValidation.isValid) {
       setUsernameError(usernameValidation.error || "Username không hợp lệ");
       return;
     }
 
-    // Kiểm tra mật khẩu trước khi hiển thị dialog
+    // Kiểm tra mật khẩu
     if (password !== confirmPassword) {
       alert("Mật khẩu không khớp");
       return;
     }
 
-    // Hiển thị dialog chọn faction trước
-    setShowFactionDialog(true);
+    // Không mở dialog chọn phe nữa → submit thẳng với DEFAULT_FACTION_ID
+    submitForm(DEFAULT_FACTION_ID);
   };
 
-  const handleFactionSelection = (factionId: number) => {
-    setSelectedFaction(factionId);
-    setShowFactionDialog(false);
+  const submitForm = (factionId: number) => {
+    // Guard tránh double-submit
+    if (isSubmitting) return;
 
-    // Sau khi chọn faction, hiển thị dialog chọn gender
-    setShowGenderDialog(true);
-  };
-
-  const handleGenderSelection = (genderId: number) => {
-    setShowGenderDialog(false);
-
-    // Sau khi chọn gender, submit form
-    submitForm(genderId);
-  };
-
-  const submitForm = (genderId: number) => {
     // Tạo FormData và submit
     const formData = new FormData();
     formData.append("name", name);
-    formData.append("email", email);
+    // Chuẩn hóa email ở client để giảm rủi ro duplicate do case
+    formData.append("email", email.trim().toLowerCase());
     formData.append("password", password);
     formData.append("confirmPassword", confirmPassword);
-    formData.append("faction", String(selectedFaction));
-    formData.append("gender", String(genderId));
+    formData.append("faction", String(factionId)); // gửi phe mặc định
+    formData.append("gender", String(DEFAULT_GENDER_ID)); // luôn = 1
 
     // Submit form bằng fetch API
-    submit(formData, { method: "post" });
+    // Ghi rõ action để submit tới route /register (fallback và debug)
+    console.log("[register:client] submitting form data", { name, email: email.trim().toLowerCase(), factionId });
+    submit(formData, { method: "post", action: "/register" });
   };
 
   return (
     <>
-      <div className="bg-gradient-radial to-bgc-layer1 mb-10 min-h-screen w-full from-[#191758] px-4">
+  <div className="mb-10 min-h-screen w-full px-4">
         {/* Container chính */}
         <div className="mx-auto mb-10 flex w-full flex-col items-center gap-[46px] pt-[104px] md:max-w-[558px] md:gap-6 md:pt-[104px]">
           {/* Logo */}
           <img
-            src="/images/logo.png"
+            src="/images/logo.webp"
             alt="Logo Vinahentai"
             className="h-[75px] w-[340px]"
           />
@@ -156,7 +148,7 @@ export default function Register() {
             </div>
 
             {/* Form fields */}
-            <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4">
+            <form action="/register" method="post" onSubmit={handleSubmit} className="flex w-full flex-col gap-4">
               {actionData?.error && (
                 <div className="rounded bg-red-500/10 p-2 text-sm font-medium text-red-500">
                   {actionData.error.message}
@@ -173,21 +165,23 @@ export default function Register() {
                     Username
                   </label>
                 </div>
-                <div className={`bg-bgc-layer2 border-bd-default flex w-full items-center rounded-xl border px-3 py-[10px] ${
-                  usernameError ? "border-red-500" : ""
-                }`}>
+                <div
+                  className={`bg-bgc-layer2 border-bd-default flex w-full items-center rounded-xl border px-3 py-[10px] ${
+                    usernameError ? "border-red-500" : ""
+                  }`}
+                >
                   <input
                     type="text"
                     id="name"
                     name="name"
                     value={name}
                     onChange={(e) => handleUsernameChange(e.target.value)}
-                    placeholder="6-15 ký tự, chỉ chữ cái và số"
+                    placeholder="6-15 ký tự, chữ cái hoặc số"
                     className="text-txt-secondary w-full bg-transparent text-base leading-6 font-medium outline-none"
                     required
                   />
                 </div>
-                
+
                 {/* Username validation error */}
                 {usernameError && (
                   <div className="flex items-center gap-2 text-red-500 text-sm">
@@ -195,11 +189,11 @@ export default function Register() {
                     <span>{usernameError}</span>
                   </div>
                 )}
-                
+
                 {/* Username format hint */}
                 {!usernameError && (
                   <div className="text-txt-secondary text-xs">
-                    6-15 ký tự, chỉ được sử dụng chữ cái (a-z, A-Z) và số (0-9)
+                    6-15 ký tự, chỉ dùng chữ cái (a-z, A-Z) và số (0-9)
                   </div>
                 )}
               </div>
@@ -302,21 +296,17 @@ export default function Register() {
         </div>
       </div>
 
-      {/* Faction Selection Dialog */}
+      {/* (ĐÃ ẨN) Faction Selection Dialog – giữ comment để team khác biết đã bỏ */}
+      {/*
       <FactionSelectionDialog
-        isOpen={showFactionDialog}
-        onClose={() => setShowFactionDialog(false)}
+        isOpen={false}
+        onClose={() => {}}
         userName={name || "Người chơi"}
-        onSelectFaction={handleFactionSelection}
+        onSelectFaction={() => {}}
       />
+      */}
 
       {/* Gender Selection Dialog */}
-      <GenderSelectionDialog
-        isOpen={showGenderDialog}
-        onClose={() => setShowGenderDialog(false)}
-        userName={name || "Người chơi"}
-        onSelectGender={handleGenderSelection}
-      />
     </>
   );
 }

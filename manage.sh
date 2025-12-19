@@ -3,6 +3,9 @@
 
 case "$1" in
   start)
+    # PM2 đôi khi bị trạng thái lỗi (process id bị lệch/mất), gây crash khi restart theo ecosystem.
+    # Start theo kiểu idempotent: xoá instances cũ của dự án rồi start lại.
+    pm2 delete ww-1 ww-2 >/dev/null 2>&1 || true
     pm2 start ecosystem.config.cjs
     ;;
   stop)

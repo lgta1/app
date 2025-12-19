@@ -1,151 +1,138 @@
 // app/components/header-genres.tsx
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState, type MouseEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import * as Popover from "@radix-ui/react-popover";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 
 import type { GenresType } from "~/database/models/genres.model";
+
+const PINNED_GENRE_SLUGS = ["3d-hentai", "manhwa", "anh-cosplay"] as const;
+const PINNED_GENRE_SET = new Set(PINNED_GENRE_SLUGS);
 
 interface HeaderGenresProps {
   genres: GenresType[];
 }
 
-function normalizeVN(s: string) {
-  return (
-    (s || "")
-      .normalize("NFD")
-      // Khử dấu bằng Unicode property để hỗ trợ đầy đủ tiếng Việt
-      .replace(/\p{Diacritic}/gu, "")
-      .toLowerCase()
-      .trim()
-  );
-}
+// Khử dấu cho VN (tránh Unicode Property Escapes để tương thích mobile cũ)
+const foldVN = (s: string) =>
+  (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]+/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
 
 export function HeaderGenres({ genres }: HeaderGenresProps) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
-  // 🔎 DEBUG: in ra TV (Header) đang nhận bao nhiêu kênh từ đài + có bondage/slave không
-  // (Không ảnh hưởng logic; chỉ hỗ trợ kiểm tra)
-  try {
-    // eslint-disable-next-line no-console
-    console.log(
-      "[ui:header] genres =",
-      Array.isArray(genres) ? genres.length : 0,
-      "| bondage:",
-      Array.isArray(genres) && genres.some((g: any) => g?.slug === "bondage"),
-      "| slave:",
-      Array.isArray(genres) && genres.some((g: any) => g?.slug === "slave")
-    );
-  } catch (_) {
-    // ignore
-  }
-
-  // BEGIN <feature> GENRES_AZ_FLAT_PIN_ONESHOT_HEADER
-  const sorted = useMemo(() => {
-    // tạo bản sao mảng, tránh mutate props
-    const arr = (genres || []).map((g) => ({ ...g }));
-
-    // Chuẩn hóa Title Case để hiển thị đồng nhất (không ảnh hưởng sort vì sort dùng normalizeVN)
-    arr.forEach((g) => {
-      if (g?.name) {
-        const parts = g.name.split(" ");
-        g.name = parts
-          .map((p) => (p.length ? p[0].toLocaleUpperCase() + p.slice(1) : p))
-          .join(" ");
-      }
-    });
-
-    // Sắp xếp: Oneshot đứng đầu, phần còn lại A–Z (khử dấu)
-    arr.sort((a, b) => {
-      const aIsOne =
-        normalizeVN(a.name) === "oneshot" || (a as any).slug === "oneshot";
-      const bIsOne =
-        normalizeVN(b.name) === "oneshot" || (b as any).slug === "oneshot";
-      if (aIsOne && !bIsOne) return -1;
-      if (!aIsOne && bIsOne) return 1;
-
-      const an = normalizeVN(a.name);
-      const bn = normalizeVN(b.name);
-      return an.localeCompare(bn);
-    });
-
-    return arr;
-  }, [genres]);
-
-  // Ô tìm kiếm: chỉ lọc theo CHỮ CÁI ĐẦU TIÊN (không phải "chứa chuỗi")
+  // BEGIN unify with MangaCreate genre search
   const [q, setQ] = useState("");
+  const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-  // Lọc theo chữ cái đầu (đã khử dấu). Nếu không nhập gì -> trả về toàn bộ.
-  const filteredByFirstLetter = useMemo(() => {
-    const letter = normalizeVN(q).trim().charAt(0); // lấy ký tự đầu
-    if (!letter) return sorted;
-    return sorted.filter((g) => {
-      const first = normalizeVN((g as any).name || "").charAt(0);
-      return first === letter;
+  // Deduplicate and sort A–Z by folded name
+  const sortedGenres: GenresType[] = useMemo(() => {
+    const list = Array.isArray(genres) ? genres.slice() : [];
+    const uniq = new Map<string, GenresType>();
+    for (const g of list) {
+      const slug = (g as any)?.slug;
+      const name = (g as any)?.name;
+      if (!slug || !name) continue;
+      if (!uniq.has(slug)) uniq.set(slug, g);
+    }
+    const alphabetical = Array.from(uniq.values()).sort((a, b) => {
+      const aa = foldVN((a as any).name || "");
+      const bb = foldVN((b as any).name || "");
+      if (aa < bb) return -1;
+      if (aa > bb) return 1;
+      return 0;
     });
-  }, [sorted, q]);
 
-  // Danh sách tên cần ép vào nhóm '#'
-  const forceHash = useMemo(() => {
-    return new Set([
-      "full color",
-      "oneshot",
-      "3d hentai",
-    ]);
-  }, []);
-
-  // Gom nhóm theo chữ cái đầu để render
-  // Yêu cầu: nhóm '#' đứng đầu và BA mục trên nằm trong '#' KHI q rỗng (không đang tìm kiếm).
-  const grouped: Array<[string, GenresType[]]> = useMemo(() => {
-    const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-    const map: Record<string, GenresType[]> = {};
-
-    for (const g of filteredByFirstLetter) {
-      const name = (g as any).name || "";
-      const normalized = normalizeVN(name);
-      const first = (normalized[0] || "#").toUpperCase();
-
-      // Khi không nhập tìm kiếm: ép vào '#'
-      const useHash = !q && forceHash.has(normalized);
-
-      const key = useHash ? "#" : (AZ.includes(first) ? first : "#");
-      (map[key] ||= []).push(g);
+    if (!alphabetical.length) {
+      return alphabetical;
     }
 
-    const ordered: Array<[string, GenresType[]]> = [];
-    // Đặt '#' lên đầu trước
-    if (map["#"]?.length) ordered.push(["#", map["#"]]);
-    // Sau đó mới tới A-Z
-    for (const L of AZ) if (map[L]?.length) ordered.push([L, map[L]]);
-    return ordered;
-  }, [filteredByFirstLetter, q, forceHash]);
-  // END <feature> GENRES_AZ_FLAT_PIN_ONESHOT_HEADER
+    const pinnedLookup = new Map<string, GenresType>();
+    for (const item of alphabetical) {
+      const slug = ((item as any)?.slug || "") as string;
+      if (PINNED_GENRE_SET.has(slug)) {
+        pinnedLookup.set(slug, item);
+      }
+    }
+
+    const pinnedOrdered = PINNED_GENRE_SLUGS.map((slug) => pinnedLookup.get(slug)).filter(Boolean) as GenresType[];
+    const remainder = alphabetical.filter((item) => !PINNED_GENRE_SET.has((((item as any)?.slug) || "") as string));
+
+    return [...pinnedOrdered, ...remainder];
+  }, [genres]);
+
+  // Tokenize query by spaces or commas
+  const tokens: string[] = useMemo(
+    () => foldVN(q).split(/[\s,]+/).filter(Boolean) as string[],
+    [q]
+  );
+
+  // If only single letters typed, filter by first letters; else match any token in name/slug
+  const filtered: GenresType[] = useMemo(() => {
+    if (!tokens.length) return sortedGenres;
+
+    const onlySingleLetters = tokens.every((t: string) => /^[a-z]$/.test(t));
+    if (onlySingleLetters) {
+      const L = new Set(tokens.map((t: string) => t.toUpperCase()));
+      return sortedGenres.filter((g: GenresType) =>
+        L.has((foldVN((g as any).name || "")[0] || "#").toUpperCase()),
+      );
+    }
+
+    return sortedGenres.filter((g: GenresType) => {
+      const hay = `${foldVN((g as any).name || "")} ${(((g as any).slug as string) || "").toLowerCase()}`;
+      return tokens.some((t: string) => hay.includes(t));
+    });
+  }, [sortedGenres, tokens]);
+
+  // Group: '#' first then A–Z
+  const grouped: Array<[string, GenresType[]]> = useMemo(() => {
+    const map: Record<string, GenresType[]> = {};
+    for (const g of filtered) {
+      const slug = (((g as any)?.slug) || "") as string;
+      const first = (foldVN((g as any).name || "")[0] || "#").toUpperCase();
+      const key = PINNED_GENRE_SET.has(slug) ? "#" : AZ.includes(first) ? first : "#";
+      (map[key] ||= []).push(g);
+    }
+    const out: Array<[string, GenresType[]]> = [];
+    if (map["#"]?.length) out.push(["#", map["#"]]);
+    for (const L of AZ) if (map[L]?.length) out.push([L, map[L]]);
+    return out;
+  }, [filtered, AZ]);
+  // END unify with MangaCreate genre search
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <div className="flex cursor-pointer items-center justify-start gap-1">
-          <div className="text-txt-primary text-sm leading-normal font-semibold">
+        {/* ⬇️ Thêm responsive font cho trigger: to hơn từ laptop/desktop */}
+        <div className="flex cursor-pointer items-center justify-start gap-1 text-sm lg:text-[17px] whitespace-nowrap">
+          <div className="text-txt-primary text-sm lg:text-[17px] leading-tight font-semibold whitespace-nowrap text-outline-purple">
             Thể loại
           </div>
-          <ChevronDown className="text-txt-primary h-3 w-3" />
+          <span className="inline-flex text-outline-purple-thin lg:text-outline-purple">
+            <ChevronDown className="text-txt-primary h-3 w-3 lg:h-4 lg:w-4" />
+          </span>
         </div>
       </Popover.Trigger>
 
       <Popover.Portal>
         <Popover.Content
-          className="bg-bgc-layer1 border-bd-default data-[state=open]:data-[side=top]:animate-slideDownAndFade data-[state=open]:data-[side=right]:animate-slideLeftAndFade data-[state=open]:data-[side=bottom]:animate-slideUpAndFade data-[state=open]:data-[side=left]:animate-slideRightAndFade z-[99999] w-[100vw] rounded-xl border p-4 shadow-lg will-change-[transform,opacity] sm:w-full sm:max-w-[95vw] md:w-[640px]"
+          className="bg-bgc-layer1 border-bd-default data-[state=open]:data-[side=top]:animate-slideDownAndFade data-[state=open]:data-[side=right]:animate-slideLeftAndFade data-[state=open]:data-[side=bottom]:animate-slideUpAndFade data-[state=open]:data-[side=left]:animate-slideRightAndFade z-[99999] w-[100vw] rounded-xl border p-4 shadow-lg will-change-[transform,opacity] sm:w-full sm:max-w-[95vw] md:w-[640px] max-h-[80svh] overflow-hidden flex flex-col"
           sideOffset={8}
           align="center"
+          // Tắt tự focus khi mở để không bật bàn phím trên mobile
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          {/* BEGIN <feature> GENRES_AZ_FLAT_PIN_ONESHOT_BODY */}
+          {/* Header: ô tìm + nút X đóng */}
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-txt-focus font-sans text-base font-semibold">
-              Thể loại
-            </div>
-
-            {/* Ô tìm kiếm (lọc theo chữ cái đầu tiên, khử dấu) */}
-            <label className="relative w-full max-w-[360px]">
+            {/* Ô tìm kiếm (lọc theo chữ cái đầu) */}
+            <label className="relative w-full">
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
@@ -160,14 +147,25 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Nhập chữ cái đầu… (vd: a, b, c)"
+                placeholder="Có thể nhập nhiều từ khóa cùng lúc… (vd: manhwa color series)"
                 className="w-full rounded-md border border-bd-default bg-bgc-layer2 pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
               />
             </label>
+
+            {/* Nút đóng ở góc phải */}
+            <Popover.Close asChild>
+              <button
+                type="button"
+                aria-label="Đóng"
+                className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md border border-bd-default bg-bgc-layer2 hover:bg-bgc-layer3"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </Popover.Close>
           </div>
 
-          {/* Danh sách: cố định 3 cột ở mọi breakpoint */}
-          <div className="max-h-[70vh] overflow-y-auto pr-2">
+          {/* Danh sách: chiếm phần còn lại & cuộn chuẩn, không bị cắt đáy */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 pb-2">
             <div className="space-y-4">
               {grouped.map(([letter, items]) => (
                 <div key={letter}>
@@ -177,26 +175,31 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
                     <div className="h-px flex-1 bg-bd-default/60" />
                   </div>
 
-                  {/* Lưới CỐ ĐỊNH 3 cột (không auto-fit) */}
+                  {/* Lưới CỐ ĐỊNH 3 cột */}
                   <div className="grid grid-cols-3 gap-x-4 gap-y-2">
                     {items.map((genre) => {
                       const name = (genre as any).name as string;
+                      const slug = (genre as any).slug as string;
+                      const href = `/genres/${slug}`;
                       return (
-                        <Link
-                          key={
-                            (genre as any)._id?.toString?.() ||
-                            (genre as any).id ||
-                            (genre as any).slug
-                          }
-                          to={`/genres/${(genre as any).slug}`}
+                        <a
+                          key={(genre as any)._id?.toString?.() || (genre as any).id || slug}
+                          href={href}
                           className="block break-inside-avoid py-1"
-                          onClick={() => setOpen(false)}
+                          title={((genre as any).description as string) || undefined}
+                          onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+                            const hydrated = (window as any)?.__APP_HYDRATED__ === true;
+                            setOpen(false);
+                            if (!hydrated) return; // để browser điều hướng tự nhiên
+                            e.preventDefault();
+                            requestAnimationFrame(() => navigate(href));
+                          }}
                         >
-                          <div className="text-txt-primary hover:text-txt-focus text-xs font-medium">
+                          <div className="text-txt-primary hover:text-txt-focus text-xs [@media(min-width:427px)]:text-[15px] sm:text-[15px] font-medium">
                             <span className="font-bold">{name.slice(0, 1)}</span>
                             {name.slice(1)}
                           </div>
-                        </Link>
+                        </a>
                       );
                     })}
                   </div>
@@ -205,11 +208,12 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
 
               {/* Không có kết quả */}
               {grouped.length === 0 && (
-                <div className="text-sm text-txt-secondary">Không có thể loại phù hợp.</div>
+                <div className="text-sm text-txt-secondary">
+                  Không có thể loại phù hợp.
+                </div>
               )}
             </div>
           </div>
-          {/* END <feature> GENRES_AZ_FLAT_PIN_ONESHOT_BODY */}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

@@ -10,11 +10,11 @@ import {
 import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Search, Trash2, Upload } from "lucide-react";
 
-import { deleteManga } from "@/mutations/manga.mutation";
+import { deleteManga, transferMangaOwner } from "@/mutations/manga.mutation";
 import {
   getAllMangaAdmin,
   getTotalMangaCountAdmin,
-  searchMangaWithPagination,
+  searchMangaAdminAdvanced,
 } from "@/queries/manga.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
@@ -30,8 +30,12 @@ export const meta: MetaFunction = () => {
   ];
 };
 
+interface MangaAdminRow extends MangaType {
+  ownerName?: string;
+}
+
 interface LoaderData {
-  mangas: MangaType[];
+  mangas: MangaAdminRow[];
   currentPage: number;
   totalPages: number;
   searchTerm: string;
@@ -46,14 +50,18 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
   const statusFilter = statusParam ? parseInt(statusParam) : undefined;
   const limit = 10;
 
-  let mangas: MangaType[];
+  let mangas: MangaAdminRow[];
   let totalMangas: number;
 
   if (searchTerm) {
-    [mangas, totalMangas] = await Promise.all([
-      searchMangaWithPagination(searchTerm, page, limit, statusFilter),
-      getTotalMangaCountAdmin({ searchTerm, status: statusFilter }),
-    ]);
+    const { mangas: searched, total } = await searchMangaAdminAdvanced({
+      keyword: searchTerm,
+      page,
+      limit,
+      status: statusFilter,
+    });
+    mangas = searched;
+    totalMangas = total;
   } else {
     [mangas, totalMangas] = await Promise.all([
       getAllMangaAdmin(page, limit, statusFilter),
@@ -63,8 +71,22 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
 
   const totalPages = Math.ceil(totalMangas / limit);
 
+  // Append ownerName by bulk fetching users
+  try {
+    const ownerIds = Array.from(new Set(mangas.map(m => m.ownerId))).filter(Boolean);
+    if (ownerIds.length) {
+      const { UserModel } = await import("~/database/models/user.model");
+      const owners = await UserModel.find({ _id: { $in: ownerIds } }).select("name").lean();
+      const map: Record<string, string> = {};
+      for (const o of owners) { map[String((o as any)._id)] = (o as any).name; }
+      mangas = mangas.map(m => ({ ...m, ownerName: map[String(m.ownerId)] || m.ownerId }));
+    }
+  } catch (e) {
+    console.error('[admin.manga] cannot resolve owner names', e);
+  }
+
   return {
-    mangas,
+    mangas: mangas,
     currentPage: page,
     totalPages,
     searchTerm,
@@ -78,6 +100,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const action = formData.get("action");
   const mangaId = formData.get("mangaId");
+  const newOwnerId = formData.get("newOwnerId");
 
   if (action === "delete" && typeof mangaId === "string") {
     try {
@@ -87,6 +110,18 @@ export async function action({ request }: ActionFunctionArgs) {
       return {
         success: false,
         message: error instanceof Error ? error.message : "Có lỗi xảy ra khi xóa truyện",
+      };
+    }
+  }
+
+  if (action === 'transfer-owner' && typeof mangaId === 'string' && typeof newOwnerId === 'string') {
+    try {
+      const result = await transferMangaOwner(request, mangaId, newOwnerId);
+      return { success: true, message: result.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Có lỗi xảy ra khi chuyển quyền',
       };
     }
   }
@@ -212,6 +247,24 @@ export default function AdminManga() {
     submit(params, { method: "get" });
   };
 
+  const [editingOwnerRow, setEditingOwnerRow] = useState<string | null>(null);
+  const [pendingOwnerId, setPendingOwnerId] = useState<string>("");
+
+  const submitTransfer = (mangaId: string) => {
+    if (!pendingOwnerId.trim()) {
+      toast.error('Vui lòng nhập ID người nhận');
+      return;
+    }
+    if (!confirm('Xác nhận chuyển quyền truyện?')) return;
+    const fd = new FormData();
+    fd.append('action', 'transfer-owner');
+    fd.append('mangaId', mangaId);
+    fd.append('newOwnerId', pendingOwnerId.trim());
+    submit(fd, { method: 'post' });
+    setEditingOwnerRow(null);
+    setPendingOwnerId('');
+  };
+
   return (
     <div className="my-8 w-full gap-4 px-4">
       <Toaster position="bottom-right" />
@@ -220,8 +273,13 @@ export default function AdminManga() {
         Quản lý truyện
       </div>
 
-      {/* Upload Button */}
-      <div className="flex justify-end">
+      {/* Upload / Import Buttons */}
+      <div className="flex justify-end gap-3">
+        <Link to="/admin/manga/import">
+          <button className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-bd-default bg-bgc-layer2 px-4 py-3 text-sm font-semibold text-txt-primary shadow hover:bg-bgc-layer2/80">
+            Auto-import vi-hentai
+          </button>
+        </Link>
         <Link to="/admin/manga/upload-revenue">
           <button className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#C466FF] to-[#924DBF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)]">
             <Upload className="h-5 w-5 text-black" />
@@ -305,10 +363,10 @@ export default function AdminManga() {
           {mangas.map((manga, index) => {
             const globalIndex = (currentPage - 1) * 7 + index + 1;
 
+            const previewHandle = manga.slug || manga.id;
             return (
-              <Link
+              <div
                 key={manga.id}
-                to={`/manga/preview/${manga.id}`}
                 className="border-bd-default flex flex-col items-start justify-start gap-2 self-stretch border-b p-2 lg:flex-row lg:items-center lg:gap-0 lg:p-0"
               >
                 {/* Mobile Layout */}
@@ -324,19 +382,21 @@ export default function AdminManga() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <img
-                      className="h-9 w-9 rounded-sm object-cover"
-                      src={manga.poster || "https://placehold.co/37x36"}
-                      alt={manga.title}
-                    />
-                    <div className="space-y-1">
-                      <div className="text-txt-primary font-sans text-sm font-semibold">
-                        {manga.title}
+                    <Link to={`/truyen-hentai/preview/${previewHandle}`} className="flex items-center gap-2">
+                      <img
+                        className="h-9 w-9 rounded-sm object-cover"
+                        src={manga.poster || "https://placehold.co/37x36"}
+                        alt={manga.title}
+                      />
+                      <div className="space-y-1">
+                        <div className="text-txt-primary font-sans text-sm font-semibold">
+                          {manga.title}
+                        </div>
+                        <div className="text-txt-secondary font-sans text-xs font-medium">
+                          {manga.translationTeam}
+                        </div>
                       </div>
-                      <div className="text-txt-secondary font-sans text-xs font-medium">
-                        {manga.translationTeam}
-                      </div>
-                    </div>
+                    </Link>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="text-txt-focus font-sans text-xs font-semibold">
@@ -353,11 +413,9 @@ export default function AdminManga() {
                     />
                   </div>
                 </div>
-
                 {/* Desktop Layout */}
                 <div
                   onClick={(e) => {
-                    e.preventDefault();
                     navigator.clipboard.writeText(manga.id);
                     toast.success("Đã copy ID");
                   }}
@@ -373,19 +431,49 @@ export default function AdminManga() {
                   </div>
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">
-                  <img
-                    className="h-9 w-9 rounded-sm object-cover"
-                    src={manga.poster || "https://placehold.co/37x36"}
-                    alt={manga.title}
-                  />
-                  <div className="text-txt-primary flex-1 font-sans text-sm leading-tight font-semibold">
-                    {manga.title}
-                  </div>
+                  <Link to={`/truyen-hentai/preview/${previewHandle}`} className="flex items-center gap-2.5">
+                    <img
+                      className="h-9 w-9 rounded-sm object-cover"
+                      src={manga.poster || "https://placehold.co/37x36"}
+                      alt={manga.title}
+                    />
+                    <div className="text-txt-primary flex-1 font-sans text-sm leading-tight font-semibold">
+                      {manga.title}
+                    </div>
+                  </Link>
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">
-                  <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
-                    {manga.translationTeam}
-                  </div>
+                  {editingOwnerRow === manga.id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="bg-bgc-layer2 border-bd-default rounded px-2 py-1 text-sm"
+                        placeholder="Nhập ID user mới"
+                        value={pendingOwnerId}
+                        onChange={(e) => setPendingOwnerId(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); submitTransfer(manga.id); }}
+                        className="rounded bg-green-500 px-2 py-1 text-xs font-semibold text-black hover:opacity-80"
+                      >Xác nhận</button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); setEditingOwnerRow(null); setPendingOwnerId(''); }}
+                        className="rounded bg-gray-400 px-2 py-1 text-xs font-semibold text-black hover:opacity-80"
+                      >Hủy</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
+                        {manga.ownerName || manga.ownerId}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); setEditingOwnerRow(manga.id); setPendingOwnerId(''); }}
+                        className="rounded bg-purple-400 px-2 py-1 text-xs font-semibold text-black hover:opacity-80"
+                      >Sửa</button>
+                    </div>
+                  )}
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">
                   <div className="text-txt-focus font-sans text-sm leading-tight font-semibold">
@@ -410,7 +498,7 @@ export default function AdminManga() {
                     onDeleteClick={(e) => handleDeleteClick(e, manga)}
                   />
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

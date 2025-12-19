@@ -52,19 +52,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Tạo data cho 7 ngày trong tuần
-    const dailyRewards = [];
+    const dailyRewards: Array<any> = [];
     const dayNames = ["T.Hai", "T.Ba", "T.Tư", "T.Năm", "T.Sáu", "T.Bảy", "C.Nhật"];
+
+    // Determine reward range based on current waifu stars
+    const userFull = await UserModel.findById(user.id).select("currentWaifu").populate("currentWaifu").lean();
+    const stars = (userFull?.currentWaifu as any)?.stars || 0;
+    const getRangeForStars = (s: number) => {
+      if (s >= 5) return [5, 10];
+      if (s === 4) return [3, 5];
+      if (s === 3) return [1, 3];
+      return [DAILY_REWARD.GOLD_AMOUNT, DAILY_REWARD.GOLD_AMOUNT];
+    };
+
+    const [minR, maxR] = getRangeForStars(stars);
 
     for (let i = 0; i < DAILY_REWARD.DAYS_IN_WEEK; i++) {
       const isCompleted = checkinRecord.checkedDays.includes(i);
       const isToday = i === currentDay;
       const canClaim = isToday && !isCompleted;
 
+      // reward field shows the range as a string when variable by stars
+      const reward = minR === maxR ? minR : `${minR}-${maxR}`;
+
       dailyRewards.push({
         day: dayNames[i],
         dayIndex: i,
         completed: isCompleted,
-        reward: DAILY_REWARD.GOLD_AMOUNT,
+        reward,
         isToday,
         canClaim,
       });
@@ -140,21 +155,58 @@ export async function action({ request }: ActionFunctionArgs) {
         });
       }
 
-      // Thực hiện check-in
+      // Determine reward amount based on current waifu stars
+  const userFullData = await UserModel.findById(user.id).select("currentWaifu").populate("currentWaifu").lean();
+  const starsNow = (userFullData?.currentWaifu as any)?.stars || 0;
+      const getRange = (s: number) => {
+        if (s >= 5) return [5, 10];
+        if (s === 4) return [3, 5];
+        if (s === 3) return [1, 3];
+        return [DAILY_REWARD.GOLD_AMOUNT, DAILY_REWARD.GOLD_AMOUNT];
+      };
+      // Determine reward using weighted probabilities by waifu stars
+      const getWeightedForStars = (s: number) => {
+        if (s <= 3) {
+          return { values: [1, 2, 3], weights: [50, 40, 10] };
+        }
+        if (s === 4) {
+          return { values: [1, 2, 3, 4], weights: [10, 30, 40, 20] };
+        }
+        // 5★+
+        return { values: [1, 2, 3, 4, 5, 6, 7, 8], weights: [0, 10, 20, 30, 20, 10, 5, 5] };
+      };
+
+      const weightedPick = (values: number[], weights: number[]) => {
+        const total = weights.reduce((a, b) => a + b, 0);
+        let r = Math.random() * total;
+        for (let i = 0; i < weights.length; i++) {
+          r -= weights[i];
+          if (r <= 0) return values[i];
+        }
+        return values[values.length - 1];
+      };
+
+      const { values, weights } = getWeightedForStars(starsNow);
+      const rewardAmount = weightedPick(values, weights);
+
+      // Thực hiện check-in (ghi số tiền thực tế nhận được)
       await DailyCheckinModel.findByIdAndUpdate(checkinRecord._id, {
         $push: { checkedDays: currentDay },
-        $inc: { goldEarned: DAILY_REWARD.GOLD_AMOUNT },
+        $inc: { goldEarned: rewardAmount },
       });
 
       // Cập nhật gold cho user
       await UserModel.findByIdAndUpdate(user.id, {
-        $inc: { gold: DAILY_REWARD.GOLD_AMOUNT },
+        $inc: { gold: rewardAmount },
       });
+
+      // Try to include waifu name in the response message for a friendlier UX
+      const waifuName = (userFullData?.currentWaifu as any)?.name || "Waifu";
 
       return Response.json({
         success: true,
-        message: `Điểm danh thành công! Bạn nhận được ${DAILY_REWARD.GOLD_AMOUNT} Dâm Ngọc`,
-        goldEarned: DAILY_REWARD.GOLD_AMOUNT,
+        message: `Bạn nhận được ${rewardAmount} Dâm Ngọc từ ${waifuName}`,
+        goldEarned: rewardAmount,
       });
     }
 

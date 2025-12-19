@@ -13,7 +13,7 @@ import {
 import { Dropdown } from "~/components/dropdown";
 import { MangaCard } from "~/components/manga-card";
 import { Pagination } from "~/components/pagination";
-import { MANGA_STATUS, MANGA_USER_STATUS } from "~/constants/manga";
+import { MANGA_CONTENT_TYPE, MANGA_STATUS, MANGA_USER_STATUS } from "~/constants/manga";
 import { GenresModel, type GenresType } from "~/database/models/genres.model";
 import type { MangaType } from "~/database/models/manga.model";
 
@@ -35,59 +35,89 @@ export const meta: MetaFunction = ({ data }: any) => {
       content:
         data.genre.description || `Khám phá thể loại ${data.genre.name} tại Vinahentai`,
     },
-  ];
+    data?.canonical ? { tagName: "link", rel: "canonical", href: data.canonical } : null,
+  ].filter(Boolean as any);
 };
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
+  const { sharedTtlCache } = await import("~/.server/utils/ttl-cache");
+
   const { slug } = params;
+  if (!slug) {
+    throw new Response("Không tìm thấy thể loại", { status: 404 });
+  }
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const sortParam = url.searchParams.get("sort") || "updatedAt";
   const limit = 18;
 
-  const genre = await GenresModel.findOne({ slug }).lean();
+  const cacheKey = `loader:genres:${slug}:page=${page}:sort=${sortParam}`;
 
-  if (!genre) {
+  const cached = await sharedTtlCache.getOrSet(cacheKey, 30_000, async () => {
+    const genre = await GenresModel.findOne({ slug }).lean();
+
+    if (!genre) {
+      return null;
+    }
+
+    const isCosplayGenre = genre.slug === "anh-cosplay" || genre.slug === "cosplay";
+
+    const query: Record<string, any> = {
+      genres: isCosplayGenre ? { $in: ["anh-cosplay", "cosplay"] } : genre.slug,
+      status: MANGA_STATUS.APPROVED,
+    };
+
+    if (isCosplayGenre) {
+      query.contentType = MANGA_CONTENT_TYPE.COSPLAY;
+    } else {
+      query.contentType = { $in: [MANGA_CONTENT_TYPE.MANGA, null] };
+    }
+
+    // sorting & extra filtering
+    let sort: Record<string, 1 | -1> | undefined;
+    switch (sortParam) {
+      case "viewNumber":
+        sort = { viewNumber: -1 };
+        break;
+      case "likeNumber":
+        sort = { likeNumber: -1 };
+        break;
+      case "completed":
+        query.userStatus = MANGA_USER_STATUS.COMPLETED;
+        sort = { updatedAt: -1 };
+        break;
+      case "oldest":
+        sort = { updatedAt: 1 };
+        break;
+      case "updatedAt":
+      default:
+        sort = { updatedAt: -1 };
+        break;
+    }
+
+    const [manga, totalCount] = await Promise.all([
+      searchMangaApprovedWithPagination({ page, limit, query, sort }),
+      getTotalMangaCount({ query }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      genre,
+      manga,
+      currentPage: page,
+      totalPages,
+      sort: sortParam,
+    };
+  });
+
+  if (!cached) {
     throw new Response("Không tìm thấy thể loại", { status: 404 });
   }
 
-  const query: Record<string, any> = {
-    genres: genre.slug,
-    status: MANGA_STATUS.APPROVED,
-  };
-
-  // sorting & extra filtering
-  let sort: Record<string, 1 | -1> | undefined;
-  switch (sortParam) {
-    case "viewNumber":
-      sort = { viewNumber: -1 };
-      break;
-    case "likeNumber":
-      sort = { likeNumber: -1 };
-      break;
-    case "completed":
-      query.userStatus = MANGA_USER_STATUS.COMPLETED;
-      sort = { updatedAt: -1 };
-      break;
-    case "updatedAt":
-    default:
-      sort = { updatedAt: -1 };
-      break;
-  }
-
-  const [manga, totalCount] = await Promise.all([
-    searchMangaApprovedWithPagination({ page, limit, query, sort }),
-    getTotalMangaCount({ query }),
-  ]);
-
-  const totalPages = Math.ceil(totalCount / limit);
-
   return Response.json({
-    genre,
-    manga,
-    currentPage: page,
-    totalPages,
-    sort: sortParam,
+    ...cached,
+    canonical: `${url.origin}/genres/${cached.genre.slug}`,
   });
 }
 
@@ -117,7 +147,7 @@ export default function Genres() {
   };
 
   return (
-    <div className="container-ad mx-auto px-4 py-6">
+    <div className="container-page mx-auto px-4 py-6">
       <div className="mb-8 flex flex-col items-start justify-start gap-3.5">
         <h1 className="text-txt-primary text-4xl leading-10 font-semibold">
           {genre?.name}
@@ -133,6 +163,7 @@ export default function Genres() {
             <Dropdown
               options={[
                 { value: "updatedAt", label: "Mới cập nhật" },
+                { value: "oldest", label: "Cũ nhất" },
                 { value: "viewNumber", label: "Đọc nhiều" },
                 { value: "likeNumber", label: "Được yêu thích" },
                 { value: "completed", label: "Đã hoàn thành" },

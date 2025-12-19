@@ -9,6 +9,7 @@ export type ReportType = {
   reason: string;
   reportType: string;
   targetId: Schema.Types.ObjectId;
+  reporterId?: Schema.Types.ObjectId;
   mangaId?: Schema.Types.ObjectId;
   postId?: Schema.Types.ObjectId;
   createdAt: Date;
@@ -22,6 +23,7 @@ const ReportSchema = new Schema<ReportType>(
     reason: { type: String, required: true },
     reportType: { type: String, required: true, enum: REPORT_TYPE },
     targetId: { type: Schema.Types.ObjectId, required: true },
+    reporterId: { type: Schema.Types.ObjectId, ref: "User" },
     mangaId: { type: Schema.Types.ObjectId },
     postId: { type: Schema.Types.ObjectId },
   },

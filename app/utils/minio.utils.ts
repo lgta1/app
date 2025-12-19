@@ -84,6 +84,45 @@ interface ExtendedListOptions extends ListObjectsOptions {
 // =============================================================================
 
 /**
+ * Sanitize object file name for storage keys.
+ * - Strips diacritics (Vietnamese accents)
+ * - Removes path segments
+ * - Keeps extension when possible
+ * - Replaces unsafe characters with '-'
+ */
+const STORAGE_FILENAME_MAX_LENGTH = 140;
+const stripDiacritics = (value: string): string => {
+  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+};
+
+const sanitizeObjectFileName = (input: string): string => {
+  const fallbackBase = `file-${Date.now()}`;
+  const fallbackExt = ".bin";
+
+  const raw = String(input || "").trim();
+  if (!raw) return `${fallbackBase}${fallbackExt}`;
+
+  const normalized = stripDiacritics(raw.replace(/\\/g, "/"));
+  const lastSegment = normalized.split("/").pop() || fallbackBase;
+
+  const lastDot = lastSegment.lastIndexOf(".");
+  const hasExtension = lastDot > 0 && lastDot < lastSegment.length - 1;
+
+  const baseRaw = hasExtension ? lastSegment.slice(0, lastDot) : lastSegment;
+  const extRaw = hasExtension ? lastSegment.slice(lastDot).toLowerCase() : fallbackExt;
+
+  const baseAscii = baseRaw.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const baseCollapsed = baseAscii.replace(/-+/g, "-");
+  const baseTrimmed = baseCollapsed.replace(/^[-_.]+|[-_.]+$/g, "");
+  const base = (baseTrimmed || fallbackBase).toLowerCase();
+
+  const ext = extRaw.replace(/[^a-z0-9.]/g, "") || fallbackExt;
+  const maxBaseLength = Math.max(8, STORAGE_FILENAME_MAX_LENGTH - ext.length);
+  const safeBase = base.slice(0, maxBaseLength);
+  return `${safeBase}${ext}`;
+};
+
+/**
  * Tạo environment prefix - thêm '/test' nếu không phải production
  */
 export const getEnvironmentPrefix = (): string => {
@@ -298,24 +337,31 @@ export const uploadToPublicBucket = async (
 ): Promise<UploadResult> => {
   const bucket = MINIO_CONFIG.DEFAULT_BUCKET;
 
+  // Always sanitize fileName (strip accents) to avoid storage/header issues
+  const safeFileName = sanitizeObjectFileName(fileName);
+
   // Generate unique filename if requested
   const actualFileName = options.generateUniqueFileName
-    ? generateUniqueFileName(fileName)
-    : fileName;
+    ? generateUniqueFileName(safeFileName)
+    : safeFileName;
 
   // Create full path with prefix
   const fullPath = createFullPath(actualFileName, options.prefixPath);
 
   // Set content type
-  const contentType = options.contentType || getMimeTypeFromExtension(fileName);
+  const contentType = options.contentType || getMimeTypeFromExtension(safeFileName);
 
   const client = getMinioClient();
 
   try {
-    const result = await client.putObject(bucket, fullPath, file, undefined, {
+    const headers: Record<string, string> = {
       "Content-Type": contentType,
-      ...options.metadata,
-    });
+      ...(options.metadata || {}),
+    };
+    if (options.cacheControl) {
+      headers["Cache-Control"] = options.cacheControl;
+    }
+    const result = await client.putObject(bucket, fullPath, file, undefined, headers);
 
     // Generate public URL
     const url = getPublicFileUrl(fullPath);
@@ -353,22 +399,29 @@ export const uploadFile = async (
   const client = getMinioClient();
   const bucket = MINIO_CONFIG.DEFAULT_BUCKET;
 
+  // Always sanitize fileName (strip accents) to avoid storage/header issues
+  const safeFileName = sanitizeObjectFileName(fileName);
+
   // Generate unique filename if requested
   const actualFileName = options.generateUniqueFileName
-    ? generateUniqueFileName(fileName)
-    : fileName;
+    ? generateUniqueFileName(safeFileName)
+    : safeFileName;
 
   // Create full path with prefix
   const fullPath = createFullPath(actualFileName, options.prefixPath);
 
   // Set content type
-  const contentType = options.contentType || getMimeTypeFromExtension(fileName);
+  const contentType = options.contentType || getMimeTypeFromExtension(safeFileName);
 
   try {
-    const result = await client.putObject(bucket, fullPath, file, undefined, {
+    const headers: Record<string, string> = {
       "Content-Type": contentType,
-      ...options.metadata,
-    });
+      ...(options.metadata || {}),
+    };
+    if (options.cacheControl) {
+      headers["Cache-Control"] = options.cacheControl;
+    }
+    const result = await client.putObject(bucket, fullPath, file, undefined, headers);
 
     // Generate private URL (presigned)
     const url = await getFileUrl(fullPath);

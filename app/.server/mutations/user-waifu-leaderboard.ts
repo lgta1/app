@@ -15,13 +15,13 @@ export const checkWaifuToUpdate = async (userId: string, waifuId: string) => {
       {
         $push: {
           waifuCollection: {
-            waifuId: waifu?.id,
-            name: waifu?.name,
-            image: waifu?.image,
-            stars: waifu?.stars,
-            expBuff: waifu?.expBuff,
-            goldBuff: waifu?.goldBuff,
-          },
+              waifuId: (waifu as any)?._id?.toString() ?? (waifu as any)?.id,
+              name: waifu?.name,
+              image: waifu?.image,
+              stars: waifu?.stars,
+              expBuff: waifu?.expBuff,
+              goldBuff: waifu?.goldBuff,
+            },
         },
         $inc: {
           totalWaifu: 1,

@@ -4,9 +4,87 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import { CHAPTER_STATUS } from "~/constants/chapter";
 import { ChapterModel, type ChapterType } from "~/database/models/chapter.model";
 import { MangaModel } from "~/database/models/manga.model";
+import { generateUniqueChapterSlug } from "~/database/helpers/chapter-slug.helper";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
+import { MANGA_STATUS } from "~/constants/manga";
+import { getFileInfo } from "~/utils/minio.utils";
+import { MINIO_CONFIG } from "@/configs/minio.config";
 
+// Helpers to validate chapter image limits for UNAPPROVED manga
+const MAX_IMAGES_UNAPPROVED = 100;
+const MAX_PER_IMAGE_UNAPPROVED = 5 * 1024 * 1024; // 5MB
+const MAX_TOTAL_UNAPPROVED = 130 * 1024 * 1024; // 130MB
+
+function fullPathFromPublicUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    let path = u.pathname.replace(/^\/+/, "");
+    // If MinIO-style URL includes bucket as first segment, strip it
+    const bucket = MINIO_CONFIG.DEFAULT_BUCKET;
+    if (path.startsWith(bucket + "/")) {
+      path = path.substring(bucket.length + 1);
+    }
+    return path;
+  } catch {
+    // Best-effort: treat as already a fullPath
+    return url;
+  }
+}
+
+async function fetchPublicImageSize(publicUrl: string): Promise<number> {
+  const fullPath = fullPathFromPublicUrl(publicUrl);
+  const info = await getFileInfo(fullPath, { isPublic: true });
+  if (typeof info.size !== "number") {
+    throw new BusinessError("Không xác định được dung lượng ảnh, vui lòng thử lại");
+  }
+  return info.size;
+}
+
+async function validateUnapprovedChapterConstraints(
+  contentUrls: string[],
+): Promise<number> {
+  if (contentUrls.length > MAX_IMAGES_UNAPPROVED) {
+    throw new BusinessError(
+      `Truyện chưa duyệt chỉ được tối đa ${MAX_IMAGES_UNAPPROVED} ảnh mỗi chương`,
+    );
+  }
+
+  let total = 0;
+  for (const publicUrl of contentUrls) {
+    const size = await fetchPublicImageSize(publicUrl);
+    if (size > MAX_PER_IMAGE_UNAPPROVED) {
+      throw new BusinessError(
+        `Ảnh vượt quá 5MB: ${publicUrl.split("/").pop() || "file"}`,
+      );
+    }
+    total += size;
+    if (total > MAX_TOTAL_UNAPPROVED) {
+      throw new BusinessError(
+        `Tổng dung lượng chương vượt quá 130MB (hiện tại ~${(total / 1024 / 1024).toFixed(1)}MB)`,
+      );
+    }
+  }
+
+   return total;
+}
+
+async function calculateChapterContentBytes(contentUrls: string[]): Promise<number> {
+  if (!Array.isArray(contentUrls) || contentUrls.length === 0) {
+    return 0;
+  }
+
+  let total = 0;
+  for (const publicUrl of contentUrls) {
+    total += await fetchPublicImageSize(publicUrl);
+  }
+  return total;
+}
+
+// CHAPTER TITLE NORMALIZATION POLICY (2025-11-08)
+// If incoming title is blank/placeholder ("" or only whitespace or "...")
+// we auto-assign "Chap N" where N is the final chapterNumber after increment.
+// This ensures consistent naming and removes the previous "..." fallback logic.
 export const createChapter = async (
   request: Request,
   chapter: Omit<ChapterType, "id" | "createdAt" | "updatedAt">,
@@ -27,38 +105,98 @@ export const createChapter = async (
     };
   }
 
-  const manga = await MangaModel.findOneAndUpdate(
-    query,
-    {
-      $inc: { chapters: 1 },
-    },
-    { new: true },
-  );
+  // Fetch manga first to enforce unapproved constraints safely
+  const manga = await MangaModel.findOne(query);
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy manga");
   }
+
+  const contentUrls = Array.isArray(chapter.contentUrls) ? chapter.contentUrls : [];
+
+  // Unapproved gating rules (skip for admins)
+  let totalBytes = 0;
+  if (!isAdmin(userInfo.role) && manga.status !== MANGA_STATUS.APPROVED) {
+    // 1) Only one chapter allowed until approved
+    if ((manga.chapters || 0) >= 1) {
+      throw new BusinessError(
+        "Truyện chưa được duyệt chỉ được đăng tối đa 1 chương",
+      );
+    }
+
+    // 2) Per-chapter constraints (images/size)
+    totalBytes = await validateUnapprovedChapterConstraints(contentUrls);
+  } else {
+    if (typeof (chapter as any).contentBytes === "number" && (chapter as any).contentBytes > 0) {
+      totalBytes = (chapter as any).contentBytes;
+    } else {
+      totalBytes = await calculateChapterContentBytes(contentUrls);
+    }
+  }
+
+  // Determine final chapter number BEFORE creation (do not mutate manga yet)
+  const finalNumber = (manga.chapters || 0) + 1;
+
   try {
-    const newChapter = await ChapterModel.create({
-      ...chapter,
-      chapterNumber: manga.chapters,
-    });
+    const rawTitle = (chapter.title ?? "").trim();
+    const isPlaceholder = rawTitle === "..."; // legacy placeholder to ignore
+    const finalTitle = rawTitle ? rawTitle : `Chap ${finalNumber}`;
 
-    notifyNewChapter(newChapter, manga);
+    // Generate stable SEO slug ONCE, based on the initial title (or "Chap N" fallback).
+    // If duplicated within this manga, add suffix: -2, -3, ...
+    let chapterSlug = await generateUniqueChapterSlug(
+      String(chapter.mangaId),
+      isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+    );
 
-    return newChapter;
+    // Best-effort retry to handle rare concurrent creates.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const newChapter = await ChapterModel.create({
+          ...chapter,
+          contentBytes: totalBytes,
+          title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+          chapterNumber: finalNumber,
+          slug: chapterSlug,
+        });
+
+        // Atomically bump chapters & set updatedAt to the new chapter's createdAt without auto timestamps
+        await MangaModel.updateOne(
+          { _id: manga.id },
+          { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
+          { timestamps: false },
+        );
+
+        notifyNewChapter(newChapter, manga);
+
+        return newChapter;
+      } catch (e: any) {
+        const code = Number(e?.code);
+        const msg = String(e?.message || "");
+        const isDup = code === 11000 || msg.includes("E11000");
+        if (!isDup) throw e;
+        // Recompute based on the same base title; suffix selection depends on current DB state.
+        chapterSlug = await generateUniqueChapterSlug(
+          String(chapter.mangaId),
+          isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+        );
+      }
+    }
+
+    throw new BusinessError("Không thể tạo slug chương duy nhất, vui lòng thử lại");
   } catch (error) {
-    manga.chapters--;
-    await manga.save();
+    // Rollback only if we already incremented chapters (best-effort: check if chapter exists?)
+    // Here we didn't increment yet unless creation succeeded; safe no-op.
     throw new BusinessError("Lỗi khi tạo chương");
   }
 };
 
+// Update chapter: if title provided but blank/placeholder => normalize to auto-number.
 export const updateChapter = async (
   request: Request,
   mangaId: string,
   chapterNumber: number,
-  updateData: Partial<Pick<ChapterType, "title" | "contentUrls">>,
+  updateData: Partial<Pick<ChapterType, "title" | "contentUrls" | "contentBytes">>,
 ) => {
   const userInfo = await getUserInfoFromSession(request);
   if (!userInfo) {
@@ -82,13 +220,36 @@ export const updateChapter = async (
     throw new BusinessError("Không tìm thấy manga hoặc bạn không có quyền chỉnh sửa");
   }
 
+  // Enforce per-chapter constraints for unapproved manga (skip for admins)
+  let updatedContentBytes: number | undefined;
+  if (Array.isArray(updateData.contentUrls)) {
+    if (!isAdmin(userInfo.role) && manga.status !== MANGA_STATUS.APPROVED) {
+      updatedContentBytes = await validateUnapprovedChapterConstraints(updateData.contentUrls);
+    } else if (typeof updateData.contentBytes === "number" && updateData.contentBytes > 0) {
+      updatedContentBytes = updateData.contentBytes;
+    } else {
+      updatedContentBytes = await calculateChapterContentBytes(updateData.contentUrls);
+    }
+  }
+
   // Update chapter
+  const rawTitle = (updateData.title ?? "").trim();
+  const isPlaceholder = rawTitle === "..."; // legacy value
+  const finalTitle = rawTitle ? rawTitle : `Chap ${chapterNumber}`;
+
+  const updatePayload: any = {
+    ...updateData,
+    title: isPlaceholder ? `Chap ${chapterNumber}` : finalTitle,
+    status: CHAPTER_STATUS.PENDING,
+  };
+
+  if (typeof updatedContentBytes === "number") {
+    updatePayload.contentBytes = updatedContentBytes;
+  }
+
   const updatedChapter = await ChapterModel.findOneAndUpdate(
     { mangaId, chapterNumber },
-    {
-      ...updateData,
-      status: CHAPTER_STATUS.PENDING,
-    },
+    updatePayload,
     { new: true },
   );
 
@@ -97,4 +258,76 @@ export const updateChapter = async (
   }
 
   return updatedChapter;
+};
+
+// Close-gap renumber when a chapter is deleted: all chapters with number > deletedNumber move up by 1
+export const renumberAfterDelete = async (
+  mangaId: string,
+  deletedNumber: number,
+) => {
+  if (!mangaId || !Number.isFinite(deletedNumber)) return;
+  await ChapterModel.updateMany(
+    { mangaId, chapterNumber: { $gt: deletedNumber } },
+    { $inc: { chapterNumber: -1 } },
+  );
+};
+
+// Reorder chapters to match the provided ordered list of chapter IDs (ascending STT)
+// Uses two-phase bulk updates to avoid unique index collisions on (mangaId, chapterNumber)
+export const reorderChaptersByIds = async (
+  mangaId: string,
+  orderedChapterIds: string[],
+) => {
+  if (!mangaId) {
+    throw new BusinessError("mangaId là bắt buộc");
+  }
+  if (!Array.isArray(orderedChapterIds) || orderedChapterIds.length === 0) {
+    throw new BusinessError("Danh sách chương mới không hợp lệ");
+  }
+
+  const chapters = await ChapterModel.find({ mangaId }).select("_id").lean();
+  const allIds = chapters.map((c: any) => String(c._id));
+
+  if (allIds.length !== orderedChapterIds.length) {
+    throw new BusinessError("Danh sách chương không khớp số lượng hiện có");
+  }
+
+  const setAll = new Set(allIds);
+  for (const id of orderedChapterIds) {
+    if (!setAll.has(String(id))) {
+      throw new BusinessError("Danh sách chương chứa phần tử không thuộc manga này");
+    }
+  }
+
+  // Build final mapping id -> chapterNumber (1..N) based on orderedChapterIds
+  const finalMap = new Map<string, number>();
+  orderedChapterIds.forEach((id, idx) => finalMap.set(String(id), idx + 1));
+
+  const OFFSET = 1_000_000;
+
+  // Phase 1: move to temporary range to avoid unique collisions
+  const phase1 = orderedChapterIds.map((id) => ({
+    updateOne: {
+      filter: { _id: id, mangaId },
+      update: { $inc: { chapterNumber: OFFSET } },
+    },
+  }));
+
+  if (phase1.length) {
+    await ChapterModel.bulkWrite(phase1);
+  }
+
+  // Phase 2: set final numbers 1..N
+  const phase2 = orderedChapterIds.map((id) => ({
+    updateOne: {
+      filter: { _id: id, mangaId },
+      update: { $set: { chapterNumber: finalMap.get(String(id))! } },
+    },
+  }));
+
+  if (phase2.length) {
+    await ChapterModel.bulkWrite(phase2);
+  }
+
+  return { count: orderedChapterIds.length };
 };

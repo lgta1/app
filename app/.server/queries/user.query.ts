@@ -1,14 +1,14 @@
 import { ROLES } from "~/constants/user";
 import { UserModel } from "~/database/models/user.model";
 
-export const getTopUser = async () => {
+export const getTopUser = async (limit: number = 10) => {
   return await UserModel.find({
     role: ROLES.USER,
     isDeleted: false,
     isBanned: false,
   })
-    .sort({ exp: -1 })
-    .limit(10)
+    .sort({ level: -1, exp: -1, createdAt: 1 })
+    .limit(Math.max(1, limit))
     .select("-password -salt")
     .lean();
 };
@@ -101,5 +101,22 @@ export const getListModAndAdmin = async (search?: string) => {
   return await UserModel.find(query)
     .sort({ createdAt: -1 })
     .select("-password -salt")
+    .lean();
+};
+
+export const getListDichGia = async (search?: string) => {
+  const query: any = {
+    role: ROLES.DICHGIA,
+    isDeleted: false,
+  };
+  if (search && search.trim()) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+    ];
+  }
+  return await UserModel.find(query)
+    .sort({ createdAt: -1 })
+    .select('-password -salt')
     .lean();
 };

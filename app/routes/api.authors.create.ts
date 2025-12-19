@@ -5,15 +5,22 @@ import mongoose from "mongoose";
 import { AuthorModel } from "~/database/models/author.model";
 
 function toSlug(name: string) {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // bỏ dấu
+  const normalized = name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // bỏ dấu Latin
     .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
+    .trim();
+
+  const sanitized = normalized
+    .replace(/[^\p{Letter}\p{Number}\s-]+/gu, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+
+  if (sanitized) return sanitized;
+  // Fallback: keep original characters (including CJK) but replace spaces with dashes
+  const fallback = name.trim().replace(/\s+/g, "-");
+  return fallback || "author";
 }
 
 function escapeRegExp(s: string) {

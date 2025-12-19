@@ -35,7 +35,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .populate({
         path: "mangaId",
         model: "Manga",
-        select: "title poster chapters viewNumber likeNumber followNumber",
+        select: "title poster slug chapters viewNumber likeNumber followNumber",
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -55,6 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         return {
           ...manga.toObject(),
           id: manga._id.toString(),
+          slug: manga.slug,
         };
       });
 

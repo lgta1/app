@@ -6,9 +6,24 @@ import { calculateLeaderboard, type LeaderboardPeriod } from "@/services/leaderb
 
 export async function loader({ request }: ActionFunctionArgs) {
   try {
-    await requireAdminLogin(request);
+    // BYPASS nội bộ bằng token bí mật (không cần login)
+const url = new URL(request.url);
+const token =
+  request.headers.get("x-internal-job-token") ||
+  url.searchParams.get("token");
 
-    const url = new URL(request.url);
+if (token && token === process.env.INTERNAL_JOB_TOKEN) {
+  const periodParam = (url.searchParams.get("period") ?? "daily") as "daily" | "weekly" | "monthly";
+  if (url.searchParams.has("period")) {
+    await calculateLeaderboard(periodParam); // weekly/monthly sẽ bị bỏ qua an toàn
+    return Response.json({ success: true, from: "internal", period: periodParam, skipped: periodParam !== "daily" });
+  } else {
+    await calculateAllLeaderboards();
+    return Response.json({ success: true, from: "internal", period: "daily" });
+  }
+}
+
+    await requireAdminLogin(request);
     const period = url.searchParams.get("period") as string;
 
     // Nếu không có period, tính toán tất cả
@@ -16,7 +31,7 @@ export async function loader({ request }: ActionFunctionArgs) {
       await calculateAllLeaderboards();
       return Response.json({
         success: true,
-        message: "Đã tính toán xong tất cả leaderboards",
+        message: "Đã tính toán xong leaderboard daily (weekly/monthly dùng counters, không cần tính)",
       });
     }
 
@@ -28,11 +43,13 @@ export async function loader({ request }: ActionFunctionArgs) {
       );
     }
 
-    await calculateLeaderboard(period as LeaderboardPeriod);
-
+    await calculateLeaderboard(period as LeaderboardPeriod); // weekly/monthly sẽ log skip
     return Response.json({
       success: true,
-      message: `Đã tính toán xong leaderboard ${period}`,
+      message: period === "daily"
+        ? "Đã tính toán xong leaderboard daily"
+        : "Weekly/Monthly đang dùng counters realtime, không cần tính snapshot",
+      skipped: period !== "daily",
     });
   } catch (error) {
     console.error("Lỗi API calculate leaderboard:", error);

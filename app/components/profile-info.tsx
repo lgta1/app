@@ -1,7 +1,8 @@
 import { NavLink } from "react-router-dom";
-import { Edit3 } from "lucide-react";
+import { Edit3, User as UserIcon } from "lucide-react";
 
 import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";
+import { getLevelTitle, getMaxExp, MAX_LEVEL } from "~/helpers/user-level.helper";
 import { formatDate } from "~/utils/date.utils";
 
 interface ProfileInfoProps {
@@ -10,55 +11,107 @@ interface ProfileInfoProps {
 }
 
 export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {
+  const avatarUrl: string = getAvatarPath(user);
+  let showIcon = !avatarUrl;
+  const levelTitle = getLevelTitle(user.level);
+  const displayName = levelTitle ? `${user.name} - ${levelTitle}` : user.name;
+  const level = Math.max(1, Number(user.level) || 1);
+  const expValue = Math.max(0, Number(user.exp) || 0);
+  const isMaxLevel = level >= MAX_LEVEL;
+  const maxExpValue = isMaxLevel ? null : getMaxExp(level);
+  const expPercent = isMaxLevel
+    ? 100
+    : Math.min(100, (expValue / Math.max(1, Number(maxExpValue) || 1)) * 100);
+  const expDisplayMax = isMaxLevel
+    ? "Tối đa"
+    : (maxExpValue ?? 0).toLocaleString("vi-VN");
+  const expDisplayCurrent = expValue.toLocaleString("vi-VN");
+
   return (
     <div className="bg-bgc-layer1 border-bd-default flex w-full flex-col gap-6 rounded-xl border p-4 lg:flex-row lg:p-6">
       {/* Left Section - User Info */}
       <div className="flex flex-1 gap-4 lg:max-w-[514px]">
-        <img
-          className="h-16 w-16 rounded-full object-cover lg:h-24 lg:w-24"
-          src={getAvatarPath(user)}
-          alt={user.name}
-        />
+        <div className="flex flex-col items-center gap-2">
+          {/* AVATAR: icon lucide khi chưa upload hoặc ảnh lỗi */}
+          <div className="h-16 w-16 lg:h-24 lg:w-24 rounded-full overflow-hidden flex items-center justify-center bg-[#121826]">
+            {showIcon ? (
+              <UserIcon className="h-10 w-10 lg:h-14 lg:w-14 text-txt-primary" />
+            ) : (
+              <img
+                className="block h-full w-full object-cover"
+                src={avatarUrl}
+                alt={user.name}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                  showIcon = true;
+                }}
+              />
+            )}
+          </div>
+          {isOwner && (
+            <NavLink
+              to="/profile-edit"
+              className="text-xs font-semibold text-success-success underline decoration-dotted underline-offset-4"
+            >
+              Chỉnh sửa hồ sơ
+            </NavLink>
+          )}
+        </div>
+
         <div className="flex flex-1 flex-col gap-3">
           {/* Name and Badge */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-3">
               <h1 className="text-txt-primary font-sans text-lg font-semibold lg:text-xl">
-                {user.name}
+                {displayName}
               </h1>
-              <img
-                className="h-6 lg:h-8"
-                src={getTitleImgPath(user as any)}
-                alt="User Badge"
-              />
+
+              {/* BADGE/TITLE: scale 2x mobile, 1.5x desktop, không tăng chiều cao hàng */}
+              <span className="relative inline-flex h-6 lg:h-8 overflow-visible">
+                <img
+                  className="block h-full w-auto object-contain"
+                  src={getTitleImgPath(user as any)}
+                  alt="User Badge"
+                  style={{
+                    transform: "scale(2)",              // default (mobile)
+                    transformOrigin: "center",
+                    marginLeft: "-2px",
+                    marginRight: "-2px",
+                  }}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
+                <style>
+                  {`
+                    @media (min-width: 1024px) {
+                      .relative.inline-flex.h-6.lg\\:h-8.overflow-visible img {
+                        transform: scale(1.5);
+                      }
+                    }
+                  `}
+                </style>
+              </span>
             </div>
+
             <p className="text-txt-secondary text-xs font-medium">
               Ngày đăng ký: {formatDate(user.createdAt || new Date())}
             </p>
           </div>
 
           {/* Experience Bar */}
-          <div className="flex items-center gap-1.5">
-            <img
-              className="h-8 w-10 lg:h-10 lg:w-12"
-              src="/images/icons/exp.png"
-              alt="EXP Icon"
-            />
-            <div className="flex flex-1 flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-txt-primary text-xs font-medium">Kinh nghiệm</span>
-                <span className="text-txt-primary text-xs font-medium">
-                  {user.exp}/{user.maxExp}
-                </span>
-              </div>
-              <div className="bg-bgc-layer2 h-2 overflow-hidden rounded">
-                <div
-                  className="via-lav-500 h-2 rounded bg-gradient-to-r from-[#3D1351] to-[#E8B5FF]"
-                  style={{
-                    width: `${((user.exp || 0) / (user.maxExp as any)) * 100}%`,
-                  }}
-                />
-              </div>
+          <div className="flex flex-1 flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-txt-primary text-xs font-medium">Kinh nghiệm</span>
+              <span className="text-txt-primary text-xs font-medium">
+                {expDisplayCurrent}/{expDisplayMax}
+              </span>
+            </div>
+            <div className="bg-bgc-layer2 h-2 overflow-hidden rounded">
+              <div
+                className="via-lav-500 h-2 rounded bg-gradient-to-r from-[#3D1351] to-[#E8B5FF]"
+                style={{ width: `${expPercent}%` }}
+              />
             </div>
           </div>
 
@@ -66,11 +119,6 @@ export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {
           <div className="flex flex-col gap-[5px]">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-white">Giới thiệu</h2>
-              {isOwner && (
-                <NavLink to="/profile-edit">
-                  <Edit3 className="text-success-success h-4 w-4" />
-                </NavLink>
-              )}
             </div>
             <p className="text-txt-secondary text-xs leading-none font-medium">
               {user.bio}
@@ -121,7 +169,7 @@ export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {
             <div className="text-txt-primary text-base font-semibold">
               {user.mangasFollowing || 0}
             </div>
-            <div className="text-txt-secondary text-xs font-medium">Truyện theo dõi</div>
+            <div className="text-txt-secondary text-xs font-medium">Đang theo dõi</div>
           </div>
         </div>
       </div>

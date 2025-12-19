@@ -3,14 +3,15 @@ import * as Dialog from "@radix-ui/react-dialog";
 interface WaifuGuideDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  banner?: any; // truyền từ trang summon để hiển thị danh sách waifu
 }
 
-export function WaifuGuideDialog({ open, onOpenChange }: WaifuGuideDialogProps) {
+export function WaifuGuideDialog({ open, onOpenChange, banner }: WaifuGuideDialogProps) {
   const milestoneRewards: Array<{ threshold: number; reward: string }> = [
-    { threshold: 50, reward: "50 vàng + 25 EXP" },
-    { threshold: 100, reward: "100 vàng + 50 EXP" },
-    { threshold: 200, reward: "200 vàng + 1 Waifu 4★" },
-    { threshold: 450, reward: "🎁 Chắc chắn nhận 1 Waifu 5★ trong banner" },
+    { threshold: 50, reward: "+5 Vàng" },
+    { threshold: 100, reward: "+10 Vàng + 1 Waifu 3★ (khi mở quà)" },
+    { threshold: 200, reward: "+20 Vàng + 1 Waifu 4★ (khi mở quà)" },
+    { threshold: 400, reward: "+40 Vàng + 1 Waifu 5★ (khi mở quà)" },
   ];
 
   return (
@@ -28,75 +29,39 @@ export function WaifuGuideDialog({ open, onOpenChange }: WaifuGuideDialogProps) 
                 <div className="h-0 w-24 outline-1 outline-offset-[-0.50px] outline-white/20 sm:w-96"></div>
               </div>
 
-              {/* Description & Banner Types */}
+              {/* Description (đã đổi “sưu tầm” -> “triệu hồi”) */}
               <div className="w-full justify-center text-sm leading-normal sm:text-base">
                 <div className="text-txt-secondary font-medium">
                   Chào mừng bạn đến với tính năng
-                  <span className="text-txt-primary font-medium">Triệu Hồi Waifu</span> —
-                  nơi bạn có thể sưu tầm những waifu xinh đẹp, quyến rũ và hiếm có đang
-                  chờ được bạn triệu hồi về, để góp mặt trong dàn harem độc nhất vô nhị
-                  của riêng bạn!
+                  <span className="text-txt-primary font-medium"> Triệu Hồi Waifu</span> — nơi bạn có thể <span className="text-txt-primary font-medium">triệu hồi</span> những waifu xinh đẹp, quyến rũ và hiếm có, để tạo nên dàn harem độc nhất vô nhị của riêng bạn!
                 </div>
                 <div className="text-txt-secondary font-medium">
-                  Hãy bắt đầu hành trình sưu tầm và mở rộng bộ sưu tập waifu mơ ước ngay
-                  hôm nay!
+                  Hãy bắt đầu hành trình sưu tầm và mở rộng bộ sưu tập waifu mơ ước ngay hôm nay!
                 </div>
-                <br />
-                <div className="text-txt-primary mb-2 text-xl font-medium">
-                  Phân Loại Banner
-                </div>
+              </div>
+
+              {/* Banner Thường */}
+              <div className="w-full justify-center text-sm leading-normal sm:text-base">
+                <div className="text-txt-primary mb-2 text-xl font-medium">Banner Thường</div>
                 <ul className="text-txt-secondary list-disc space-y-2 pl-5 font-medium">
                   <li>
-                    <span>Banner Thường</span>
-                    <ul className="list-[circle] space-y-1 pl-5">
-                      <li>
-                        <span>1 lượt: </span>
-                        <span className="text-txt-focus font-medium">
-                          Tốn 10 Dâm Ngọc
-                        </span>
-                      </li>
-                      <li>
-                        <span>10 lượt: </span>
-                        <span className="text-txt-focus font-medium">
-                          Tốn 90 Dâm Ngọc
-                        </span>
-                      </li>
-                      <li>
-                        <span className="text-txt-focus font-medium">Lưu ý: </span> Các
-                        lượt quay KHÔNG được tích lũy nhận thưởng.
-                      </li>
-                    </ul>
+                    <span>1 lượt: </span>
+                    <span className="text-txt-focus font-medium">tốn 1 Dâm Ngọc</span>
                   </li>
                   <li>
-                    <span>Banner Rate Up</span>
-                    <ul className="list-[circle] space-y-1 pl-5">
-                      <li>
-                        <span>1 lượt: </span>
-                        <span className="text-txt-focus font-medium">
-                          Tốn 15 Dâm Ngọc
-                        </span>
-                      </li>
-                      <li>
-                        <span>10 lượt: </span>
-                        <span className="text-txt-focus font-medium">
-                          Tốn 130 Dâm Ngọc
-                        </span>
-                      </li>
-                      <li>
-                        <span className="text-txt-focus font-medium">Đặc biệt: </span>
-                        <span className="text-txt-secondary font-medium">
-                          Khi quay banner Rate Up, lượt quay sẽ được tích lũy để nhận
-                          thưởng theo các mốc dưới đây:
-                        </span>
-                      </li>
-                    </ul>
+                    <span>10 lượt: </span>
+                    <span className="text-txt-focus font-medium">tốn 9 Dâm Ngọc</span>
+                  </li>
+                  <li>
+                    <span className="text-txt-focus font-medium">Đặc biệt: </span>
+                    các lượt quay <span className="text-txt-focus font-medium">được tích lũy</span> để nhận thưởng theo các mốc dưới đây.
                   </li>
                 </ul>
               </div>
 
-              {/* Milestone Rewards Title */}
+              {/* Milestone Rewards Title (đã bỏ phần ngoặc) */}
               <div className="text-txt-primary w-full justify-center text-sm leading-normal font-medium sm:text-base">
-                Mốc Quay Tích Lũy Banner Rate Up
+                Mốc Quay Tích Lũy
               </div>
 
               {/* Milestone Rewards Table */}
@@ -105,12 +70,12 @@ export function WaifuGuideDialog({ open, onOpenChange }: WaifuGuideDialogProps) 
                 <div className="bg-bgc-layer2 outline-bd-default flex w-full outline-1 outline-offset-[-1px]">
                   <div className="border-bd-default flex flex-[2] items-center justify-center gap-2.5 border-r px-2 py-2 sm:px-3">
                     <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      Mốc Quay Tích Lũy
+                      Mốc quay
                     </div>
                   </div>
                   <div className="flex flex-[3] items-center justify-center gap-2.5 px-2 py-2 sm:px-3">
                     <div className="text-txt-primary justify-center text-xs font-medium sm:text-base">
-                      Phần Thưởng
+                      Phần thưởng
                     </div>
                   </div>
                 </div>
@@ -133,6 +98,47 @@ export function WaifuGuideDialog({ open, onOpenChange }: WaifuGuideDialogProps) 
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Danh sách Waifu (nối xuống dưới hướng dẫn) */}
+              <div className="w-full justify-center text-sm leading-normal sm:text-base">
+                <div className="text-txt-primary mb-3 text-xl font-medium">Danh sách nhân vật</div>
+                {/* Group theo sao: 5 → 4 → 3 */}
+                {(() => {
+                  const grouped: Record<number, any[]> = {};
+                  const list = banner?.waifuList || [];
+                  for (const w of list) {
+                    const s = w?.stars ?? 3;
+                    if (!grouped[s]) grouped[s] = [];
+                    grouped[s].push(w);
+                  }
+                  const order = [5, 4, 3];
+                  return (
+                    <div className="flex flex-col gap-6">
+                      {order.map((s) =>
+                        grouped[s]?.length ? (
+                          <div key={s} className="flex flex-col gap-3">
+                            <div className="text-txt-primary text-base font-medium sm:text-lg">Waifu {s} sao</div>
+                            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                              {grouped[s].map((w, idx) => (
+                                <div
+                                  key={`w-${s}-${idx}`}
+                                  className="relative h-[160px] w-full overflow-hidden rounded-lg bg-white"
+                                  title={w?.name}
+                                >
+                                  <img src={w?.image || "/images/waifu/waifu-1.png"} alt={w?.name} className="h-full w-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null,
+                      )}
+                      {!order.some((s) => grouped[s]?.length) && (
+                        <div className="py-8 text-center text-txt-secondary">Chưa có nhân vật nào trong danh sách</div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

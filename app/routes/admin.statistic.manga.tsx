@@ -44,7 +44,7 @@ export default function AdminStatistic() {
 
   const tabs = [
     { key: "manga" as const, label: "Top Truyện tranh" },
-    { key: "member" as const, label: "Top Thành viên" },
+    { key: "member" as const, label: "Thánh Lọ Bảng" },
   ];
 
   const periods = [

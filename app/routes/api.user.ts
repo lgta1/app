@@ -54,8 +54,17 @@ export async function action({ request }: ActionFunctionArgs) {
         });
       }
 
+      // Derive static still filename: prefer waifu.image if already a still extension
+      // (You can adjust this mapping later if animated vs still differ)
+      const image = waifu.image || "";
+      const isStill = /(\.webp|\.png|\.jpg|\.jpeg)$/i.test(image);
+      const stillFilename = isStill ? image.split('/').pop() : null;
+
       await UserModel.findByIdAndUpdate(user.id, {
         currentWaifu: waifu._id,
+        currentWaifuName: waifu.name ?? null,
+        // Only set waifuFilename if we detected a plausible still file name
+        ...(stillFilename ? { waifuFilename: stillFilename } : {}),
       });
 
       return Response.json({
@@ -65,6 +74,8 @@ export async function action({ request }: ActionFunctionArgs) {
     } else if (actionType === "unsetWaifu") {
       await UserModel.findByIdAndUpdate(user.id, {
         currentWaifu: null,
+        currentWaifuName: null,
+        waifuFilename: null,
       });
 
       return Response.json({

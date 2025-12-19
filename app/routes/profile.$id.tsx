@@ -1,58 +1,113 @@
+import { isValidObjectId } from "mongoose";
 import { type LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
+import { useState } from "react";
 
+import { getUserInfoFromSession } from "@/services/session.svc";
+import { ProfileOwnerView } from "~/components/profile-owner-view";
 import { ProfileInfo } from "~/components/profile-info";
 import { ProfileMangaUploadedPublic } from "~/components/profile-manga-uploaded-public";
 import { UserModel } from "~/database/models/user.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
 import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
-import { getMaxExp } from "~/helpers/user-level.helper";
+import { UserWaifuModel } from "~/database/models/user-waifu";
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
   const userId = params.id;
+  if (!userId || !isValidObjectId(userId)) {
+    throw new Response("User not found", { status: 404 });
+  }
+  const sessionUser = await getUserInfoFromSession(request);
+  const isOwner = !!sessionUser && sessionUser.id === userId;
+
   const userData = await UserModel.findById(userId)
     .select("name avatar createdAt level exp gold bio exp mangasCount faction gender")
     .lean();
-
-  const maxExp = userData?.level === 9 ? "Tối đa" : getMaxExp(userData?.level || 1);
+  if (!userData) {
+    throw new Response("User not found", { status: 404 });
+  }
+  const userIdString = String(userData?._id || userId);
 
   const chaptersRead = await UserReadChapterModel.countDocuments({
-    userId: userId,
+    userId,
   });
 
   const mangasFollowing = await UserFollowMangaModel.countDocuments({
-    userId: userId,
+    userId,
   });
 
   const userWaifuLeaderboard = await UserWaifuLeaderboardModel.findOne({
-    userId: userId,
-  }).select("waifuCollection totalWaifu");
+    userId,
+  })
+    .select("waifuCollection totalWaifu")
+    .lean();
 
-  const waifuCollection =
-    userWaifuLeaderboard?.waifuCollection
-      .sort((a, b) => b.stars - a.stars)
-      .slice(0, 6)
-      .map((waifu) => waifu.image) || [];
+  let waifuCollection = Array.isArray(userWaifuLeaderboard?.waifuCollection)
+    ? [...userWaifuLeaderboard.waifuCollection].sort((a: any, b: any) => (b?.stars || 0) - (a?.stars || 0))
+    : [];
+
+  if (waifuCollection.length && isOwner) {
+    waifuCollection = await Promise.all(
+      waifuCollection.map(async (waifu: any) => {
+        const waifuCount = await UserWaifuModel.countDocuments({
+          userId,
+          waifuId: waifu.waifuId,
+        });
+
+        return {
+          ...waifu,
+          count: waifuCount,
+        };
+      }),
+    );
+  }
 
   const waifuCount = userWaifuLeaderboard?.totalWaifu || 0;
+  const userFull = await UserModel.findById(userId)
+    .select("currentWaifu")
+    .populate("currentWaifu")
+    .lean();
+  const currentWaifu = userFull?.currentWaifu || null;
 
   return {
-    ...userData,
-    waifuCollection,
-    waifuCount,
-    chaptersRead,
-    mangasFollowing,
-    maxExp,
+    profileUser: {
+      ...userData,
+      id: userIdString,
+      waifuCollection,
+      waifuCount,
+      currentWaifu,
+      chaptersRead,
+      mangasFollowing,
+    },
+    isOwner,
   };
 }
 
 export default function Profile() {
-  const user = useLoaderData<typeof loader>();
+  const { profileUser, isOwner } = useLoaderData<typeof loader>();
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  if (isOwner) {
+    return <ProfileOwnerView user={profileUser} />;
+  }
+
+  const waifuSlots = Array.from({ length: 4 }, (_, idx) => {
+    const entry = profileUser.waifuCollection?.[idx];
+    if (!entry) return null;
+    if (typeof entry === "string") return entry;
+    return (entry as any).image ?? null;
+  });
+
+  // Mobile: chạm vào 1 ảnh -> bật hiệu ứng giống hover trong 500ms
+  const handleTap = (index: number) => {
+    setActiveIndex(index);
+    setTimeout(() => setActiveIndex(null), 500);
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-[968px] flex-col items-center gap-6 p-4 lg:py-8">
-      <ProfileInfo user={user} isOwner={false} />
+      <ProfileInfo user={profileUser} isOwner={false} />
 
       {/* Waifu Collection Section */}
       <div className="flex w-full flex-col gap-6">
@@ -64,19 +119,42 @@ export default function Profile() {
             </h2>
           </div>
         </div>
-        <div className="flex gap-4 md:overflow-x-hidden lg:gap-6">
-          {user.waifuCollection.map((image: string, index: number) => (
-            <img
-              key={index}
-              className="aspect-2/3 h-40 rounded-lg object-cover sm:h-48 lg:h-50"
-              src={image}
-              alt={`Waifu ${index + 1}`}
-            />
-          ))}
+
+        <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-4">
+          {waifuSlots.map((image: string | null, index: number) => {
+            const isActive = activeIndex === index;
+            if (!image) {
+              return (
+                <div
+                  key={`slot-${index}`}
+                  className="aspect-[2/3] w-full rounded-lg border border-dashed border-white/10 bg-white/5"
+                />
+              );
+            }
+
+            return (
+              <div
+                key={`slot-${index}`}
+                onTouchStart={() => handleTap(index)}
+                onClick={() => handleTap(index)}
+                className={`aspect-[2/3] w-full overflow-hidden rounded-lg transition-all duration-300 ${
+                  isActive
+                    ? "scale-105 shadow-[0_0_12px_rgba(146,53,190,0.6)] ring-2 ring-lav-500"
+                    : "hover:scale-105 hover:shadow-[0_0_12px_rgba(146,53,190,0.6)] hover:ring-2 hover:ring-lav-500"
+                }`}
+              >
+                <img
+                  src={image}
+                  alt={`Waifu ${index + 1}`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <ProfileMangaUploadedPublic userId={user.id} />
+      <ProfileMangaUploadedPublic userId={profileUser.id} />
     </div>
   );
 }

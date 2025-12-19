@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { CircleArrowOutUpRight, SkipForward } from "lucide-react";
 
 import { SummonCard } from "./summon-card";
 
@@ -17,13 +16,56 @@ interface SummonResultOverlayProps {
   isVisible: boolean;
   results: SummonItem[];
   onClose: () => void;
+  onRepeatMulti?: () => void;
+  runId?: number | null;
 }
 
 export function SummonResultOverlay({
   isVisible,
   results,
   onClose,
+  onRepeatMulti,
+  runId,
 }: SummonResultOverlayProps) {
+  // Preload waifu images when results arrive to reduce chance of missing images
+  useEffect(() => {
+    if (!results || results.length === 0) return;
+
+    const imgs: HTMLImageElement[] = [];
+
+    const doPreload = () => {
+      results.forEach((r, i) => {
+        const url = r?.item?.image;
+        if (!url) return;
+        const img = new Image();
+        imgs.push(img);
+        const cb = runId ? `_r=${runId}` : `_r=${Date.now()}`;
+        const sep = url.includes("?") ? "&" : "?";
+        // stagger requests to avoid a large spike
+        const src = `${url}${sep}${cb}`;
+        setTimeout(() => {
+          try {
+            img.src = src;
+            // best-effort decode (no await)
+            // @ts-ignore
+            if (img.decode) img.decode().catch(() => {});
+          } catch {}
+        }, i * 80);
+      });
+    };
+
+    const ric = (window as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 0));
+    ric(doPreload);
+
+    return () => {
+      imgs.forEach((im) => {
+        try {
+          im.src = "";
+        } catch {}
+      });
+    };
+  }, [results, runId]);
+
   const [revealedCards, setRevealedCards] = useState<Set<number>>(new Set());
   const [forceRevealAll, setForceRevealAll] = useState(false);
 
@@ -57,7 +99,7 @@ export function SummonResultOverlay({
   }
 
   const handleCardReveal = (index: number) => {
-    setRevealedCards((prev) => new Set([...prev, index]));
+    setRevealedCards((prev: Set<number>) => new Set([...prev, index]));
   };
 
   const handleRevealAll = () => {
@@ -78,6 +120,7 @@ export function SummonResultOverlay({
             isRevealed={revealedCards.has(0)}
             onReveal={handleCardReveal}
             forceReveal={forceRevealAll}
+            dropDelay={0} // hiện cùng lúc
           />
         </div>
       );
@@ -98,11 +141,12 @@ export function SummonResultOverlay({
                 key={index}
                 item={item}
                 index={index}
+                runId={runId}
                 size="medium"
                 isRevealed={revealedCards.has(index)}
                 onReveal={handleCardReveal}
                 forceReveal={forceRevealAll}
-                dropDelay={index * 120}
+                dropDelay={0} // hiện cùng lúc trên mobile
               />
             ))}
           </div>
@@ -116,11 +160,12 @@ export function SummonResultOverlay({
                   key={index}
                   item={item}
                   index={index}
+                  runId={runId}
                   size="medium"
                   isRevealed={revealedCards.has(index)}
                   onReveal={handleCardReveal}
                   forceReveal={forceRevealAll}
-                  dropDelay={index * 120}
+                  dropDelay={0}
                 />
               );
             })}
@@ -135,11 +180,12 @@ export function SummonResultOverlay({
                   key={index}
                   item={item}
                   index={index}
+                  runId={runId}
                   size="medium"
                   isRevealed={revealedCards.has(index)}
                   onReveal={handleCardReveal}
                   forceReveal={forceRevealAll}
-                  dropDelay={index * 120}
+                  dropDelay={0}
                 />
               );
             })}
@@ -157,11 +203,12 @@ export function SummonResultOverlay({
                     key={index}
                     item={item}
                     index={index}
+                    runId={runId}
                     size="medium"
                     isRevealed={revealedCards.has(index)}
                     onReveal={handleCardReveal}
                     forceReveal={forceRevealAll}
-                    dropDelay={index * 150}
+                    dropDelay={index * 120}
                   />
                 ))}
               </div>
@@ -175,11 +222,12 @@ export function SummonResultOverlay({
                       key={idx}
                       item={item}
                       index={idx}
+                      runId={runId}
                       size="medium"
                       isRevealed={revealedCards.has(idx)}
                       onReveal={handleCardReveal}
                       forceReveal={forceRevealAll}
-                      dropDelay={idx * 150}
+                      dropDelay={idx * 120}
                     />
                   );
                 })}
@@ -197,23 +245,33 @@ export function SummonResultOverlay({
       <div className="absolute inset-0 from-transparent via-black/50 to-black" />
 
       {/* Action buttons */}
-      <div className="absolute top-2 right-2 z-10 flex gap-3 lg:top-4 lg:right-4">
+      <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-2 lg:top-4 lg:right-4 lg:flex-row">
         {!allCardsRevealed && (
           <button
             onClick={handleRevealAll}
-            className="to-lav-500 flex cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-3 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
+            className="to-lav-500 flex cursor-pointer items-center justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-2 text-sm font-semibold text-black shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
           >
-            <SkipForward className="h-5 w-5" />
+            Lật hết
           </button>
         )}
 
         {allCardsRevealed && (
-          <button
-            onClick={onClose}
-            className="to-lav-500 flex cursor-pointer items-center justify-center gap-1 rounded-xl bg-gradient-to-b from-[#DD94FF] px-3 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
-          >
-            <CircleArrowOutUpRight className="h-5 w-5" />
-          </button>
+          <div className="flex flex-col items-end gap-2 lg:flex-row lg:items-center">
+            <button
+              onClick={onClose}
+              className="to-lav-500 flex cursor-pointer items-center justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-2 text-sm font-semibold text-black shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
+            >
+              Thoát
+            </button>
+            {onRepeatMulti && (
+              <button
+                onClick={onRepeatMulti}
+                className="to-lav-500 flex cursor-pointer items-center justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-2 text-sm font-semibold text-black shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#e3a8ff]"
+              >
+                Tiếp 10 lượt
+              </button>
+            )}
+          </div>
         )}
       </div>
 

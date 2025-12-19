@@ -22,61 +22,6 @@ const getExpValue = (star: number) => {
   return 0;
 };
 
-const processMilestoneReward = async (
-  user: UserType,
-  reachedMilestone: number,
-  request?: Request,
-) => {
-  let exp = 0;
-  let gold = 0;
-  let itemStar = 1;
-
-  if (reachedMilestone === 50) {
-    gold = 50;
-    exp = 25;
-  } else if (reachedMilestone === 100) {
-    gold = 100;
-    exp = 50;
-  } else if (reachedMilestone === 200) {
-    gold = 200;
-    itemStar = 4;
-  } else if (reachedMilestone === 450) {
-    itemStar = 5;
-  }
-
-  // Lấy thông tin user hiện tại trước khi update
-  const currentUser = await UserModel.findById(user.id).lean();
-  if (!currentUser) {
-    throw new BusinessError("Không tìm thấy thông tin người dùng");
-  }
-
-  const { newExp, newLevel, didLevelUp } = updateUserExp(currentUser as UserType, exp);
-
-  let updatedSession = null;
-  if (didLevelUp) {
-    // Nếu level up, cập nhật exp (reset), level và tăng gold
-    await UserModel.updateOne(
-      { _id: user.id },
-      {
-        $set: { exp: newExp, level: newLevel },
-        $inc: { gold },
-      },
-    );
-
-    // Cập nhật session khi level thay đổi
-    if (request) {
-      const session = await getUserSession(request);
-      const updatedUser = { ...user, level: newLevel, exp: newExp };
-      setUserDataToSession(session, updatedUser);
-      updatedSession = session;
-    }
-  } else {
-    // Nếu không level up, chỉ tăng exp và gold
-    await UserModel.updateOne({ _id: user.id }, { $inc: { gold, exp } });
-  }
-
-  return { itemStar, updatedSession };
-};
 
 export const summon = async (
   user: UserType,
@@ -98,11 +43,7 @@ export const summon = async (
 
   //   Get item star
   let itemStar = 1;
-  if (reachedMilestone) {
-    const milestoneResult = await processMilestoneReward(user, reachedMilestone, request);
-    itemStar = milestoneResult.itemStar;
-    updatedSession = milestoneResult.updatedSession;
-  } else {
+  {
     const r = Math.random() * 100;
     for (let i = 0; i < cum.rates.length; i++) {
       if (r < cum.rates[i]) {
@@ -128,7 +69,7 @@ export const summon = async (
     );
 
     if (didLevelUp) {
-      // Nếu level up, cập nhật exp (reset) và level
+      // Nếu level up, cập nhật exp (reset theo level) và level
       await UserModel.updateOne(
         { _id: user.id },
         { $set: { exp: newExp, level: newLevel } },
@@ -142,13 +83,19 @@ export const summon = async (
         updatedSession = session;
       }
     } else {
-      // Nếu không level up, chỉ tăng exp
+      // Nếu không level up, chỉ tăng exp (in-level)
       await UserModel.updateOne({ _id: user.id }, { $inc: { exp: expValue } });
     }
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
 
     await cleanupUserSummonHistory(user.id, 50);
+
+    // Debug: log exp item created
+    try {
+      // eslint-disable-next-line no-console
+      console.log(`[summon.svc] creating EXP item for user=${user.id} expItemId=${expItem?.id} name=${expItem?.name}`);
+    } catch {}
 
     await UserWaifuModel.create({
       bannerId: banner.id,
@@ -164,6 +111,7 @@ export const summon = async (
       item: expItem,
       expValue,
       updatedSession,
+      milestoneReached: reachedMilestone || null,
     };
   }
 
@@ -183,11 +131,18 @@ export const summon = async (
 
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");
 
+  try {
+    // Debug: log before checking/updating leaderboard
+    // eslint-disable-next-line no-console
+    console.log(`[summon.svc] will checkWaifuToUpdate user=${user.id} waifuId=${waifu?.id} name=${waifu?.name} image=${waifu?.image}`);
+  } catch {}
+
   await checkWaifuToUpdate(user.id, waifu.id);
 
   await cleanupUserSummonHistory(user.id, 50);
 
-  await UserWaifuModel.create({
+
+  const created = await UserWaifuModel.create({
     bannerId: banner.id,
     userId: user.id,
     waifuId: waifu.id,
@@ -195,11 +150,101 @@ export const summon = async (
     waifuStars: waifu.stars,
   });
 
+  try {
+    // Debug: confirm creation and show the stored waifuId (string)
+    // eslint-disable-next-line no-console
+    console.log(`[summon.svc] created UserWaifu id=${(created as any)?._id?.toString()} waifuId=${(created as any)?.waifuId} for user=${user.id}`);
+  } catch {}
+
   return {
     type: "waifu",
     itemStar,
     item: waifu,
     updatedSession,
+    milestoneReached: reachedMilestone || null,
+  };
+};
+
+// Guaranteed summon used by milestone claim: one free roll, forced star, affects summonCount and can chain milestones
+export const summonGuaranteedWaifu = async (
+  user: UserType,
+  banner: BannerType,
+  starWanted: number,
+) => {
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[summonGuaranteedWaifu] start user=${user.id} banner=${banner.id} star=${starWanted}`);
+  } catch {}
+  // Increase summonCount like a real summon (accept chain milestone behavior)
+  const userFull = await UserModel.findOneAndUpdate(
+    { _id: user.id },
+    { $inc: { summonCount: 1 } },
+    { new: true },
+  ).lean();
+
+  // Pick waifu by forced stars
+  // 1) Ưu tiên danh sách banner nếu có (đảm bảo đúng theme sự kiện)
+  let waifu: any = null;
+  try {
+    const candidates = (banner?.waifuList || []).filter((w: any) => Number(w?.stars) === Number(starWanted));
+    if (candidates.length > 0) {
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      const chosenId = (chosen as any)?.id?.toString?.() ?? (chosen as any)?.id;
+      if (chosenId) {
+        waifu = await WaifuModel.findById(chosenId).lean();
+      }
+    }
+  } catch {}
+
+  // 2) Fallback global pool nếu banner rỗng hoặc waifu bị thiếu
+  if (!waifu) {
+    const waifuCount = await WaifuModel.countDocuments({ stars: starWanted });
+    if (waifuCount <= 0) throw new BusinessError("Không tìm thấy waifu phù hợp");
+    const waifuPool = await WaifuModel.find({ stars: starWanted })
+      .select(["_id", "name", "image", "stars"]).limit(50).lean();
+    if (!waifuPool || waifuPool.length === 0) throw new BusinessError("Không tìm thấy waifu phù hợp");
+    waifu = waifuPool[Math.floor(Math.random() * waifuPool.length)];
+  }
+  if (!waifu) throw new BusinessError("Không tìm thấy waifu");
+
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[summonGuaranteedWaifu] picked waifu id=${(waifu as any)?._id?.toString() ?? (waifu as any)?.id} name=${waifu?.name}`);
+  } catch {}
+
+  const waifuIdStr = (waifu as any)?._id?.toString?.() ?? (waifu as any)?.id;
+  if (!waifuIdStr) throw new BusinessError("Thiếu mã waifu");
+  await checkWaifuToUpdate(user.id, waifuIdStr);
+  await cleanupUserSummonHistory(user.id, 50);
+
+  const bannerIdStr = (banner as any)?._id?.toString?.() ?? (banner as any)?.id;
+  if (!bannerIdStr) throw new BusinessError("Thiếu bannerId");
+  const created = await UserWaifuModel.create({
+    bannerId: bannerIdStr,
+    userId: user.id,
+    waifuId: waifuIdStr,
+    waifuName: waifu.name,
+    waifuStars: waifu.stars,
+  });
+
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[summonGuaranteedWaifu] created UserWaifu id=${(created as any)?._id?.toString()} waifuId=${(created as any)?.waifuId}`);
+  } catch {}
+
+  // Check if new milestone reached due to this free roll
+  const reachedMilestone = await (async () => {
+    const sc = (userFull?.summonCount ?? 0);
+    const milestone = GIFT_MILESTONES.find((m: number) => m === sc);
+    return milestone || null;
+  })();
+
+  return {
+    type: "waifu" as const,
+    itemStar: starWanted,
+    item: waifu,
+    milestoneReached: reachedMilestone,
+    createdUserWaifuId: (created as any)?._id?.toString?.() ?? null,
   };
 };
 
@@ -231,7 +276,7 @@ export const multiSummon = async (
 
 const checkEligibleGift = async (currentSummonCount: number) => {
   const summonCount = currentSummonCount;
-  const milestone = GIFT_MILESTONES.find((milestone) => milestone === summonCount);
+  const milestone = GIFT_MILESTONES.find((milestone: number) => milestone === summonCount);
   if (milestone) {
     return milestone;
   }

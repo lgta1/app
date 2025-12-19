@@ -5,33 +5,39 @@ import { CHAPTER_STATUS } from "~/constants/chapter";
 export type ChapterType = {
   id: string;
   title: string;
+  /** Stable SEO slug for chapter URL (generated once, never changes). */
+  slug?: string;
   viewNumber?: number;
   likeNumber?: number;
   commentNumber?: number;
   chapterNumber?: number;
   contentUrls: string[];
+  contentBytes?: number;
   mangaId: string;
   status?: number;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
 };
 
 const ChapterSchema = new Schema<ChapterType>(
   {
     title: { type: String, required: true },
+    slug: { type: String, default: "" },
     viewNumber: { type: Number, default: 0 },
     likeNumber: { type: Number, default: 0 },
     commentNumber: { type: Number, default: 0 },
     chapterNumber: { type: Number, required: true },
     contentUrls: { type: [String], required: true },
+    contentBytes: { type: Number, default: 0 },
     mangaId: { type: String, required: true, ref: "Manga" },
     status: { type: Number, enum: CHAPTER_STATUS, default: CHAPTER_STATUS.PENDING },
   },
-  { timestamps: true },
+  { timestamps: { createdAt: true, updatedAt: false } },
 );
 
 // Index tối ưu cho các query patterns
 ChapterSchema.index({ mangaId: 1, chapterNumber: 1 }, { unique: true }); // Unique lookup và prevent duplicate
+ChapterSchema.index({ mangaId: 1, slug: 1 }, { unique: true, sparse: true }); // Stable SEO URL per manga
 ChapterSchema.index({ mangaId: 1, createdAt: -1 }); // List chapters của manga theo thời gian
 
 export const ChapterModel = model("Chapter", ChapterSchema);

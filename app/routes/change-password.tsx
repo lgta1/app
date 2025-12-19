@@ -123,8 +123,8 @@ export default function ChangePassword() {
     <div className="bg-bgc-layer1 flex items-center justify-center p-4 py-8 lg:pb-28">
       <Toaster position="bottom-right" />
       <div className="inline-flex w-96 flex-col items-center justify-start gap-11 sm:w-full sm:max-w-[558px] sm:gap-6">
-        {/* Logo */}
-        <img className="h-20 w-60 object-contain" src="/images/logo.png" alt="Logo" />
+  {/* Logo */}
+  <img className="h-20 w-60 object-contain" src="/images/logo.webp" alt="Logo" />
 
         {/* Main Card */}
         <div className="border-bd-default flex w-full flex-col items-center justify-center gap-6 rounded-xl border bg-slate-950 p-4">

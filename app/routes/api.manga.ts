@@ -9,6 +9,7 @@ import { UserModel } from "~/database/models/user.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserLikeMangaModel } from "~/database/models/user-like-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
+import { isAdmin } from "~/helpers/user.helper";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "DELETE") {
@@ -46,6 +47,22 @@ export async function action({ request }: ActionFunctionArgs) {
         { error: "Bạn không có quyền xóa truyện này" },
         { status: 403 },
       );
+    }
+
+    const isAdminUser = isAdmin(user.role);
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    if (!isAdminUser) {
+      const createdAt = manga.createdAt instanceof Date ? manga.createdAt : new Date(manga.createdAt);
+      const ageMs = Date.now() - createdAt.getTime();
+      if (!Number.isFinite(createdAt.getTime()) || ageMs > SEVEN_DAYS_MS) {
+        return Response.json(
+          {
+            error: "Bạn không thể xoá truyện đã đăng quá 7 ngày. Chỉ admin có thể xoá.",
+            success: false,
+          },
+          { status: 403 },
+        );
+      }
     }
 
     // Lấy tất cả chapterIds để xóa UserReadChapter records

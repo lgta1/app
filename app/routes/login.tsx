@@ -49,7 +49,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
@@ -59,12 +59,12 @@ export default function Login() {
   const isSubmitting = navigation.state === "submitting";
 
   return (
-    <div className="bg-gradient-radial to-bgc-layer1 min-h-screen w-full from-[#191758] px-4">
+  <div className="min-h-screen w-full px-4">
       {/* Container chính */}
       <div className="mx-auto mb-10 flex w-full max-w-[402px] flex-col items-center gap-[46px] pt-[104px] md:max-w-[558px] md:gap-6 md:pt-[104px]">
         {/* Logo */}
         <img
-          src="/images/logo.png"
+          src="/images/logo.webp"
           alt="Logo Vinahentai"
           className="h-[75px] w-[340px]"
         />
@@ -93,25 +93,25 @@ export default function Login() {
               </div>
             )}
 
-            {/* Email */}
+            {/* Email / Username */}
             <div className="flex w-full flex-col">
               <div className="flex items-center gap-[10px] pb-3">
                 <label
                   htmlFor="email"
                   className="text-txt-primary text-xs leading-4 font-semibold"
                 >
-                  Email
+                  Email/Username
                 </label>
               </div>
               <div className="bg-bgc-layer2 border-bd-default flex w-full items-center rounded-xl border px-3 py-[10px]">
                 <input
-                  type="email"
+                  type="text"
                   id="email"
                   name="email"
-                  placeholder="Nhập email của bạn"
+                  placeholder="Nhập email hoặc username của bạn"
                   className="text-txt-secondary w-full bg-transparent text-base leading-6 font-medium outline-none"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                 />
               </div>
@@ -148,6 +148,7 @@ export default function Login() {
               </span>
               <Link
                 to="/register"
+                reloadDocument
                 className="text-txt-focus text-sm leading-5 font-medium"
               >
                 Đăng ký ngay

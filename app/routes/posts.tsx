@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { ChevronDown, Eye, Heart, MessageCircle, Search } from "lucide-react";
+import { User as UserIcon } from "lucide-react";
 
 import { Pagination } from "~/components/pagination";
 import PostCreationSidebar from "~/components/post-creation-sidebar";
@@ -8,6 +10,19 @@ import type { UserType } from "~/database/models/user.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
 import { usePagination } from "~/hooks/use-pagination";
 import { formatDistanceToNow } from "~/utils/date.utils";
+
+import { POSTS_ENABLED } from "~/constants/feature-flags";
+
+const notFoundHeaders = {
+  "X-Robots-Tag": "noindex, nofollow, noarchive",
+} as const;
+
+export async function loader(_args: LoaderFunctionArgs) {
+  if (!POSTS_ENABLED) {
+    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+  }
+  return null;
+}
 
 type PostType = {
   id: string;
@@ -143,11 +158,19 @@ function PostCard({ post }: { post: PostType }) {
         {/* User Info */}
         <div className="flex gap-4">
           {/* Avatar */}
-          <img
-            className="h-11 w-11 flex-shrink-0 rounded-full object-cover"
-            src={post.authorId.avatar || "/images/user-placeholder.png"}
-            alt={post.authorId.name}
-          />
+          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full bg-[#121826]">
+            <UserIcon className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 text-txt-primary" />
+            {post.authorId.avatar ? (
+              <img
+                className="absolute inset-0 h-full w-full object-cover"
+                src={post.authorId.avatar}
+                alt={post.authorId.name}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : null}
+          </div>
 
           {/* Content */}
           <div className="min-w-0 flex-1">

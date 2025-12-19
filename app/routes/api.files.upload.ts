@@ -3,70 +3,13 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import type { Route } from "./+types/api.files.upload";
 
 import { isBusinessError } from "~/helpers/errors.helper";
-import { uploadToPublicBucket } from "~/utils/minio.utils";
-
-// Utility functions for filename handling
-function smartSanitizeFilename(filename: string): {
-  sanitized: string;
-  needsFallback: boolean;
-} {
-  // Get file extension first
-  const lastDotIndex = filename.lastIndexOf(".");
-  const extension =
-    lastDotIndex > 0 ? filename.substring(lastDotIndex).toLowerCase() : "";
-  const nameWithoutExt =
-    lastDotIndex > 0 ? filename.substring(0, lastDotIndex) : filename;
-
-  // Sanitize the name part only, preserving Vietnamese diacritics and common chars
-  let sanitized = nameWithoutExt
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "") // Remove dangerous filesystem characters
-    .replace(/[^\w\s\-\.\u00C0-\u024F\u1E00-\u1EFF]/g, "") // Keep alphanumeric, spaces, hyphens, dots, Vietnamese chars
-    .replace(/\s+/g, "_") // Replace spaces with underscores for better compatibility
-    .replace(/_{2,}/g, "_") // Remove multiple underscores
-    .replace(/^_+|_+$/g, "") // Remove leading/trailing underscores
-    .substring(0, 200); // Leave room for extension
-
-  // If sanitized name is empty, we need a fallback
-  const needsFallback = sanitized.length === 0;
-
-  if (needsFallback) {
-    sanitized = `file_${Date.now()}`;
-  }
-
-  return {
-    sanitized: (sanitized + extension).substring(0, 255),
-    needsFallback,
-  };
-}
-
-function encodeForMetadata(value: string): string {
-  // Encode to Base64 to handle special characters in S3 metadata
-  return Buffer.from(value, "utf-8").toString("base64");
-}
-
-function isAllowedFileExtension(filename: string): boolean {
-  const allowedExtensions = [
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".webp",
-    ".svg",
-    ".pdf",
-    ".txt",
-    ".doc",
-    ".docx",
-    ".mp4",
-    ".webm",
-    ".mp3",
-    ".wav",
-  ];
-  const lastDotIndex = filename.lastIndexOf(".");
-  if (lastDotIndex === -1) return false;
-
-  const ext = filename.substring(lastDotIndex).toLowerCase();
-  return allowedExtensions.includes(ext);
-}
+import {
+  encodeForMetadata,
+  sanitizePrefixPath,
+  smartSanitizeFilename,
+  uploadBufferWithValidation,
+} from "~/.server/services/file-upload.service";
+import { applyWatermark } from "~/.server/utils/watermark.utils";
 
 function getErrorMessage(error: unknown): { message: string; statusCode: number } {
   if (isBusinessError(error)) {
@@ -98,7 +41,7 @@ function getErrorMessage(error: unknown): { message: string; statusCode: number 
       return { message: "Lỗi hệ thống lưu trữ. Vui lòng thử lại sau.", statusCode: 500 };
     }
 
-    return { message: `Lỗi lưu trữ: ${message}`, statusCode: 500 };
+    return { message, statusCode: 500 };
   }
 
   if (error instanceof Error) {
@@ -155,11 +98,13 @@ export async function action({ request }: Route.ActionArgs) {
     let formData: FormData;
     let file: File;
     let prefixPath: string;
+    let watermarkFlagRaw: FormDataEntryValue | null = null;
 
     try {
       formData = await request.formData();
       file = formData.get("file") as File;
       prefixPath = (formData.get("prefixPath") as string) || "uploads";
+      watermarkFlagRaw = formData.get("watermark");
     } catch (error) {
       console.error("Error parsing form data:", error);
       return Response.json(
@@ -193,68 +138,13 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
 
-    // Smart filename handling - auto-fix instead of rejecting
     const originalFilename = file.name || "unnamed_file";
-    const { sanitized: sanitizedFilename, needsFallback } =
-      smartSanitizeFilename(originalFilename);
+    const { sanitized: previewSanitizedName, needsFallback } = smartSanitizeFilename(originalFilename);
 
-    // Check if file extension is allowed (this is a hard business rule)
-    if (!isAllowedFileExtension(sanitizedFilename)) {
-      return Response.json(
-        {
-          success: false,
-          error:
-            "Định dạng file không được phép. Chỉ chấp nhận: jpg, png, gif, webp, svg, pdf, txt, doc, docx, mp4, webm, mp3, wav",
-        },
-        { status: 400 },
-      );
+    if (needsFallback || previewSanitizedName !== originalFilename) {
+      console.log(`Filename auto-fixed: "${originalFilename}" → "${previewSanitizedName}"`);
     }
 
-    // Log if filename was changed for debugging
-    if (needsFallback || sanitizedFilename !== originalFilename) {
-      console.log(`Filename auto-fixed: "${originalFilename}" → "${sanitizedFilename}"`);
-    }
-
-    // File size limit (10MB)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return Response.json(
-        {
-          success: false,
-          error: `File quá lớn. Kích thước tối đa: ${maxSize / 1024 / 1024}MB`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Validate file type
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "image/svg+xml",
-      "application/pdf",
-      "text/plain",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "video/mp4",
-      "video/webm",
-      "audio/mpeg",
-      "audio/wav",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      return Response.json(
-        {
-          success: false,
-          error: "Loại file không được phép",
-        },
-        { status: 400 },
-      );
-    }
-
-    // Convert file to buffer with error handling
     let buffer: Buffer;
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -281,29 +171,37 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
 
-    // Validate prefix path
-    const validPrefixPath = prefixPath
-      .replace(/[^a-zA-Z0-9\-_\/]/g, "")
-      .substring(0, 100);
+    const validPrefixPath = sanitizePrefixPath(prefixPath as string);
 
-    // Upload to default bucket with prefix path and metadata including userId
-    // Fix: Encode filename for metadata to handle special characters
-    const result = await uploadToPublicBucket(buffer, sanitizedFilename, {
+    // Apply server-side watermark only for manga page uploads when explicitly requested
+    const shouldWatermark = validPrefixPath.startsWith("manga-images");
+    const watermarkRequested = typeof watermarkFlagRaw === "string" && ["true", "1", "yes"].includes(watermarkFlagRaw.toLowerCase());
+    const watermarkResult = shouldWatermark && watermarkRequested ? await applyWatermark(buffer) : { buffer, applied: false };
+    const effectiveBuffer = watermarkResult.buffer;
+    const effectiveContentType =
+      watermarkResult.applied && watermarkResult.format
+        ? `image/${watermarkResult.format === "jpg" ? "jpeg" : watermarkResult.format}`
+        : file.type || "application/octet-stream";
+
+    const metadata = {
+      "original-name-encoded": encodeForMetadata(originalFilename),
+      "original-name-sanitized": previewSanitizedName,
+      "was-renamed": (previewSanitizedName !== originalFilename).toString(),
+      "upload-date": new Date().toISOString(),
+      "uploaded-by": userInfo.id,
+      size: effectiveBuffer.length.toString(),
+      "content-type": file.type,
+      "user-agent": encodeForMetadata(request.headers.get("user-agent") || "unknown"),
+      "upload-timestamp": Date.now().toString(),
+      "watermark-applied": watermarkResult.applied ? "true" : "false",
+    } satisfies Record<string, string>;
+
+    const result = await uploadBufferWithValidation({
+      buffer: effectiveBuffer,
+      originalFilename,
       prefixPath: validPrefixPath,
-      generateUniqueFileName: true,
-      contentType: file.type,
-      metadata: {
-        // Encode original filename with special characters to Base64
-        "original-name-encoded": encodeForMetadata(originalFilename),
-        "original-name-sanitized": sanitizedFilename,
-        "was-renamed": (sanitizedFilename !== originalFilename).toString(),
-        "upload-date": new Date().toISOString(),
-        "uploaded-by": userInfo.id,
-        size: file.size.toString(),
-        "content-type": file.type,
-        "user-agent": encodeForMetadata(request.headers.get("user-agent") || "unknown"),
-        "upload-timestamp": Date.now().toString(),
-      },
+      contentType: effectiveContentType,
+      metadata,
     });
 
     return Response.json({
@@ -311,13 +209,13 @@ export async function action({ request }: Route.ActionArgs) {
       data: {
         objectName: result.objectName,
         fullPath: result.fullPath,
-        url: result.url, // Direct public URL
-        prefixPath: prefixPath,
-        size: file.size,
-        type: file.type,
+        url: result.url,
+        prefixPath: validPrefixPath,
+        size: effectiveBuffer.length,
+        type: effectiveContentType,
         originalName: originalFilename,
-        sanitizedName: sanitizedFilename,
-        isRenamed: sanitizedFilename !== originalFilename,
+        sanitizedName: result.sanitizedFilename,
+        isRenamed: result.wasRenamed,
         isPublic: true,
       },
       message: "Tải file lên thành công",

@@ -1,109 +1,292 @@
 // app/components/manga-card.tsx
 import { Link } from "react-router-dom";
+import { EyeOff } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
-import { formatDistanceToNow } from "~/utils/date.utils";
+import { MANGA_USER_STATUS } from "~/constants/manga";
+import { buildMangaUrl } from "~/utils/manga-url.utils";
 
 type Props = {
   manga: Pick<
     MangaType,
-    "id" | "title" | "poster" | "chapters" | "createdAt" | "updatedAt" | "genres"
-  >;
+    | "id"
+    | "title"
+    | "poster"
+    | "chapters"
+    | "createdAt"
+    | "updatedAt"
+    | "genres"
+    | "userStatus"
+  > & {
+    /** Tên chương mới nhất (optionally denormalized) */
+    latestChapterTitle?: string | null;
+  };
+  /** Override latest chapter title (nếu truyền vào sẽ ưu tiên hơn manga.latestChapterTitle) */
+  latestChapterTitle?: string | null;
+  /**
+   * variant:
+   *  - default: dùng bình thường
+   *  - bannerDesktop: desktop hot carousel (larger title + meta raised)
+   */
+  variant?: "default" | "bannerDesktop";
+  className?: string;
+  /** Thu nhỏ chữ (≈ -0.5 size) cho danh sách truyện mới */
+  compact?: boolean;
+  /** Tăng riêng kích thước title (≈ +0.5 size) khi dùng compact ở LatestUpdates */
+  boostTitle?: boolean;
+  /** Tùy chỉnh cách load ảnh poster để tránh double-lazy ở trang index */
+  imgLoading?: "lazy" | "eager" | "auto";
+  imgFetchPriority?: "high" | "low" | "auto";
+  /** Ẩn gradient nền dưới (dưới phần ảnh và meta) để tránh flicker ở carousel mobile */
+  hideBottomOverlay?: boolean;
 };
 
-export function MangaCard({ manga }: Props) {
-  const { id, title, poster, chapters, createdAt, updatedAt, genres } = manga;
+export function MangaCard({
+  manga,
+  variant = "default",
+  className,
+  latestChapterTitle,
+  compact = false,
+  boostTitle = false,
+  imgLoading = "lazy",
+  imgFetchPriority = "high",
+  hideBottomOverlay = false,
+}: Props) {
+  const { id, title, poster, chapters, createdAt, updatedAt, genres, userStatus } = manga as any;
+  const effectiveLatestTitle = (latestChapterTitle ?? (manga as any).latestChapterTitle ?? null) as string | null;
 
+  // genres là slug string
+  const genreSlugs: string[] = Array.isArray(genres)
+    ? genres.map((g) => String(g).trim().toLowerCase())
+    : [];
+
+  // ONESHOT: nhận các biến thể slug phổ biến
   const isOneshot =
-    Array.isArray(genres) &&
-    genres.some((g) => String(g).trim().toLowerCase() === "oneshot");
+    genreSlugs.includes("oneshot") ||
+    genreSlugs.includes("one-shot") ||
+    genreSlugs.includes("one_shot");
 
-  const timeLabel =
-    updatedAt || createdAt ? formatDistanceToNow(updatedAt ?? createdAt) : undefined;
+  // COMPLETED: chỉ áp cho non-oneshot
+  const isCompleted = !isOneshot && userStatus === MANGA_USER_STATUS.COMPLETED;
 
+  // Thời gian: chỉ hiển thị nếu trong 1 giờ gần nhất, định dạng ngắn gọn vi: 36p trc
+  const baseTime = updatedAt ?? createdAt;
+  const isRecentWithin3h = (() => {
+    if (!baseTime) return false;
+    const t = new Date(baseTime as any).getTime();
+    if (!Number.isFinite(t)) return false;
+    return Date.now() - t <= 1 * 60 * 60 * 1000; // 1 giờ
+  })();
+  const timeLabel = (() => {
+    if (!baseTime || !isRecentWithin3h) return undefined;
+    const now = Date.now();
+    const t = new Date(baseTime as any).getTime();
+    if (!Number.isFinite(t)) return undefined;
+    const diffMs = Math.max(0, now - t);
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 60) return `${diffMin}p trc`;
+    return undefined; // >=1h: không hiển thị
+  })();
+
+  const isBannerDesktop = variant === "bannerDesktop";
+  // Blacklist overlay: read from localStorage (client-only) and check intersection with manga genres
+  const isBlacklisted = (() => {
+    try {
+      if (typeof window === "undefined") return false;
+      const raw = window.localStorage.getItem("vh_blacklist_tags");
+      if (!raw) return false;
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr) || arr.length === 0) return false;
+      const set = new Set((arr as string[]).map((s) => String(s).toLowerCase()));
+      return genreSlugs.some((g) => set.has(String(g).toLowerCase()));
+    } catch {
+      return false;
+    }
+  })();
   return (
     <Link
-      to={`/manga/${id}`}
-      prefetch="intent"
-      className="group bg-bgc-layer1 relative block overflow-hidden rounded-xl border border-white/5 transition-colors hover:border-white/10"
+      to={buildMangaUrl(manga as any)}
+      className={[
+        // add transform + scale on hover
+        "group bg-bgc-layer1 relative block overflow-hidden rounded-xl border border-bd-default transition-colors hover:border-bd-default transform transition-transform duration-200 ease-out will-change-transform",
+        // hover scale applied to the link itself (+ keyboard focus)
+        "hover:scale-105 focus:scale-105 focus-visible:scale-105",
+        isBannerDesktop && "banner-desktop-card",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      data-variant={variant}
     >
-      {/* Ảnh nền 2:3 */}
-      <div className="relative aspect-[2/3] w-full overflow-hidden">
-        <img
-          src={poster}
-          alt={title}
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
-      </div>
-
-      {/* Ảnh 3:4 phủ top – fill khung cha */}
-      <div className="absolute inset-x-0 top-0 z-[1]">
-        <div className="aspect-[3/4] overflow-hidden">
+      {/* Blacklist overlay covers entire card; pointer-events none keeps it clickable */}
+      {isBlacklisted ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-[50] flex flex-col items-center justify-center gap-2 px-4 text-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
+        >
+          <EyeOff className="h-8 w-8 text-white/80" aria-hidden="true" />
+          <div className="text-white/85 text-sm font-semibold leading-snug">
+            Ảnh bị che do chứa thể loại bạn đã chặn
+          </div>
+        </div>
+      ) : null}
+      {/* CSS keyframes cho shimmer đỏ (gắn cục bộ trong component) */}
+      <style
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: `@keyframes shimmer-red { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }`,
+        }}
+      />
+      {/* Phương án 1: chỉ 1 ảnh thật bên trong overlay 3:4, nhưng khung tổng 2:3 để dành vùng meta phía dưới */}
+      <div
+        className="relative aspect-[2/3] w-full overflow-hidden bg-black"
+        style={{ aspectRatio: "2 / 3" }}
+      >
+        {/* Overlay 3:4 hiển thị phần trên của poster */}
+        <div
+          className="absolute left-0 top-0 w-full overflow-hidden"
+          style={{ aspectRatio: "3 / 4" }}
+        >
           <img
             src={poster}
             alt={title}
-            className="w-full h-full object-cover pointer-events-none select-none"
-            loading="lazy"
+            width={300}
+            height={400}
+            loading={imgLoading}
+            decoding="async"
+            fetchpriority={imgFetchPriority}
+            className="block h-full w-full object-cover object-top select-none pointer-events-none"
           />
-         </div>
-       </div>
+          {!hideBottomOverlay && (
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-[9%] z-[1] bg-gradient-to-t from-black/40 via-black/30 to-transparent/0"
+            />
+          )}
+          {/* Thin lavender separator between image and meta; always kept on for carousel mobile */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-lav-500/30 z-[3]" />
+          {/* Thời gian ở góc phải với shimmer đỏ chậm */}
+          {timeLabel ? (
+            <span
+              className="pointer-events-none absolute top-2 right-2 z-[4] select-none rounded-full px-2 py-0.5 text-xs font-semibold text-white shadow-[0_1px_6px_rgba(0,0,0,0.55)]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(100deg, rgba(244,63,94,0.4) 0%, rgba(244,63,94,0.95) 20%, rgba(244,63,94,0.4) 40%, rgba(244,63,94,0.95) 60%, rgba(244,63,94,0.4) 80%)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer-red 4s linear infinite",
+                border: "1px solid rgba(248,113,113,0.45)",
+              }}
+              title={new Date(baseTime as any).toLocaleString()}
+            >
+              {timeLabel}
+            </span>
+          ) : null}
+        </div>
+      </div>
 
-      {/* Overlay gradient */}
-      <div
-        className="
-          pointer-events-none absolute inset-x-0 bottom-0
-          h-[17%] min-h-[50px]
-          bg-gradient-to-t from-black/90 via-black/80 to-transparent
-          backdrop-blur-[1.5px]
-          z-[2]
-        "
-      />
-
-      {/* Nội dung */}
-      <div className="absolute inset-x-0 bottom-0 z-[2] p-2 pb-1">
-        {/* Tiêu đề */}
-        <h3
-          className="
-            truncate text-base leading-5 font-semibold text-white
-            max-[415px]:text-[15.5px] max-[415px]:leading-[18px]
-            max-[376px]:text-[14.5px] max-[376px]:leading-[18px]
-          "
-          title={title}
-          style={{
-            textShadow: `
-              1px 0 2px rgba(0,0,0,0.9),
-              -1px 0 2px rgba(0,0,0,0.9),
-              0 1px 2px rgba(0,0,0,0.9),
-              0 -1px 2px rgba(0,0,0,0.9)
-            `,
-          }}
-        >
-          {title}
-        </h3>
-
-        {/* Meta */}
+      {!hideBottomOverlay && (
         <div
           className="
-            mt-1 flex items-center gap-2 text-xs text-white/90
-            max-[415px]:text-[11px] max-[415px]:leading-[15px]
-            max-[376px]:text-[10px] max-[376px]:leading-[14px]
+            pointer-events-none absolute inset-x-[-10px] bottom-[-10px]
+            h-[25%] min-h-[58px]
+            bg-gradient-to-t from-[#0B0C1D]/95 via-[#0B0C1D]/90 to-transparent/0
+            rounded-b-[5px]
+            z-[1]
           "
+        />
+      )}
+
+      {/* Nội dung: meta phía trên, title bên dưới (không thêm nền đen riêng) */}
+  <div className="absolute inset-x-0 bottom-0 z-[2] min-w-0">
+        {/* Meta */}
+        <div
+          className={[
+            // Use baseline alignment and min-w-0 to let children truncate properly
+            "flex items-center gap-2 px-2 pt-2 pb-1 text-xs text-white/90 min-w-0",
+            "max-[415px]:text-[11px] max-[415px]:leading-[15px]",
+            "max-[376px]:text-[10px] max-[376px]:leading-[14px]",
+            isBannerDesktop && "-translate-y-[4px]",
+          ].join(" ")}
         >
-          <span
-            className="
-              inline-flex h-6 items-center rounded-full border border-white/20 bg-white/15 px-2
-              max-[415px]:h-[22px] max-[415px]:px-[7px]
-              max-[376px]:h-5 max-[376px]:px-[6px]
-            "
+          {isOneshot ? (
+            <span
+              className={[
+                "inline-flex h-6 items-center rounded-full border px-2 font-semibold",
+                "max-[415px]:h-[22px] max-[415px]:px-[7px]",
+                "max-[376px]:h-5 max-[376px]:px-[6px]",
+                "bg-[#261343] text-[#DFA8FF]",
+                "border-lav-500/45",
+              ].join(" ")}
+            >
+              Oneshot
+            </span>
+          ) : null}
+
+          {!isOneshot && (() => {
+            // Raw chapter name, no pill, no cleaning. Fallback only when missing.
+            const raw = effectiveLatestTitle ?? undefined;
+            const label = raw && String(raw).trim().length > 0 ? String(raw) : `Chương ${Number(chapters ?? 0)}`;
+            return (
+              <span
+                className={[
+                  "text-white/90 font-semibold truncate flex-1 min-w-0 basis-auto text-outline",
+                  compact
+                    ? "text-[16px] leading-[20px] sm:text-[15px] sm:leading-[19px]"
+                    : "text-[17px] leading-[21px] sm:text-base sm:leading-[20px]",
+                  "max-[415px]:text-[14px] max-[415px]:leading-[18px]",
+                  "max-[376px]:text-[13px] max-[376px]:leading-[17px]",
+                ].join(" ")}
+                title={label}
+              >
+                {label}
+              </span>
+            );
+          })()}
+
+          {isCompleted ? (
+            <span
+              className={[
+                "ml-auto inline-flex h-6 items-center rounded-full border px-2 font-semibold",
+                "max-[415px]:h-[22px] max-[415px]:px-[7px]",
+                "max-[376px]:h-5 max-[376px]:px-[6px]",
+                // Static END pill colors
+                "bg-[#2A1216] text-[#D94545]",
+                "border-red-500/45",
+              ].join(" ")}
+              title="Đã END"
+            >
+              END!
+            </span>
+          ) : null}
+        </div>
+
+        {/* Title: đẩy meta cao hơn bằng khoảng cách dưới meta */}
+        <div className="px-2 pb-2">
+          <h3
+            className={[
+              "mt-1.5 truncate font-semibold text-white",
+              compact
+                ? boostTitle
+                  ? "text-[17px] leading-[21px] sm:text-base sm:leading-5" // boosted title size mobile +0.5
+                  : "text-[16px] leading-[20px] sm:text-[15px] sm:leading-[19px]" // compact size mobile +0.5
+                : "text-[17px] leading-[21px] sm:text-base sm:leading-5", // default mobile +0.5
+              "max-[415px]:text-[17px] max-[415px]:leading-[19px]",
+              "max-[376px]:text-[15px] max-[376px]:leading-[19px]",
+              isBannerDesktop && "text-[18px] leading-[21px]",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            title={title}
+            style={{
+              textShadow: `
+                1px 0 2px rgba(0,0,0,0.9),
+                -1px 0 2px rgba(0,0,0,0.9),
+                0 1px 2px rgba(0,0,0,0.9),
+                0 -1px 2px rgba(0,0,0,0.9)
+              `,
+            }}
           >
-            {isOneshot ? "Oneshot" : `Chương ${Number(chapters ?? 0)}`}
-          </span>
-
-          {timeLabel ? (
-  <span className="truncate ml-auto mr-1.5 text-white/70">{timeLabel}</span>
-) : null}
-
+            {title}
+          </h3>
         </div>
       </div>
     </Link>

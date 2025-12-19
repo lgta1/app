@@ -1,10 +1,9 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { useLoaderData } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import { Link } from "react-router-dom";
 
 import { MangaCard } from "~/components/manga-card";
-import { AuthorModel } from "~/database/models/author.model";
-import { MangaModel } from "~/database/models/manga.model";
+import { MANGA_CONTENT_TYPE, MANGA_STATUS } from "~/constants/manga";
 
 // (tuỳ bạn) có thể dùng json() nếu bạn đã cấu hình, còn không thì return object như các route khác
 // import { json } from "@remix-run/node";
@@ -20,29 +19,58 @@ export async function loader({ params }: LoaderFunctionArgs) {
     throw new Response("Not Found", { status: 404 });
   }
 
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Dynamic imports keep server-only code out of client bundles.
+  const [{ AuthorModel }, { MangaModel }] = await Promise.all([
+    import("~/database/models/author.model"),
+    import("~/database/models/manga.model"),
+  ]);
+
   // 1) Lấy tác giả theo slug
   const author = await AuthorModel.findOne({ slug }).lean();
   if (!author) {
+    // Fallback: nếu slug base bị mất nhưng vẫn còn bản "-2/-3..." (do slug collision),
+    // redirect để người dùng không gặp 404 khi click tag.
+    const escapedSlug = escapeRegExp(slug);
+    const candidates = await AuthorModel.find(
+      { slug: { $regex: `^${escapedSlug}-\\d+$`, $options: "i" } },
+      { slug: 1 },
+    )
+      .limit(2)
+      .lean();
+
+    if (candidates.length === 1 && candidates[0]?.slug) {
+      return redirect(`/authors/${candidates[0].slug}`, { status: 301 });
+    }
+
     throw new Response("Không tìm thấy tác giả", { status: 404 });
   }
 
-  // 2) Lấy danh sách manga chứa tên tác giả trong field 'author'
-  //    Field 'author' hiện đang là chuỗi, có thể là "Tên1, Tên2".
-  //    Regex khớp nguyên tên trong danh sách, không ăn nhầm tên con.
+  // 2) Lấy danh sách manga theo tác giả
+  // - Canonical: match theo authorSlugs (ổn định, xử lý collision -2/-3, giữ Unicode)
+  // - Legacy fallback: match theo chuỗi manga.author = "Tên1, Tên2".
   const name = author.name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const authorRegex = new RegExp(`(?:^|,\\s*)${name}(?:\\s*,|$)`, "i");
 
   // Lấy các field cần cho MangaCard
   const mangas = await MangaModel.find(
-    { author: authorRegex },
+    {
+      status: MANGA_STATUS.APPROVED,
+      contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, MANGA_CONTENT_TYPE.COSPLAY, null] },
+      $or: [{ authorSlugs: author.slug }, { author: authorRegex }],
+    },
     {
       _id: 1,
+      slug: 1,
       title: 1,
       poster: 1,
       updatedAt: 1,
       createdAt: 1,
-      chaptersCount: 1, // nếu schema có
-      latestChapterNumber: 1, // nếu schema có
+      chapters: 1,
+      genres: 1,
+      userStatus: 1,
+      latestChapterTitle: 1,
     },
   )
     .sort({ updatedAt: -1 })
@@ -51,13 +79,15 @@ export async function loader({ params }: LoaderFunctionArgs) {
   // Chuẩn hoá dữ liệu để MangaCard dùng ngay
   const normalized = (mangas || []).map((m) => ({
     id: m._id.toString(),
+    slug: m.slug,
     title: m.title,
     poster: m.poster,
-    // MangaCard chỉ cần 1 trong các field chap + 1 field thời gian,
-    // nên đưa cả 2 biến thể vào để nó tự ưu tiên.
-    chaptersCount: m.chaptersCount ?? undefined,
-    latestChapterNumber: m.latestChapterNumber ?? undefined,
+    chapters: m.chapters ?? 0,
+    genres: m.genres ?? [],
+    userStatus: m.userStatus ?? undefined,
+    latestChapterTitle: (m as any)?.latestChapterTitle ?? undefined,
     updatedAt: m.updatedAt ?? m.createdAt,
+    createdAt: m.createdAt,
   }));
 
   return {

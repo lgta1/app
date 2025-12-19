@@ -2,6 +2,7 @@ import {
   NotificationModel,
   type NotificationType,
 } from "~/database/models/notification.model";
+import { pruneNotificationsForUser, MAX_NOTIFICATIONS_PER_USER } from "~/.server/queries/notification.query";
 
 export const readNotifications = async (notificationIds: string[]) => {
   try {
@@ -40,7 +41,11 @@ export const deleteNotification = async (notificationId: string) => {
 
 export const createNotification = async (notification: Partial<NotificationType>) => {
   try {
-    await NotificationModel.create(notification);
+    const created = await NotificationModel.create(notification);
+    const userId = created?.userId || notification.userId;
+    if (userId) {
+      await pruneNotificationsForUser(userId, MAX_NOTIFICATIONS_PER_USER);
+    }
 
     return {
       success: true,

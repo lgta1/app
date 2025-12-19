@@ -4,7 +4,9 @@ import {
   deleteNotification,
   readNotifications,
 } from "~/.server/mutations/notification.mutation";
-import { getNewestNotifications } from "~/.server/queries/notification.query";
+import {
+  getNotificationsWithUnreadCount,
+} from "~/.server/queries/notification.query";
 import { getUserInfoFromSession } from "~/.server/services/session.svc";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -15,8 +17,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   try {
-    const notifications = await getNewestNotifications(user.id, 5);
-    return Response.json({ success: true, data: notifications });
+    const { notifications, totalUnreadCount } = await getNotificationsWithUnreadCount(user.id, 10);
+    return Response.json({ success: true, data: notifications, totalUnreadCount });
   } catch (error) {
     return Response.json(
       { success: false, message: "Lỗi khi lấy danh sách thông báo" },

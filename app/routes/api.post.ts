@@ -6,7 +6,16 @@ import type { Route } from "./+types/api.post";
 import { getAllPosts } from "~/.server/queries/post.query";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
 
+import { POSTS_ENABLED } from "~/constants/feature-flags";
+
+const notFoundHeaders = {
+  "X-Robots-Tag": "noindex, nofollow, noarchive",
+} as const;
+
 export async function loader({ request }: Route.LoaderArgs) {
+  if (!POSTS_ENABLED) {
+    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+  }
   try {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
@@ -37,6 +46,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  if (!POSTS_ENABLED) {
+    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+  }
   try {
     const user = await getUserInfoFromSession(request);
 

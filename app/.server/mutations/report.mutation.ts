@@ -9,6 +9,7 @@ export interface CreateReportParams {
   targetId: string;
   mangaId?: string;
   postId?: string;
+  reporterId?: string;
 }
 
 export async function createReport(params: CreateReportParams): Promise<ReportType> {
@@ -20,6 +21,10 @@ export async function createReport(params: CreateReportParams): Promise<ReportTy
       reportType: params.reportType,
       targetId: params.targetId,
     };
+
+    if (params.reporterId) {
+      reportData.reporterId = params.reporterId;
+    }
 
     if (params.mangaId) {
       reportData.mangaId = params.mangaId;

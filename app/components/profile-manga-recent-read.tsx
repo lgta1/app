@@ -5,6 +5,7 @@ import { LoadingSpinner } from "~/components/loading-spinner";
 import { Pagination } from "~/components/pagination";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
+import { buildMangaUrl } from "~/utils/manga-url.utils";
 
 interface ProfileMangaRecentReadProps {
   userId?: string;
@@ -13,6 +14,7 @@ interface ProfileMangaRecentReadProps {
 export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) {
   const queryParams = userId ? { userId } : undefined;
 
+  const PAGE_SIZE = 10;
   const {
     data: recentReadMangas,
     currentPage,
@@ -22,7 +24,7 @@ export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) 
     goToPage,
   } = usePagination<MangaType>({
     apiUrl: "/api/manga/recent-read",
-    limit: 5,
+    limit: PAGE_SIZE,
     queryParams,
   });
 
@@ -44,10 +46,6 @@ export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) 
 
   return (
     <div className="flex flex-col items-start gap-4">
-      <div className="text-txt-secondary text-sm font-medium">
-        Tổng cộng: {recentReadMangas.length}
-      </div>
-
       {recentReadMangas.length === 0 ? (
         <div className="py-8 text-center">
           <p className="text-txt-secondary text-sm font-medium">
@@ -56,39 +54,37 @@ export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) 
         </div>
       ) : (
         <>
-          <div className="flex w-full flex-col gap-2">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-1">
             {recentReadMangas.map((manga) => (
               <Link
                 key={manga.id}
-                to={`/manga/${manga.id}`}
-                className="bg-bgc-layer1 border-bd-default flex w-full items-center justify-between rounded-xl border p-3"
+                to={buildMangaUrl(manga)}
+                className="bg-bgc-layer1 border-bd-default group flex h-full flex-col overflow-hidden rounded-2xl border text-left transition hover:border-lav-500 lg:flex-row"
               >
-                <div className="flex items-center gap-3">
+                <div className="aspect-[3/4] w-full overflow-hidden bg-bgc-layer2 lg:max-w-[180px]">
                   <img
-                    className="h-8 w-8 rounded object-cover"
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                     src={manga.poster}
                     alt={manga.title}
                   />
-                  <div className="flex flex-1 flex-col gap-0.5">
-                    <h3 className="text-txt-primary line-clamp-1 text-sm leading-tight font-medium">
+                </div>
+                <div className="flex flex-1 flex-col gap-3 p-4">
+                  <div className="flex flex-col gap-1">
+                    <h3 className="text-txt-primary line-clamp-2 text-base font-semibold">
                       {manga.title}
                     </h3>
-                    <div className="flex flex-wrap items-start gap-2">
-                      <span className="text-txt-focus text-xs font-medium">
-                        Chapter {manga.chapters}
-                      </span>
-                      <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
-                        <Eye className="text-txt-secondary h-3 w-3" />
-                        <span className="text-txt-secondary text-xs font-medium">
-                          {manga.viewNumber?.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
-                        <Heart className="text-txt-secondary h-3 w-3" />
-                        <span className="text-txt-secondary text-xs font-medium">
-                          {manga.likeNumber?.toLocaleString()}
-                        </span>
-                      </div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-txt-focus">
+                      Chapter {manga.chapters ?? 0}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs font-semibold text-txt-secondary sm:flex sm:flex-wrap sm:gap-4">
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>{manga.viewNumber?.toLocaleString() ?? 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Heart className="h-3.5 w-3.5" />
+                      <span>{manga.likeNumber?.toLocaleString() ?? 0}</span>
                     </div>
                   </div>
                 </div>
@@ -99,11 +95,7 @@ export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) 
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex w-full justify-center">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={goToPage}
-              />
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={goToPage} />
             </div>
           )}
         </>

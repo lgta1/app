@@ -20,11 +20,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     isDropdown: true,
   },
   {
-    label: "Đăng truyện",
-    href: "/manga/create",
-  },
-  {
-    label: "Xếp hạng",
+    label: "🏆 BXH",
     href: "/leaderboard",
     mobile: true,
   },
@@ -34,10 +30,6 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     isSpecial: true,
     icon: "/images/icons/waifu-icon.png",
     mobile: true,
-  },
-  {
-    label: "Diễn đàn",
-    href: "/posts",
   },
 ];
 

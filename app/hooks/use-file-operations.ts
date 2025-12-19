@@ -8,6 +8,26 @@ interface UploadFileOptions {
   prefixPath?: string;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
+  watermark?: boolean;
+}
+
+interface UploadedFileResult {
+  objectName: string;
+  fullPath: string;
+  url: string;
+  prefixPath?: string;
+  size?: number;
+  type?: string;
+  originalName?: string;
+  sanitizedName?: string;
+  isRenamed?: boolean;
+  isPublic?: boolean;
+}
+
+interface UploadSession {
+  promise: Promise<UploadedFileResult[]>;
+  cancel: () => void;
+  getUploadedResults: () => UploadedFileResult[];
 }
 
 interface DeleteFileOptions {
@@ -21,6 +41,10 @@ interface DeleteFilesOptions {
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
 }
+
+const isAbortError = (error: unknown): boolean => {
+  return error instanceof DOMException && error.name === "AbortError";
+};
 
 export function useFileOperations() {
   const submit = useSubmit();
@@ -75,6 +99,10 @@ export function useFileOperations() {
         formData.append("prefixPath", options.prefixPath);
       }
 
+      if (options.watermark) {
+        formData.append("watermark", "true");
+      }
+
       submit(formData, {
         action: "/api/files/upload",
         method: "post",
@@ -92,6 +120,10 @@ export function useFileOperations() {
 
       if (options.prefixPath) {
         formData.append("prefixPath", options.prefixPath);
+      }
+
+      if (options.watermark) {
+        formData.append("watermark", "true");
       }
 
       // Store callbacks before submitting
@@ -192,15 +224,25 @@ export function useFileOperations() {
 
   // Upload multiple files
   const uploadMultipleFiles = useCallback(
-    async (uploads: Array<{ file: File; options: UploadFileOptions }>) => {
+    async (
+      uploads: Array<{ file: File; options: UploadFileOptions }>,
+      onProgress?: (done: number, total: number) => void,
+    ) => {
       try {
-        // Create upload promises for parallel execution
+        let completed = 0;
+        const total = uploads.length;
+        if (onProgress) onProgress(0, total);
+        // Parallel upload, update progress as each finishes
         const uploadPromises = uploads.map(async ({ file, options }) => {
           const formData = new FormData();
           formData.append("file", file);
 
           if (options.prefixPath) {
             formData.append("prefixPath", options.prefixPath);
+          }
+
+          if (options.watermark) {
+            formData.append("watermark", "true");
           }
 
           const response = await fetch("/api/files/upload", {
@@ -217,6 +259,9 @@ export function useFileOperations() {
           // Execute individual success callback if provided
           options.onSuccess?.(result.data);
 
+          completed += 1;
+          if (onProgress) onProgress(completed, total);
+
           return result.data;
         });
 
@@ -224,6 +269,7 @@ export function useFileOperations() {
         const results = await Promise.all(uploadPromises);
 
         toast.success(`Upload ${results.length} file thành công!`);
+        if (onProgress) onProgress(total, total);
         return results;
       } catch (error) {
         const errorMessage =
@@ -241,6 +287,93 @@ export function useFileOperations() {
     [],
   );
 
+  const uploadMultipleFilesCancelable = useCallback(
+    (
+      uploads: Array<{ file: File; options: UploadFileOptions }>,
+      onProgress?: (done: number, total: number) => void,
+    ): UploadSession => {
+      const controllers = uploads.map(() => new AbortController());
+      const uploadedResults: UploadedFileResult[] = [];
+      let completed = 0;
+      const total = uploads.length;
+      let canceled = false;
+
+      if (onProgress) onProgress(0, total);
+
+      const uploadPromises = uploads.map(async ({ file, options }, index) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        if (options.prefixPath) {
+          formData.append("prefixPath", options.prefixPath);
+        }
+
+        if (options.watermark) {
+          formData.append("watermark", "true");
+        }
+
+        const response = await fetch("/api/files/upload", {
+          method: "POST",
+          body: formData,
+          signal: controllers[index].signal,
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new BusinessError(result.error || "Tải file lên thất bại");
+        }
+
+        uploadedResults.push(result.data as UploadedFileResult);
+
+        options.onSuccess?.(result.data);
+
+        completed += 1;
+        if (onProgress) onProgress(completed, total);
+
+        return result.data as UploadedFileResult;
+      });
+
+      const promise = (async () => {
+        try {
+          const results = await Promise.all(uploadPromises);
+
+          if (!canceled) {
+            toast.success(`Upload ${results.length} file thành công!`);
+            if (onProgress) onProgress(total, total);
+          }
+
+          return results;
+        } catch (error) {
+          if (isAbortError(error) || canceled) {
+            throw new DOMException("Upload canceled", "AbortError");
+          }
+
+          const errorMessage =
+            error instanceof Error ? error.message : "Có lỗi xảy ra khi upload file";
+          toast.error(errorMessage);
+          uploads.forEach(({ options }) => {
+            options.onError?.(errorMessage);
+          });
+          throw error;
+        }
+      })();
+
+      const cancel = () => {
+        if (canceled) return;
+        canceled = true;
+        controllers.forEach((controller) => controller.abort());
+      };
+
+      return {
+        promise,
+        cancel,
+        getUploadedResults: () => [...uploadedResults],
+      };
+    },
+    [],
+  );
+
   return {
     uploadFile,
     uploadFileWithFetcher,
@@ -248,6 +381,7 @@ export function useFileOperations() {
     deleteFiles,
     downloadFile,
     uploadMultipleFiles,
+    uploadMultipleFilesCancelable,
     isUploading: uploadFetcher.state === "submitting",
     isDeleting: deleteFetcher.state === "submitting",
     isLoading: uploadFetcher.state === "loading" || deleteFetcher.state === "loading",

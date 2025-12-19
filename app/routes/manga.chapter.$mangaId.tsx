@@ -1,100 +1,44 @@
-import { useLoaderData } from "react-router";
-
-import { getChapterByMangaIdAndNumber } from "@/queries/chapter.query";
-import { getMangaPublishedById, getRelatedManga } from "@/queries/manga.query";
-import { getUserInfoFromSession } from "@/services/session.svc";
-
+import { redirect } from "react-router";
 import type { Route } from "./+types/manga.chapter.$mangaId";
 
-import { ChapterDetail } from "~/components/chapter-detail";
-import { CHAPTER_STATUS } from "~/constants/chapter";
-import { ChapterModel } from "~/database/models/chapter.model";
-import type { UserType } from "~/database/models/user.model";
-
+// Legacy route: 301 redirect to new chapter URL prefix
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const mangaId = params.mangaId;
-
+  const handle = params.mangaId;
   const url = new URL(request.url);
-  const chapterNumber = Number(url.searchParams.get("chapterNumber"));
-  const user = await getUserInfoFromSession(request);
 
-  if (!mangaId) {
+  if (!handle) {
     throw new Response("Không tìm thấy chapter", { status: 404 });
   }
 
-  // Lấy dữ liệu manga
-  const manga = await getMangaPublishedById(mangaId, user);
+  const { getMangaPublishedById } = await import("@/queries/manga.query");
+  const { getChapterByMangaIdAndNumber } = await import("@/queries/chapter.query");
+  const manga = await getMangaPublishedById(handle);
   if (!manga) {
     throw new Response("Không tìm thấy truyện", { status: 404 });
   }
 
-  // Lấy dữ liệu chapter
-  const chapter = await getChapterByMangaIdAndNumber(
-    mangaId,
-    chapterNumber,
-    user as UserType,
-  );
-  if (!chapter) {
-    throw new Response("Không tìm thấy chapter", { status: 404 });
+  const chapterParam = url.searchParams.get("chapter") ?? url.searchParams.get("chapterNumber");
+  const chapterNumber = Number(chapterParam);
+
+  const targetHandle = manga.slug ?? handle;
+  if (!Number.isFinite(chapterNumber) || chapterNumber < 1) {
+    return redirect(`/truyen-hentai/${targetHandle}`, { status: 301 });
   }
 
-  const breadcrumb = `Trang chủ / ${manga?.title || "Manga"} / Chapter ${chapter.chapterNumber}`;
-
-  let preChapter, nextChapter;
-
-  if (chapter.chapterNumber) {
-    preChapter = await ChapterModel.findOne({
-      mangaId,
-      chapterNumber: chapter.chapterNumber - 1,
-      status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] },
-    });
-
-    nextChapter = await ChapterModel.findOne({
-      mangaId,
-      chapterNumber: chapter.chapterNumber + 1,
-      status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] },
-    });
+  const chapter = await getChapterByMangaIdAndNumber(manga.id, chapterNumber, null as any);
+  const cSlug = String((chapter as any)?.slug || "").trim();
+  if (!cSlug) {
+    return redirect(`/truyen-hentai/${targetHandle}`, { status: 301 });
   }
 
-  return {
-    chapter: {
-      ...chapter,
-      breadcrumb,
-      hasPrevious: Boolean(preChapter),
-      hasNext: Boolean(nextChapter),
-    },
-    relatedManga: await getRelatedManga(manga),
-  };
+  url.searchParams.delete("chapter");
+  url.searchParams.delete("chapterNumber");
+  const rest = url.searchParams.toString();
+
+  const target = `/truyen-hentai/${encodeURIComponent(targetHandle)}/${encodeURIComponent(cSlug)}`;
+  return redirect(rest ? `${target}?${rest}` : target, { status: 301 });
 }
 
-export function meta({ data }: Route.MetaArgs) {
-  if (!data?.chapter) {
-    return [
-      { title: "Không tìm thấy chương | VinaHentai" },
-      { name: "description", content: "Chương truyện không tồn tại" },
-    ];
-  }
-
-  return [
-    { title: `${data.chapter.title} | VinaHentai` },
-    { name: "description", content: `Đọc ${data.chapter.title} tại VinaHentai` },
-  ];
-}
-
-export default function ChapterReader() {
-  const { chapter, relatedManga } = useLoaderData<typeof loader>();
-
-  return (
-    <div className="container-ad mx-auto px-4 py-6 sm:px-6">
-      <ChapterDetail
-        chapter={{
-          ...chapter,
-          hasPrevious: Boolean(chapter.hasPrevious),
-          hasNext: Boolean(chapter.hasNext),
-        }}
-        isEnableClaimReward={true}
-        relatedManga={relatedManga}
-      />
-    </div>
-  );
+export default function ChapterLegacyRedirect() {
+  return null;
 }

@@ -11,7 +11,7 @@ import { useLoaderData, useSearchParams, useSubmit } from "react-router-dom";
 import { Gift, Search, Trash2, TriangleAlert } from "lucide-react";
 
 import { banUser, deleteUser, rewardGoldUser } from "@/mutations/user.mutation";
-import { getListModAndAdmin, getListUser, getTotalUserCount } from "@/queries/user.query";
+import { getListModAndAdmin, getListUser, getTotalUserCount, getListDichGia } from "@/queries/user.query";
 import { requireAdminOrModLogin } from "@/services/auth.server";
 
 import { BanMemberDialog } from "~/components/dialog-ban-member";
@@ -41,6 +41,7 @@ const SORT_OPTIONS = [
 interface LoaderData {
   members: UserType[];
   admins: UserType[];
+  dichgia: UserType[];
   currentPage: number;
   totalPages: number;
   searchTerm: string;
@@ -61,6 +62,21 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
     return {
       members: [],
       admins,
+      dichgia: [],
+      currentPage: 1,
+      totalPages: 1,
+      searchTerm,
+      activeTab,
+      sortBy,
+    };
+  }
+
+  if (activeTab === 'dichgia') {
+    const dichgia = await getListDichGia(searchTerm);
+    return {
+      members: [],
+      admins: [],
+      dichgia,
       currentPage: 1,
       totalPages: 1,
       searchTerm,
@@ -79,6 +95,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderDat
   return {
     members,
     admins: [],
+    dichgia: [],
     currentPage: page,
     totalPages,
     searchTerm,
@@ -269,6 +286,7 @@ export default function AdminMember() {
   const {
     members,
     admins,
+    dichgia,
     currentPage,
     totalPages,
     searchTerm: initialSearchTerm,
@@ -279,8 +297,8 @@ export default function AdminMember() {
   const [searchParams] = useSearchParams();
   const submit = useSubmit();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [activeTab, setActiveTab] = useState<"members" | "admins">(
-    initialActiveTab as "members" | "admins",
+  const [activeTab, setActiveTab] = useState<"members" | "admins" | "dichgia">(
+    initialActiveTab as "members" | "admins" | "dichgia",
   );
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -356,7 +374,7 @@ export default function AdminMember() {
     }
   };
 
-  const handleTabChange = (tab: "members" | "admins") => {
+  const handleTabChange = (tab: "members" | "admins" | "dichgia") => {
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams);
     params.set("tab", tab);
@@ -389,9 +407,40 @@ export default function AdminMember() {
     submit(params, { method: "get" });
   };
 
-  // Use real data based on active tab
-  const displayData = activeTab === "members" ? members : admins;
+  // Use real data based on active tab (members | admins | dichgia)
+  const displayData =
+    activeTab === "members"
+      ? members
+      : activeTab === "admins"
+        ? admins
+        : dichgia;
   const showPagination = activeTab === "members" && totalPages > 1;
+  const isDichGiaTab = activeTab === "dichgia";
+
+  const [showAddDichGia, setShowAddDichGia] = useState(false);
+  const [newDichGiaId, setNewDichGiaId] = useState("");
+  const submitNewDichGia = async () => {
+    if (!newDichGiaId.trim()) {
+      toast.error("Nhập ID user");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("userId", newDichGiaId.trim());
+    try {
+      const resp = await fetch("/admin/roles/set-dichgia", { method: "POST", body: fd });
+      const json = await resp.json();
+      if (json.success) {
+        toast.success(json.message || "Đã gán dịch giả");
+        setShowAddDichGia(false);
+        setNewDichGiaId("");
+        const params = new URLSearchParams(searchParams);
+        params.set("tab", "dichgia");
+        submit(params, { method: "get" });
+      } else toast.error(json.message || "Thất bại");
+    } catch (e) {
+      toast.error("Lỗi mạng");
+    }
+  };
 
   return (
     <div className="container mx-auto my-8 w-full max-w-[1141px] gap-4 px-4 lg:px-0">
@@ -407,11 +456,13 @@ export default function AdminMember() {
         <Tab active={activeTab === "admins"} onClick={() => handleTabChange("admins")}>
           Ban Quản trị
         </Tab>
+        <Tab active={activeTab === "dichgia"} onClick={() => handleTabChange("dichgia")}>Dịch giả</Tab>
       </div>
 
       {/* Main Content */}
       <div className="bg-bgc-layer1 border-bd-default flex min-h-[596px] flex-col items-start justify-start gap-6 self-stretch rounded-xl border p-6 shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)]">
         {/* Search and Sort Controls */}
+        {/* Search and Sort Controls + Add DichGia */}
         <div className="flex flex-col items-start justify-between gap-4 self-stretch md:flex-row md:gap-0">
           <div className="bg-bgc-layer2 border-bd-default flex w-full items-center justify-start gap-2 rounded-xl border px-3 py-2 md:w-80">
             <Search className="text-txt-primary h-5 w-5" />
@@ -430,6 +481,27 @@ export default function AdminMember() {
             className="w-full md:w-72"
             placeholder="Sắp xếp theo"
           />
+          {isDichGiaTab && (
+            <div className="flex w-full flex-col gap-2 md:w-auto md:items-end">
+              {!showAddDichGia && (
+                <button onClick={() => setShowAddDichGia(true)} className="rounded bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] px-4 py-2 text-sm font-semibold text-black shadow">Thêm</button>
+              )}
+              {showAddDichGia && (
+                <div className="flex flex-col gap-2 rounded-xl border border-bd-default bg-bgc-layer2 p-3 md:flex-row">
+                  <input
+                    placeholder="ID User"
+                    value={newDichGiaId}
+                    onChange={(e)=>setNewDichGiaId(e.target.value)}
+                    className="rounded border border-bd-default bg-bgc-layer1 px-2 py-1 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={submitNewDichGia} className="rounded bg-purple-400 px-3 py-1 text-xs font-semibold text-black hover:opacity-80">Set làm Dịch giả</button>
+                    <button onClick={()=>{setShowAddDichGia(false); setNewDichGiaId('');}} className="rounded bg-gray-400 px-3 py-1 text-xs font-semibold text-black hover:opacity-80">Hủy</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Table */}
@@ -485,8 +557,7 @@ export default function AdminMember() {
               activeTab === "members" ? (currentPage - 1) * 10 + index + 1 : index + 1;
 
             return (
-              <Link
-                to={`/profile/${user.id}`}
+              <div
                 key={user.id}
                 className="border-bd-default flex flex-col items-start justify-start gap-2 self-stretch border-b p-2 lg:flex-row lg:items-center lg:gap-0 lg:p-0"
               >
@@ -499,9 +570,17 @@ export default function AdminMember() {
                     <StatusBadge status={status} />
                   </div>
                   <div className="space-y-1">
-                    <div className="text-txt-primary font-sans text-sm font-semibold">
+                    <Link
+                      to={`/profile/${user.id}`}
+                      className="text-txt-primary font-sans text-sm font-semibold inline-flex items-center hover:underline"
+                    >
                       {user.name}
-                    </div>
+                      {user.role === "DICHGIA" && (
+                        <span className="ml-1 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent font-semibold">
+                          – Dịch giả
+                        </span>
+                      )}
+                    </Link>
                     <div className="text-txt-secondary font-sans text-xs font-medium">
                       {user.email}
                     </div>
@@ -536,9 +615,17 @@ export default function AdminMember() {
                   </div>
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">
-                  <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
+                  <Link
+                    to={`/profile/${user.id}`}
+                    className="text-txt-primary font-sans text-sm leading-tight font-semibold flex items-center hover:underline"
+                  >
                     {user.name}
-                  </div>
+                    {user.role === "DICHGIA" && (
+                      <span className="ml-1 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent font-semibold">
+                        – Dịch giả
+                      </span>
+                    )}
+                  </Link>
                 </div>
                 <div className="hidden flex-1 items-center justify-start gap-2.5 p-3 lg:flex">
                   <div className="text-txt-primary font-sans text-sm leading-tight font-semibold">
@@ -566,7 +653,7 @@ export default function AdminMember() {
                     onRewardClick={handleRewardClick}
                   />
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

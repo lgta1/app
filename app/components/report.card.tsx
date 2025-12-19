@@ -1,13 +1,24 @@
-import { Clock } from "lucide-react";
+import { Clock, Gift } from "lucide-react";
 
 import { REPORT_TYPE } from "~/constants/report";
 import type { ReportType } from "~/database/models/report.model";
 import { formatDate, formatTime } from "~/utils/date.utils";
 
+type ReportCardReport = ReportType & {
+  chapterTitle?: string;
+  mangaTitle?: string;
+  reporterUser?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+};
+
 interface ReportCardProps {
-  report: ReportType;
+  report: ReportCardReport;
   onDeleteClick: (reportId: string) => void;
-  onViewClick: (report: ReportType) => void;
+  onViewClick: (report: ReportCardReport) => void;
+  onRewardClick?: (report: ReportCardReport) => void;
 }
 
 // Helper function để map report type
@@ -25,9 +36,15 @@ function getReportTypeDisplay(reportType: string, mangaId: any): string {
   }
 }
 
-export function ReportCard({ report, onDeleteClick, onViewClick }: ReportCardProps) {
+export function ReportCard({ report, onDeleteClick, onViewClick, onRewardClick }: ReportCardProps) {
   const reportTypeColor =
     report.reportType === REPORT_TYPE.MANGA ? "text-[#25EBAC]" : "text-[#FFE133]";
+  const isMangaReport = report.reportType === REPORT_TYPE.MANGA;
+  const targetLabel = isMangaReport ? "Chương báo cáo" : "Đối tượng báo cáo";
+  const targetValue = isMangaReport
+    ? report.chapterTitle || report.targetName
+    : report.targetName;
+  const canReward = Boolean(report.reporterUser?.id && onRewardClick);
 
   return (
     <div className="border-bd-default bg-bgc-layer2 relative flex flex-col gap-4 self-stretch rounded-xl border p-6">
@@ -58,6 +75,11 @@ export function ReportCard({ report, onDeleteClick, onViewClick }: ReportCardPro
             <div className="text-txt-primary font-sans text-base leading-normal font-semibold">
               {report.reporterName}
             </div>
+            {report.reporterUser?.email && (
+              <div className="text-txt-secondary font-sans text-xs leading-tight">
+                {report.reporterUser.email}
+              </div>
+            )}
           </div>
 
           <div className="inline-flex w-full flex-col gap-0.5 md:w-24">
@@ -74,11 +96,16 @@ export function ReportCard({ report, onDeleteClick, onViewClick }: ReportCardPro
 
         <div className="inline-flex flex-col gap-0.5">
           <div className="text-txt-secondary font-sans text-sm leading-tight font-semibold">
-            Đối tượng báo cáo
+            {targetLabel}
           </div>
           <div className="text-txt-primary font-sans text-base leading-normal font-semibold">
-            {report.targetName}
+            {targetValue}
           </div>
+          {isMangaReport && report.mangaTitle && (
+            <div className="text-txt-secondary font-sans text-xs leading-tight">
+              Truyện: <span className="text-txt-primary font-semibold">{report.mangaTitle}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -94,6 +121,17 @@ export function ReportCard({ report, onDeleteClick, onViewClick }: ReportCardPro
 
       {/* Action Buttons - Responsive Position */}
       <div className="flex items-center gap-2 self-end lg:absolute lg:top-4 lg:right-6">
+        {canReward && (
+          <button
+            onClick={() => onRewardClick?.(report)}
+            className="flex items-center justify-center gap-2.5 rounded-xl border border-[#F97316] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(249,115,22,0.25)]"
+          >
+            <Gift className="h-4 w-4 text-[#F97316]" />
+            <div className="cursor-pointer text-center font-sans text-sm leading-tight font-semibold text-[#F97316]">
+              Thưởng
+            </div>
+          </button>
+        )}
         <button
           onClick={() => onDeleteClick(report.id)}
           className="flex items-center justify-center gap-2.5 rounded-xl border border-[#E03F46] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(146,53,190,0.25)]"

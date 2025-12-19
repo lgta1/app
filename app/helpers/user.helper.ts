@@ -1,4 +1,5 @@
 import { ROLES } from "~/constants/user";
+import { MANGA_STATUS } from "~/constants/manga";
 import type { UserType } from "~/database/models/user.model";
 import { UserWaifuModel } from "~/database/models/user-waifu";
 
@@ -6,26 +7,42 @@ export const isAdmin = (role: string) => {
   return [ROLES.ADMIN, ROLES.MOD].includes(role);
 };
 
+export const isDichGia = (role: string) => role === ROLES.DICHGIA;
+
+// Bulk permission: admin OR (dichgia & owner)
+export const canBulkDownloadChapters = (
+  role: string,
+  isOwner: boolean,
+) => {
+  return isAdmin(role) || (isDichGia(role) && isOwner);
+};
+
 export const getTitleImgPath = (user: UserType) => {
   if (user.level > 9) {
-    return `/images/title/${user.faction}/9.png`;
+    return `/images/title/${user.faction}/9.webp`;
   }
 
   if (user.faction === 0) {
     if (user.level <= 3) {
-      return `/images/title/0/${user.level}_${user.gender}.png`;
+      return `/images/title/0/${user.level}_${user.gender}.webp`;
     }
-    return `/images/title/0/${user.level}.png`;
+    return `/images/title/0/${user.level}.webp`;
   } else if (user.faction === 1) {
-    return `/images/title/1/${user.level}.png`;
+    return `/images/title/1/${user.level}.webp`;
   }
 };
 
+/**
+ * NOTE: Đổi hành vi theo yêu cầu:
+ * - Nếu user chưa có ảnh upload thật sự → TRẢ VỀ CHUỖI RỖNG ("")
+ * - Không còn fallback theo genders ở helper này nữa.
+ *   (UI sẽ tự hiển thị icon lucide-react khi src rỗng.)
+ */
 export const getAvatarPath = (user: UserType) => {
-  if (user.avatar) {
-    return user.avatar;
-  }
-  return `/images/genders/${user.gender}-character.png`;
+  const raw = user?.avatar as unknown as string | undefined | null;
+  if (!raw) return "";
+  if (raw === "null" || raw === "undefined") return "";
+  return String(raw);
 };
 
 /**

@@ -3,6 +3,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { MangaModel } from "~/database/models/manga.model";
+import { isAdmin } from "~/helpers/user.helper";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -11,40 +12,48 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const limit = parseInt(url.searchParams.get("limit") || "10");
     const userIdParam = url.searchParams.get("userId");
 
+    const sessionUser = await getUserInfoFromSession(request);
     let targetUserId: string;
 
     if (userIdParam) {
-      // Nếu có userId trong query params, sử dụng userId đó
       targetUserId = userIdParam;
     } else {
-      // Nếu không có userId, lấy từ session (flow hiện tại)
-      const user = await getUserInfoFromSession(request);
-      if (!user) {
+      if (!sessionUser) {
         return Response.json(
           { error: "Vui lòng đăng nhập để xem truyện đã đăng" },
           { status: 401 },
         );
       }
-      targetUserId = user.id;
+      targetUserId = sessionUser.id;
     }
 
-    // Lấy danh sách manga đã đăng
     const skip = (page - 1) * limit;
+    const matchCondition = { ownerId: targetUserId };
 
-    const uploadedMangas = await MangaModel.find({ ownerId: targetUserId })
-      .select("title poster chapters viewNumber likeNumber followNumber status createdAt")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const [uploadedMangas, totalUploaded, totalViewsAgg] = await Promise.all([
+      MangaModel.find(matchCondition)
+        .select(
+          "title poster slug chapters viewNumber likeNumber followNumber status createdAt userStatus",
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      MangaModel.countDocuments(matchCondition),
+      MangaModel.aggregate([
+        { $match: matchCondition },
+        { $group: { _id: null, totalViews: { $sum: { $ifNull: ["$viewNumber", 0] } } } },
+      ]),
+    ]);
 
-    // Đếm tổng số manga đã đăng
-    const totalUploaded = await MangaModel.countDocuments({ ownerId: targetUserId });
     const totalPages = Math.ceil(totalUploaded / limit);
+    const totalViews = totalViewsAgg?.[0]?.totalViews ?? 0;
+    const isAdminUser = Boolean(sessionUser && isAdmin(sessionUser.role));
 
     // Chuyển đổi dữ liệu
     const mangaList = uploadedMangas.map((manga) => ({
       ...manga.toObject(),
       id: manga._id.toString(),
+      slug: manga.slug,
     }));
 
     return Response.json({
@@ -53,6 +62,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       currentPage: page,
       totalPages,
       totalUploaded,
+      totalViews,
+      isAdminUser,
     });
   } catch (error) {
     console.error("Error in manga uploaded loader:", error);

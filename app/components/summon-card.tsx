@@ -16,6 +16,8 @@ interface SummonCardProps {
   onReveal?: (index: number) => void;
   forceReveal?: boolean;
   dropDelay?: number;
+  disableDropAnimation?: boolean; // mới: tắt hiệu ứng rơi/hover/idle, hiển thị ngay
+  runId?: number | null;
 }
 
 export function SummonCard({
@@ -26,6 +28,8 @@ export function SummonCard({
   onReveal,
   forceReveal = false,
   dropDelay = 0,
+  disableDropAnimation = false,
+  runId,
 }: SummonCardProps) {
   const [isFlipping, setIsFlipping] = useState(false);
   const [localIsRevealed, setLocalIsRevealed] = useState(isRevealed);
@@ -33,11 +37,16 @@ export function SummonCard({
   const [shouldAnimate, setShouldAnimate] = useState(false);
 
   useEffect(() => {
+    if (disableDropAnimation) {
+      // Không animate: hiển thị ngay, không áp dụng class animate-card-*
+      setShouldAnimate(false);
+      return;
+    }
     const timer = setTimeout(() => {
       setShouldAnimate(true);
     }, dropDelay);
     return () => clearTimeout(timer);
-  }, [dropDelay]);
+  }, [dropDelay, disableDropAnimation]);
 
   useEffect(() => {
     if (forceReveal && !localIsRevealed) {
@@ -69,16 +78,34 @@ export function SummonCard({
     large: "aspect-2/3 w-48 lg:w-[300px]",
   };
 
+  // Manage image src to allow cache-busting / retries when image fails intermittently
+  // Use card back as a safe fallback so we don't 404 when placeholder missing
+  const FALLBACK_IMAGE = "/images/waifu/card.png";
+  const [imgSrc, setImgSrc] = useState<string>(item.item.image || FALLBACK_IMAGE);
+  const [errorCount, setErrorCount] = useState(0);
+
+  useEffect(() => {
+    // Reset src when item or runId changes
+    setImgSrc(item.item.image || FALLBACK_IMAGE);
+    setErrorCount(0);
+  }, [item.item.image, runId]);
+
   return (
     <div
       className={`relative cursor-pointer ${sizeClasses[size]} ${
-        shouldAnimate ? "animate-card-drop" : "opacity-0"
+        disableDropAnimation
+          ? ""
+          : shouldAnimate
+            ? "animate-card-drop"
+            : "opacity-0"
       } ${
-        shouldAnimate && isHovering && !localIsRevealed && !isFlipping
-          ? "animate-card-hover"
-          : shouldAnimate && !localIsRevealed && !isFlipping
-            ? "animate-card-idle"
-            : ""
+        disableDropAnimation
+          ? ""
+          : shouldAnimate && isHovering && !localIsRevealed && !isFlipping
+            ? "animate-card-hover"
+            : shouldAnimate && !localIsRevealed && !isFlipping
+              ? "animate-card-idle"
+              : ""
       }`}
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovering(true)}
@@ -113,10 +140,28 @@ export function SummonCard({
       {localIsRevealed && (
         <div className="animate-card-reveal absolute inset-0">
           <img
-            src={item.item.image}
+            key={`${runId ?? "r0"}-${index}-${errorCount}`}
+            src={imgSrc}
             alt={`Summon result ${index + 1}`}
             className="h-full w-full rounded-lg shadow-xl"
             draggable={false}
+            loading="eager"
+            decoding="async"
+            onError={() => {
+              // Retry up to 2 times with a small backoff and cache-busting query param
+              const base = item.item.image || FALLBACK_IMAGE;
+              if (errorCount < 2 && item.item.image) {
+                setErrorCount((c: number) => c + 1);
+                const cb = runId ? `_r=${runId}` : `_r=${Date.now()}`;
+                const sep = base.includes("?") ? "&" : "?";
+                const newSrc = `${item.item.image}${sep}${cb}`;
+                // small backoff so not all retries fire exactly at once
+                setTimeout(() => setImgSrc(newSrc), 150 * (errorCount + 1));
+              } else {
+                // final fallback to placeholder (if not already)
+                if (imgSrc !== FALLBACK_IMAGE) setImgSrc(FALLBACK_IMAGE);
+              }
+            }}
           />
         </div>
       )}

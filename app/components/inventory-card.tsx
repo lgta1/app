@@ -1,22 +1,27 @@
 import { useEffect, useState } from "react";
 
-interface SummonCardProps {
-  count: number;
-  image: string;
-  index: number;
+interface InventoryCardProps {
+  count?: number;
+  image?: string;
+  imageUrl?: string;
+  index?: number;
   dropDelay?: number;
   className?: string;
   onClick?: () => void;
+  status?: "active" | "inactive";
+  name?: string;
 }
 
 export function InventoryCard({
-  count,
+  count = 0,
   image,
-  index,
+  imageUrl,
+  index = 0,
   dropDelay = 0,
   className,
   onClick,
-}: SummonCardProps) {
+  status,
+}: InventoryCardProps) {
   const [shouldAnimate, setShouldAnimate] = useState(false);
 
   // Trigger drop animation with delay
@@ -44,11 +49,15 @@ export function InventoryCard({
           </div>
         )}
         <img
-          src={image}
+          src={image || imageUrl || ""}
           alt={`Inventory card ${index + 1}`}
           className="aspect-2/3 w-full rounded-lg shadow-xl"
           draggable={false}
         />
+
+        {status === "active" && (
+          <div className="absolute inset-0 rounded-lg ring-2 ring-lav-500" />
+        )}
       </div>
     </div>
   );

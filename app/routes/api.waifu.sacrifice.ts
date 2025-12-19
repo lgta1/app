@@ -10,11 +10,11 @@ import { UserModel, type UserType } from "~/database/models/user.model";
 import { UserWaifuModel } from "~/database/models/user-waifu";
 import { updateUserExp } from "~/helpers/user-level.helper";
 
-// Bảng quy đổi theo cấp sao
+// Bảng quy đổi theo cấp sao (Dâm Ngọc chi phí + EXP nhận)
 const SACRIFICE_RATES = {
-  3: { exp: 50, gold: 10 },
-  4: { exp: 200, gold: 15 },
-  5: { exp: 1000, gold: 20 },
+  3: { exp: 30, gold: 1 },
+  4: { exp: 100, gold: 5 },
+  5: { exp: 500, gold: 10 },
 } as const;
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -93,8 +93,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const totalExp = rates.exp * sacrificeAmount;
     const totalGoldCost = rates.gold * sacrificeAmount;
 
-    // Check user có đủ gold không
-    const currentUser = await UserModel.findById(user.id).select("gold");
+    // Check user có đủ vàng/Dâm Ngọc & cần exp/level hiện tại cho logic cộng exp
+    const currentUser = await UserModel.findById(user.id).select("gold level exp").lean();
     if (!currentUser || currentUser.gold < totalGoldCost) {
       return Response.json(
         {
@@ -135,7 +135,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     let updatedSession = null;
     if (didLevelUp) {
-      // Nếu level up, cập nhật exp (reset), level và trừ gold
+      // Nếu level up, reset exp-in-level, cập nhật level và trừ gold
       await UserModel.updateOne(
         { _id: user.id },
         {
@@ -150,7 +150,7 @@ export async function action({ request }: ActionFunctionArgs) {
       setUserDataToSession(session, updatedUserData);
       updatedSession = session;
     } else {
-      // Nếu không level up, chỉ tăng exp và trừ gold
+      // Nếu không level up, chỉ tăng exp-in-level và trừ gold
       await UserModel.updateOne(
         { _id: user.id },
         {

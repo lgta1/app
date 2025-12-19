@@ -1,3 +1,18 @@
+function createSlugFromName(rawName: string): string {
+  if (!rawName) return "";
+  const normalized = rawName
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  const sanitized = normalized
+    .replace(/[^\p{Letter}\p{Number}\s-]+/gu, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (sanitized) return sanitized;
+  return rawName.trim().replace(/\s+/g, "-");
+}
 // app/components/author-select.tsx
 import * as React from "react";
 
@@ -12,6 +27,14 @@ type Props = {
   initialAuthors?: AuthorLite[];
   onChange?: (authors: AuthorLite[], orderIds: string[]) => void;
   placeholder?: string;
+  /** Put "Create ..." option at top (default true). */
+  pinCreateOnTop?: boolean;
+  /** Base API path, default "/api/authors". Should expose /search and /create */
+  basePath?: string;
+  /** Key in create response wrapping item (e.g. author, doujinshi, translator, character) */
+  responseKey?: string;
+  /** Singular label used for create option (e.g. "tác giả", "doujinshi", "dịch giả", "nhân vật") */
+  createLabelSingular?: string;
 };
 
 type SearchItem = AuthorLite & { _isNew?: boolean };
@@ -24,17 +47,7 @@ function normalizeEntity(obj: any): AuthorLite | null {
   if (!obj || typeof obj !== "object") return null;
   const id = obj.id ?? obj._id ?? obj.value ?? null;
   const name = obj.name ?? obj.title ?? obj.label ?? null;
-  const slugRaw =
-    obj.slug ??
-    (typeof name === "string"
-      ? name
-          .normalize("NFD")
-          .replace(/\p{Diacritic}/gu, "")
-          .toLowerCase()
-          .trim()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9\-]/g, "")
-      : "");
+  const slugRaw = obj.slug ?? (typeof name === "string" ? createSlugFromName(name) : "");
   if (!id || !name) return null;
   return {
     id: String(id),
@@ -44,13 +57,13 @@ function normalizeEntity(obj: any): AuthorLite | null {
   };
 }
 
-/** Lấy Author từ nhiều kiểu response của API create */
-function pickAuthorFromCreateResponse(data: any): AuthorLite | null {
+/** Generic: lấy entity từ nhiều kiểu response của API create */
+function pickAuthorFromCreateResponse(data: any, key: string): AuthorLite | null {
   const candidates: any[] = [];
 
   // các chỗ thường gặp
-  if (data?.author) candidates.push(data.author);
-  if (data?.data?.author) candidates.push(data.data.author);
+  if (data?.[key]) candidates.push(data[key]);
+  if (data?.data?.[key]) candidates.push(data.data[key]);
   if (data?.data) candidates.push(data.data);
   if (data?.item) candidates.push(data.item);
   if (Array.isArray(data?.items)) candidates.push(...data.items);
@@ -75,6 +88,10 @@ export default function AuthorSelect({
   initialAuthors = [],
   onChange,
   placeholder = "Thêm tác giả…",
+  pinCreateOnTop = true,
+  basePath = "/api/authors",
+  responseKey = "author",
+  createLabelSingular = "tác giả",
 }: Props) {
   const [query, setQuery] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -93,7 +110,7 @@ export default function AuthorSelect({
   React.useEffect(() => {
     onChange?.(
       selected,
-      selected.map((a) => a.id),
+      selected.map((a: AuthorLite) => a.id),
     );
   }, [selected, onChange]);
 
@@ -132,7 +149,7 @@ export default function AuthorSelect({
     const t = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/authors/search?q=${encodeURIComponent(query.trim())}&limit=${MAX_RESULTS}`,
+          `${basePath}/search?q=${encodeURIComponent(query.trim())}&limit=${MAX_RESULTS}`,
           { signal: controller.signal },
         );
         if (!res.ok) {
@@ -146,10 +163,10 @@ export default function AuthorSelect({
             .filter(Boolean) as AuthorLite[];
 
           // lọc bớt đã chọn
-          const chosenIds = new Set(selected.map((s) => s.id));
+          const chosenIds = new Set(selected.map((s: AuthorLite) => s.id));
           const filtered = items.filter((i) => !chosenIds.has(i.id));
 
-          // ✅ LUÔN đặt "Tạo tác giả ..." ở TOP
+          // ✅ LUÔN đặt "Tạo <entity> ..." ở TOP
           const createOption: SearchItem = {
             id: "__new__",
             name: query.trim(),
@@ -157,7 +174,10 @@ export default function AuthorSelect({
             avatarUrl: null,
             _isNew: true,
           };
-          const list = [createOption, ...filtered].slice(0, MAX_RESULTS);
+          const filteredTrimmed = filtered.slice(0, Math.max(0, MAX_RESULTS - 1));
+          const list = pinCreateOnTop
+            ? [createOption, ...filteredTrimmed]
+            : [...filteredTrimmed, createOption];
 
           setResults(list);
           setOpen(true);
@@ -184,7 +204,7 @@ export default function AuthorSelect({
       quickCreate(item.name);
       return;
     }
-    if (selected.find((s) => s.id === item.id)) return;
+    if (selected.find((s: AuthorLite) => s.id === item.id)) return;
     const next = [
       ...selected,
       {
@@ -212,13 +232,13 @@ export default function AuthorSelect({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/authors/create`, {
+      const res = await fetch(`${basePath}/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmed }),
       });
 
-      // chấp nhận cả 201/409; server có thể trả {author}, {data:{author}}, {_id,name}, ...
+  // chấp nhận cả 201/409; server có thể trả {author}, {data:{author}}, {_id,name}, ...
       let data: any = null;
       try {
         data = await res.json();
@@ -226,34 +246,34 @@ export default function AuthorSelect({
         setError("Phản hồi không đúng định dạng (không phải JSON).");
         return;
       }
-      const author = pickAuthorFromCreateResponse(data);
+  const author = pickAuthorFromCreateResponse(data, responseKey);
 
       if (!author) {
         setError("Phản hồi không đúng định dạng");
         return;
       }
-      if (selected.find((s) => s.id === author.id)) {
+  if (selected.find((s: AuthorLite) => s.id === author.id)) {
         setQuery("");
         setResults([]);
         setOpen(false);
         setHighlightIndex(-1);
         return;
       }
-      setSelected((prev) => [...prev, author]);
+  setSelected((prev: AuthorLite[]) => [...prev, author]);
       setQuery("");
       setResults([]);
       setOpen(false);
       setHighlightIndex(-1);
       inputRef.current?.focus();
     } catch (e) {
-      setError("Không thể tạo tác giả");
+  setError(`Không thể tạo ${createLabelSingular}`);
     } finally {
       setLoading(false);
     }
   }
 
   function removeAuthor(id: string) {
-    setSelected((prev) => prev.filter((s) => s.id !== id));
+    setSelected((prev: AuthorLite[]) => prev.filter((s: AuthorLite) => s.id !== id));
     inputRef.current?.focus();
   }
 
@@ -283,10 +303,10 @@ export default function AuthorSelect({
     if (!open) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightIndex((i) => (results.length === 0 ? -1 : (i + 1) % results.length));
+  setHighlightIndex((i: number) => (results.length === 0 ? -1 : (i + 1) % results.length));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightIndex((i) =>
+      setHighlightIndex((i: number) =>
         results.length === 0 ? -1 : (i - 1 + results.length) % results.length,
       );
     } else if (e.key === "Enter") {
@@ -380,11 +400,11 @@ export default function AuthorSelect({
                   e.preventDefault();
                 }}
                 onClick={() => addAuthor(item)}
-                title={item._isNew ? `Tạo tác giả "${item.name}"` : item.name}
+                title={item._isNew ? `Tạo ${createLabelSingular} "${item.name}"` : item.name}
               >
                 {item._isNew ? (
                   <span>
-                    ➕ Tạo tác giả <strong>“{item.name}”</strong>
+                    ➕ Tạo {createLabelSingular} <strong>“{item.name}”</strong>
                   </span>
                 ) : (
                   <span>{item.name}</span>

@@ -1,8 +1,8 @@
-import { model, Schema } from "mongoose";
+import { model, Schema, Types } from "mongoose";
 
 export type UserReadChapterType = {
   id: string;
-  chapterId: string;
+  chapterId: Types.ObjectId;   // 🔧 Dùng ObjectId để join với chapters._id
   userId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -10,14 +10,16 @@ export type UserReadChapterType = {
 
 const UserReadChapterSchema = new Schema<UserReadChapterType>(
   {
-    chapterId: { type: String, ref: "Chapter", required: true },
-    userId: { type: String, ref: "User", required: true },
+    chapterId: { type: Schema.Types.ObjectId, ref: "Chapter", required: true, index: true }, // 🔧
+    userId: { type: String, ref: "User", required: true, index: true },
   },
-  { timestamps: true },
+  { timestamps: true }, // có createdAt/updatedAt
 );
 
-UserReadChapterSchema.index({ chapterId: 1, userId: 1 }, { unique: true });
+// Unique mỗi (user, chapter)
+UserReadChapterSchema.index({ userId: 1, chapterId: 1 }, { unique: true });
 
-UserReadChapterSchema.index({ userId: 1, createdAt: -1 });
+// Truy vấn lịch sử nhanh theo thời gian
+UserReadChapterSchema.index({ userId: 1, updatedAt: -1 });
 
-export const UserReadChapterModel = model("UserReadChapter", UserReadChapterSchema);
+export const UserReadChapterModel = model<UserReadChapterType>("UserReadChapter", UserReadChapterSchema);
