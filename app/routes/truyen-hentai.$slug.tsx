@@ -233,7 +233,6 @@ export function meta({ data }: Route.MetaArgs) {
   return [
     { title: pageTitle },
     { name: "description", content: description },
-    { tagName: "link", rel: "canonical", href: canonicalUrl },
     { property: "og:title", content: pageTitle },
     { property: "og:description", content: description },
     { property: "og:type", content: "article" },

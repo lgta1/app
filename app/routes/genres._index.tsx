@@ -15,7 +15,6 @@ export const meta: Route.MetaFunction = ({ data }) => {
       content:
         "Trang tổng hợp tất cả thể loại truyện hentai của Vinahentai như NTR, MILF, 3D, Doujinshi, ảnh cosplay và nhiều nhánh phụ khác. Mỗi thể loại dẫn tới danh sách truyện riêng được cập nhật thường xuyên, giúp bạn nhanh chóng tìm đúng nội dung hợp gu mà không phải dò tìm từng trang lẻ.",
     },
-    { tagName: "link", rel: "canonical", href: canonical },
   ];
 };
 

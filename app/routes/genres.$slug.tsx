@@ -35,7 +35,6 @@ export const meta: Route.MetaFunction = ({ data }) => {
       content:
         data.genre.description || `Khám phá thể loại ${data.genre.name} tại Vinahentai`,
     },
-    ...(data?.canonical ? [{ tagName: "link", rel: "canonical", href: data.canonical }] : []),
   ];
 };
 

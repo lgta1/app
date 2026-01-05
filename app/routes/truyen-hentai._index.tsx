@@ -84,7 +84,6 @@ export const meta: Route.MetaFunction = ({ data }) => {
   return [
     { title },
     { name: "description", content: description },
-    { tagName: "link", rel: "canonical", href: canonical },
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:url", content: canonical },

@@ -57,7 +57,7 @@ export function meta({ data }: Route.MetaArgs) {
   const baseTitle = "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO";
   const description =
     "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN,... KHÔNG QUẢNG CÁO, cập nhật nhanh, đa dạng thể loại. Trải nghiệm ngay!";
-  const origin = (data as any)?.origin || "https://vinahentai.xyz";
+  const canonicalUrl = (data as any)?.canonicalUrl || (data as any)?.origin || "https://vinahentai.xyz";
   const image = DEFAULT_SHARE_IMAGE;
   return [
     { title: baseTitle },
@@ -66,22 +66,25 @@ export function meta({ data }: Route.MetaArgs) {
     { property: "og:site_name", content: "Vinahentai" },
     { property: "og:title", content: baseTitle },
     { property: "og:description", content: description },
-    { property: "og:url", content: origin },
+    { property: "og:url", content: canonicalUrl },
     { property: "og:image", content: image },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: baseTitle },
     { name: "twitter:description", content: description },
     { name: "twitter:image", content: image },
-    { name: "twitter:url", content: origin },
+    { name: "twitter:url", content: canonicalUrl },
   ];
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const { canonicalUrl } = useLoaderData<RootLoaderData>();
+
   return (
     <html lang="vi">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}
         {/* Early toggle: allow disabling external Google Fonts via ?nofonts=1 or localStorage */}
         <script
           dangerouslySetInnerHTML={{
@@ -191,24 +194,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export async function loader({ request }: Route.LoaderArgs) {
   const { sharedTtlCache } = await import("~/.server/utils/ttl-cache");
   const { isbot } = await import("isbot");
-  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  const { getCanonicalUrl, getCanonicalOrigin, getEffectiveRequestUrl } = await import("~/.server/utils/canonical-url");
 
-  // Consolidate hostname (e.g. www -> non-www) at the app layer.
+  // Consolidate hostname (e.g. www -> non-www), protocol (http -> https), trailing slashes
+  // and common tracking params at the app layer.
   // Cloudflare should also enforce this, but this prevents duplicate content
   // and session fragmentation if edge rules are missing/misconfigured.
-  const canonicalOriginEnv = (process.env.CANONICAL_ORIGIN ?? "").trim();
-  if (canonicalOriginEnv && (request.method === "GET" || request.method === "HEAD")) {
+  const canonicalUrl = (() => {
     try {
-      const requestUrl = new URL(request.url);
-      const canonicalOrigin = getCanonicalOrigin(request as any);
-      if (canonicalOrigin) {
-        const canonicalHost = new URL(canonicalOrigin).host;
-        const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
-        const requestHost = forwardedHost.split(",")[0].trim();
-        if (requestHost && requestHost !== canonicalHost) {
-          const target = new URL(requestUrl.pathname + requestUrl.search, canonicalOrigin);
-          return redirect(encodeURI(target.toString()), { status: 301 });
-        }
+      return getCanonicalUrl(request as any);
+    } catch {
+      return undefined;
+    }
+  })();
+
+  if (canonicalUrl && (request.method === "GET" || request.method === "HEAD")) {
+    try {
+      const effectiveUrl = getEffectiveRequestUrl(request as any);
+      if (effectiveUrl.toString() !== canonicalUrl) {
+        return redirect(encodeURI(canonicalUrl), { status: 301 });
       }
     } catch {}
   }
@@ -221,7 +225,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const user = await getUserInfoFromSession(request);
   const genres = await sharedTtlCache.getOrSet("genres:all", 5 * 60 * 1000, () => getAllGenres());
-  const origin = getCanonicalOrigin(request as any);
+  const origin = (() => {
+    try {
+      return new URL(canonicalUrl || getCanonicalOrigin(request as any)).origin;
+    } catch {
+      return getCanonicalOrigin(request as any);
+    }
+  })();
 
   const responseHeaders = new Headers();
   // Prevent CDN/Cloudflare from caching HTML/data responses and serving stale asset-hash refs
@@ -235,11 +245,11 @@ export async function loader({ request }: Route.LoaderArgs) {
       unreadCount = await countUnreadNotifications(user.id);
     } catch {}
     return json(
-      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified, origin },
+      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified, origin, canonicalUrl },
       { headers: responseHeaders },
     );
   }
-  return json({ isAdmin: false, genres, isBot, ageVerified, origin }, { headers: responseHeaders });
+  return json({ isAdmin: false, genres, isBot, ageVerified, origin, canonicalUrl }, { headers: responseHeaders });
 }
 
 type RootLoaderData = {
@@ -250,6 +260,7 @@ type RootLoaderData = {
   isBot?: boolean;
   ageVerified?: boolean;
   origin?: string;
+  canonicalUrl?: string;
 };
 
 export default function App() {

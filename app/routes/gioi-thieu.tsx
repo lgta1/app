@@ -21,7 +21,6 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
       content:
         "VinaHentai – Trang web đọc truyện 18+ đa dạng thể loại: NTR, MILF, 3D, doujinshi… Truy cập ngay để trải nghiệm nội dung hấp dẫn, không quảng cáo.",
     },
-    { tagName: "link", rel: "canonical", href: canonicalUrl },
     { property: "og:title", content: "Giới thiệu Vinahentai – Website đọc truyện hentai 18+ chất lượng" },
     {
       property: "og:description",

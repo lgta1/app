@@ -96,7 +96,6 @@ export function meta({ data }: Route.MetaArgs) {
       content:
         "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN,... KHÔNG QUẢNG CÁO, cập nhật nhanh, đa dạng thể loại. Trải nghiệm ngay!",
     },
-    { tagName: "link", rel: "canonical", href: canonical },
     { property: "og:url", content: canonical },
     { name: "twitter:url", content: canonical },
   ];

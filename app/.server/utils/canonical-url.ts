@@ -1,5 +1,21 @@
 const DEFAULT_CANONICAL_ORIGIN = "https://vinahentai.xyz";
 
+const TRACKING_QUERY_KEYS = new Set([
+  "fbclid",
+  "gclid",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "utm_name",
+  "utm_reader",
+  "utm_referrer",
+  "utm_creative_format",
+  "utm_marketing_tactic",
+]);
+
 function getRequestOrigin(request: Request): string | undefined {
   try {
     const forwardedProto = request.headers.get("x-forwarded-proto") ?? "";
@@ -11,6 +27,40 @@ function getRequestOrigin(request: Request): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function getKnownSiteCanonicalOriginForHost(hostname: string | undefined): string | undefined {
+  const host = (hostname ?? "").trim().toLowerCase();
+  if (!host) return undefined;
+
+  // Explicit mapping for this repo's live domains.
+  // If request is for one of these (including www), canonicalize to DEFAULT_CANONICAL_ORIGIN.
+  if (host === "vinahentai.xyz" || host === "www.vinahentai.xyz") return DEFAULT_CANONICAL_ORIGIN;
+  if (host === "vinahentai.com" || host === "www.vinahentai.com") return DEFAULT_CANONICAL_ORIGIN;
+
+  return undefined;
+}
+
+function normalizePathname(pathname: string): string {
+  const raw = pathname || "/";
+  const collapsed = raw.replace(/\/+/g, "/");
+  const trimmed = collapsed.replace(/\/+$/g, "");
+  return trimmed || "/";
+}
+
+function stripTrackingParams(search: string): string {
+  if (!search) return "";
+  const params = new URLSearchParams(search);
+  for (const key of Array.from(params.keys())) {
+    const k = key.toLowerCase();
+    if (k.startsWith("utm_") || TRACKING_QUERY_KEYS.has(k)) params.delete(key);
+  }
+
+  // Stable ordering helps avoid duplicates due to param order.
+  const entries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const next = new URLSearchParams(entries);
+  const nextStr = next.toString();
+  return nextStr ? `?${nextStr}` : "";
 }
 
 function normalizeOrigin(input: string | undefined): string | undefined {
@@ -25,6 +75,31 @@ function normalizeOrigin(input: string | undefined): string | undefined {
 
 export const CANONICAL_ORIGIN =
   normalizeOrigin(process.env.CANONICAL_ORIGIN) ?? DEFAULT_CANONICAL_ORIGIN;
+
+export function getEffectiveRequestUrl(request: Request): URL {
+  const incoming = new URL(request.url);
+
+  const forwardedProto = request.headers.get("x-forwarded-proto") ?? "";
+  const proto = forwardedProto.split(",")[0].trim() || incoming.protocol.replace(/:$/, "") || "https";
+
+  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  const host = forwardedHost.split(",")[0].trim() || incoming.host;
+
+  return new URL(`${proto}://${host}${incoming.pathname}${incoming.search}`);
+}
+
+export function getCanonicalUrl(request: Request): string {
+  const effective = getEffectiveRequestUrl(request);
+
+  const envOrigin = normalizeOrigin(process.env.CANONICAL_ORIGIN);
+  const knownCanonical = getKnownSiteCanonicalOriginForHost(effective.hostname);
+
+  const canonicalOrigin = envOrigin ?? knownCanonical ?? effective.origin;
+  const canonicalPath = normalizePathname(effective.pathname);
+  const canonicalSearch = stripTrackingParams(effective.search);
+
+  return new URL(`${canonicalPath}${canonicalSearch}`, canonicalOrigin).toString();
+}
 
 export function getCanonicalOrigin(_request?: Request): string {
   // Prefer explicit env configuration.

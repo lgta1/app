@@ -151,7 +151,6 @@ export function meta({ data }: any) {
   return [
     { title: `${chapName} | ${mangaTitle}` },
     { name: "description", content: description },
-    { tagName: "link", rel: "canonical", href: canonicalUrl },
     { property: "og:type", content: "article" },
     { property: "og:title", content: `${chapName} | ${mangaTitle}` },
     { property: "og:description", content: description },
