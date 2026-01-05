@@ -7,7 +7,7 @@ import { ChevronDown, X } from "lucide-react";
 import type { GenresType } from "~/database/models/genres.model";
 
 const PINNED_GENRE_SLUGS = ["3d-hentai", "manhwa", "anh-cosplay"] as const;
-const PINNED_GENRE_SET = new Set(PINNED_GENRE_SLUGS);
+const PINNED_GENRE_SET: Set<string> = new Set(PINNED_GENRE_SLUGS);
 
 interface HeaderGenresProps {
   genres: GenresType[];

@@ -1,10 +1,7 @@
 User-agent: *
 Allow: /
 
-# Posts are currently disabled (treat as non-existent)
-Disallow: /post
-Disallow: /posts
-Disallow: /post-create
-Disallow: /post-edit
-Disallow: /api/post
-Sitemap: https://vinahentai.net/sitemap.xml
+# Posts are disabled and should be removed from index.
+# Do NOT block via robots.txt, so crawlers can fetch and observe 410/404.
+
+Sitemap: https://vinahentai.xyz/sitemap.xml

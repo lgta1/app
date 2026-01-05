@@ -13,7 +13,8 @@
     "backfill:manga-author-relations": "tsx scripts/backfill-manga-author-relations.ts",
     "backfill:manga-slugs": "tsx scripts/backfill-manga-slugs.ts",
     "backfill:chapter-slugs": "tsx scripts/backfill-chapter-slugs.ts",
-    "import:vi-hentai": "tsx scripts/import-vi-hentai.ts"
+    "import:vi-hentai": "tsx scripts/import-vi-hentai.ts",
+    "migrate:cdn-host": "tsx scripts/migrate-cdn-host.ts --dry-run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.888.0",

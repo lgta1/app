@@ -1,16 +1,16 @@
 import { redirect } from "react-router";
 
 import { updateChapter } from "@/mutations/chapter.mutation";
-import { getUserInfoFromSession } from "@/services/session.svc";
+import { requireLogin } from "@/services/auth.server";
 
 import { MangaModel } from "~/database/models/manga.model";
 import { ChapterModel } from "~/database/models/chapter.model";
 import type { UserType } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
-import { isAdmin } from "~/helpers/user.helper";
+import { isAdmin, isDichGia } from "~/helpers/user.helper";
 import { resolveMangaHandle } from "~/database/helpers/manga-slug.helper";
 
-export { default } from "./truyen-hentai.chapter.edit.$mangaId";
+export { EditChapterView as default } from "./truyen-hentai.chapter.edit.$mangaId";
 
 export async function loader({ request, params }: any) {
   const handle = String(params?.mangaId ?? "");
@@ -22,10 +22,7 @@ export async function loader({ request, params }: any) {
     throw new BusinessError("Không tìm thấy chapter ID");
   }
 
-  const user = (await getUserInfoFromSession(request)) as UserType | null;
-  if (!user) {
-    throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
-  }
+  const user = (await requireLogin(request)) as UserType;
 
   const target = await resolveMangaHandle(handle);
   if (!target) {
@@ -37,8 +34,13 @@ export async function loader({ request, params }: any) {
 
   // Non-admins can only edit their own manga.
   if (!isAdmin(String((user as any).role ?? ""))) {
-    const ok = await MangaModel.findOne({ _id: mangaId, ownerId: (user as any).id }).select({ _id: 1 }).lean();
-    if (!ok) {
+    const normalize = (v: any) => String(v ?? "").trim().toLowerCase();
+    const okOwner = await MangaModel.findOne({ _id: mangaId, ownerId: (user as any).id }).select({ _id: 1, translationTeam: 1 }).lean();
+    const isTranslatorForManga =
+      isDichGia(String((user as any).role ?? "")) && normalize((user as any)?.name) && normalize((target as any)?.translationTeam) &&
+      normalize((user as any)?.name) === normalize((target as any)?.translationTeam);
+
+    if (!okOwner && !isTranslatorForManga) {
       throw new BusinessError("Không tìm thấy manga hoặc bạn không có quyền chỉnh sửa");
     }
   }
@@ -53,6 +55,7 @@ export async function loader({ request, params }: any) {
 
 export async function action({ request, params }: any) {
   try {
+    await requireLogin(request);
     const handle = String(params?.mangaId ?? "");
     const chapterId = String(params?.chapterId ?? "");
     if (!handle) {

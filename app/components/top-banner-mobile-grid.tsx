@@ -132,11 +132,7 @@ export default function TopBannerMobileGrid({
         cssMode={false}
         rewind={false}
         loopAdditionalSlides={Math.min(columns.length, 2)}
-        loopedSlides={columns.length}
         watchSlidesProgress={true}
-        // @ts-expect-error Swiper typings omit preloadImages although runtime supports it
-        preloadImages={true}
-        updateOnImagesReady={true}
         onTouchStart={(swiper) => {
           if (isIOS) setDragging(true);
           scheduleAutoplayResume(swiper);
@@ -217,7 +213,7 @@ export default function TopBannerMobileGrid({
           --swiper-pagination-bullet-inactive-color: rgba(168,85,247,1); /* base purple */
           --swiper-pagination-bullet-inactive-opacity: 0.30; /* inactive reduced by 10% (from 0.40 to 0.30) */
           overflow: hidden; /* prevent horizontal overflow on mobile */
-          padding-bottom: 22px; /* reserve room for pagination dots inside */
+          padding-bottom: 27px; /* reserve room for pagination dots inside (+5px) */
         }
         .swiper_columns, .swiper_columns .swiper-wrapper { width: 100%; max-width: 100%; }
         .swiper_columns .swiper-slide { box-sizing: border-box; }

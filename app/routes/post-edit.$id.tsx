@@ -29,7 +29,7 @@ interface PreviewImage {
 
 export async function loader({ params }: Route.LoaderArgs) {
   if (!POSTS_ENABLED) {
-    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+    throw new Response("Gone", { status: 410, headers: notFoundHeaders });
   }
   const { id } = params;
 

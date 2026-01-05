@@ -10,14 +10,25 @@ type ShareButtonsProps = {
 // Small, unobtrusive share buttons block
 export function ShareButtons({ title, className }: ShareButtonsProps) {
   const location = useLocation();
-  const defaultOrigin = typeof window !== "undefined" ? window.location.origin : "https://vinahentai.com";
-  const defaultUrl = `${defaultOrigin}${location.pathname}${location.search}`;
+  const CANONICAL_ORIGIN =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : ((import.meta as any)?.env?.VITE_CANONICAL_ORIGIN as string | undefined) ?? "https://vinahentai.xyz";
+  const defaultUrl = `${CANONICAL_ORIGIN}${location.pathname}${location.search}`;
   const [shareUrl, setShareUrl] = React.useState(defaultUrl);
   const [copied, setCopied] = React.useState(false);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
-      setShareUrl(window.location.href.split("#")[0]);
+      try {
+        const current = new URL(window.location.href.split("#")[0]);
+        const canonical = new URL(CANONICAL_ORIGIN);
+        current.protocol = canonical.protocol;
+        current.host = canonical.host;
+        setShareUrl(current.toString());
+      } catch {
+        setShareUrl(`${CANONICAL_ORIGIN}${location.pathname}${location.search}`);
+      }
     }
   }, [location]);
 

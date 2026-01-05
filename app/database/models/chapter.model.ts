@@ -9,6 +9,8 @@ export type ChapterType = {
   slug?: string;
   viewNumber?: number;
   likeNumber?: number;
+  dislikeNumber?: number;
+  chapScore?: number;
   commentNumber?: number;
   chapterNumber?: number;
   contentUrls: string[];
@@ -25,6 +27,8 @@ const ChapterSchema = new Schema<ChapterType>(
     slug: { type: String, default: "" },
     viewNumber: { type: Number, default: 0 },
     likeNumber: { type: Number, default: 0 },
+    dislikeNumber: { type: Number, default: 0 },
+    chapScore: { type: Number, default: 0 },
     commentNumber: { type: Number, default: 0 },
     chapterNumber: { type: Number, required: true },
     contentUrls: { type: [String], required: true },

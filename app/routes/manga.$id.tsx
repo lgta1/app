@@ -22,10 +22,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   // Tránh redirect nhiều bước: luôn chuyển thẳng sang URL mới
   if (currentUrl.pathname === targetPath) {
-    return redirect(targetUrl);
+    return redirect(encodeURI(targetUrl));
   }
 
-  return redirect(targetUrl, { status: 301 });
+  return redirect(encodeURI(targetUrl), { status: 301 });
 }
 
 export default function MangaLegacyRedirect() {

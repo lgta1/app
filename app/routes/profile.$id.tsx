@@ -12,6 +12,8 @@ import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model"
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
 import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
 import { UserWaifuModel } from "~/database/models/user-waifu";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
+import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const userId = params.id;
@@ -47,6 +49,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     ? [...userWaifuLeaderboard.waifuCollection].sort((a: any, b: any) => (b?.stars || 0) - (a?.stars || 0))
     : [];
 
+  if (waifuCollection.length) {
+    waifuCollection = waifuCollection.map((w: any) => {
+      const nextImg = normalizeWaifuImageUrl(w?.image);
+      return nextImg ? { ...w, image: nextImg } : w;
+    });
+  }
+
   if (waifuCollection.length && isOwner) {
     waifuCollection = await Promise.all(
       waifuCollection.map(async (waifu: any) => {
@@ -68,11 +77,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .select("currentWaifu")
     .populate("currentWaifu")
     .lean();
-  const currentWaifu = userFull?.currentWaifu || null;
+  const currentWaifu = (() => {
+    const cw: any = userFull?.currentWaifu || null;
+    if (cw && typeof cw === "object") {
+      const nextImg = normalizeWaifuImageUrl((cw as any).image);
+      if (nextImg) (cw as any).image = nextImg;
+    }
+    return cw;
+  })();
 
   return {
     profileUser: {
       ...userData,
+      avatar: typeof (userData as any)?.avatar === "string" ? rewriteLegacyCdnUrl((userData as any).avatar) : (userData as any)?.avatar,
       id: userIdString,
       waifuCollection,
       waifuCount,

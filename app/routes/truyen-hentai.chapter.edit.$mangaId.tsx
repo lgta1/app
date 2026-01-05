@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "react-hot-toast";
 import {
   Link,
+  Outlet,
   redirect,
   useActionData,
   useFetcher,
@@ -13,7 +14,7 @@ import { ArrowLeft, BookOpen, FileText, Upload, X } from "lucide-react";
 
 import { updateChapter } from "@/mutations/chapter.mutation";
 import { getChapterByMangaIdAndNumber } from "@/queries/chapter.query";
-import { getUserInfoFromSession } from "@/services/session.svc";
+import { requireLogin } from "@/services/auth.server";
 
 import type { Route } from "./+types/truyen-hentai.chapter.edit.$mangaId";
 
@@ -46,9 +47,23 @@ interface CompressionProgress {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const url = new URL(request.url);
+  // This route has a nested canonical route:
+  //   /truyen-hentai/chapter/edit/:mangaId/:chapterId
+  // In React Router nested matching, the parent loader may run as well.
+  // We must NOT run legacy redirect logic for the canonical URL.
+  const parts = url.pathname.split("/").filter(Boolean);
+  const isCanonicalPath =
+    parts[0] === "truyen-hentai" &&
+    parts[1] === "chapter" &&
+    parts[2] === "edit" &&
+    parts.length >= 5;
+  if (isCanonicalPath) {
+    return null;
+  }
+
   const chapterNumber = url.searchParams.get("chapterNumber");
   const handle = params.mangaId;
-  const user = await getUserInfoFromSession(request);
+  const user = (await requireLogin(request)) as UserType;
   if (!handle) {
     throw new BusinessError("Không tìm thấy manga ID");
   }
@@ -91,13 +106,23 @@ export async function action({ request, params }: Route.ActionArgs) {
     const formData = await request.formData();
     const handle = params.mangaId;
     const url = new URL(request.url);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const isCanonicalPath =
+      parts[0] === "truyen-hentai" &&
+      parts[1] === "chapter" &&
+      parts[2] === "edit" &&
+      parts.length >= 5;
+    const chapterIdFromPath = isCanonicalPath
+      ? decodeURIComponent(String(parts[4] ?? "")).trim()
+      : "";
     const chapterNumber = url.searchParams.get("chapterNumber");
 
     if (!handle) {
       throw new BusinessError("Không tìm thấy manga ID");
     }
 
-    if (!chapterNumber) {
+    // Canonical URL uses chapterId path param, legacy URL uses ?chapterNumber=N
+    if (!chapterNumber && !chapterIdFromPath) {
       throw new BusinessError("Thiếu số chương để chỉnh sửa");
     }
 
@@ -107,6 +132,19 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
     const mangaId = String((target as any).id ?? (target as any)._id ?? "");
 
+    // If this action is hit on the canonical route, resolve chapterNumber via chapterId.
+    let effectiveChapterNumber = chapterNumber ? parseInt(chapterNumber) : NaN;
+    if (!Number.isFinite(effectiveChapterNumber) && chapterIdFromPath) {
+      const { ChapterModel } = await import("~/database/models/chapter.model");
+      const chapter = await ChapterModel.findOne({ _id: chapterIdFromPath, mangaId })
+        .select({ chapterNumber: 1 })
+        .lean();
+      effectiveChapterNumber = Number((chapter as any)?.chapterNumber);
+    }
+    if (!Number.isFinite(effectiveChapterNumber) || effectiveChapterNumber < 1) {
+      throw new BusinessError("Không tìm thấy chương");
+    }
+
     const title = (formData.get("title") as string) ?? "";
     const contentUrls = JSON.parse(formData.get("contentUrls") as string);
     // Allow blank title; server will auto-name as "Chap N" based on chapterNumber
@@ -114,7 +152,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       throw new BusinessError("Vui lòng tải lên ít nhất một ảnh");
     }
 
-    await updateChapter(request, mangaId, parseInt(chapterNumber), {
+    await updateChapter(request, mangaId, effectiveChapterNumber, {
       title: title.trim(),
       contentUrls,
     });
@@ -137,6 +175,18 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function EditChapter() {
+  const params = useParams();
+
+  // When visiting the canonical URL (/truyen-hentai/chapter/edit/:mangaId/:chapterId)
+  // this route is a parent layout. Render the nested route instead.
+  if ((params as any)?.chapterId) {
+    return <Outlet />;
+  }
+
+  return <EditChapterView />;
+}
+
+export function EditChapterView() {
   const params = useParams();
   const routeHandle = params.mangaId;
   const navigate = useNavigate();
@@ -175,10 +225,21 @@ export default function EditChapter() {
 
   // Initialize form data when editing
   useEffect(() => {
-    setTitle(chapter.title);
+    setTitle(String((chapter as any)?.title ?? ""));
 
-    // Convert existing content URLs to preview images (giữ thứ tự chương hiện tại)
-    const existingImages: PreviewImage[] = chapter.contentUrls.map((url, index) => ({
+    // Legacy compatibility:
+    // - Preferred: chapter.contentUrls: string[]
+    // - Legacy: chapter.pages: Array<{ url?: string }>
+    const urls: string[] = Array.isArray((chapter as any)?.contentUrls)
+      ? (chapter as any).contentUrls
+      : Array.isArray((chapter as any)?.pages)
+        ? (chapter as any).pages
+            .map((p: any) => String(p?.url ?? "").trim())
+            .filter(Boolean)
+        : [];
+
+    // Convert existing URLs to preview images (giữ thứ tự chương hiện tại)
+    const existingImages: PreviewImage[] = urls.map((url, index) => ({
       url,
       id: `existing-${index}`,
       isExisting: true,

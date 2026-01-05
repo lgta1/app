@@ -7,6 +7,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  redirect,
 } from "react-router";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -52,11 +53,11 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ data }: Route.MetaArgs) {
   const baseTitle = "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO";
   const description =
     "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN,... KHÔNG QUẢNG CÁO, cập nhật nhanh, đa dạng thể loại. Trải nghiệm ngay!";
-  const origin = "https://vinahentai.com";
+  const origin = (data as any)?.origin || "https://vinahentai.xyz";
   const image = DEFAULT_SHARE_IMAGE;
   return [
     { title: baseTitle },
@@ -190,6 +191,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export async function loader({ request }: Route.LoaderArgs) {
   const { sharedTtlCache } = await import("~/.server/utils/ttl-cache");
   const { isbot } = await import("isbot");
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+
+  // Consolidate hostname (e.g. www -> non-www) at the app layer.
+  // Cloudflare should also enforce this, but this prevents duplicate content
+  // and session fragmentation if edge rules are missing/misconfigured.
+  const canonicalOriginEnv = (process.env.CANONICAL_ORIGIN ?? "").trim();
+  if (canonicalOriginEnv && (request.method === "GET" || request.method === "HEAD")) {
+    try {
+      const requestUrl = new URL(request.url);
+      const canonicalOrigin = getCanonicalOrigin(request as any);
+      if (canonicalOrigin) {
+        const canonicalHost = new URL(canonicalOrigin).host;
+        const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+        const requestHost = forwardedHost.split(",")[0].trim();
+        if (requestHost && requestHost !== canonicalHost) {
+          const target = new URL(requestUrl.pathname + requestUrl.search, canonicalOrigin);
+          return redirect(encodeURI(target.toString()), { status: 301 });
+        }
+      }
+    } catch {}
+  }
 
   const userAgent = request.headers.get("user-agent") ?? "";
   const isBot = userAgent ? isbot(userAgent) : false;
@@ -199,6 +221,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const user = await getUserInfoFromSession(request);
   const genres = await sharedTtlCache.getOrSet("genres:all", 5 * 60 * 1000, () => getAllGenres());
+  const origin = getCanonicalOrigin(request as any);
 
   const responseHeaders = new Headers();
   // Prevent CDN/Cloudflare from caching HTML/data responses and serving stale asset-hash refs
@@ -212,15 +235,25 @@ export async function loader({ request }: Route.LoaderArgs) {
       unreadCount = await countUnreadNotifications(user.id);
     } catch {}
     return json(
-      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified },
+      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified, origin },
       { headers: responseHeaders },
     );
   }
-  return json({ isAdmin: false, genres, isBot, ageVerified }, { headers: responseHeaders });
+  return json({ isAdmin: false, genres, isBot, ageVerified, origin }, { headers: responseHeaders });
 }
 
+type RootLoaderData = {
+  isAdmin: boolean;
+  user?: any;
+  genres: any[];
+  unreadCount?: number;
+  isBot?: boolean;
+  ageVerified?: boolean;
+  origin?: string;
+};
+
 export default function App() {
-  const { isAdmin, user, genres, unreadCount, isBot, ageVerified } = useLoaderData<typeof loader>();
+  const { isAdmin, user, genres, unreadCount, isBot, ageVerified } = useLoaderData<RootLoaderData>();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -343,7 +376,6 @@ export default function App() {
     <NotificationsProvider
       key={user ? user.id : "guest"}
       initialUnreadCount={typeof unreadCount === "number" ? unreadCount : 0}
-      autoPrefetchOnMount={Boolean(user) && isHome}
     >
       <DialogWarningAdultContent
         enabled={isAdultWarningPillar}

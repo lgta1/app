@@ -1,0 +1,5 @@
+## 2025-12-25T01:47:37Z
+NOTE: Skipped 'pm2 env <id>' to avoid leaking secrets.
+Only recording environment variable NAMES (keys) from pm2 jlist.
+
+Unable to parse pm2 jlist JSON: The "path" argument must be of type string or an instance of Buffer or URL. Received undefined

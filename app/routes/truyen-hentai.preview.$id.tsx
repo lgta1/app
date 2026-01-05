@@ -27,7 +27,7 @@ import { compressMultipleImages, normalizePosterImage } from "~/utils/image-comp
 import { getChaptersByMangaId } from "@/queries/chapter.query";
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
 
-import type { Route } from "./+types/manga.preview.$id";
+import type { Route } from "./+types/truyen-hentai.preview.$id";
 
 import {
   approveManga,
@@ -56,7 +56,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const manga = await getMangaByIdAndOwner(id, user.id, isAdminUser);
   if (!manga) throw new BusinessError("Không tìm thấy truyện");
 
-  const chapters = await getChaptersByMangaId(manga.id, user);
+  const chaptersRaw = await getChaptersByMangaId(manga.id, user);
+  const chapters = (Array.isArray(chaptersRaw) ? chaptersRaw : []).map((c: any) => ({
+    ...c,
+    id: String(c?.id ?? c?._id ?? ""),
+  }));
 
   const isOwner = String(manga.ownerId) === String(user.id);
 
@@ -284,8 +288,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const dragSrcIndexRef = useRef<number | null>(null);
 
-  const submit = useSubmit();
   const navigate = useNavigate();
+  const submit = useSubmit();
   const posterUpdateFetcher = useFetcher<typeof action>();
   const statusUpdateFetcher = useFetcher<typeof action>();
   const shiftPublishedFetcher = useFetcher<typeof action>();
@@ -1181,7 +1185,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                               className="group text-left w-full"
                               onClick={(e) => {
                                 e.preventDefault();
-                                if (isAdminUser || isOwner) {
+                                if (isAdminUser || isOwner || isDichGiaUser) {
                                   setEditingChapterId(chapter.id);
                                   setEditingTitle(String(chapter.title || ""));
                                 }
@@ -1198,18 +1202,40 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                           </div>
                         )}
                         <div className="flex items-center justify-end gap-2">
-                          <Edit
-                            onClick={(e) => {
-                              e.preventDefault();
-                              navigate(`/truyen-hentai/chapter/edit/${mangaHandle}/${chapter.id}`);
-                            }}
-                            className="text-txt-secondary hover:text-txt-focus h-5 w-5 cursor-pointer"
+                          <Link
+                            to={`/truyen-hentai/chapter/edit/${encodeURIComponent(String(mangaHandle ?? ""))}/${encodeURIComponent(String(chapter?.id ?? chapter?._id ?? ""))}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-txt-secondary hover:text-txt-focus"
                             title="Chỉnh sửa"
-                          />
-                          {isAdminUser && (
-                            <Trash2
+                            aria-label="Chỉnh sửa"
+                          >
+                            <Edit className="h-5 w-5" />
+                          </Link>
+
+                          {(isAdminUser || isOwner || isDichGiaUser) && (
+                            <button
+                              type="button"
                               onClick={async (e) => {
                                 e.preventDefault();
+                                e.stopPropagation();
+
+                                const createdAtRaw = (chapter as any)?.createdAt;
+                                const createdAt = createdAtRaw instanceof Date ? createdAtRaw : new Date(createdAtRaw);
+                                const createdTs = createdAt.getTime();
+                                const ageMs = Date.now() - createdTs;
+                                const THREE_DAYS_MS = 72 * 60 * 60 * 1000;
+
+                                if (!isAdminUser) {
+                                  if (!Number.isFinite(createdTs)) {
+                                    toast.error("Không xác định được thời gian tạo chương để xoá");
+                                    return;
+                                  }
+                                  if (ageMs > THREE_DAYS_MS) {
+                                    toast.error("Đã quá 72h từ khi tạo chương. Chỉ admin mới có thể xoá.");
+                                    return;
+                                  }
+                                }
+
                                 const ok = window.confirm(`Xóa chương "${chapter.title}"? Hành động không thể hoàn tác.`);
                                 if (!ok) return;
                                 const r = await fetch(`/api/chapter?mangaId=${manga.id}&chapterId=${chapter.id}`, { method: "DELETE" });
@@ -1221,9 +1247,12 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                                   toast.error(data?.error || "Xóa chương thất bại");
                                 }
                               }}
-                              className="text-rose-400 hover:text-rose-300 h-5 w-5 cursor-pointer"
+                              className="text-rose-400 hover:text-rose-300"
                               title="Xóa chương"
-                            />
+                              aria-label="Xóa chương"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
                           )}
                         </div>
                       </div>

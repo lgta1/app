@@ -44,8 +44,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const { buildGenreDisplayMap } = genreDisplayUtils as any;
   const { sharedTtlCache } = ttlCacheUtils as any;
 
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+
   const handle = params.slug;
-  const origin = new URL(request.url).origin;
+  const origin = getCanonicalOrigin(request as any);
   const currentUser = await getUserInfoFromSession(request);
 
   // Anonymous traffic is the hottest: cache the heavy payload briefly to reduce DB/CPU.
@@ -101,7 +103,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     const incomingHandle = handle.toLowerCase();
     const canonicalSlug = cached.manga.slug?.toLowerCase();
     if (incomingHandle && canonicalSlug && incomingHandle !== canonicalSlug) {
-      return redirect(`/truyen-hentai/${cached.manga.slug}`);
+      return redirect(encodeURI(`/truyen-hentai/${cached.manga.slug}`));
     }
 
     return {
@@ -120,7 +122,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const incomingHandle = handle?.toLowerCase();
   const canonicalSlug = manga.slug?.toLowerCase();
   if (incomingHandle && canonicalSlug && incomingHandle !== canonicalSlug) {
-    return redirect(`/truyen-hentai/${manga.slug}`);
+    return redirect(encodeURI(`/truyen-hentai/${manga.slug}`));
   }
 
   const isAdminUser = isAdmin(currentUser?.role ?? "");
@@ -179,7 +181,7 @@ export function meta({ data }: Route.MetaArgs) {
     ];
   }
 
-  const origin = data.origin || "https://vinahentai.com";
+  const origin = data.origin || "https://vinahentai.xyz";
   const canonicalPath = data.manga.slug
     ? `/truyen-hentai/${data.manga.slug}`
     : `/truyen-hentai/${data.manga.id}`;
@@ -266,6 +268,24 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
         {/* ===== CỘT TRÁI: CHI TIẾT TRUYỆN ===== */}
         <section className="md:mt-8">
+          <nav aria-label="Breadcrumb" className="text-txt-focus font-sans text-sm font-medium mb-1.5">
+            <ol className="flex flex-wrap items-center gap-0.5 sm:gap-1">
+              <li className="flex items-center gap-0.5 sm:gap-1">
+                <Link to="/" className="transition-colors hover:text-lav-500">
+                  Trang chủ
+                </Link>
+                <span className="text-txt-secondary/60 px-0.5">/</span>
+              </li>
+              <li>
+                <span className="text-txt-focus" title={manga.title || "Manga"}>
+                  {(manga.title || "Manga").length > 20
+                    ? (manga.title || "Manga").slice(0, 19).trimEnd() + "…"
+                    : (manga.title || "Manga")}
+                </span>
+              </li>
+            </ol>
+          </nav>
+
           {canManageManga && (
             <div className="mb-4 flex justify-end">
               <Link

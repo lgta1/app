@@ -1,0 +1,254 @@
+## 2025-12-30T00:46:00Z
+$ command -v pm2 && pm2 ls
+
+/usr/local/bin/pm2
+┌────┬─────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name    │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼─────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ [1m[36m0[39m[22m  │ ww-1    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316460  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 62.6mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+│ [1m[36m1[39m[22m  │ ww-2    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316452  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 62.4mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+│ [1m[36m2[39m[22m  │ ww-3    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316596  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 62.9mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+│ [1m[36m3[39m[22m  │ ww-4    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316602  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 62.8mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+└────┴─────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+[exit=0]
+## 2025-12-30T00:46:00Z
+$ pm2 jlist (redacted) > ops_backups/prechange-20251230-004600/runtime/pm2.jlist.json
+
+[exit=0]
+## 2025-12-30T00:46:00Z
+$ pm2 describe ww-1 | redact_stream
+
+[1m[7m Describing process with id 0 - name ww-1 [27m[22m
+┌───────────────────┬─────────────────────────────────────────────┐
+│ status            │ [32m[1monline[22m[39m                                      │
+│ name              │ ww-1                                        │
+│ namespace         │ default                                     │
+│ version           │ N/A                                         │
+│ restarts          │ 1                                           │
+│ uptime            │ 2D                                          │
+│ entire log path   │ /home/devuser/ww-new/logs/ww-1-combined.log │
+│ script path       │ /usr/local/bin/npm                          │
+│ script args       │ start                                       │
+│ error log path    │ /home/devuser/ww-new/logs/ww-1-error.log    │
+│ out log path      │ /home/devuser/ww-new/logs/ww-1-out.log      │
+│ pid path          │ /home/devuser/.pm2/pids/ww-0.pid            │
+│ interpreter       │ /usr/local/bin/node                         │
+│ interpreter args  │ N/A                                         │
+│ script id         │ 0                                           │
+│ exec cwd          │ /home/devuser/ww-new                        │
+│ exec mode         │ fork_mode                                   │
+│ node.js version   │ 20.19.2                                     │
+│ node env          │ production                                  │
+│ watch & reload    │ ✘                                           │
+│ unstable restarts │ 0                                           │
+│ created at        │ 2025-12-27T03:54:54.574Z                    │
+└───────────────────┴─────────────────────────────────────────────┘
+[7m[1m Actions available [22m[27m
+┌────────────────────────┐
+│ km:heapdump            │
+│ km:cpu:profiling:start │
+│ km:cpu:profiling:stop  │
+│ km:heap:sampling:start │
+│ km:heap:sampling:stop  │
+└────────────────────────┘
+[37m[3m Trigger via: pm2 trigger ww-1 <action_name>[23m[39m
+[37m[3m[23m[39m
+[7m[1m Code metrics value [22m[27m
+┌────────────────────────┬───────────┐
+│ Used Heap Size         │ 13.06 MiB │
+│ Heap Usage             │ 90.21 %   │
+│ Heap Size              │ 14.47 MiB │
+│ Event Loop Latency p95 │ 1.52 ms   │
+│ Event Loop Latency     │ 0.45 ms   │
+│ Active handles         │ 5         │
+│ Active requests        │ 0         │
+└────────────────────────┴───────────┘
+[7m[1m Divergent env variables from local env [22m[27m
+┌──────────────┬────────────────────────────────────────────────────────────────────────┐
+│ SUDO_COMMAND │ /bin/bash -c bash -lc cd\ /home/devuser/ww-new\ &&\ ./manage.sh\ start │
+└──────────────┴────────────────────────────────────────────────────────────────────────┘
+
+[37m[3m Add your own code metrics: http://bit.ly/code-metrics[23m[39m
+[37m[3m Use `pm2 logs ww-1 [--lines 1000]` to display logs[23m[39m
+[37m[3m Use `pm2 env 0` to display environment variables[23m[39m
+[37m[3m Use `pm2 monit` to monitor CPU and Memory usage[23m[39m ww-1
+
+[exit=0]
+## 2025-12-30T00:46:00Z
+$ pm2 describe ww-2 | redact_stream
+
+[1m[7m Describing process with id 1 - name ww-2 [27m[22m
+┌───────────────────┬─────────────────────────────────────────────┐
+│ status            │ [32m[1monline[22m[39m                                      │
+│ name              │ ww-2                                        │
+│ namespace         │ default                                     │
+│ version           │ N/A                                         │
+│ restarts          │ 1                                           │
+│ uptime            │ 2D                                          │
+│ entire log path   │ /home/devuser/ww-new/logs/ww-2-combined.log │
+│ script path       │ /usr/local/bin/npm                          │
+│ script args       │ start                                       │
+│ error log path    │ /home/devuser/ww-new/logs/ww-2-error.log    │
+│ out log path      │ /home/devuser/ww-new/logs/ww-2-out.log      │
+│ pid path          │ /home/devuser/.pm2/pids/ww-1.pid            │
+│ interpreter       │ /usr/local/bin/node                         │
+│ interpreter args  │ N/A                                         │
+│ script id         │ 1                                           │
+│ exec cwd          │ /home/devuser/ww-new                        │
+│ exec mode         │ fork_mode                                   │
+│ node.js version   │ 20.19.2                                     │
+│ node env          │ production                                  │
+│ watch & reload    │ ✘                                           │
+│ unstable restarts │ 0                                           │
+│ created at        │ 2025-12-27T03:54:54.580Z                    │
+└───────────────────┴─────────────────────────────────────────────┘
+[7m[1m Actions available [22m[27m
+┌────────────────────────┐
+│ km:heapdump            │
+│ km:cpu:profiling:start │
+│ km:cpu:profiling:stop  │
+│ km:heap:sampling:start │
+│ km:heap:sampling:stop  │
+└────────────────────────┘
+[37m[3m Trigger via: pm2 trigger ww-2 <action_name>[23m[39m
+[37m[3m[23m[39m
+[7m[1m Code metrics value [22m[27m
+┌────────────────────────┬───────────┐
+│ Used Heap Size         │ 12.63 MiB │
+│ Heap Usage             │ 88.81 %   │
+│ Heap Size              │ 14.22 MiB │
+│ Event Loop Latency p95 │ 1.62 ms   │
+│ Event Loop Latency     │ 0.53 ms   │
+│ Active handles         │ 5         │
+│ Active requests        │ 0         │
+└────────────────────────┴───────────┘
+[7m[1m Divergent env variables from local env [22m[27m
+┌──────────────┬────────────────────────────────────────────────────────────────────────┐
+│ SUDO_COMMAND │ /bin/bash -c bash -lc cd\ /home/devuser/ww-new\ &&\ ./manage.sh\ start │
+└──────────────┴────────────────────────────────────────────────────────────────────────┘
+
+[37m[3m Add your own code metrics: http://bit.ly/code-metrics[23m[39m
+[37m[3m Use `pm2 logs ww-2 [--lines 1000]` to display logs[23m[39m
+[37m[3m Use `pm2 env 1` to display environment variables[23m[39m
+[37m[3m Use `pm2 monit` to monitor CPU and Memory usage[23m[39m ww-2
+
+[exit=0]
+## 2025-12-30T00:46:00Z
+$ pm2 describe ww-3 | redact_stream
+
+[1m[7m Describing process with id 2 - name ww-3 [27m[22m
+┌───────────────────┬─────────────────────────────────────────────┐
+│ status            │ [32m[1monline[22m[39m                                      │
+│ name              │ ww-3                                        │
+│ namespace         │ default                                     │
+│ version           │ N/A                                         │
+│ restarts          │ 1                                           │
+│ uptime            │ 2D                                          │
+│ entire log path   │ /home/devuser/ww-new/logs/ww-3-combined.log │
+│ script path       │ /usr/local/bin/npm                          │
+│ script args       │ start                                       │
+│ error log path    │ /home/devuser/ww-new/logs/ww-3-error.log    │
+│ out log path      │ /home/devuser/ww-new/logs/ww-3-out.log      │
+│ pid path          │ /home/devuser/.pm2/pids/ww-2.pid            │
+│ interpreter       │ /usr/local/bin/node                         │
+│ interpreter args  │ N/A                                         │
+│ script id         │ 2                                           │
+│ exec cwd          │ /home/devuser/ww-new                        │
+│ exec mode         │ fork_mode                                   │
+│ node.js version   │ 20.19.2                                     │
+│ node env          │ production                                  │
+│ watch & reload    │ ✘                                           │
+│ unstable restarts │ 0                                           │
+│ created at        │ 2025-12-27T03:54:59.782Z                    │
+└───────────────────┴─────────────────────────────────────────────┘
+[7m[1m Actions available [22m[27m
+┌────────────────────────┐
+│ km:heapdump            │
+│ km:cpu:profiling:start │
+│ km:cpu:profiling:stop  │
+│ km:heap:sampling:start │
+│ km:heap:sampling:stop  │
+└────────────────────────┘
+[37m[3m Trigger via: pm2 trigger ww-3 <action_name>[23m[39m
+[37m[3m[23m[39m
+[7m[1m Code metrics value [22m[27m
+┌────────────────────────┬───────────┐
+│ Used Heap Size         │ 13.80 MiB │
+│ Heap Usage             │ 93.77 %   │
+│ Heap Size              │ 14.72 MiB │
+│ Event Loop Latency p95 │ 1.52 ms   │
+│ Event Loop Latency     │ 0.47 ms   │
+│ Active handles         │ 5         │
+│ Active requests        │ 0         │
+└────────────────────────┴───────────┘
+[7m[1m Divergent env variables from local env [22m[27m
+┌──────────────┬────────────────────────────────────────────────────────────────────────┐
+│ SUDO_COMMAND │ /bin/bash -c bash -lc cd\ /home/devuser/ww-new\ &&\ ./manage.sh\ start │
+└──────────────┴────────────────────────────────────────────────────────────────────────┘
+
+[37m[3m Add your own code metrics: http://bit.ly/code-metrics[23m[39m
+[37m[3m Use `pm2 logs ww-3 [--lines 1000]` to display logs[23m[39m
+[37m[3m Use `pm2 env 2` to display environment variables[23m[39m
+[37m[3m Use `pm2 monit` to monitor CPU and Memory usage[23m[39m ww-3
+
+[exit=0]
+## 2025-12-30T00:46:01Z
+$ pm2 describe ww-4 | redact_stream
+
+[1m[7m Describing process with id 3 - name ww-4 [27m[22m
+┌───────────────────┬─────────────────────────────────────────────┐
+│ status            │ [32m[1monline[22m[39m                                      │
+│ name              │ ww-4                                        │
+│ namespace         │ default                                     │
+│ version           │ N/A                                         │
+│ restarts          │ 1                                           │
+│ uptime            │ 2D                                          │
+│ entire log path   │ /home/devuser/ww-new/logs/ww-4-combined.log │
+│ script path       │ /usr/local/bin/npm                          │
+│ script args       │ start                                       │
+│ error log path    │ /home/devuser/ww-new/logs/ww-4-error.log    │
+│ out log path      │ /home/devuser/ww-new/logs/ww-4-out.log      │
+│ pid path          │ /home/devuser/.pm2/pids/ww-3.pid            │
+│ interpreter       │ /usr/local/bin/node                         │
+│ interpreter args  │ N/A                                         │
+│ script id         │ 3                                           │
+│ exec cwd          │ /home/devuser/ww-new                        │
+│ exec mode         │ fork_mode                                   │
+│ node.js version   │ 20.19.2                                     │
+│ node env          │ production                                  │
+│ watch & reload    │ ✘                                           │
+│ unstable restarts │ 0                                           │
+│ created at        │ 2025-12-27T03:54:59.795Z                    │
+└───────────────────┴─────────────────────────────────────────────┘
+[7m[1m Actions available [22m[27m
+┌────────────────────────┐
+│ km:heapdump            │
+│ km:cpu:profiling:start │
+│ km:cpu:profiling:stop  │
+│ km:heap:sampling:start │
+│ km:heap:sampling:stop  │
+└────────────────────────┘
+[37m[3m Trigger via: pm2 trigger ww-4 <action_name>[23m[39m
+[37m[3m[23m[39m
+[7m[1m Code metrics value [22m[27m
+┌────────────────────────┬───────────┐
+│ Used Heap Size         │ 13.15 MiB │
+│ Heap Usage             │ 89.32 %   │
+│ Heap Size              │ 14.72 MiB │
+│ Event Loop Latency p95 │ 1.48 ms   │
+│ Event Loop Latency     │ 0.43 ms   │
+│ Active handles         │ 5         │
+│ Active requests        │ 0         │
+└────────────────────────┴───────────┘
+[7m[1m Divergent env variables from local env [22m[27m
+┌──────────────┬────────────────────────────────────────────────────────────────────────┐
+│ SUDO_COMMAND │ /bin/bash -c bash -lc cd\ /home/devuser/ww-new\ &&\ ./manage.sh\ start │
+└──────────────┴────────────────────────────────────────────────────────────────────────┘
+
+[37m[3m Add your own code metrics: http://bit.ly/code-metrics[23m[39m
+[37m[3m Use `pm2 logs ww-4 [--lines 1000]` to display logs[23m[39m
+[37m[3m Use `pm2 env 3` to display environment variables[23m[39m
+[37m[3m Use `pm2 monit` to monitor CPU and Memory usage[23m[39m ww-4
+
+[exit=0]

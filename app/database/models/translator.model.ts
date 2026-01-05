@@ -7,6 +7,7 @@ export type TranslatorType = {
   _id: mongoose.Types.ObjectId;
   name: string;
   slug: string;
+  followNumber?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -22,6 +23,7 @@ const TranslatorSchema = new Schema<TranslatorType>(
       lowercase: true,
       trim: true,
     },
+    followNumber: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

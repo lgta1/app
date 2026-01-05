@@ -77,9 +77,14 @@ export function MobileMenuPublic({ className = "" }: MobileMenuProps) {
                 <span>Tìm kiếm nâng cao</span>
               </a>
             </Popover.Close>
+
             <Popover.Close asChild>
-              <a href="/login?redirect=%2Fuser%2Fblacklist-tags" data-mobile-menu-item="true" className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-txt-primary transition hover:bg-bgc-layer2">
-                <span>Lọc thể loại không xem</span>
+              <a
+                href="/login?redirect=%2Fuser%2Fblacklist-tags"
+                data-mobile-menu-item="true"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-txt-primary transition hover:bg-bgc-layer2"
+              >
+                <span>Lọc thể loại không thích</span>
               </a>
             </Popover.Close>
             <Popover.Close asChild>

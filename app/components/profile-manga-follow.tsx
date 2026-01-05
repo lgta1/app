@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useFetcher } from "react-router-dom";
-import { Eye, Heart, StarOff } from "lucide-react";
+import { Eye, StarOff } from "lucide-react";
 
 import { WarningActionDialog } from "~/components/dialog-warning-action";
 import { LoadingSpinner } from "~/components/loading-spinner";
@@ -135,8 +135,15 @@ export function ProfileMangaFollow({ userId }: ProfileMangaFollowProps) {
                       <span>{manga.viewNumber?.toLocaleString() ?? 0}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Heart className="h-3.5 w-3.5" />
-                      <span>{manga.likeNumber?.toLocaleString() ?? 0}</span>
+                      <span className="tabular-nums">
+                        {(() => {
+                          const chaptersWithVotes = Number((manga as any)?.ratingChaptersWithVotes ?? 0);
+                          const totalVotes = Number((manga as any)?.ratingTotalVotes ?? 0);
+                          const score = Number((manga as any)?.ratingScore ?? 0);
+                          if (chaptersWithVotes < 3 || totalVotes < 5) return "0.0/0";
+                          return `${Math.max(0, Math.min(10, score)).toFixed(1)}/10`;
+                        })()}
+                      </span>
                     </div>
                   </div>
                 </div>

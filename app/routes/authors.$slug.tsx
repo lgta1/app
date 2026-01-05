@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { redirect, useLoaderData } from "react-router";
-import { Link } from "react-router-dom";
+import { Link, useFetcher } from "react-router-dom";
 
 import { MangaCard } from "~/components/manga-card";
 import { MANGA_CONTENT_TYPE, MANGA_STATUS } from "~/constants/manga";
@@ -13,7 +14,7 @@ export const meta: MetaFunction = ({ params }) => {
   return [{ title }, { name: "description", content: "Danh sách truyện theo tác giả" }];
 };
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
   const slug = params.slug as string;
   if (!slug) {
     throw new Response("Not Found", { status: 404 });
@@ -22,9 +23,10 @@ export async function loader({ params }: LoaderFunctionArgs) {
   const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   // Dynamic imports keep server-only code out of client bundles.
-  const [{ AuthorModel }, { MangaModel }] = await Promise.all([
+  const [{ AuthorModel }, { MangaModel }, { UserFollowAuthorModel }] = await Promise.all([
     import("~/database/models/author.model"),
     import("~/database/models/manga.model"),
+    import("~/database/models/user-follow-author.model"),
   ]);
 
   // 1) Lấy tác giả theo slug
@@ -41,7 +43,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
       .lean();
 
     if (candidates.length === 1 && candidates[0]?.slug) {
-      return redirect(`/authors/${candidates[0].slug}`, { status: 301 });
+      return redirect(encodeURI(`/authors/${candidates[0].slug}`), { status: 301 });
     }
 
     throw new Response("Không tìm thấy tác giả", { status: 404 });
@@ -90,25 +92,82 @@ export async function loader({ params }: LoaderFunctionArgs) {
     createdAt: m.createdAt,
   }));
 
+  const { getUserInfoFromSession } = await import("@/services/session.svc");
+  const sessionUser = await getUserInfoFromSession(request).catch(() => null);
+  const userId = (sessionUser as any)?.id as string | undefined;
+  const [isFollowing, followersCount] = await Promise.all([
+    userId
+      ? UserFollowAuthorModel.findOne({ userId, authorSlug: String(author.slug).toLowerCase() }).then((r: any) => !!r)
+      : Promise.resolve(false),
+    Promise.resolve(((author as any).followNumber as number | undefined) ?? 0),
+  ]);
+
   return {
-    author: { name: author.name, slug: author.slug },
+    author: { name: author.name, slug: author.slug, followersCount },
+    isFollowing,
     mangas: normalized,
   };
 }
 
 export default function AuthorPage() {
-  const { author, mangas } = useLoaderData<typeof loader>();
+  const { author, mangas, isFollowing: initialIsFollowing } = useLoaderData<typeof loader>();
+
+  const followFetcher = useFetcher();
+  const [isFollowing, setIsFollowing] = useState<boolean>(!!initialIsFollowing);
+  const [followersCount, setFollowersCount] = useState<number>((author as any)?.followersCount ?? 0);
+
+  useEffect(() => {
+    setIsFollowing(!!initialIsFollowing);
+  }, [initialIsFollowing]);
+
+  useEffect(() => {
+    const data: any = (followFetcher as any).data;
+    if (!data || followFetcher.state !== "idle") return;
+    if (typeof data.isFollowing === "boolean") {
+      setIsFollowing(data.isFollowing);
+    }
+    if (typeof data.followersCount === "number") {
+      setFollowersCount(data.followersCount);
+    }
+  }, [followFetcher.data, followFetcher.state]);
 
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-6 lg:px-0">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1
-          className="text-txt-primary font-sans text-2xl font-semibold sm:text-3xl"
-          style={{ textShadow: "0px 0px 4px rgba(182, 25, 255, 0.59)" }}
-        >
-          Tác giả: <span className="text-txt-focus">{author.name}</span>
-        </h1>
+        <div className="flex flex-col gap-2">
+          <h1
+            className="text-txt-primary font-sans text-2xl font-semibold sm:text-3xl"
+            style={{ textShadow: "0px 0px 4px rgba(182, 25, 255, 0.59)" }}
+          >
+            Tác giả: <span className="text-txt-focus">{author.name}</span>
+          </h1>
+
+          <div className="flex items-center gap-3">
+            <span className="text-txt-secondary text-sm">
+              {(followersCount ?? 0).toLocaleString("vi-VN")} người theo dõi
+            </span>
+
+            <button
+              type="button"
+              disabled={followFetcher.state === "submitting"}
+              className={`border-lav-500 text-txt-focus hover:bg-lav-500/10 flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                followFetcher.state === "submitting" ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              }`}
+              aria-pressed={isFollowing}
+              aria-label={isFollowing ? "Bỏ theo dõi" : "Theo dõi"}
+              onClick={() => {
+                if (followFetcher.state === "submitting") return;
+                const formData = new FormData();
+                formData.append("intent", isFollowing ? "unfollow" : "follow");
+                formData.append("authorSlug", author.slug);
+                followFetcher.submit(formData, { method: "POST", action: "/api/author-follow" });
+              }}
+            >
+              {isFollowing ? "Bỏ theo dõi" : "Theo dõi"}
+            </button>
+          </div>
+        </div>
 
         <Link
           to="/"

@@ -56,7 +56,7 @@ export async function validateUsernameComplete(
   // Để tránh kéo logic client vào đây, re-validate theo cùng tiêu chí sanitize+regex ASCII
   const trimmed = sanitizeUsername(username).normalize("NFC");
   const len = Array.from(trimmed).length;
-  if (len < 6) return { isValid: false, error: "Username phải có ít nhất 6 ký tự" };
+  if (len < 1) return { isValid: false, error: "Username là bắt buộc" };
   if (len > 15) return { isValid: false, error: "Username không được vượt quá 15 ký tự" };
   const unicodeLettersDigitsSpaces = /^[\p{L}0-9 ]+$/u;
   if (!unicodeLettersDigitsSpaces.test(trimmed)) {

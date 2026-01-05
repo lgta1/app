@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
-import { Eye, Heart, Bookmark, BookmarkCheck } from "lucide-react";
+import { Eye, Bookmark, BookmarkCheck } from "lucide-react";
 
 import { FEATURED_GENRE_SLUGS } from "~/constants/featured-genres";
 import { MANGA_USER_STATUS } from "~/constants/manga";
@@ -377,10 +377,6 @@ export function MangaDetail({ manga, chapters, hideActions, hideChaptersList }: 
   const [followCount, setFollowCount] = useState<number>(followNumber || 0);
   const [isLoadingFollow, setIsLoadingFollow] = useState(false);
 
-  const [isLiked, setIsLiked] = useState(false);
-  const [isLoadingLike, setIsLoadingLike] = useState(false);
-
-  // ⭐ Rating system removed – states deleted
   // === Progress state (đọc tiếp)
   const [lastReadChapter, setLastReadChapter] = useState<number | null>(null);
 
@@ -458,19 +454,8 @@ export function MangaDetail({ manga, chapters, hideActions, hideChaptersList }: 
       }
     };
 
-    const checkLikeStatus = async () => {
-      try {
-        const response = await fetch(`/api/manga-like?mangaId=${mangaIdSafe}`);
-        const data = await response.json();
-        if (response.ok) setIsLiked(data.isLiked);
-      } catch (error) {
-        console.error("Error checking like status:", error);
-      }
-    };
-
     if (mangaIdSafe) {
       checkFollowStatus();
-      checkLikeStatus();
     }
   }, [mangaIdSafe]);
 
@@ -485,7 +470,7 @@ useEffect(() => {
       if (!raw) return null;
       const obj = JSON.parse(raw);
       const n = obj?.chapterNumber == null ? null : Number(obj.chapterNumber);
-      return Number.isFinite(n) && n >= 1 ? n : null;
+      return typeof n === "number" && Number.isFinite(n) && n >= 1 ? n : null;
     } catch {
       return null;
     }
@@ -584,35 +569,14 @@ useEffect(() => {
     }
   };
 
-  const handleLikeToggle = async () => {
-    if (isLoadingLike) return;
-    setIsLoadingLike(true);
+  const ratingChaptersWithVotes = Number((manga as any)?.ratingChaptersWithVotes ?? 0);
+  const ratingTotalVotes = Number((manga as any)?.ratingTotalVotes ?? 0);
+  const ratingScore = Number((manga as any)?.ratingScore ?? 0);
 
-    const formData = new FormData();
-    formData.append("intent", isLiked ? "unlike" : "like");
-    formData.append("mangaId", mangaIdSafe);
-
-    try {
-      const response = await fetch("/api/manga-like", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setIsLiked(data.isLiked);
-        toast.success(data.message);
-      } else {
-        toast.error(data.error || "Có lỗi xảy ra");
-      }
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      toast.error("Có lỗi xảy ra khi xử lý yêu cầu");
-    } finally {
-      setIsLoadingLike(false);
-    }
-  };
-
-  // Rating feature removed – handler deleted
+  const ratingDisplayText = useMemo(() => {
+    if (ratingChaptersWithVotes < 3 || ratingTotalVotes < 5) return "0.0/0";
+    return `${Number.isFinite(ratingScore) ? Math.max(0, Math.min(10, ratingScore)).toFixed(1) : "0.0"}/10`;
+  }, [ratingChaptersWithVotes, ratingTotalVotes, ratingScore]);
 
   return (
     <div className="w-full">
@@ -801,21 +765,14 @@ useEffect(() => {
           {/* Buttons (ẩn nếu hideActions) */}
           {!hideActions && (
           <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-            {/* Yêu thích (compact, giữ text-sm) */}
-            <button
-              onClick={handleLikeToggle}
-              disabled={isLoadingLike}
-              className={`border-lav-500 text-txt-focus hover:bg-lav-500/10 flex items-center justify-center gap-1 rounded-lg border px-3 py-2 transition-colors ${isLoadingLike ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
-              aria-pressed={isLiked}
-              aria-label={isLiked ? "Bỏ thích" : "Yêu thích"}
+            {/* Điểm truyện (thay cho "Yêu thích") */}
+            <div
+              className="border-lav-500 text-txt-focus flex items-center justify-center gap-1 rounded-lg border px-3 py-2"
+              title="Điểm truyện (tính từ like/dislike theo từng chương)"
+              aria-label={`Điểm truyện: ${ratingDisplayText}`}
             >
-              <Heart
-                className={`h-4 w-4 ${isLiked ? "fill-txt-focus text-txt-focus" : ""}`}
-              />
-              <span className="text-sm font-semibold">
-                {isLiked ? "Đã thích" : "Yêu thích"}
-              </span>
-            </button>
+              <span className="text-sm font-semibold">{ratingDisplayText}</span>
+            </div>
 
             {/* Theo dõi (compact, giữ text-sm) */}
             <button
@@ -943,6 +900,8 @@ useEffect(() => {
             const commonClass =
               "bg-bgc-layer1 border-bd-default flex items-center justify-between rounded-xl border px-4 py-2 transition-colors hover:bg-white/5";
 
+            const updatedAt = chapter.updatedAt ? new Date(chapter.updatedAt as any) : null;
+
             const content = (
               <>
                 <span className="text-txt-primary text-base font-medium">
@@ -955,10 +914,10 @@ useEffect(() => {
                   </span>
                   <time
                     className="text-txt-secondary text-sm"
-                    title={`${formatTime(chapter.updatedAt)} · ${formatDate(chapter.updatedAt)}`}
-                    dateTime={new Date(chapter.updatedAt).toISOString()}
+                    title={updatedAt ? `${formatTime(updatedAt)} · ${formatDate(updatedAt)}` : ""}
+                    dateTime={updatedAt ? updatedAt.toISOString() : undefined}
                   >
-                    {getRelativeTimeNumeric(chapter.updatedAt)}
+                    {updatedAt ? getRelativeTimeNumeric(updatedAt) : ""}
                   </time>
                 </div>
               </>

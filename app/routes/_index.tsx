@@ -60,7 +60,9 @@ function ResponsiveLazyRender({
 }
 // END <feature> HOT_SECTION_AUTOSCROLL_IMPORTS
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+
   const [topUser, hotLeaderboard, weeklyLeaderboard, latestPage, recentComments, cosplayPreview] =
     await Promise.all([
       getTopUser(),
@@ -74,6 +76,7 @@ export async function loader() {
     ]);
 
   return {
+    origin: getCanonicalOrigin(request as any),
     topUser,
     hotLeaderboard,
     weeklyLeaderboard,
@@ -83,7 +86,9 @@ export async function loader() {
   };
 }
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ data }: Route.MetaArgs) {
+  const origin = data?.origin ?? "https://vinahentai.xyz";
+  const canonical = origin ? `${origin}/` : "/";
   return [
     { title: "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO" },
     {
@@ -91,6 +96,9 @@ export function meta({}: Route.MetaArgs) {
       content:
         "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN,... KHÔNG QUẢNG CÁO, cập nhật nhanh, đa dạng thể loại. Trải nghiệm ngay!",
     },
+    { tagName: "link", rel: "canonical", href: canonical },
+    { property: "og:url", content: canonical },
+    { name: "twitter:url", content: canonical },
   ];
 }
 function ScrollToTopButton() {
@@ -179,7 +187,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
   return (
     <> 
-  <div className="container-page mx-auto px-4 py-6">
+  <div className="container-page mx-auto px-4 pt-3 pb-6 md:py-6">
       {/* SEO giữ tiêu đề nhưng ẩn */}
       <h1 className="sr-only">
         Vinahentai – Truyện hentai 18+ vietsub, KHÔNG QUẢNG CÁO hot nhất 2025
@@ -192,14 +200,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       </div>
       <section className="min-w-0">
         {/* Mobile/Tablet: 2x2 grid carousel */}
-        <div className="relative lg:hidden -mx-4">
+        <div className="relative md:hidden -mx-2">
           <div className="mx-auto w-full">
             <TopBannerMobileGrid items={bannerSource} />
           </div>
         </div>
 
         {/* Desktop: TopBanner (5 cột) + 2 nút click trái/phải */}
-        <div className="relative hidden lg:block">
+        <div className="relative hidden md:block">
           <div className="overflow-x-hidden">
             <div className="hot-rail">
               <TopBanner ref={topDesktopRef} bannerItems={bannerSource} />
@@ -227,8 +235,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       {/* Ẩn banner tím cũ */}
       <div className="hidden" aria-hidden="true" />
 
-  {/* Lưới nội dung còn lại: căn cùng top cho 2 tiêu đề bằng cách bỏ margin-top ở section phải và thêm mt-8 chung ngoài */}
-  <div className="mt-6 grid grid-cols-1 gap-4 md:mt-8 md:grid-cols-[minmax(0,1fr)_auto]">
+  {/* Lưới nội dung còn lại */}
+  <div className="mt-[18px] grid grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-[minmax(0,1fr)_27%]">
         {/* Truyện mới cập nhật */}
         <div className="min-w-0 space-y-8">
           <LatestUpdates
@@ -243,8 +251,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           <CosplayPreviewGrid items={(cosplayPreview as any)?.manga ?? (cosplayPreview as any)?.data ?? []} />
         </div>
 
-        {/* Bảng bình luận gần đây + Bảng xếp hạng + Doanh thu + Thành viên */}
-  <section className="mt-0 w-full md:max-w-[400px] md:justify-self-end">
+          {/* Bảng bình luận gần đây + Bảng xếp hạng + Doanh thu + Thành viên */}
+        <section className="mt-0 w-full sm:justify-self-end">
           <div className="space-y-10">
             {/* Bảng Xếp Hạng */}
             <ResponsiveLazyRender
@@ -290,8 +298,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                 initialData={(recentComments as any)?.data ?? []}
                 initialPage={(recentComments as any)?.currentPage ?? 1}
                 initialTotalPages={(recentComments as any)?.totalPages ?? 1}
-                limit={10}
-                showPagination={false}
+                showPagination
               />
             </ResponsiveLazyRender>
 

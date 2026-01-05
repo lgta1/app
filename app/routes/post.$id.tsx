@@ -23,7 +23,7 @@ const notFoundHeaders = {
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!POSTS_ENABLED) {
-    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+    throw new Response("Gone", { status: 410, headers: notFoundHeaders });
   }
   const { id } = params;
 
@@ -48,7 +48,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!POSTS_ENABLED) {
-    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+    throw new Response("Gone", { status: 410, headers: notFoundHeaders });
   }
   const { id } = params;
 

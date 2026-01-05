@@ -1,5 +1,6 @@
 import { CommentModel } from "~/database/models/comment.model";
 import { ensureMangaSlug } from "~/database/helpers/manga-slug.helper";
+import { rewriteLegacyCdnUrl, rewriteLegacyCdnUrlsInText } from "~/.server/utils/cdn-url";
 
 // Generic function để get comments cho cả manga và post
 export const getComments = async (
@@ -183,28 +184,57 @@ export const getRecentMangaComments = async (
       .map((c: any) => ensureMangaSlug(c.mangaId)),
   );
 
-  const data = pageItems.map((c: any) => ({
-    ...c,
-    id: String(c._id ?? c.id ?? ""),
-    user: c.userId
-      ? {
-          id: String(c.userId._id ?? c.userId.id ?? ""),
-          name: c.userId.name,
-          avatar: c.userId.avatar,
-        }
-      : null,
-    manga: c.mangaId
-      ? {
-          id: String(c.mangaId._id ?? c.mangaId.id ?? ""),
-          title: c.mangaId.title,
-          poster: (c.mangaId as any).poster,
-          slug: (c.mangaId as any).slug,
-        }
-      : null,
-  }));
+  const data = pageItems.map((c: any) => {
+    const userId = (c as any)?.userId;
+    const mangaId = (c as any)?.mangaId;
 
-  // Suy luận totalPages nhưng tối đa 3 trang
-  const inferredTotalPages = hasNext ? Math.min(3, page + 1) : Math.min(3, page);
+    const normalizedContent =
+      typeof (c as any)?.content === "string" ? rewriteLegacyCdnUrlsInText((c as any).content) : (c as any)?.content;
+
+    const normalizedUserId =
+      userId && typeof userId === "object"
+        ? {
+            ...userId,
+            avatar: typeof userId.avatar === "string" ? rewriteLegacyCdnUrl(userId.avatar) : userId.avatar,
+          }
+        : userId;
+
+    const normalizedMangaId =
+      mangaId && typeof mangaId === "object"
+        ? {
+            ...mangaId,
+            poster: typeof mangaId.poster === "string" ? rewriteLegacyCdnUrl(mangaId.poster) : mangaId.poster,
+          }
+        : mangaId;
+
+    return {
+      ...(c ?? {}),
+      id: String((c as any)?._id ?? (c as any)?.id ?? ""),
+      content: normalizedContent,
+      userId: normalizedUserId,
+      mangaId: normalizedMangaId,
+      user:
+        userId && typeof userId === "object"
+          ? {
+              id: String(userId._id ?? userId.id ?? ""),
+              name: userId.name,
+              avatar: typeof userId.avatar === "string" ? rewriteLegacyCdnUrl(userId.avatar) : userId.avatar,
+            }
+          : null,
+      manga:
+        mangaId && typeof mangaId === "object"
+          ? {
+              id: String(mangaId._id ?? mangaId.id ?? ""),
+              title: mangaId.title,
+              poster: typeof mangaId.poster === "string" ? rewriteLegacyCdnUrl(mangaId.poster) : mangaId.poster,
+              slug: mangaId.slug,
+            }
+          : null,
+    };
+  });
+
+  // Suy luận totalPages nhưng tối đa 2 trang (10 bình luận gần nhất với limit=5)
+  const inferredTotalPages = hasNext ? Math.min(2, page + 1) : Math.min(2, page);
 
   return {
     data,

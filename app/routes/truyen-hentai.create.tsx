@@ -39,6 +39,11 @@ import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 import { normalizePosterImage } from "~/utils/image-compression.utils";
+import {
+  ANTI_VANILLA_TAGS,
+  normalizeGenreSlug,
+  VANILLA_GENRE_SLUG,
+} from "~/constants/vanilla-anti-tags";
 
 export const meta: MetaFunction = () => {
   return [
@@ -68,6 +73,20 @@ export async function action({ request }: ActionFunctionArgs) {
         : "...";
     // END <feature> MANGACREATE_DESCRIPTION_FALLBACK
 
+    const parsedGenresRaw = JSON.parse(formData.get("genres") as string);
+    const parsedGenres: string[] = Array.isArray(parsedGenresRaw)
+      ? parsedGenresRaw.map(normalizeGenreSlug).filter(Boolean)
+      : [];
+
+    // Rule cứng: vanilla không được tồn tại đồng thời với bất kỳ anti-vanilla tag nào.
+    // (UI đã chặn, nhưng vẫn guard server để tránh bypass.)
+    if (
+      parsedGenres.includes(VANILLA_GENRE_SLUG) &&
+      parsedGenres.some((g) => ANTI_VANILLA_TAGS.has(g))
+    ) {
+      throw new BusinessError("Có thể loại trái ngược với vanilla đã được chọn");
+    }
+
     const mangaData = {
       title: formData.get("title") as string,
       description: safeDescription, // <- dùng fallback
@@ -78,7 +97,7 @@ export async function action({ request }: ActionFunctionArgs) {
       keywords: formData.get("keywords") as string,
       userStatus: Number(formData.get("userStatus")),
       poster: formData.get("posterUrl") as string,
-      genres: JSON.parse(formData.get("genres") as string),
+      genres: parsedGenres,
       contentType: isCosplay ? MANGA_CONTENT_TYPE.COSPLAY : MANGA_CONTENT_TYPE.MANGA,
       // Optional denormalized relations
       doujinshiNames: JSON.parse((formData.get("doujinshiNames") as string) || "[]"),
@@ -97,16 +116,26 @@ export async function action({ request }: ActionFunctionArgs) {
     // Admin override updatedAt (backfill support without schema change)
     const overrideUpdatedAt = formData.get("overrideUpdatedAt");
     if (isAdmin(userInfo.role) && typeof overrideUpdatedAt === "string" && overrideUpdatedAt.trim()) {
-      const d = new Date(overrideUpdatedAt.trim());
-      if (!isNaN(d.getTime())) {
-        // Manual update without triggering timestamps
-        await MangaModel.findByIdAndUpdate(manga._id, { updatedAt: d }, { timestamps: false });
+      try {
+        const d = new Date(overrideUpdatedAt.trim());
+        if (!isNaN(d.getTime())) {
+          // Manual update without triggering timestamps
+          await MangaModel.findByIdAndUpdate(manga._id, { updatedAt: d }, { timestamps: false });
+        }
+      } catch (e) {
+        // Best-effort only: manga đã tạo thành công, không nên báo lỗi cho user.
+        console.error("overrideUpdatedAt failed", e);
       }
     }
 
-    await UserModel.findByIdAndUpdate(userInfo.id, {
-      $inc: { mangasCount: 1 },
-    });
+    try {
+      await UserModel.findByIdAndUpdate(userInfo.id, {
+        $inc: { mangasCount: 1 },
+      });
+    } catch (e) {
+      // Best-effort only: manga đã tạo thành công, không nên báo lỗi cho user.
+      console.error("increment mangasCount failed", e);
+    }
 
   // 👇 Sau khi tạo truyện lần đầu: điều hướng tới trang cảm ơn/success
   // Nút "Tiếp tục" trên đó sẽ dẫn tới /truyen-hentai/manage thay vì trang tạo chapter.
@@ -180,12 +209,34 @@ export default function CreateStory() {
   const formRef = useRef<HTMLFormElement>(null);
 
   const handleGenreToggle = (genreSlug: string) => {
-    setFormData((prev: FormDataShape) => ({
-      ...prev,
-      genres: prev.genres.includes(genreSlug)
-        ? prev.genres.filter((g: string) => g !== genreSlug)
-        : [...prev.genres, genreSlug],
-    }));
+    const slug = normalizeGenreSlug(genreSlug);
+    setFormData((prev: FormDataShape) => {
+      const current = Array.isArray(prev.genres) ? prev.genres.map(normalizeGenreSlug) : [];
+      const isRemoving = current.includes(slug);
+
+      // Always allow removing.
+      if (isRemoving) {
+        return { ...prev, genres: current.filter((g) => g !== slug) };
+      }
+
+      const hasVanilla = current.includes(VANILLA_GENRE_SLUG);
+      const hasAnti = current.some((g) => ANTI_VANILLA_TAGS.has(g));
+
+      // Case 1: already has anti-vanilla tags, block adding vanilla.
+      if (slug === VANILLA_GENRE_SLUG && hasAnti) {
+        toast.error("Có thể loại trái ngược với vanilla đã được chọn");
+        return prev;
+      }
+
+      // Case 2 (Option A): already has vanilla, block adding any anti-vanilla tag.
+      if (hasVanilla && ANTI_VANILLA_TAGS.has(slug)) {
+        toast.error("truyện đã có vanilla, không được phép thêm thể loại trái ngược");
+        return prev;
+      }
+
+      // Otherwise allow adding.
+      return { ...prev, genres: [...current, slug] };
+    });
   };
 
   const handleInputChange = (field: keyof FormDataShape, value: string) => {

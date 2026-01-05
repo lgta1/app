@@ -1,6 +1,5 @@
-import { Link } from "react-router-dom";
-
 import type { MangaType } from "~/database/models/manga.model";
+import { AppLink } from "~/components/app-link";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
 
 interface CosplayPreviewGridProps {
@@ -23,26 +22,26 @@ export function CosplayPreviewGrid({ items }: CosplayPreviewGridProps) {
           </div>
           <h2 className="text-txt-primary text-xl font-semibold uppercase">Ảnh cosplay</h2>
         </div>
-        <Link
+        <AppLink
           to="/genres/anh-cosplay"
-          className="text-txt-secondary hidden text-sm font-semibold transition-colors hover:text-txt-primary md:inline-flex"
+          className="text-txt-secondary hidden text-sm font-semibold transition-colors md:inline-flex"
         >
           Xem tất cả →
-        </Link>
+        </AppLink>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         {displayItems.map((item) => (
-          <Link
+          <AppLink
             key={item.id}
             to={buildMangaUrl(item as any)}
-            className="group relative block overflow-hidden rounded-2xl"
+            className="relative block overflow-hidden rounded-2xl touch-manipulation"
           >
             <div className="relative w-full overflow-hidden rounded-2xl border border-white/5 aspect-[3/4]">
               <img
                 src={item.poster}
                 alt={item.title}
-                className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                className="h-full w-full object-cover object-center transition-transform duration-300 vh-hover-scale-105"
                 loading="lazy"
                 decoding="async"
               />
@@ -50,7 +49,7 @@ export function CosplayPreviewGrid({ items }: CosplayPreviewGridProps) {
                 <p className="text-sm font-semibold text-white line-clamp-2">{item.title}</p>
               </div>
             </div>
-          </Link>
+          </AppLink>
         ))}
       </div>
 

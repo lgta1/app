@@ -27,7 +27,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Nếu chưa có tham số áp dụng (apply=1) → chỉ tải danh sách thể loại, không truy vấn manga
   const isApplied = url.searchParams.get("apply") === "1";
   const q = url.searchParams.get("q") || "";
-  const sortParam = url.searchParams.get("sort") || "updatedAt"; // updatedAt | oldest | viewNumber | likeNumber | completed
+  const sortParam = url.searchParams.get("sort") || "updatedAt"; // updatedAt | oldest | viewNumber | likeNumber(=rating) | completed
   const statuses = new Set((url.searchParams.get("status") || "").split(",").filter(Boolean));
   // Back-compat: old param `genres` is treated as includeGenres
   const includeGenres = (url.searchParams.get("includeGenres") || url.searchParams.get("genres") || "")
@@ -72,7 +72,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       sort = { viewNumber: -1 };
       break;
     case "likeNumber":
-      sort = { likeNumber: -1 };
+      // Legacy: `likeNumber` previously meant "Được yêu thích".
+      // Now map it to rating-based ordering.
+      sort = { ratingScore: -1, ratingTotalVotes: -1, viewNumber: -1 };
       break;
     case "completed":
       query.userStatus = MANGA_USER_STATUS.COMPLETED;
@@ -322,7 +324,7 @@ export default function AdvancedSearchPage() {
                 { value: "updatedAt", label: "Mới cập nhật" },
                 { value: "oldest", label: "Cũ nhất" },
                 { value: "viewNumber", label: "Đọc nhiều" },
-                { value: "likeNumber", label: "Được yêu thích" },
+                { value: "likeNumber", label: "Đánh giá cao" },
                 { value: "completed", label: "Đã hoàn thành" },
               ]}
               value={sortParam}

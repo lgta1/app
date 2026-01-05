@@ -119,6 +119,7 @@ export const createComment = async (data: {
         targetType?: string;
         targetId?: string;
         targetUrl?: string;
+        targetSlug?: string | null;
       },
     ) => {
       const to = targetUserId ? String(targetUserId) : null;

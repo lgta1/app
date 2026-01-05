@@ -5,6 +5,7 @@ import { FEATURED_GENRE_SLUGS, normalizeGenreSlugs } from "~/constants/featured-
 import type { UserType } from "~/database/models/user.model";
 import { isAdmin } from "~/helpers/user.helper";
 import { ensureSlugForDocs, resolveMangaHandle } from "~/database/helpers/manga-slug.helper";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 
 const buildContentTypeFilter = (
   desired: MangaContentType,
@@ -73,6 +74,9 @@ export const getNewManga = async (
   let manga = (mangaRaw as any[]).map((m) => ({
     ...m,
     id: String(m.id ?? m._id ?? ""),
+    poster: typeof m?.poster === "string" ? rewriteLegacyCdnUrl(m.poster) : m?.poster,
+    shareImage:
+      typeof m?.shareImage === "string" ? rewriteLegacyCdnUrl(m.shareImage) : m?.shareImage,
   }));
 
   // Append latestChapterTitle denormalized to reduce client requests
@@ -243,6 +247,20 @@ export const searchMangaApprovedWithPagination = async ({
   query?: Record<string, any>;
   sort?: Record<string, 1 | -1>;
 }) => {
+  const attachLatestChapterTitles = async (docs: any[]) => {
+    const withId = (docs as any[]).map((d) => ({ ...d, id: String(d?.id ?? d?._id ?? "") }));
+    try {
+      const ids = withId.map((m) => String((m as any).id ?? (m as any)._id));
+      const titles = await getLatestChapterTitlesForMangaIds(ids);
+      return withId.map((m) => ({
+        ...(m as any),
+        latestChapterTitle: titles[String((m as any).id ?? (m as any)._id)] ?? null,
+      }));
+    } catch {
+      return withId;
+    }
+  };
+
   const skip = (page - 1) * limit;
   const normalizedQuery = withContentType(query);
 
@@ -266,9 +284,9 @@ export const searchMangaApprovedWithPagination = async ({
         status: MANGA_STATUS.APPROVED,
         ...normalizedQuery,
       }).lean();
-      return (byCode as any[]).map((d) => ({ ...d, id: String(d?.id ?? d?._id ?? "") }));
+      return await attachLatestChapterTitles(byCode as any[]);
     }
-    return (mangas as any[]).map((d) => ({ ...d, id: String(d?.id ?? d?._id ?? "") }));
+    return await attachLatestChapterTitles(mangas as any[]);
   }
 
   const docs = await MangaModel.find({
@@ -279,7 +297,7 @@ export const searchMangaApprovedWithPagination = async ({
     .skip(skip)
     .limit(limit)
     .lean();
-  return (docs as any[]).map((d) => ({ ...d, id: String(d?.id ?? d?._id ?? "") }));
+  return await attachLatestChapterTitles(docs as any[]);
 };
 
 export const getRelatedManga = async (manga: MangaType, limit: number = 10) => {
@@ -511,12 +529,63 @@ export const getRecommendedByFeaturedGenres = async (
 export const getMangaPublishedById = async (handle: string, user?: UserType) => {
   const manga = await resolveMangaHandle(handle);
 
+  const attachAuthorMangaCounts = async (doc: any) => {
+    if (!doc || typeof doc !== "object") return doc;
+    const slugsRaw = Array.isArray((doc as any)?.authorSlugs) ? ((doc as any).authorSlugs as unknown[]) : [];
+    const slugs = Array.from(
+      new Set(
+        slugsRaw
+          .map((s) => String(s ?? "").trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+    if (slugs.length === 0) return doc;
+
+    // Count approved stories for each author slug (canonical field).
+    const rows = await MangaModel.aggregate<{ _id: string; count: number }>([
+      {
+        $match: {
+          status: MANGA_STATUS.APPROVED,
+          contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, MANGA_CONTENT_TYPE.COSPLAY, null] },
+          authorSlugs: { $in: slugs },
+        },
+      },
+      { $unwind: "$authorSlugs" },
+      { $match: { authorSlugs: { $in: slugs } } },
+      { $group: { _id: "$authorSlugs", count: { $sum: 1 } } },
+    ]).catch(() => []);
+
+    const map: Record<string, number> = {};
+    for (const slug of slugs) map[slug] = 0;
+    for (const r of rows) {
+      const k = String((r as any)?._id ?? "").toLowerCase();
+      if (k) map[k] = Number((r as any)?.count ?? 0) || 0;
+    }
+    (doc as any).authorMangaCountBySlug = map;
+    return doc;
+  };
+
+  const normalize = (doc: any) => {
+    if (!doc) return doc;
+    return {
+      ...(doc as any),
+      id: String((doc as any).id ?? (doc as any)._id ?? ""),
+      poster: typeof (doc as any)?.poster === "string" ? rewriteLegacyCdnUrl((doc as any).poster) : (doc as any)?.poster,
+      shareImage:
+        typeof (doc as any)?.shareImage === "string"
+          ? rewriteLegacyCdnUrl((doc as any).shareImage)
+          : (doc as any)?.shareImage,
+    } as any;
+  };
+
   if (manga?.status === MANGA_STATUS.APPROVED) {
-    return { ...(manga as any), id: String((manga as any).id ?? (manga as any)._id ?? "") } as any;
+    const doc = await attachAuthorMangaCounts(manga);
+    return normalize(doc);
   }
 
   if (manga?.ownerId === user?.id || isAdmin(user?.role || "")) {
-    return { ...(manga as any), id: String((manga as any).id ?? (manga as any)._id ?? "") } as any;
+    const doc = await attachAuthorMangaCounts(manga);
+    return normalize(doc);
   }
 
   return null;

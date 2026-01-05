@@ -16,7 +16,9 @@ function hasAgeVerifiedCookie(): boolean {
 function setAgeVerifiedCookie(days = 365) {
   try {
     const maxAge = Math.max(1, Math.floor(days)) * 24 * 60 * 60;
-    document.cookie = `${AGE_COOKIE_NAME}=1; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+    const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+    const domain = hostname.endsWith("vinahentai.xyz") ? "; Domain=.vinahentai.xyz" : "";
+    document.cookie = `${AGE_COOKIE_NAME}=1; Max-Age=${maxAge}; Path=/; SameSite=Lax${domain}`;
   } catch {
     // ignore
   }

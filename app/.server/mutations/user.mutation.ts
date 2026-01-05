@@ -185,6 +185,7 @@ export const rewardGoldUser = async (
       userId,
       title: `Bạn đã nhận được ${amount} dâm ngọc. Vì ${message}`,
       imgUrl: "/images/noti/gold.png",
+      type: "gold-reward",
     }),
   ]);
 

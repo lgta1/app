@@ -11,7 +11,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (!user) {
       return Response.json({ success: true, data: null });
     }
-    const userFull = await UserModel.findById(user?.id).lean();
+    const userFull = await UserModel.findById(user?.id)
+      .select("-password -salt")
+      .lean();
     return Response.json({ success: true, data: userFull });
   } catch (error) {
     return Response.json(

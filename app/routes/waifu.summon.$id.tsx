@@ -33,7 +33,7 @@ import { toastWarning } from "~/helpers/toast.helper";
 import { WAIFU_SUMMON_SHARE_IMAGE } from "~/constants/share-images";
 
 export function meta({ params }: Route.MetaArgs) {
-  const origin = "https://vinahentai.com";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://vinahentai.xyz";
   const canonicalPath = params.id ? `/waifu/summon/${params.id}` : "/waifu/summon";
   const canonicalUrl = `${origin}${canonicalPath}`;
   const title = "VinaHentai – Triệu hồi Waifu";
@@ -75,7 +75,11 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
       throw redirect("/");
     }
 
-  const openedBanners = bannersResult.data as any[];
+  const openedBannersRaw = bannersResult.data as any[];
+  const openedBanners = (Array.isArray(openedBannersRaw) ? openedBannersRaw : []).map((b: any) => ({
+    ...b,
+    id: b?.id ?? b?._id,
+  }));
 
     const navItems = openedBanners.map((banner, index) => ({
       label: "Banner thường",
@@ -89,7 +93,7 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
       id: "leaderboard",
     });
 
-    const banner = openedBanners.find((b) => b.id === id);
+    const banner = openedBanners.find((b) => String(b.id) === String(id));
 
     return { navItems, banner, user: userResult.data };
   } catch (error) {
@@ -303,7 +307,8 @@ export default function WaifuSummon() {
   }, []);
 
   const handleSummon = (type: "single" | "multi") => {
-    if (!banner?.id) return;
+    const bannerId = banner?.id ?? (banner as any)?._id;
+    if (!bannerId) return;
     if (!user) return navigate("/login");
 
     if (type === "multi") {
@@ -320,7 +325,7 @@ export default function WaifuSummon() {
 
     const formData = new FormData();
     formData.append("intent", type);
-    formData.append("bannerId", banner.id);
+    formData.append("bannerId", String(bannerId));
 
     setIsSummoning(skipCinematic);
     submit(formData, { method: "post" });

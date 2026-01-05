@@ -5,6 +5,7 @@ import { createNotification } from "@/mutations/notification.mutation";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { ReadingRewardModel } from "~/database/models/reading-reward.model";
+import { ReadingRewardClaimModel } from "~/database/models/reading-reward-claim.model";
 import { UserModel } from "~/database/models/user.model";
 import mongoose from "mongoose";
 import crypto from "node:crypto";
@@ -12,8 +13,8 @@ import crypto from "node:crypto";
 /* =========================
  * Config / Constants
  * ========================= */
-const GOLD_REWARD_CHANCE = 0.20;          // 20%
-const MAX_REWARD_PER_DAY = 9;            // tối đa 9 lần/ngày
+const GOLD_REWARD_CHANCE = 0.25;          // 25%
+const MAX_REWARD_PER_DAY = 6;            // tối đa 6 lần/ngày
 const RATE_LIMIT_MS = 60_000;             // 1 phút
 const IDEMPOTENCY_TTL_SECONDS = 300;      // 5 phút
 
@@ -101,9 +102,10 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     const rawUserId = user?.id ?? user?._id;
-    const userIdQ: any = mongoose.isValidObjectId(String(rawUserId))
-      ? new mongoose.Types.ObjectId(String(rawUserId))
-      : String(rawUserId);
+    const userIdStr = String(rawUserId);
+    const userIdQ: any = mongoose.isValidObjectId(userIdStr)
+      ? new mongoose.Types.ObjectId(userIdStr)
+      : userIdStr;
 
     let formData: FormData;
     try {
@@ -117,10 +119,16 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ success: false, error: "Hành động không hợp lệ", requestId }, { status: 400 });
     }
 
+    const chapterIdRaw = formData.get("chapterId");
+    const chapterId = typeof chapterIdRaw === "string" ? chapterIdRaw.trim() : "";
+    if (!chapterId || !mongoose.isValidObjectId(chapterId)) {
+      return json({ success: false, error: "Thiếu chapterId", requestId }, { status: 400 });
+    }
+
     const idempotencyKey = (request.headers.get("x-idempotency-key") ?? formData.get("idempotencyKey")) as string | null;
     if (idempotencyKey) {
       try {
-        const prev = await readIdempotency(idempotencyKey, String(userIdQ));
+        const prev = await readIdempotency(idempotencyKey, userIdStr);
         if (prev?.response) {
           const resp = prev.response;
           return new Response(JSON.stringify({ ...resp.body, requestId, fromCache: true }), {
@@ -143,13 +151,33 @@ export async function action({ request }: ActionFunctionArgs) {
     const oneMinuteAgo = new Date(now.getTime() - RATE_LIMIT_MS);
 
     const isRewardGranted = random01() < GOLD_REWARD_CHANCE;
-    const goldAmount = isRewardGranted ? (random01() < 0.01 ? 10 : 1) : 0;
+    const goldAmount = isRewardGranted ? 1 : 0;
+
+    // Anti-cheat: mỗi chapter chỉ claim 1 lần / user.
+    // Lưu ý: chỉ "lock" claim khi request hợp lệ (không bị rate-limit/max-day). Nếu bị gate fail,
+    // cho phép thử lại sau (tránh người dùng mất quyền claim vì click/refresh sớm).
+    const tryCreateClaim = async () => {
+      try {
+        await ReadingRewardClaimModel.create({
+          userId: userIdStr,
+          chapterId,
+          date: today,
+          granted: isRewardGranted,
+          gold: goldAmount,
+        });
+        return { ok: true as const };
+      } catch (e: any) {
+        const msg = String(e?.message ?? "");
+        if (/E11000/i.test(msg)) return { ok: false as const, reason: "duplicate" as const };
+        return { ok: false as const, reason: "error" as const, error: e };
+      }
+    };
 
     // === GATE (upsert:false) ===
     let passed: any = null;
     try {
       const filterGate = {
-        userId: userIdQ,
+        userId: userIdStr,
         date: today,
         $and: [
           { $or: [{ rewardCount: { $lt: MAX_REWARD_PER_DAY } }, { rewardCount: { $exists: false } }] },
@@ -159,7 +187,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
       const updateGate: any = {
         $set: { updatedAt: now },
-        $setOnInsert: { userId: userIdQ, date: today, createdAt: now },
+        $setOnInsert: { userId: userIdStr, date: today, createdAt: now },
       };
       if (isRewardGranted) updateGate.$inc = { rewardCount: 1 };
 
@@ -171,32 +199,57 @@ export async function action({ request }: ActionFunctionArgs) {
     const finalize = async (payload: { body: any; status: number; headers?: Record<string, string> }) => {
       const resp = { body: { ...payload.body, requestId }, status: payload.status, headers: { ...(payload.headers ?? {}) } };
       if (idempotencyKey) {
-        try { await writeIdempotency(idempotencyKey, String(userIdQ), resp); } catch (e) {}
+        try { await writeIdempotency(idempotencyKey, userIdStr, resp); } catch (e) {}
       }
       return new Response(JSON.stringify(resp.body), { status: resp.status, headers: { ...noStoreHeaders, ...resp.headers } });
     };
 
     if (!passed) {
-      // === CREATE HÔM NAY (upsert:true) ===
+      // Có 2 tình huống:
+      // (1) Chưa có record hôm nay (lần đầu trong ngày) → tạo record.
+      // (2) Đã có record nhưng không pass gate (rate-limit / max/day) → không cho claim.
+      // Trước đây code (upsert:true) khiến (2) vẫn có thể "trúng" → có thể spam API để ăn gold.
+
+      let existingToday: any = null;
       try {
-        await ReadingRewardModel.findOneAndUpdate(
-          { userId: userIdQ, date: today },
-          {
-            $setOnInsert: {
-              userId: userIdQ,
-              date: today,
-              rewardCount: isRewardGranted ? 1 : 0,
-              createdAt: now,
-            },
-            $set: { updatedAt: now },
-          },
-          { new: true, upsert: true }
-        );
+        existingToday = await ReadingRewardModel.findOne({ userId: userIdStr, date: today }).select({ _id: 1 }).lean();
       } catch (e) {
-        return fail("create-today.findOneAndUpdate", e, { requestId, today, isRewardGranted }, 500);
+        return fail("check-existing-today.findOne", e, { requestId, today }, 500);
+      }
+
+      if (existingToday) {
+        // rate-limit hoặc đã max/day → không lock claim
+        return finalize({ body: { success: true, code: "SKIPPED" }, status: 200 });
+      }
+
+      // === CREATE HÔM NAY (atomic) ===
+      // Dùng create để tránh race-condition: nhiều request đồng thời đầu ngày
+      // có thể cùng upsert và cùng được thưởng.
+      try {
+        await ReadingRewardModel.create({
+          userId: userIdStr,
+          date: today,
+          rewardCount: isRewardGranted ? 1 : 0,
+        });
+      } catch (e: any) {
+        const msg = String(e?.message ?? "");
+        if (/E11000/i.test(msg)) {
+          return finalize({ body: { success: true, code: "SKIPPED" }, status: 200 });
+        }
+        return fail("create-today.create", e, { requestId, today, isRewardGranted }, 500);
       }
 
       // ❌ BỎ thông báo MISS → chỉ xử lý khi trúng
+      {
+        const claim = await tryCreateClaim();
+        if (!claim.ok) {
+          if (claim.reason === "duplicate") {
+            return finalize({ body: { success: true, code: "ALREADY_CLAIMED" }, status: 200 });
+          }
+          return fail("claim.create.firstDay", claim.error, { requestId, today, chapterId }, 500);
+        }
+      }
+
       if (!isRewardGranted) return finalize({ body: { success: true, code: "SKIPPED" }, status: 200 });
 
       // === TRÚNG ===
@@ -208,13 +261,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
       try {
         await createNotification({
-          userId: String(userIdQ),
+          userId: userIdStr,
           title: "Thưởng đọc truyện.",
-          subtitle: goldAmount === 10
-            ? "Chúc mừng bạn đoạt hết may mắn của 10 người khác, nhận được 10 dâm ngọc"
-            : `Chúc mừng bạn nhận được ${goldAmount} Dâm Ngọc!`,
+          subtitle: `Chúc mừng bạn nhận được ${goldAmount} Dâm Ngọc!`,
           imgUrl: "/images/noti/gold.png",
-          type: goldAmount === 10 ? "big-win" : "default",
+          type: "default",
         });
       } catch {}
 
@@ -222,6 +273,16 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // === ĐÃ QUA GATE ===
+    {
+      const claim = await tryCreateClaim();
+      if (!claim.ok) {
+        if (claim.reason === "duplicate") {
+          return finalize({ body: { success: true, code: "ALREADY_CLAIMED" }, status: 200 });
+        }
+        return fail("claim.create.afterGate", claim.error, { requestId, today, chapterId }, 500);
+      }
+    }
+
     if (!isRewardGranted) return finalize({ body: { success: true, code: "SKIPPED" }, status: 200 });
 
     try {
@@ -232,13 +293,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
     try {
       await createNotification({
-        userId: String(userIdQ),
+        userId: userIdStr,
         title: "Thưởng đọc truyện.",
-        subtitle: goldAmount === 10
-          ? "Chúc mừng bạn đoạt hết may mắn của 10 người khác, nhận được 10 dâm ngọc"
-          : `Chúc mừng bạn nhận được ${goldAmount} Dâm Ngọc!`,
+        subtitle: `Chúc mừng bạn nhận được ${goldAmount} Dâm Ngọc!`,
         imgUrl: "/images/noti/gold.png",
-        type: goldAmount === 10 ? "big-win" : "default",
+        type: "default",
       });
     } catch {}
 

@@ -6,6 +6,7 @@ import { ENV } from "@/configs/env.config";
 import { MANGA_CONTENT_TYPE, MANGA_STATUS } from "~/constants/manga";
 import { getLatestChapterTitlesForMangaIds } from "./shared.latest-chapter-titles";
 import { ensureSlugForDocs } from "~/database/helpers/manga-slug.helper";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 
 const HOT_CAROUSEL_LIMITS = {
   MANGA: ENV.LEADERBOARD.MAX_ITEMS,
@@ -18,6 +19,33 @@ const HOT_CAROUSEL_CACHE_TTL_MS = 60 * 1000; // cache snapshot for 60s to avoid 
 type HotCarouselCache = {
   data: MangaType[];
   expiresAt: number;
+};
+
+export type HotCarouselScoreBreakdown = {
+  baseScore: number;
+  weeklyRank: number | null;
+  monthlyRank: number | null;
+  weeklyPenalty: number;
+  monthlyPenalty: number;
+  penalty: number;
+  penaltyMultiplier: number;
+  isRecent: boolean;
+  recentMultiplier: number;
+  hasManhwaGenre: boolean;
+  genreMultiplier: number;
+  adjustedScore: number;
+};
+
+export type HotCarouselScoreRow = {
+  rank: number;
+  id: string;
+  story: MangaType;
+  baseScore: number;
+  adjustedScore: number;
+  breakdown: HotCarouselScoreBreakdown;
+  steps: string[];
+  formula: string;
+  lastInteractionAt: string | null;
 };
 
 let hotCarouselCache: HotCarouselCache | null = null;
@@ -34,6 +62,13 @@ const attachLatestChapterTitles = async (items: any[]) => {
 
 const mapWithStableId = (docs: any[]) => docs.map((d: any) => ({ id: String(d?._id ?? d?.id ?? ""), ...d }));
 
+const normalizeMangaAssets = (story: any) => {
+  if (!story || typeof story !== "object") return story;
+  if (typeof (story as any).poster === "string") (story as any).poster = rewriteLegacyCdnUrl((story as any).poster);
+  if (typeof (story as any).shareImage === "string") (story as any).shareImage = rewriteLegacyCdnUrl((story as any).shareImage);
+  return story;
+};
+
 const getDailyViewsLeaderboard = async () => {
   const docs = await MangaModel.find({
     status: 1 /* APPROVED */,
@@ -44,7 +79,7 @@ const getDailyViewsLeaderboard = async () => {
     .lean();
 
   await ensureSlugForDocs(docs as any[]);
-  const out = mapWithStableId(docs);
+  const out = mapWithStableId(docs).map(normalizeMangaAssets);
   await attachLatestChapterTitles(out);
   for (const s of out as any[]) {
     (s as any).viewNumber = s.dailyViews || 0;
@@ -69,7 +104,7 @@ export const getLeaderboard = async (period: LeaderboardPeriod) => {
       .lean();
 
     await ensureSlugForDocs(docs as any[]);
-    const out = mapWithStableId(docs);
+    const out = mapWithStableId(docs).map(normalizeMangaAssets);
     await attachLatestChapterTitles(out);
     for (const s of out as any[]) {
       if (period === "weekly") (s as any).viewNumber = s.weeklyViews || 0;
@@ -141,10 +176,15 @@ const aggregateHotCarouselSnapshot = async () => {
     .filter(Boolean);
   if (!leaderboardIds.length) return [];
 
-  const stories = await MangaModel.find({ _id: { $in: leaderboardIds } }).lean<MangaType>();
-  const storyMap = new Map(stories.map((story) => [String((story as any)?._id ?? story?.id ?? ""), story]));
+  const stories = (await MangaModel.find({ _id: { $in: leaderboardIds } }).lean()) as any as MangaType[];
+  const storyMap = new Map<string, MangaType>(
+    (Array.isArray(stories) ? stories : []).map((story: MangaType) => [
+      String((story as any)?._id ?? (story as any)?.id ?? ""),
+      story,
+    ]),
+  );
 
-  const getAdjustedScore = (doc: any, story?: MangaType | null) => {
+  const getHotCarouselScoreBreakdown = (doc: any, story?: MangaType | null): HotCarouselScoreBreakdown => {
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     const baseScore = typeof doc?.score === "number" ? doc.score : 0;
 
@@ -152,14 +192,23 @@ const aggregateHotCarouselSnapshot = async () => {
     // - Weekly top 1..5: 25%, 21%, 18%, 15%, 12%
     // - Monthly top 1..5: 25%, 21%, 18%, 15%, 12%
     // If a manga is top #1 in both weekly & monthly, penalty becomes 50%.
-    const weeklyRank = weeklyRankMap.get(sid);
-    const monthlyRank = monthlyRankMap.get(sid);
+    const weeklyRank = weeklyRankMap.get(sid) ?? null;
+    const monthlyRank = monthlyRankMap.get(sid) ?? null;
     const weeklyPenalty = weeklyRank && weeklyRank <= 5 ? TOP_RANK_PENALTY[weeklyRank - 1] : 0;
     const monthlyPenalty = monthlyRank && monthlyRank <= 5 ? TOP_RANK_PENALTY[monthlyRank - 1] : 0;
     const penalty = weeklyPenalty + monthlyPenalty;
+    const penaltyMultiplier = 1 - penalty;
+
+    // Genre penalty: if manga has genre "manhwa", reduce score by 35%.
+    // Apply to manga only (not COSPLAY).
+    const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
+    const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
+    const hasManhwaGenre =
+      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
+      genres.some((g) => typeof g === "string" && g.trim().toLowerCase() === "manhwa");
+    const genreMultiplier = hasManhwaGenre ? 0.65 : 1;
 
     // Recent bonus applies to manga only (contentType MANGA/null) and uses updatedAt as proxy for latest chapter time.
-    const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
     const storyUpdatedAt = (story as any)?.updatedAt instanceof Date
       ? (story as any).updatedAt
       : (story as any)?.updatedAt
@@ -170,9 +219,25 @@ const aggregateHotCarouselSnapshot = async () => {
       !!storyUpdatedAt &&
       !Number.isNaN(storyUpdatedAt.getTime()) &&
       storyUpdatedAt.getTime() >= recentThresholdMs;
-    const bonusMultiplier = isRecent ? 1.25 : 1;
+    // Do NOT apply recent bonus for manhwa.
+    const recentMultiplier = isRecent && !hasManhwaGenre ? 1.25 : 1;
 
-    return baseScore * (1 - penalty) * bonusMultiplier;
+    const adjustedScore = baseScore * penaltyMultiplier * recentMultiplier * genreMultiplier;
+
+    return {
+      baseScore,
+      weeklyRank,
+      monthlyRank,
+      weeklyPenalty,
+      monthlyPenalty,
+      penalty,
+      penaltyMultiplier,
+      isRecent,
+      recentMultiplier,
+      hasManhwaGenre,
+      genreMultiplier,
+      adjustedScore,
+    };
   };
 
   // Re-rank documents using adjusted score (tie-break by base score then most recent interaction).
@@ -182,8 +247,8 @@ const aggregateHotCarouselSnapshot = async () => {
     const aStory = storyMap.get(aId);
     const bStory = storyMap.get(bId);
 
-    const aAdj = getAdjustedScore(a, aStory);
-    const bAdj = getAdjustedScore(b, bStory);
+    const aAdj = getHotCarouselScoreBreakdown(a, aStory).adjustedScore;
+    const bAdj = getHotCarouselScoreBreakdown(b, bStory).adjustedScore;
     if (bAdj !== aAdj) return bAdj - aAdj;
 
     const aBase = typeof a?.score === "number" ? a.score : 0;
@@ -247,9 +312,210 @@ const aggregateHotCarouselSnapshot = async () => {
     if (!story.id) {
       story.id = String((story as any)?._id ?? "");
     }
+    normalizeMangaAssets(story as any);
   }
 
   return combined;
+};
+
+export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarouselScoreRow[]> => {
+  const leaderboardDocs = await InteractionModel.aggregate(buildHotCarouselPipeline(HOT_CAROUSEL_PIPELINE_LIMIT) as any);
+  if (!leaderboardDocs?.length) return [];
+
+  const now = Date.now();
+  const recentThresholdMs = now - 12 * 3600 * 1000;
+  const TOP_RANK_PENALTY = [0.25, 0.21, 0.18, 0.15, 0.12] as const;
+
+  const [weeklyTopDocs, monthlyTopDocs] = await Promise.all([
+    MangaModel.find({
+      status: 1 /* APPROVED */,
+      contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, null] },
+    })
+      .sort({ weeklyViews: -1, updatedAt: -1 })
+      .limit(5)
+      .select({ _id: 1 })
+      .lean(),
+    MangaModel.find({
+      status: 1 /* APPROVED */,
+      contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, null] },
+    })
+      .sort({ monthlyViews: -1, updatedAt: -1 })
+      .limit(5)
+      .select({ _id: 1 })
+      .lean(),
+  ]);
+
+  const weeklyRankMap = new Map<string, number>();
+  for (let i = 0; i < weeklyTopDocs.length; i++) {
+    const id = String((weeklyTopDocs[i] as any)?._id ?? "");
+    if (id) weeklyRankMap.set(id, i + 1);
+  }
+  const monthlyRankMap = new Map<string, number>();
+  for (let i = 0; i < monthlyTopDocs.length; i++) {
+    const id = String((monthlyTopDocs[i] as any)?._id ?? "");
+    if (id) monthlyRankMap.set(id, i + 1);
+  }
+
+  const leaderboardIds = leaderboardDocs
+    .map((doc: any) => String(doc?.story_id ?? doc?._id ?? ""))
+    .filter(Boolean);
+  if (!leaderboardIds.length) return [];
+
+  const stories = (await MangaModel.find({ _id: { $in: leaderboardIds } }).lean()) as any as MangaType[];
+  const storyMap = new Map<string, MangaType>(
+    (Array.isArray(stories) ? stories : []).map((story: MangaType) => [
+      String((story as any)?._id ?? (story as any)?.id ?? ""),
+      story,
+    ]),
+  );
+
+  const getHotCarouselScoreBreakdown = (doc: any, story?: MangaType | null): HotCarouselScoreBreakdown => {
+    const sid = String(doc?.story_id ?? doc?._id ?? "");
+    const baseScore = typeof doc?.score === "number" ? doc.score : 0;
+
+    const weeklyRank = weeklyRankMap.get(sid) ?? null;
+    const monthlyRank = monthlyRankMap.get(sid) ?? null;
+    const weeklyPenalty = weeklyRank && weeklyRank <= 5 ? TOP_RANK_PENALTY[weeklyRank - 1] : 0;
+    const monthlyPenalty = monthlyRank && monthlyRank <= 5 ? TOP_RANK_PENALTY[monthlyRank - 1] : 0;
+    const penalty = weeklyPenalty + monthlyPenalty;
+    const penaltyMultiplier = 1 - penalty;
+
+    // Genre penalty: if manga has genre "manhwa", reduce score by 35%.
+    // Apply to manga only (not COSPLAY).
+    const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
+    const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
+    const hasManhwaGenre =
+      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
+      genres.some((g) => typeof g === "string" && g.trim().toLowerCase() === "manhwa");
+    const genreMultiplier = hasManhwaGenre ? 0.65 : 1;
+
+    const storyUpdatedAt = (story as any)?.updatedAt instanceof Date
+      ? (story as any).updatedAt
+      : (story as any)?.updatedAt
+        ? new Date((story as any).updatedAt)
+        : null;
+    const isRecent =
+      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
+      !!storyUpdatedAt &&
+      !Number.isNaN(storyUpdatedAt.getTime()) &&
+      storyUpdatedAt.getTime() >= recentThresholdMs;
+    // Do NOT apply recent bonus for manhwa.
+    const recentMultiplier = isRecent && !hasManhwaGenre ? 1.25 : 1;
+
+    const adjustedScore = baseScore * penaltyMultiplier * recentMultiplier * genreMultiplier;
+
+    return {
+      baseScore,
+      weeklyRank,
+      monthlyRank,
+      weeklyPenalty,
+      monthlyPenalty,
+      penalty,
+      penaltyMultiplier,
+      isRecent,
+      recentMultiplier,
+      hasManhwaGenre,
+      genreMultiplier,
+      adjustedScore,
+    };
+  };
+
+  const rankedDocs = [...leaderboardDocs].sort((a: any, b: any) => {
+    const aId = String(a?.story_id ?? a?._id ?? "");
+    const bId = String(b?.story_id ?? b?._id ?? "");
+    const aStory = storyMap.get(aId);
+    const bStory = storyMap.get(bId);
+
+    const aAdj = getHotCarouselScoreBreakdown(a, aStory).adjustedScore;
+    const bAdj = getHotCarouselScoreBreakdown(b, bStory).adjustedScore;
+    if (bAdj !== aAdj) return bAdj - aAdj;
+
+    const aBase = typeof a?.score === "number" ? a.score : 0;
+    const bBase = typeof b?.score === "number" ? b.score : 0;
+    if (bBase !== aBase) return bBase - aBase;
+
+    const aT = a?.last_interaction_at instanceof Date ? a.last_interaction_at.getTime() : (a?.last_interaction_at ? new Date(a.last_interaction_at).getTime() : 0);
+    const bT = b?.last_interaction_at instanceof Date ? b.last_interaction_at.getTime() : (b?.last_interaction_at ? new Date(b.last_interaction_at).getTime() : 0);
+    return bT - aT;
+  });
+
+  const mangaList: any[] = [];
+  const cosplayList: any[] = [];
+  const seen = new Set<string>();
+  for (const doc of rankedDocs as any[]) {
+    const sid = String(doc?.story_id ?? doc?._id ?? "");
+    if (!sid || seen.has(sid)) continue;
+    const story = storyMap.get(sid);
+    if (!story) continue;
+    if ((story as any).status !== MANGA_STATUS.APPROVED) continue;
+
+    const type = (story as any).contentType ?? MANGA_CONTENT_TYPE.MANGA;
+    if (type === MANGA_CONTENT_TYPE.COSPLAY) {
+      if (cosplayList.length < HOT_CAROUSEL_LIMITS.COSPLAY) {
+        cosplayList.push({ doc, sid, story });
+        seen.add(sid);
+      }
+    } else {
+      if (mangaList.length < HOT_CAROUSEL_LIMITS.MANGA) {
+        mangaList.push({ doc, sid, story });
+        seen.add(sid);
+      }
+    }
+
+    if (mangaList.length >= HOT_CAROUSEL_LIMITS.MANGA && cosplayList.length >= HOT_CAROUSEL_LIMITS.COSPLAY) {
+      break;
+    }
+  }
+
+  const FIRST_COSPLAY_INSERT_INDEX = 5;
+  const combined: any[] = [];
+  combined.push(...mangaList.slice(0, FIRST_COSPLAY_INSERT_INDEX));
+  if (cosplayList.length > 0) combined.push(cosplayList[0]);
+  combined.push(...mangaList.slice(FIRST_COSPLAY_INSERT_INDEX));
+  if (cosplayList.length > 1) combined.push(cosplayList[1]);
+  if (cosplayList.length > 2) combined.push(...cosplayList.slice(2));
+
+  const combinedStories = combined.map((x) => x.story);
+  await ensureSlugForDocs(combinedStories as any[]);
+  await attachLatestChapterTitles(combinedStories);
+  for (const story of combinedStories as MangaType[]) {
+    if (!(story as any).id) (story as any).id = String((story as any)?._id ?? "");
+    normalizeMangaAssets(story as any);
+  }
+
+  const formula = "adjusted = baseScore * (1 - (weeklyPenalty + monthlyPenalty)) * recentMultiplier * genreMultiplier";
+
+  const rows: HotCarouselScoreRow[] = [];
+  for (let i = 0; i < combined.length; i++) {
+    const { doc, sid, story } = combined[i];
+    const breakdown = getHotCarouselScoreBreakdown(doc, story);
+    const lastInteractionAt = doc?.last_interaction_at
+      ? (doc.last_interaction_at instanceof Date ? doc.last_interaction_at.toISOString() : new Date(doc.last_interaction_at).toISOString())
+      : null;
+
+    const steps: string[] = [];
+    steps.push(`baseScore = ${breakdown.baseScore}`);
+    steps.push(`weeklyRank=${breakdown.weeklyRank ?? "-"}, weeklyPenalty=${breakdown.weeklyPenalty}`);
+    steps.push(`monthlyRank=${breakdown.monthlyRank ?? "-"}, monthlyPenalty=${breakdown.monthlyPenalty}`);
+    steps.push(`penaltyTotal = ${breakdown.penalty} => penaltyMultiplier = ${breakdown.penaltyMultiplier}`);
+    steps.push(`recent: ${breakdown.isRecent && !breakdown.hasManhwaGenre ? "+25%" : "no"} => recentMultiplier = ${breakdown.recentMultiplier}`);
+    steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-35%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
+    steps.push(`adjustedScore = ${breakdown.baseScore} * ${breakdown.penaltyMultiplier} * ${breakdown.recentMultiplier} * ${breakdown.genreMultiplier} = ${breakdown.adjustedScore}`);
+
+    rows.push({
+      rank: i + 1,
+      id: sid,
+      story,
+      baseScore: breakdown.baseScore,
+      adjustedScore: breakdown.adjustedScore,
+      breakdown,
+      steps,
+      formula,
+      lastInteractionAt,
+    });
+  }
+
+  return rows;
 };
 
 const buildHotCarouselPipeline = (limit: number) => {

@@ -1,0 +1,64 @@
+## 2025-12-30T00:38:02Z
+$ git rev-parse HEAD
+
+6c51becc4baef555040c1a5beae06c6d6011d85a
+
+[exit=0]
+## 2025-12-30T00:38:02Z
+$ git log -1 --oneline
+
+6c51bec khôi phục background hình nền.
+
+[exit=0]
+## 2025-12-30T00:38:02Z
+$ git status --porcelain
+
+ M OPS_RUNBOOK.md
+ M app/.server/mutations/chapter.mutation.ts
+ M app/.server/queries/chapter.query.ts
+ M app/components/app-link.tsx
+ M app/components/chapter-detail.tsx
+ M app/components/comment-detail.tsx
+ M app/components/cosplay-preview-grid.tsx
+ M app/components/header.tsx
+ M app/components/manga-card.tsx
+ M app/components/manga-detail.tsx
+ M app/components/mobile-menu-public.tsx
+ M app/components/user-dropdown-menu.tsx
+ M app/entry.server.tsx
+ M app/routes/_index.tsx
+ M app/routes/api.chapter.ts
+ M app/routes/api.chapter.update-title.ts
+ M app/routes/api.post.ts
+ M app/routes/api.reading-reward.ts
+ M app/routes/post-create.tsx
+ M app/routes/post-edit.$id.tsx
+ M app/routes/post.$id.tsx
+ M app/routes/posts.tsx
+ M app/routes/profile-edit.tsx
+ M app/routes/register.tsx
+ M app/routes/truyen-hentai.$slug.tsx
+ M app/routes/truyen-hentai.chapter.edit.$mangaId.$chapterId.tsx
+ M app/routes/truyen-hentai.chapter.edit.$mangaId.tsx
+ M app/routes/truyen-hentai.preview.$id.tsx
+ M app/routes/user.blacklist-tags.tsx
+ M app/styles/globals.css
+ M app/styles/utilities.css
+ M app/utils/username-validator.client.ts
+ M app/utils/username-validator.server.ts
+ M ecosystem.config.cjs
+ M manage.sh
+ M public/favicon.ico
+ M public/images/logo2.webp
+ M public/robots.txt
+?? app/database/models/reading-reward-claim.model.ts
+?? ops_backups/
+?? react-router.config.ts
+?? scripts/prechange-snapshot-devuser.sh
+?? scripts/prechange-snapshot-root.sh
+
+[exit=0]
+## 2025-12-30T00:38:02Z
+$ git diff | redact_stream
+
+bash: line 1: redact_stream: command not found

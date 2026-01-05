@@ -8,6 +8,7 @@ import { ChapterDetail } from "~/components/chapter-detail";
 import { CHAPTER_STATUS } from "~/constants/chapter";
 import { DEFAULT_SHARE_IMAGE } from "~/constants/share-images";
 import { ChapterModel } from "~/database/models/chapter.model";
+import { UserChapterReactionModel } from "~/database/models/user-chapter-reaction.model";
 import type { UserType } from "~/database/models/user.model";
 import { getChapterDisplayName } from "~/utils/chapter.utils";
 
@@ -20,7 +21,8 @@ export async function loader({ params, request }: any) {
   }
 
   const url = new URL(request.url);
-  const origin = url.origin;
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  const origin = getCanonicalOrigin(request as any);
   const user = await getUserInfoFromSession(request);
 
   const manga = await getMangaPublishedById(mangaHandle, user);
@@ -33,7 +35,7 @@ export async function loader({ params, request }: any) {
   const incomingMangaSlug = mangaHandle.toLowerCase();
   if (canonicalMangaSlug && incomingMangaSlug && canonicalMangaSlug !== incomingMangaSlug) {
     const target = `/truyen-hentai/${manga.slug}/${encodeURIComponent(incomingChapterSlug)}`;
-    return redirect(target + url.search, { status: 301 });
+    return redirect(encodeURI(target + url.search), { status: 301 });
   }
 
   const chapter = await getChapterByMangaIdAndSlug(
@@ -46,12 +48,22 @@ export async function loader({ params, request }: any) {
     throw new Response("Không tìm thấy chapter", { status: 404 });
   }
 
+  // Normalize ids so the client can reliably call APIs using `mangaId + chapterSlug`
+  // even if some downstream code expects string values.
+  const chapterId = String((chapter as any).id ?? (chapter as any)._id ?? "").trim();
+  const chapterMangaId = String((chapter as any).mangaId ?? manga.id ?? "").trim();
+  const userReaction = user && chapterId
+    ? ((await UserChapterReactionModel.findOne({ userId: user.id, chapterId })
+        .select({ reaction: 1 })
+        .lean()) as any)?.reaction ?? null
+    : null;
+
   // Canonicalize chapter slug
   const canonicalChapterSlug = String((chapter as any).slug || "").toLowerCase();
   if (canonicalChapterSlug && canonicalChapterSlug !== incomingChapterSlug.toLowerCase()) {
     const targetMangaHandle = manga.slug || manga.id;
     const target = `/truyen-hentai/${targetMangaHandle}/${encodeURIComponent((chapter as any).slug)}`;
-    return redirect(target + url.search, { status: 301 });
+    return redirect(encodeURI(target + url.search), { status: 301 });
   }
 
   const detailPath = manga.slug ? `/truyen-hentai/${manga.slug}` : `/truyen-hentai/${manga.id}`;
@@ -93,7 +105,11 @@ export async function loader({ params, request }: any) {
   return {
     chapter: {
       ...(chapter as any),
+      id: chapterId || String((chapter as any).id ?? ""),
+      _id: chapterId || String((chapter as any)._id ?? ""),
+      mangaId: chapterMangaId,
       mangaSlug: manga.slug,
+      userReaction,
       breadcrumb,
       breadcrumbItems,
       hasPrevious: Boolean(preChapter),
@@ -123,7 +139,7 @@ export function meta({ data }: any) {
     ? data.chapter.title
     : `Chap ${data.chapter.chapterNumber}`;
   const mangaTitle = data.mangaTitle ?? "VinaHentai";
-  const origin = data.origin || "https://vinahentai.com";
+  const origin = data.origin || "https://vinahentai.xyz";
 
   const mangaSlugOrId = data.chapter.mangaSlug || data.chapter.mangaId || "";
   const chapterSlug = data.chapter.slug || "";

@@ -1,0 +1,40 @@
+## 2025-12-25T01:47:38Z
+$ ls -la build build/client build/server 2>/dev/null || true
+
+build:
+total 16
+drwxrwxr-x  4 devuser devuser 4096 Dec 24 03:57 .
+drwxr-xr-x 16 devuser devuser 4096 Dec 24 03:57 ..
+drwxrwxr-x  7 devuser devuser 4096 Dec 24 03:57 client
+drwxrwxr-x  3 devuser devuser 4096 Dec 24 03:57 server
+
+build/client:
+total 200
+drwxrwxr-x  7 devuser devuser   4096 Dec 24 03:57 .
+drwxrwxr-x  4 devuser devuser   4096 Dec 24 03:57 ..
+-rw-r--r--  1 devuser devuser   8196 Dec 24 03:57 .DS_Store
+-rw-r--r--  1 devuser devuser     32 Dec 24 03:57 2481cca03856867e36baa8b8cfb53690.html
+drwxrwxr-x  2 devuser devuser  16384 Dec 24 03:57 assets
+drwxrwxr-x  2 devuser devuser   4096 Dec 24 03:57 audio
+-rw-r--r--  1 devuser devuser 123763 Dec 24 03:57 favicon.ico
+drwxrwxr-x  2 devuser devuser   4096 Dec 24 03:57 gif-meme
+drwxrwxr-x 10 devuser devuser   4096 Dec 24 03:57 images
+-rw-r--r--  1 devuser devuser    220 Dec 24 03:57 robots.txt
+drwxrwxr-x  2 devuser devuser   4096 Dec 24 03:57 videos
+
+build/server:
+total 20
+drwxrwxr-x 3 devuser devuser 4096 Dec 24 03:57 .
+drwxrwxr-x 4 devuser devuser 4096 Dec 24 03:57 ..
+drwxrwxr-x 2 devuser devuser 4096 Dec 24 03:57 assets
+-rw-rw-r-- 1 devuser devuser 1076 Dec 24 03:57 index.js
+
+[exit=0]
+## 2025-12-25T01:47:38Z
+$ stat -c '%y %U:%G %a %n' build build/client build/server 2>/dev/null || true
+
+2025-12-24 03:57:08.003408031 +0000 devuser:devuser 775 build
+2025-12-24 03:57:08.037913644 +0000 devuser:devuser 775 build/client
+2025-12-24 03:57:08.036407645 +0000 devuser:devuser 775 build/server
+
+[exit=0]

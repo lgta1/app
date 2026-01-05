@@ -1,9 +1,11 @@
-import { Link, type LoaderFunctionArgs, type MetaFunction, useLoaderData } from "react-router-dom";
+import { Link } from "react-router-dom";
+
+import type { Route } from "./+types/genres._index";
 
 import { getAllGenres } from "~/.server/queries/genres.query";
 import type { GenresType } from "~/database/models/genres.model";
 
-export const meta: MetaFunction = ({ data }) => {
+export const meta: Route.MetaFunction = ({ data }) => {
   const origin = data?.origin ?? "";
   const canonical = origin ? `${origin}/genres` : "/genres";
   return [
@@ -17,16 +19,16 @@ export const meta: MetaFunction = ({ data }) => {
   ];
 };
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   const genres = await getAllGenres();
   const sortedGenres = (genres || []).sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
-  const url = new URL(request.url);
-  return Response.json({ genres: sortedGenres, origin: url.origin });
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  return { genres: sortedGenres, origin: getCanonicalOrigin(request as any) };
 }
 
-export default function GenresIndex() {
-  const { genres } = useLoaderData<{ genres: GenresType[] }>();
+export default function GenresIndex({ loaderData }: Route.ComponentProps) {
+  const { genres } = loaderData;
 
   return (
     <div className="container-page mx-auto px-4 py-10">

@@ -50,7 +50,7 @@ const getNavigationItems = (
         return (
           <div key={item.href} className="flex h-6 items-center justify-center whitespace-nowrap max-[375px]:min-w-0 shrink-0">
             {!isMobile && item.icon ? (
-              <img src={item.icon} alt={item.label} className="hidden md:inline-block h-6 pointer-events-none select-none" />
+              <img src={item.icon} alt={item.label} className="hidden lg:inline-block h-6 pointer-events-none select-none" />
             ) : null}
             <a
               href={item.href}
@@ -85,45 +85,14 @@ const RandomNavButton = () => (
   </a>
 );
 
+
 export function Header({ user, isAdmin = false, genres = [], hideBanner = false, disableAutoHide = false, isFixed = true, autoPrefetchNotifications = false }: HeaderProps) {
   const [isHidden, setIsHidden] = useState(false);
-  const fixedRef = useRef<HTMLDivElement | null>(null);
   const bannerRef = useRef<HTMLDivElement | null>(null);
   const [bannerMounted, setBannerMounted] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(false);
   const [isHome, setIsHome] = useState(false);
   const bannerName = (user as any)?.displayName || (user as any)?.username || (user as any)?.name || "";
-
-  // Keep CSS var in sync with actual fixed header height so main content never gets covered.
-  useEffect(() => {
-    const root = document.documentElement;
-    if (!isFixed) {
-      try {
-        root.style.setProperty("--site-header-height", "0px");
-      } catch {}
-      return;
-    }
-    const el = fixedRef.current;
-    if (!el) return;
-    const setHeightVar = () => {
-      const rect = el.getBoundingClientRect();
-      const height = Math.max(0, Math.ceil(rect.height));
-      root.style.setProperty("--site-header-height", `${height}px`);
-    };
-
-    setHeightVar();
-    let ro: ResizeObserver | null = null;
-    if (typeof window !== "undefined" && "ResizeObserver" in window) {
-      ro = new ResizeObserver(() => setHeightVar());
-      ro.observe(el);
-    }
-    window.addEventListener("resize", setHeightVar);
-
-    return () => {
-      window.removeEventListener("resize", setHeightVar);
-      ro?.disconnect();
-    };
-  }, [isFixed]);
 
   // Headroom-like behavior
   useEffect(() => {
@@ -197,43 +166,6 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
     } catch {}
   }, []);
 
-  // Keep main content below the fixed header by setting a CSS variable.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const root = document.documentElement;
-
-    if (!isFixed) {
-      try {
-        root.style.setProperty("--site-header-height", "0px");
-      } catch {}
-      return;
-    }
-
-    const el = fixedRef.current;
-    if (!el) return;
-
-    const update = () => {
-      try {
-        const h = Math.ceil(el.getBoundingClientRect().height || 0);
-        root.style.setProperty("--site-header-height", `${h}px`);
-      } catch {}
-    };
-
-    update();
-    window.addEventListener("resize", update);
-
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => update());
-      ro.observe(el);
-    }
-
-    return () => {
-      window.removeEventListener("resize", update);
-      ro?.disconnect();
-    };
-  }, [isFixed]);
 
   return (
     <header className="flex w-full flex-col">
@@ -250,13 +182,13 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
           <img src="/images/icons/star-icon.svg" alt="Star" className="hidden h-2 w-2 md:block md:h-4 md:w-4" />
           <span className="text-center text-[10px] leading-tight font-semibold text-[#0A1020] md:text-sm max-[376px]:hidden">
             {bannerName
-              ? `VinaHentai hiện không đặt quảng cáo, chúc đồng dâm ${bannerName} đọc truyện vui vẻ ❤️`
-              : `VinaHentai hiện không đặt quảng cáo, chúc đồng dâm đọc truyện vui vẻ ❤️`}
+              ? `VinaHentai không đặt quảng cáo, chúc đồng dâm ${bannerName} đọc truyện vui vẻ ❤️`
+              : `VinaHentai không đặt quảng cáo, chúc đồng dâm đọc truyện vui vẻ ❤️`}
           </span>
           <span className="hidden text-center text-[10px] leading-tight font-semibold text-[#0A1020] md:text-sm max-[376px]:inline">
             {bannerName
-              ? `VinaHentai hiện không đặt quảng cáo. Chúc ${bannerName} đọc truyện vui vẻ ❤️`
-              : `VinaHentai hiện không đặt quảng cáo. Cảm ơn đồng dâm ❤️`}
+              ? `VinaHentai không đặt quảng cáo. Chúc ${bannerName} đọc truyện vui vẻ ❤️`
+              : `VinaHentai không đặt quảng cáo. Cảm ơn đồng dâm ❤️`}
           </span>
           <img src="/images/icons/star-icon.svg" alt="Star" className="hidden h-2 w-2 md:block md:h-4 md:w-4" />
         </div>
@@ -264,7 +196,6 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
 
       {/* Fixed wrapper */}
       <div
-        ref={fixedRef}
         className={
           isFixed
             ? `fixed left-0 right-0 z-50 transition-transform duration-300 will-change-transform ${
@@ -272,12 +203,12 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
               }`
             : `relative z-20`
         }
-        style={isFixed ? { top: 0 } : undefined}
+        style={isFixed ? { top: 0, height: "var(--site-header-height)" } : undefined}
       >
         {/* Top strip: desktop constrained to container, mobile unchanged */}
-        <div className="relative flex items-center justify-between self-stretch overflow-hidden bg-[rgba(9,16,26,0.9)] px-0 pt-2.5 pb-2 shadow-lg backdrop-blur-sm">
-          {/* Desktop >= md */}
-          <div className="hidden md:block w-full">
+        <div className="relative flex items-center justify-between self-stretch overflow-hidden bg-[rgba(9,16,26,0.85)] px-0 pt-2.5 pb-0.5 shadow-lg backdrop-blur-sm md:bg-[rgba(9,16,26,0.9)] md:pb-2">
+          {/* Desktop >= lg (tablet uses mobile header) */}
+          <div className="hidden lg:block w-full">
             <div className="container-page mx-auto px-4 relative flex items-center justify-between">
               {/* Left: Logo */}
               <div className="flex items-center">
@@ -297,9 +228,6 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
                 <UserMenu user={user} isAdmin={isAdmin} isMobile={false} autoPrefetchNotifications={autoPrefetchNotifications} />
               ) : (
                 <div className="flex items-center justify-start gap-4">
-                  <a href="/login?redirect=%2Fuser%2Fblacklist-tags" className="hidden lg:inline-flex items-center justify-center gap-2.5 rounded-xl px-2 py-2">
-                    <span className="text-txt-primary text-center text-sm leading-tight font-medium">Lọc thể loại không xem</span>
-                  </a>
                   <a href="/login" className="outline-lav-500 flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 outline outline-offset-[-1px]">
                     <span className="text-txt-focus text-center text-sm leading-tight font-medium">Đăng nhập</span>
                   </a>
@@ -311,8 +239,8 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
             </div>
           </div>
 
-          {/* Mobile < md */}
-          <div className="flex w-full items-center justify-between px-4 md:hidden sm:px-8">
+          {/* Mobile + tablet < lg */}
+          <div className="flex w-full items-center justify-between px-4 lg:hidden sm:px-8">
             <a href="/">
               <img src="/images/logo2.webp" alt="VinaHentai Logo" className="h-10 w-auto cursor-pointer" />
             </a>
@@ -328,13 +256,13 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
         </div>
 
         {/* Desktop nav links */}
-        <nav className="hidden items-center justify-center gap-8 overflow-hidden bg-[rgba(9,16,26,0.8)] px-8 py-[0.55rem] md:flex md:w-full -mt-1.5">
+        <nav className="hidden items-center justify-center gap-8 overflow-hidden bg-[rgba(9,16,26,0.8)] px-8 py-[0.55rem] lg:flex lg:w-full -mt-1.5">
           {getNavigationItems(false, isAdmin, genres)}
           {RandomNavButton()}
         </nav>
 
         {/* Mobile nav menu */}
-        <nav className="relative z-30 flex w-full flex-row flex-nowrap items-center justify-center gap-4 overflow-x-auto bg-[rgba(9,16,26,0.8)] px-4 py-[0.6rem] md:hidden no-scrollbar touch-pan-x max-[376px]:gap-2 max-[376px]:px-2">
+        <nav className="relative z-30 flex w-full flex-row flex-nowrap items-center justify-center gap-4 overflow-x-auto bg-[rgba(9,16,26,0.85)] px-4 pt-[0.15rem] pb-[0.6rem] lg:hidden no-scrollbar touch-pan-x md:bg-[rgba(9,16,26,0.8)] md:py-[0.6rem] max-[376px]:gap-2 max-[376px]:px-2">
           {getNavigationItems(true, isAdmin, genres)}
         </nav>
 
@@ -343,7 +271,7 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
       </div>
 
       {/* Spacer for fixed header */}
-      {isFixed ? <div style={{ height: `var(--site-header-height, 96px)` }} /> : null}
+      {isFixed ? <div style={{ height: `var(--site-header-height, var(--site-header-height-base))` }} /> : null}
     </header>
   );
 }

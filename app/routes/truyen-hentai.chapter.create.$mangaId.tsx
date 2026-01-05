@@ -66,6 +66,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       chapters: manga.chapters,
       genres: Array.isArray(manga.genres) ? manga.genres : [],
     },
+    isAdminUser,
   };
 }
 // END <feature> CHAPTER_CREATE_LOADER_FETCH_GENRES>
@@ -197,7 +198,7 @@ export default function CreateChapter() {
   };
 
   // BEGIN <feature> CHAPTER_CREATE_USE_GENRES_FROM_LOADER>
-  const { manga } = useLoaderData<typeof loader>();
+  const { manga, isAdminUser } = useLoaderData<typeof loader>();
   const genres: string[] = Array.isArray(manga?.genres) ? (manga.genres as string[]) : [];
   const skipCompression = genres.some((g) =>
     ["manhwa", "manhua"].includes(String(g).toLowerCase()),
@@ -275,16 +276,19 @@ export default function CreateChapter() {
 
       setPreviewImages((prev) => [...prev, ...newPreviewImages]);
 
-      const totalOriginalSize = compressionResults.reduce((acc, curr) => acc + curr.originalSize, 0);
-      const totalCompressedSize = compressionResults.reduce((acc, curr) => acc + curr.compressedSize, 0);
-      const totalSavings = ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100;
-
-      toast.success(
-        `Đã tối ưu ${list.length} ảnh thành công! Tiết kiệm ${formatFileSize(
-          totalOriginalSize - totalCompressedSize,
-        )} (${Math.round(totalSavings)}%)`,
-        { id: "compression" },
-      );
+      if (isAdminUser) {
+        const totalOriginalSize = compressionResults.reduce((acc, curr) => acc + curr.originalSize, 0);
+        const totalCompressedSize = compressionResults.reduce((acc, curr) => acc + curr.compressedSize, 0);
+        const totalSavings = ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100;
+        toast.success(
+          `Đã tối ưu ${list.length} ảnh thành công! Tiết kiệm ${formatFileSize(
+            totalOriginalSize - totalCompressedSize,
+          )} (${Math.round(totalSavings)}%)`,
+          { id: "compression" },
+        );
+      } else {
+        toast.success(`Đã tối ưu ${list.length} ảnh thành công!`, { id: "compression" });
+      }
     } catch (error) {
       console.error("Error compressing images:", error);
       toast.error(
@@ -936,7 +940,8 @@ export default function CreateChapter() {
                           </div>
                           <div className="rounded bg-black/70 px-1 py-0.5 text-[11px] leading-none text-white">
                             {formatFileSize(image.file.size)}
-                            {image.originalSize &&
+                            {isAdminUser &&
+                              image.originalSize &&
                               image.compressedSize &&
                               image.originalSize !== image.compressedSize && (
                                 <span className="ml-1 text-lav-300">

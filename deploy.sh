@@ -9,9 +9,8 @@ git pull --ff-only
 npm ci
 npm run build
 
-# 3) restart duy nhất app ww qua PM2
-pm2 restart ww --update-env
-pm2 save
+# 3) reload app qua PM2 (multi-instance: ww-1..ww-4)
+./manage.sh rolling-restart 5
 
 # 4) smoke test nhanh
-curl -sS http://127.0.0.1:3000/api/genres/debug | jq
+curl -sS http://127.0.0.1:3001/api/genres/debug | jq

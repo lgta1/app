@@ -6,10 +6,11 @@ import { ChapterModel, type ChapterType } from "~/database/models/chapter.model"
 import { MangaModel } from "~/database/models/manga.model";
 import { generateUniqueChapterSlug } from "~/database/helpers/chapter-slug.helper";
 import { BusinessError } from "~/helpers/errors.helper";
-import { isAdmin } from "~/helpers/user.helper";
+import { isAdmin, isDichGia } from "~/helpers/user.helper";
 import { MANGA_STATUS } from "~/constants/manga";
 import { getFileInfo } from "~/utils/minio.utils";
 import { MINIO_CONFIG } from "@/configs/minio.config";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 
 // Helpers to validate chapter image limits for UNAPPROVED manga
 const MAX_IMAGES_UNAPPROVED = 100;
@@ -66,7 +67,7 @@ async function validateUnapprovedChapterConstraints(
     }
   }
 
-   return total;
+  return total;
 }
 
 async function calculateChapterContentBytes(contentUrls: string[]): Promise<number> {
@@ -112,7 +113,9 @@ export const createChapter = async (
     throw new BusinessError("Không tìm thấy manga");
   }
 
-  const contentUrls = Array.isArray(chapter.contentUrls) ? chapter.contentUrls : [];
+  const contentUrls = (Array.isArray(chapter.contentUrls) ? chapter.contentUrls : []).map(
+    (u) => rewriteLegacyCdnUrl(u),
+  );
 
   // Unapproved gating rules (skip for admins)
   let totalBytes = 0;
@@ -154,6 +157,7 @@ export const createChapter = async (
       try {
         const newChapter = await ChapterModel.create({
           ...chapter,
+          contentUrls,
           contentBytes: totalBytes,
           title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
           chapterNumber: finalNumber,
@@ -203,32 +207,36 @@ export const updateChapter = async (
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
-  let query: any = {
-    _id: mangaId,
-  };
-
-  if (!isAdmin(userInfo.role)) {
-    query = {
-      ...query,
-      ownerId: userInfo.id,
-    };
-  }
-
-  // Verify manga ownership
-  const manga = await MangaModel.findOne(query);
+  // Verify manga permission: admin OR owner OR translator (translationTeam matches username)
+  const manga = await MangaModel.findById(mangaId);
   if (!manga) {
     throw new BusinessError("Không tìm thấy manga hoặc bạn không có quyền chỉnh sửa");
   }
 
+  if (!isAdmin(userInfo.role)) {
+    const normalize = (v: any) => String(v ?? "").trim().toLowerCase();
+    const isOwner = String((manga as any).ownerId) === String((userInfo as any).id);
+    const isTranslatorForManga =
+      isDichGia(userInfo.role) && normalize((userInfo as any)?.name) && normalize((manga as any)?.translationTeam) &&
+      normalize((userInfo as any)?.name) === normalize((manga as any)?.translationTeam);
+    if (!isOwner && !isTranslatorForManga) {
+      throw new BusinessError("Không tìm thấy manga hoặc bạn không có quyền chỉnh sửa");
+    }
+  }
+
   // Enforce per-chapter constraints for unapproved manga (skip for admins)
   let updatedContentBytes: number | undefined;
+  const normalizedContentUrls = Array.isArray(updateData.contentUrls)
+    ? updateData.contentUrls.map((u) => rewriteLegacyCdnUrl(u))
+    : undefined;
+
   if (Array.isArray(updateData.contentUrls)) {
     if (!isAdmin(userInfo.role) && manga.status !== MANGA_STATUS.APPROVED) {
-      updatedContentBytes = await validateUnapprovedChapterConstraints(updateData.contentUrls);
+      updatedContentBytes = await validateUnapprovedChapterConstraints(normalizedContentUrls!);
     } else if (typeof updateData.contentBytes === "number" && updateData.contentBytes > 0) {
       updatedContentBytes = updateData.contentBytes;
     } else {
-      updatedContentBytes = await calculateChapterContentBytes(updateData.contentUrls);
+      updatedContentBytes = await calculateChapterContentBytes(normalizedContentUrls!);
     }
   }
 
@@ -239,6 +247,7 @@ export const updateChapter = async (
 
   const updatePayload: any = {
     ...updateData,
+    ...(normalizedContentUrls ? { contentUrls: normalizedContentUrls } : null),
     title: isPlaceholder ? `Chap ${chapterNumber}` : finalTitle,
     status: CHAPTER_STATUS.PENDING,
   };

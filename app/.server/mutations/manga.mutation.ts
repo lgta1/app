@@ -13,6 +13,11 @@ import { UserLikeMangaModel } from "~/database/models/user-like-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin, isDichGia } from "~/helpers/user.helper";
+import { createNotification } from "@/mutations/notification.mutation";
+import { UserFollowAuthorModel } from "~/database/models/user-follow-author.model";
+import { UserFollowTranslatorModel } from "~/database/models/user-follow-translator.model";
+import { AuthorModel } from "~/database/models/author.model";
+import { TranslatorModel } from "~/database/models/translator.model";
 
 const resolveMangaMutationTarget = async (handle: string) => {
   if (!handle) return null;
@@ -236,11 +241,101 @@ export const approveManga = async (request: Request, mangaId: string) => {
     throw new BusinessError("Không tìm thấy truyện");
   }
 
+  const wasApproved = (resolved.doc as any)?.status === MANGA_STATUS.APPROVED;
+
   await MangaModel.findByIdAndUpdate(
     resolved.targetId,
     { $set: { status: MANGA_STATUS.APPROVED } },
     { timestamps: false },
   );
+
+  // Notify followers (non-blocking, best-effort) when manga is released (approved).
+  if (!wasApproved) {
+    const mangaDoc = resolved.doc as any;
+    const title: string = String(mangaDoc?.title ?? "Truyện mới");
+    const poster: string = String(mangaDoc?.poster ?? "/images/logo.webp");
+    const slug: string | null = mangaDoc?.slug ? String(mangaDoc.slug) : null;
+    const authorSlugs: string[] = Array.isArray(mangaDoc?.authorSlugs)
+      ? mangaDoc.authorSlugs.map((s: any) => String(s).toLowerCase()).filter(Boolean)
+      : [];
+    const translatorSlugs: string[] = Array.isArray(mangaDoc?.translatorSlugs)
+      ? mangaDoc.translatorSlugs.map((s: any) => String(s).toLowerCase()).filter(Boolean)
+      : [];
+
+    const targetUrl = slug ? `/truyen-hentai/${slug}` : `/truyen-hentai/${String(resolved.targetId)}`;
+
+    void (async () => {
+      try {
+        const [authors, translators] = await Promise.all([
+          authorSlugs.length
+            ? AuthorModel.find({ slug: { $in: authorSlugs } }).select({ slug: 1, name: 1 }).lean()
+            : Promise.resolve([] as Array<{ slug: string; name: string }>),
+          translatorSlugs.length
+            ? TranslatorModel.find({ slug: { $in: translatorSlugs } }).select({ slug: 1, name: 1 }).lean()
+            : Promise.resolve([] as Array<{ slug: string; name: string }>),
+        ]);
+
+        const BATCH_SIZE = 50;
+
+        // Send per followed entity to include exact name in notification.
+        for (const author of authors as any[]) {
+          const authorSlug = String((author as any)?.slug ?? "").toLowerCase().trim();
+          const authorName = String((author as any)?.name ?? authorSlug).trim();
+          if (!authorSlug || !authorName) continue;
+          const followerIds = await UserFollowAuthorModel.find({ authorSlug }).distinct("userId");
+          const recipients = (followerIds as any[])
+            .map((uid) => String(uid ?? "").trim())
+            .filter(Boolean);
+          if (!recipients.length) continue;
+
+          const payloadBase = {
+            title: `Tác giả "${authorName}" bạn theo dõi vừa ra truyện mới`,
+            subtitle: `Tác giả/dịch giả "${authorName}" vừa ra truyện "${title}"`,
+            imgUrl: poster,
+            type: "follow-release-author",
+            targetType: "manga",
+            targetId: String(resolved.targetId),
+            targetSlug: slug,
+            targetUrl,
+          };
+
+          for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+            const batch = recipients.slice(i, i + BATCH_SIZE);
+            await Promise.allSettled(batch.map((userId) => createNotification({ userId, ...payloadBase })));
+          }
+        }
+
+        for (const translator of translators as any[]) {
+          const translatorSlug = String((translator as any)?.slug ?? "").toLowerCase().trim();
+          const translatorName = String((translator as any)?.name ?? translatorSlug).trim();
+          if (!translatorSlug || !translatorName) continue;
+          const followerIds = await UserFollowTranslatorModel.find({ translatorSlug }).distinct("userId");
+          const recipients = (followerIds as any[])
+            .map((uid) => String(uid ?? "").trim())
+            .filter(Boolean);
+          if (!recipients.length) continue;
+
+          const payloadBase = {
+            title: `Dịch giả "${translatorName}" bạn theo dõi vừa ra truyện mới`,
+            subtitle: `Tác giả/dịch giả "${translatorName}" vừa ra truyện "${title}"`,
+            imgUrl: poster,
+            type: "follow-release-translator",
+            targetType: "manga",
+            targetId: String(resolved.targetId),
+            targetSlug: slug,
+            targetUrl,
+          };
+
+          for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+            const batch = recipients.slice(i, i + BATCH_SIZE);
+            await Promise.allSettled(batch.map((userId) => createNotification({ userId, ...payloadBase })));
+          }
+        }
+      } catch (err) {
+        console.warn("[approveManga] notify followers failed", err);
+      }
+    })();
+  }
 
   return {
     success: true,

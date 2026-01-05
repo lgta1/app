@@ -1,7 +1,7 @@
 import type { Route } from "./+types/api.chapter.update-title";
 
 import { requireLogin } from "~/.server/services/auth.server";
-import { isAdmin } from "~/helpers/user.helper";
+import { isAdmin, isDichGia } from "~/helpers/user.helper";
 import { BusinessError } from "~/helpers/errors.helper";
 import { ChapterModel } from "~/database/models/chapter.model";
 import { MangaModel } from "~/database/models/manga.model";
@@ -32,7 +32,13 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json({ success: false, error: "Chương không thuộc truyện này" }, { status: 400 });
     }
 
-    const canEdit = isAdmin(user.role) || String(manga.ownerId) === String(user.id);
+    const normalize = (v: any) => String(v ?? "").trim().toLowerCase();
+    const isOwner = String(manga.ownerId) === String(user.id);
+    const isTranslatorForManga =
+      isDichGia(user.role) && normalize((user as any)?.name) && normalize((manga as any)?.translationTeam) &&
+      normalize((user as any)?.name) === normalize((manga as any)?.translationTeam);
+
+    const canEdit = isAdmin(user.role) || isOwner || isTranslatorForManga;
     if (!canEdit) return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
 
   // Cập nhật tiêu đề chapter; KHÔNG đụng tới manga.updatedAt theo quy chuẩn mới

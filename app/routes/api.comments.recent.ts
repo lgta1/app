@@ -6,13 +6,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "15");
+    // Quy chuẩn mới: tối đa 10 bình luận gần nhất, chia 2 trang, mỗi trang 5.
+    const limit = 5;
 
-    // Chỉ hiển thị tối đa 3 trang gần nhất
-    const clampedPage = Math.max(1, Math.min(page, 3));
+    // Chỉ cho phép 2 trang
+    const clampedPage = Math.max(1, Math.min(page, 2));
 
     const result = await getRecentMangaComments(clampedPage, limit);
-    const cappedTotalPages = Math.min(result.totalPages ?? 1, 3);
+    const cappedTotalPages = Math.min(result.totalPages ?? 1, 2);
 
     return Response.json(
       {

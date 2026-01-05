@@ -123,13 +123,16 @@ export function HeaderSearch() {
       return;
     }
 
-    if (data.resolvedQuery !== trimmedQuery) {
+    // `/api/search` lowercases the query before calling `smartSearch`, so `resolvedQuery`
+    // is the trimmed + lowercased string. Compare using the same normalization to avoid
+    // dropping valid responses when user types uppercase on desktop.
+    if (data.resolvedQuery !== trimmedQuery.toLowerCase()) {
       return;
     }
 
     setHasMore(data.hasMore);
     setIsLoading(false);
-  hideLoadingStatus();
+    hideLoadingStatus();
     setOffset(data.nextOffset);
 
     if (data.requestedOffset === 0) {

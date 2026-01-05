@@ -6,7 +6,8 @@ import { useFetcher, useNavigate, Link } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
-  Home,
+  ThumbsDown,
+  ThumbsUp,
   ArrowUpToLine,
   ArrowDownToLine,
   AlertTriangle,
@@ -22,6 +23,7 @@ import type { MangaType } from "~/database/models/manga.model";
 import { formatDate, formatTime } from "../utils/date.utils";
 import { getChapterDisplayName } from "../utils/chapter.utils";
 import LazyImage from "~/components/lazy-image";
+import { calcChapterScore, CHAPTER_RATING_CONFIG } from "~/constants/chapter-rating";
 
 const normalizeObjectId = (value: unknown): string => {
   if (value == null) return "";
@@ -69,9 +71,16 @@ export function ChapterDetail({
   recommendedManga = [],
   isLoggedIn = false,
 }: ChapterDetailProps) {
+  const truncateBreadcrumbLabel = (label: string, max = 20) => {
+    const s = String(label ?? "");
+    if (s.length <= max) return s;
+    return s.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+  };
+
   // Lấy id chapter an toàn: ưu tiên _id rồi tới id
   const chapterIdResolved = normalizeObjectId((chapter as any)?._id ?? (chapter as any)?.id);
   const mangaIdResolved = normalizeObjectId((chapter as any)?.mangaId ?? (chapter as any)?.manga?._id ?? (chapter as any)?.manga?.id);
+  const chapterSlugResolved = String((chapter as any)?.slug ?? "").trim();
   const mangaDetailUrl = chapter.mangaSlug
     ? `/truyen-hentai/${chapter.mangaSlug}`
     : mangaIdResolved
@@ -156,6 +165,17 @@ export function ChapterDetail({
   const rewardFetcher = useFetcher();
   const expFetcher = useFetcher();
   const chaptersFetcher = useFetcher();
+  const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
+  const [chapterLikeCount, setChapterLikeCount] = useState<number>(
+    Math.max(0, Number((chapter as any)?.likeNumber) || 0),
+  );
+  const [chapterDislikeCount, setChapterDislikeCount] = useState<number>(
+    Math.max(0, Number((chapter as any)?.dislikeNumber) || 0),
+  );
+  const [chapterScore, setChapterScore] = useState<number>(Number((chapter as any)?.chapScore) || 0);
+  const [userReaction, setUserReaction] = useState<"like" | "dislike" | null>(
+    ((chapter as any)?.userReaction as any) ?? null,
+  );
   const readingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastImageRef = useRef<HTMLImageElement | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -188,6 +208,106 @@ export function ChapterDetail({
       }
     }
   }, [chaptersFetcher.data]);
+
+  // Sync rating state when navigating between chapters
+  useEffect(() => {
+    setChapterLikeCount(Math.max(0, Number((chapter as any)?.likeNumber) || 0));
+    setChapterDislikeCount(Math.max(0, Number((chapter as any)?.dislikeNumber) || 0));
+    setChapterScore(Number((chapter as any)?.chapScore) || 0);
+    setUserReaction(((chapter as any)?.userReaction as any) ?? null);
+  }, [chapter]);
+
+  const submitReaction = useCallback(
+    async (reaction: "like" | "dislike") => {
+      if (!isLoggedIn) {
+        toast.error("Vui lòng đăng nhập để đánh giá chương");
+        return;
+      }
+      const mangaSlugResolved = String((chapter as any)?.mangaSlug ?? (chapter as any)?.manga?.slug ?? "").trim();
+      const chapterNumberResolved = Number((chapter as any)?.chapterNumber);
+      // Production: the reaction API is reliably resolvable by `chapterId` or (`mangaId` + `chapterSlug`/`chapterNumber`).
+      // We intentionally avoid slug-only and mangaSlug-only resolution paths.
+      const hasWorkingSlugLookup = Boolean(mangaIdResolved && chapterSlugResolved);
+      const hasWorkingNumberLookup = Boolean(mangaIdResolved && Number.isFinite(chapterNumberResolved));
+      if (!chapterIdResolved && !hasWorkingSlugLookup && !hasWorkingNumberLookup) {
+        toast.error("Thiếu thông tin chương, vui lòng tải lại trang");
+        return;
+      }
+      if (isSubmittingReaction) return;
+
+      // If user clicks the same reaction again: keep it a no-op (server is also a no-op).
+      if (userReaction === reaction) return;
+
+      const prev = {
+        like: chapterLikeCount,
+        dislike: chapterDislikeCount,
+        score: chapterScore,
+        userReaction,
+      };
+
+      // Optimistic update
+      let nextLike = Math.max(0, Number(prev.like) || 0);
+      let nextDislike = Math.max(0, Number(prev.dislike) || 0);
+      if (prev.userReaction === "like") nextLike = Math.max(0, nextLike - 1);
+      if (prev.userReaction === "dislike") nextDislike = Math.max(0, nextDislike - 1);
+      if (reaction === "like") nextLike += 1;
+      else nextDislike += 1;
+
+      setIsSubmittingReaction(true);
+      setUserReaction(reaction);
+      setChapterLikeCount(nextLike);
+      setChapterDislikeCount(nextDislike);
+      setChapterScore(calcChapterScore(nextLike, nextDislike));
+
+      try {
+        const formData = new FormData();
+        if (chapterIdResolved) formData.append("chapterId", chapterIdResolved);
+        if (mangaIdResolved) formData.append("mangaId", mangaIdResolved);
+        if (mangaSlugResolved) formData.append("mangaSlug", mangaSlugResolved);
+        if (chapterSlugResolved) formData.append("chapterSlug", chapterSlugResolved);
+        if (Number.isFinite(chapterNumberResolved)) formData.append("chapterNumber", String(chapterNumberResolved));
+        formData.append("reaction", reaction);
+
+        const res = await fetch("/api/chapter/reaction", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+
+        const data: any = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          const message =
+            (data && (data.error || data.message)) ||
+            (res.status === 401 ? "Vui lòng đăng nhập để đánh giá chương" : "Có lỗi xảy ra");
+          throw new Error(String(message));
+        }
+
+        setChapterLikeCount(Math.max(0, Number(data.like) || 0));
+        setChapterDislikeCount(Math.max(0, Number(data.dislike) || 0));
+        setChapterScore(Number(data.chapScore) || 0);
+        setUserReaction((data.userReaction as any) ?? null);
+      } catch (e: any) {
+        setChapterLikeCount(prev.like);
+        setChapterDislikeCount(prev.dislike);
+        setChapterScore(prev.score);
+        setUserReaction(prev.userReaction);
+        toast.error(String(e?.message || "Có lỗi xảy ra"));
+      } finally {
+        setIsSubmittingReaction(false);
+      }
+    },
+    [
+      isLoggedIn,
+      chapterIdResolved,
+      mangaIdResolved,
+      chapterSlugResolved,
+      isSubmittingReaction,
+      userReaction,
+      chapterLikeCount,
+      chapterDislikeCount,
+      chapterScore,
+    ],
+  );
 
   // === Derive nearest existing prev/next from chapters list ===
   const sortedChapterNumbers = useMemo(() => {
@@ -271,6 +391,10 @@ export function ChapterDetail({
       if (!hasClaimedThisChapter && isEnableClaimGold) {
         const formData = new FormData();
         formData.append("intent", "claim-reading-reward");
+          try {
+            const cid = String((chapter as any)?.id ?? "");
+            if (cid) formData.append("chapterId", cid);
+          } catch {}
         rewardFetcher.submit(formData, {
           method: "POST",
           action: "/api/reading-reward",
@@ -507,8 +631,6 @@ useEffect(() => {
     }
     const targetChapterId = chapterIdResolved || chapter.id;
     if (!targetChapterId) return;
-
-    setHasCompletedReading(true);
     const formData = new FormData();
     formData.append("intent", "claim-reading-exp");
     formData.append("chapterId", targetChapterId);
@@ -611,23 +733,26 @@ useEffect(() => {
         <div className="flex flex-col gap-2">
           <nav
             aria-label="Breadcrumb"
-            className="text-txt-focus font-sans text-sm font-medium sm:text-base"
+            className="text-txt-focus font-sans text-sm font-medium"
           >
             <ol className="flex flex-wrap items-center gap-0.5 sm:gap-1">
               {normalizedBreadcrumbItems.map((item, index) => {
                 const isLast = index === normalizedBreadcrumbItems.length - 1;
+                const originalLabel = String(item.label ?? "");
+                const truncated = truncateBreadcrumbLabel(originalLabel, 20);
                 return (
                   <li key={`${item.label}-${index}`} className="flex items-center gap-0.5 sm:gap-1">
                     {item.href && !isLast ? (
                       <Link
                         to={item.href}
                         className="transition-colors hover:text-lav-500"
+                        title={originalLabel}
                       >
-                        {item.label}
+                        {truncated}
                       </Link>
                     ) : (
-                      <span className={isLast ? "text-txt-focus" : "text-txt-secondary"}>
-                        {item.label}
+                      <span className={isLast ? "text-txt-focus" : "text-txt-secondary"} title={originalLabel}>
+                        {truncated}
                       </span>
                     )}
                     {!isLast && <span className="text-txt-secondary/60 px-0.5">/</span>}
@@ -707,40 +832,174 @@ useEffect(() => {
       {/* Static navigation + report (under content) */}
       <div className="mx-auto mb-6 flex w-full max-w-[1080px] flex-col gap-2 px-0">
         <div className="rounded-2xl border border-white/10 bg-[#05070F] px-0 py-0 shadow-none w-full">
-          <div className="grid grid-cols-3 gap-2 w-full px-2 pt-2">
+          {/* Mobile: 1 row with fixed proportions (23/20/14/20/23) */}
+          <div className="grid w-full grid-cols-[23fr_20fr_14fr_20fr_23fr] gap-2 px-2 pt-2 sm:hidden">
             <button
               type="button"
               disabled={!hasPrevChapter}
               onClick={() => navigateToChapter(prevTarget, prevSlug)}
-              className={`flex items-center justify-center gap-2 rounded-xl border px-0 py-0 h-10 w-full text-sm font-semibold transition-all ${
+              className={`flex h-10 w-full items-center justify-center rounded-xl border px-0 py-0 text-sm font-semibold transition-all ${
+                hasPrevChapter
+                  ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] hover:brightness-105"
+                  : "border-white/10 bg-[#141727] text-white/40 cursor-not-allowed opacity-70"
+              }`}
+              aria-label="Chương trước"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => submitReaction("like")}
+              disabled={!isLoggedIn || isSubmittingReaction}
+              className={[
+                "flex h-10 w-full min-w-0 items-center justify-center gap-1 rounded-xl border px-2 text-xs font-semibold transition-all",
+                userReaction === "like"
+                  ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1"
+                  : "border-white/10 bg-[#141727] text-white/80 hover:bg-[#1b1f33]",
+                (!isLoggedIn || isSubmittingReaction) ? "opacity-70" : "",
+              ].join(" ")}
+              aria-pressed={userReaction === "like"}
+              aria-label="Like chương"
+              title={!isLoggedIn ? "Đăng nhập để đánh giá" : undefined}
+            >
+              <ThumbsUp className="h-4 w-4 text-green-500" />
+              <span className="tabular-nums">{(chapterLikeCount ?? 0).toLocaleString("vi-VN")}</span>
+            </button>
+
+            <div
+              className="flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-[#141727] px-1 text-[11px] font-semibold tabular-nums text-white/80"
+              aria-label="Điểm chương"
+              title="Điểm chương"
+            >
+              {(() => {
+                const votes = (chapterLikeCount || 0) + (chapterDislikeCount || 0);
+                if (votes < CHAPTER_RATING_CONFIG.minVotesToDisplay) return "0.0/0";
+                return `${(Number(chapterScore) || 0).toFixed(1)}/10`;
+              })()}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => submitReaction("dislike")}
+              disabled={!isLoggedIn || isSubmittingReaction}
+              className={[
+                "flex h-10 w-full min-w-0 items-center justify-center gap-1 rounded-xl border px-2 text-xs font-semibold transition-all",
+                userReaction === "dislike"
+                  ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1"
+                  : "border-white/10 bg-[#141727] text-white/80 hover:bg-[#1b1f33]",
+                (!isLoggedIn || isSubmittingReaction) ? "opacity-70" : "",
+              ].join(" ")}
+              aria-pressed={userReaction === "dislike"}
+              aria-label="Dislike chương"
+              title={!isLoggedIn ? "Đăng nhập để đánh giá" : undefined}
+            >
+              <ThumbsDown className="h-4 w-4 text-red-500" />
+              <span className="tabular-nums">{(chapterDislikeCount ?? 0).toLocaleString("vi-VN")}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!hasNextChapter}
+              onClick={() => navigateToChapter(nextTarget, nextSlug)}
+              className={`flex h-10 w-full items-center justify-center rounded-xl border px-0 py-0 text-sm font-semibold transition-all ${
+                hasNextChapter
+                  ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] hover:brightness-105"
+                  : "border-white/10 bg-[#141727] text-white/40 cursor-not-allowed opacity-70"
+              }`}
+              aria-label="Chương sau"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Desktop/tablet: keep existing layout */}
+          <div className="hidden w-full grid-cols-3 gap-2 px-2 pt-2 sm:grid">
+            <button
+              type="button"
+              disabled={!hasPrevChapter}
+              onClick={() => navigateToChapter(prevTarget, prevSlug)}
+              className={`flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-0 py-0 text-sm font-semibold transition-all ${
                 hasPrevChapter
                   ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] hover:brightness-105"
                   : "border-white/10 bg-[#141727] text-white/40 cursor-not-allowed opacity-70"
               }`}
             >
               <ChevronLeft className="h-4 w-4" />
-              <span>Chương trước</span>
+              <span className="hidden sm:inline">Chương trước</span>
             </button>
 
-              <Link
-                to={mangaDetailUrl}
-              className="flex items-center justify-center gap-2 rounded-xl border px-0 py-0 h-10 w-full text-sm font-semibold transition-all bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1 border-transparent shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] hover:brightness-105"
-            >
-              <Home className="h-4 w-4" />
-              <span>Home</span>
-            </Link>
+            <div className="flex w-full flex-col items-center justify-center rounded-xl border border-transparent bg-[#0B0F1A]/60 px-2 py-1">
+              <div className="flex w-full items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => submitReaction("like")}
+                  disabled={!isLoggedIn || isSubmittingReaction}
+                  className={[
+                    "flex items-center justify-center gap-2 rounded-lg border px-2 py-2 text-sm font-semibold transition-all",
+                    "w-[110px]",
+                    userReaction === "like"
+                      ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1"
+                      : "border-white/10 bg-[#141727] text-white/80 hover:bg-[#1b1f33]",
+                    (!isLoggedIn || isSubmittingReaction) ? "opacity-70" : "",
+                  ].join(" ")}
+                  aria-pressed={userReaction === "like"}
+                  aria-label="Like chương"
+                  title={!isLoggedIn ? "Đăng nhập để đánh giá" : undefined}
+                >
+                  <ThumbsUp className="h-4 w-4 text-green-500" />
+                  <span className="tabular-nums">{(chapterLikeCount ?? 0).toLocaleString("vi-VN")}</span>
+                </button>
+
+                <div
+                  className={[
+                    "flex items-center justify-center rounded-lg border px-2 py-2 text-sm font-semibold tabular-nums",
+                    "w-[96px]",
+                    "border-white/10 bg-[#141727] text-white/80",
+                  ].join(" ")}
+                  aria-label="Điểm chương"
+                  title="Điểm chương"
+                >
+                  {(() => {
+                    const votes = (chapterLikeCount || 0) + (chapterDislikeCount || 0);
+                    if (votes < CHAPTER_RATING_CONFIG.minVotesToDisplay) return "0.0/0";
+                    return `${(Number(chapterScore) || 0).toFixed(1)}/10`;
+                  })()}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => submitReaction("dislike")}
+                  disabled={!isLoggedIn || isSubmittingReaction}
+                  className={[
+                    "flex items-center justify-center gap-2 rounded-lg border px-2 py-2 text-sm font-semibold transition-all",
+                    "w-[110px]",
+                    userReaction === "dislike"
+                      ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1"
+                      : "border-white/10 bg-[#141727] text-white/80 hover:bg-[#1b1f33]",
+                    (!isLoggedIn || isSubmittingReaction) ? "opacity-70" : "",
+                  ].join(" ")}
+                  aria-pressed={userReaction === "dislike"}
+                  aria-label="Dislike chương"
+                  title={!isLoggedIn ? "Đăng nhập để đánh giá" : undefined}
+                >
+                  <ThumbsDown className="h-4 w-4 text-red-500" />
+                  <span className="tabular-nums">{(chapterDislikeCount ?? 0).toLocaleString("vi-VN")}</span>
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"
               disabled={!hasNextChapter}
               onClick={() => navigateToChapter(nextTarget, nextSlug)}
-              className={`flex items-center justify-center gap-2 rounded-xl border px-0 py-0 h-10 w-full text-sm font-semibold transition-all ${
+              className={`flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-0 py-0 text-sm font-semibold transition-all ${
                 hasNextChapter
                   ? "border-transparent bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-bgc-layer1 shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] hover:brightness-105"
                   : "border-white/10 bg-[#141727] text-white/40 cursor-not-allowed opacity-70"
               }`}
             >
-              <span>Chương sau</span>
+              <span className="hidden sm:inline">Chương sau</span>
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>

@@ -86,8 +86,19 @@ export function NotificationPopup({
                 <div className="flex flex-col divide-y divide-bd-default/40">
                   {notifications.map((notification) => {
                     const isBigWin = (notification as any).type === "big-win";
+                    const isFollowRelease =
+                      (notification as any).type === "follow-release-author" ||
+                      (notification as any).type === "follow-release-translator";
+                    const isGoldReward = (notification as any).type === "gold-reward";
                     const targetUrl = resolveTargetUrl(notification);
                     const showGoButton = Boolean(targetUrl);
+
+                    const titleClassName = isFollowRelease
+                      ? "text-success-success"
+                      : isGoldReward
+                        ? "text-yellow-300"
+                        : "text-txt-focus";
+
                     return (
                       <div
                         key={notification.id}
@@ -106,7 +117,7 @@ export function NotificationPopup({
                               </span>
                             ) : (
                               <>
-                                <span className="text-txt-focus font-sans text-sm font-semibold leading-snug">
+                                <span className={`${titleClassName} font-sans text-sm font-semibold leading-snug`}>
                                   {notification.title}
                                 </span>
                                 {notification.subtitle && (

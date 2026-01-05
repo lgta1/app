@@ -268,7 +268,10 @@ export default function RecommendedManga({ mangaList, variant = "detail-vertical
             to={buildMangaUrl(m as any)}
             className="flex items-start gap-4 rounded-lg transition-colors hover:bg-white/5 p-2 -m-2"
           >
-            <div className="overflow-hidden rounded-lg bg-black/20" style={{ width: 56, height: 84 }}>
+            <div
+              className="flex-shrink-0 overflow-hidden rounded-lg bg-black/20 aspect-[2/3]"
+              style={{ width: 56 * 1.4 }}
+            >
               <img
                 src={(m as any).poster || (m as any).cover || (m as any).thumbnail || (m as any).image}
                 alt={(m as any).title}

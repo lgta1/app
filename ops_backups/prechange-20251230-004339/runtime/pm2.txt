@@ -1,0 +1,42 @@
+## 2025-12-30T00:43:39Z
+$ command -v pm2 && pm2 ls
+
+/usr/local/bin/pm2
+┌────┬─────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name    │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼─────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ [1m[36m0[39m[22m  │ ww-1    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316460  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 63.0mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+│ [1m[36m1[39m[22m  │ ww-2    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316452  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 63.0mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+│ [1m[36m2[39m[22m  │ ww-3    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316596  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 62.8mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+│ [1m[36m3[39m[22m  │ ww-4    │ default     │ N/A     │ [7m[1mfork[22m[27m    │ 1316602  │ 2D     │ 1    │ [32m[1monline[22m[39m    │ 0%       │ 63.1mb   │ [1mdevuser[22m  │ [90mdisabled[39m │
+└────┴─────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+[exit=0]
+## 2025-12-30T00:43:40Z
+$ pm2 jlist (redacted) > ops_backups/prechange-20251230-004339/runtime/pm2.jlist.json
+
+[exit=0]
+## 2025-12-30T00:43:40Z
+$ pm2 describe ww-1 | redact_stream
+
+bash: line 1: redact_stream: command not found
+
+[exit=127]
+## 2025-12-30T00:43:40Z
+$ pm2 describe ww-2 | redact_stream
+
+bash: line 1: redact_stream: command not found
+
+[exit=127]
+## 2025-12-30T00:43:40Z
+$ pm2 describe ww-3 | redact_stream
+
+bash: line 1: redact_stream: command not found
+
+[exit=127]
+## 2025-12-30T00:43:41Z
+$ pm2 describe ww-4 | redact_stream
+
+bash: line 1: redact_stream: command not found
+
+[exit=127]

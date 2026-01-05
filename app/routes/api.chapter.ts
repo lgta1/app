@@ -1,7 +1,7 @@
 // app/routes/api.chapter.ts
 import type { ActionFunctionArgs } from "react-router";
 import { requireLogin } from "~/.server/services/auth.server";
-import { isAdmin } from "~/helpers/user.helper";
+import { isAdmin, isDichGia } from "~/helpers/user.helper";
 import { BusinessError } from "~/helpers/errors.helper";
 
 import { MangaModel } from "~/database/models/manga.model";
@@ -40,19 +40,25 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json({ success: false, error: "Chapter không thuộc manga này" }, { status: 400 });
     }
 
-    const canDelete = isAdmin(user.role) || String(manga.ownerId) === String(user.id);
+    const normalize = (v: any) => String(v ?? "").trim().toLowerCase();
+    const isOwner = String(manga.ownerId) === String(user.id);
+    const isTranslatorForManga =
+      isDichGia(user.role) && normalize((user as any)?.name) && normalize((manga as any)?.translationTeam) &&
+      normalize((user as any)?.name) === normalize((manga as any)?.translationTeam);
+
+    const canDelete = isAdmin(user.role) || isOwner || isTranslatorForManga;
     if (!canDelete) return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
 
-    // Non-admin: chỉ được xóa chapter trong vòng 7 ngày kể từ lúc đăng.
+    // Non-admin: chỉ được xóa chapter trong vòng 72h kể từ lúc tạo.
     if (!isAdmin(user.role)) {
-      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+      const THREE_DAYS_MS = 72 * 60 * 60 * 1000;
       const createdAtRaw = (chapter as any)?.createdAt;
       const createdAt = createdAtRaw instanceof Date ? createdAtRaw : new Date(createdAtRaw);
       const ts = createdAt.getTime();
       const ageMs = Date.now() - ts;
-      if (!Number.isFinite(ts) || ageMs > SEVEN_DAYS_MS) {
+      if (!Number.isFinite(ts) || ageMs > THREE_DAYS_MS) {
         return Response.json(
-          { success: false, error: "Bạn không thể xoá chương đã đăng quá 7 ngày. Chỉ admin có thể xoá." },
+          { success: false, error: "Đã quá 72h từ khi tạo chương. Chỉ admin mới có thể xoá." },
           { status: 403 },
         );
       }

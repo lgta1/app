@@ -5,6 +5,21 @@ import { ChapterModel } from "~/database/models/chapter.model";
 import { ensureChapterSlug, ensureChapterSlugsForManga } from "~/database/helpers/chapter-slug.helper";
 import type { UserType } from "~/database/models/user.model";
 import { isAdmin } from "~/helpers/user.helper";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
+
+const withId = <T extends Record<string, any>>(doc: T) => ({
+  ...doc,
+  id: String((doc as any)?.id ?? (doc as any)?._id ?? ""),
+});
+
+const normalizeChapter = (doc: any) => {
+  if (!doc) return doc;
+  const urls: unknown[] = Array.isArray(doc?.contentUrls) ? doc.contentUrls : [];
+  return {
+    ...(doc as any),
+    contentUrls: urls.map((u) => (typeof u === "string" ? rewriteLegacyCdnUrl(u) : String(u ?? ""))),
+  };
+};
 
 export const getChaptersByMangaId = async (mangaId: string, user?: UserType) => {
   const manga = await getMangaPublishedById(mangaId, user);
@@ -20,12 +35,14 @@ export const getChaptersByMangaId = async (mangaId: string, user?: UserType) => 
     };
   }
 
-  const chapters = await ChapterModel.find(query).sort({ createdAt: -1 }).lean();
+  const chaptersRaw = await ChapterModel.find(query).sort({ createdAt: -1 }).lean();
+  const chapters = (chaptersRaw as any[]).map((c) => normalizeChapter(withId(c)));
 
   // Backfill stable slugs (one-time) to support SEO URLs.
   if (chapters.some((c: any) => !c?.slug)) {
     await ensureChapterSlugsForManga(manga.id);
-    return await ChapterModel.find(query).sort({ createdAt: -1 }).lean();
+    const refetched = await ChapterModel.find(query).sort({ createdAt: -1 }).lean();
+    return (refetched as any[]).map((c) => normalizeChapter(withId(c)));
   }
 
   return chapters;
@@ -41,25 +58,28 @@ export const getChapterByMangaIdAndNumber = async (
     return null;
   }
 
-  const chapter = await ChapterModel.findOne({
+  const chapterRaw = await ChapterModel.findOne({
     mangaId,
     chapterNumber,
   }).lean();
 
+  const chapter = chapterRaw ? withId(chapterRaw as any) : null;
+  const normalized = chapter ? normalizeChapter(chapter) : null;
+
   // Ensure stable slug exists for downstream canonical/links
-  if (chapter && !chapter?.slug) {
-    await ensureChapterSlug(chapter);
+  if (normalized && !normalized?.slug) {
+    await ensureChapterSlug(normalized);
   }
 
   if (
-    chapter?.status === CHAPTER_STATUS.APPROVED ||
-    chapter?.status === CHAPTER_STATUS.PENDING
+    normalized?.status === CHAPTER_STATUS.APPROVED ||
+    normalized?.status === CHAPTER_STATUS.PENDING
   ) {
-    return chapter;
+    return normalized;
   }
 
   if (manga.ownerId === user?.id || isAdmin(user?.role || "")) {
-    return chapter;
+    return normalized;
   }
 
   return null;
@@ -78,20 +98,23 @@ export const getChapterByMangaIdAndSlug = async (
   // Ensure legacy chapters can be resolved by slug.
   await ensureChapterSlugsForManga(manga.id);
 
-  const chapter = await ChapterModel.findOne({
+  const chapterRaw = await ChapterModel.findOne({
     mangaId,
     slug: chapterSlug,
   }).lean();
 
+  const chapter = chapterRaw ? withId(chapterRaw as any) : null;
+  const normalized = chapter ? normalizeChapter(chapter) : null;
+
   if (
-    chapter?.status === CHAPTER_STATUS.APPROVED ||
-    chapter?.status === CHAPTER_STATUS.PENDING
+    normalized?.status === CHAPTER_STATUS.APPROVED ||
+    normalized?.status === CHAPTER_STATUS.PENDING
   ) {
-    return chapter;
+    return normalized;
   }
 
   if (manga.ownerId === user?.id || isAdmin(user?.role || "")) {
-    return chapter;
+    return normalized;
   }
 
   return null;

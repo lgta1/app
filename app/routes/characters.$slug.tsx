@@ -43,7 +43,9 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
       sort = { viewNumber: -1 };
       break;
     case "likeNumber":
-      sort = { likeNumber: -1 };
+      // Legacy: `likeNumber` previously meant "Được yêu thích".
+      // Now map it to rating-based ordering.
+      sort = { ratingScore: -1, ratingTotalVotes: -1, viewNumber: -1 };
       break;
     case "completed":
       query.userStatus = MANGA_USER_STATUS.COMPLETED;
@@ -104,7 +106,7 @@ export default function CharactersPage() {
               options={[
                 { value: "updatedAt", label: "Mới cập nhật" },
                 { value: "viewNumber", label: "Đọc nhiều" },
-                { value: "likeNumber", label: "Được yêu thích" },
+                { value: "likeNumber", label: "Đánh giá cao" },
                 { value: "completed", label: "Đã hoàn thành" },
               ]}
               value={sortParam}

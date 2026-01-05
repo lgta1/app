@@ -14,7 +14,7 @@ const notFoundHeaders = {
 
 export async function loader({ request }: Route.LoaderArgs) {
   if (!POSTS_ENABLED) {
-    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+    throw new Response("Gone", { status: 410, headers: notFoundHeaders });
   }
   try {
     const url = new URL(request.url);
@@ -47,7 +47,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   if (!POSTS_ENABLED) {
-    throw new Response("Not Found", { status: 404, headers: notFoundHeaders });
+    throw new Response("Gone", { status: 410, headers: notFoundHeaders });
   }
   try {
     const user = await getUserInfoFromSession(request);

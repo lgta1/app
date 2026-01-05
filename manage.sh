@@ -23,11 +23,52 @@ pm2_exec() {
   sudo -u "$PM2_USER" -H bash -lc "$cmd"
 }
 
+get_instances() {
+  # Read from ecosystem.config.cjs: `const instances = N;`
+  local n
+  n=$(grep -E '^\s*const\s+instances\s*=\s*[0-9]+' ecosystem.config.cjs | head -n 1 | grep -Eo '[0-9]+' | head -n 1 || true)
+  if [[ -z "$n" ]]; then
+    echo 4
+    return
+  fi
+  echo "$n"
+}
+
+app_names() {
+  local n
+  n=$(get_instances)
+  local i
+  for ((i=1; i<=n; i++)); do
+    echo "ww-$i"
+  done
+}
+
+rolling_pm2() {
+  local action="$1"; shift
+  local delay_s="${1:-5}"; shift || true
+
+  local names=()
+  while IFS= read -r name; do
+    names+=("$name")
+  done < <(app_names)
+
+  local i
+  for ((i=0; i<${#names[@]}; i++)); do
+    local name="${names[$i]}"
+    echo "[rolling] $action $name (${i}/${#names[@]})"
+    # --update-env ensures refreshed env values from ecosystem/config
+    pm2_exec "$action" "$name" --update-env
+    if (( i < ${#names[@]} - 1 )); then
+      sleep "$delay_s"
+    fi
+  done
+}
+
 case "$1" in
   start)
     # PM2 đôi khi bị trạng thái lỗi (process id bị lệch/mất), gây crash khi restart theo ecosystem.
     # Start theo kiểu idempotent: xoá instances cũ của dự án rồi start lại.
-    pm2_exec delete ww-1 ww-2 >/dev/null 2>&1 || true
+    pm2_exec delete ww-1 ww-2 ww-3 ww-4 >/dev/null 2>&1 || true
     pm2_exec start ecosystem.config.cjs
     ;;
   stop)
@@ -38,6 +79,14 @@ case "$1" in
     ;;
   reload)
     pm2_exec reload all
+    ;;
+  rolling-restart)
+    # Sequential restart ww-1..ww-N with delay (seconds, default=5)
+    rolling_pm2 restart "${2:-5}"
+    ;;
+  rolling-reload)
+    # Sequential reload ww-1..ww-N with delay (seconds, default=5)
+    rolling_pm2 reload "${2:-5}"
     ;;
   status)
     pm2_exec status
@@ -57,7 +106,7 @@ case "$1" in
     pm2_exec start ecosystem.config.cjs
     ;;
   *)
-    echo "Usage: $0 {start|stop|restart|reload|status|logs|monitor|scale <number>}"
+    echo "Usage: $0 {start|stop|restart|reload|rolling-restart [delay_s]|rolling-reload [delay_s]|status|logs|monitor|scale <number>}"
     exit 1
     ;;
 esac

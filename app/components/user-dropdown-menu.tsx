@@ -31,7 +31,7 @@ export function UserDropdownMenu({
   const mobileItems: MenuEntry[] = [
     { href: "/random", label: "Random", Icon: Shuffle, group: 0 },
     { href: "/search/advanced", label: "Tìm kiếm nâng cao", Icon: Search, group: 0 },
-    { href: "/user/blacklist-tags", label: "Lọc thể loại không xem", Icon: ShieldBan, gapBelow: true, group: 0 },
+    { href: "/user/blacklist-tags", label: "Lọc thể loại không thích", Icon: ShieldBan, gapBelow: true, group: 0 },
     { href: "/profile#reading-history", label: "Lịch sử đọc", Icon: History, group: 1 },
     { href: "/profile#saved-stories", label: "Truyện đang theo dõi", Icon: BookmarkCheck, gapBelow: true, group: 1 },
     { href: "/profile", label: "Trang cá nhân", Icon: UserRound, group: 2 },
@@ -40,7 +40,7 @@ export function UserDropdownMenu({
   ];
 
   const desktopItems: MenuEntry[] = [
-    { href: "/user/blacklist-tags", label: "Lọc thể loại không xem", Icon: ShieldBan, gapBelow: true, group: 0 },
+    { href: "/user/blacklist-tags", label: "Lọc thể loại không thích", Icon: ShieldBan, gapBelow: true, group: 0 },
     { href: "/profile#reading-history", label: "Lịch sử đọc", Icon: History, group: 1 },
     { href: "/profile#saved-stories", label: "Truyện đang theo dõi", Icon: BookmarkCheck, gapBelow: true, group: 1 },
     { href: "/profile", label: "Trang cá nhân", Icon: UserRound, group: 2 },

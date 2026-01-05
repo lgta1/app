@@ -1,0 +1,63 @@
+# Thêm upstream block cho load balancing
+upstream ww_backend {
+    least_conn;  # Chọn server có ít connection nhất
+    server 127.0.0.1:3001 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:3002 max_fails=3 fail_timeout=30s;
+    keepalive 32;
+}
+
+server {
+    server_name vinahentai.com www.vinahentai.com;
+
+    # QUAN TRỌNG: Path cho Let's Encrypt verification
+    location ~ /.well-known/acme-challenge {
+        allow all;
+        root /var/www/html;
+    }
+
+    location / {
+        proxy_pass http://ww_backend;  # Thay đổi: trỏ đến upstream thay vì localhost:3000
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        
+        # Thêm headers quan trọng
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # Tăng buffer size nếu cần
+        proxy_buffering off;
+    }
+    
+    # Tăng client body size cho upload
+    client_max_body_size 100M;
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/vinahentai.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/vinahentai.com/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    if ($host = www.vinahentai.com) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    if ($host = vinahentai.com) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    server_name vinahentai.com www.vinahentai.com;
+    return 404; # managed by Certbot
+}
+

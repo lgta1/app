@@ -4,9 +4,9 @@ import { Link, useLoaderData } from "react-router-dom";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const url = new URL(request.url);
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
   return {
-    origin: url.origin,
+    origin: getCanonicalOrigin(request as any),
   };
 }
 
@@ -19,14 +19,14 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
     {
       name: "description",
       content:
-        "Vinahentai.com – Trang web đọc truyện hentai 18+ đa dạng thể loại: NTR, MILF, 3D, doujinshi… Truy cập ngay để trải nghiệm nội dung hentai hấp dẫn, không quảng cáo.",
+        "VinaHentai – Trang web đọc truyện 18+ đa dạng thể loại: NTR, MILF, 3D, doujinshi… Truy cập ngay để trải nghiệm nội dung hấp dẫn, không quảng cáo.",
     },
     { tagName: "link", rel: "canonical", href: canonicalUrl },
     { property: "og:title", content: "Giới thiệu Vinahentai – Website đọc truyện hentai 18+ chất lượng" },
     {
       property: "og:description",
       content:
-        "Vinahentai.com – Trang web đọc truyện hentai 18+ đa dạng thể loại: NTR, MILF, 3D, doujinshi… Truy cập ngay để trải nghiệm nội dung hentai hấp dẫn, không quảng cáo.",
+        "VinaHentai – Trang web đọc truyện 18+ đa dạng thể loại: NTR, MILF, 3D, doujinshi… Truy cập ngay để trải nghiệm nội dung hấp dẫn, không quảng cáo.",
     },
     { property: "og:url", content: canonicalUrl },
     { name: "twitter:card", content: "summary" },
@@ -34,7 +34,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
     {
       name: "twitter:description",
       content:
-        "Vinahentai.com – Trang web đọc truyện hentai 18+ đa dạng thể loại: NTR, MILF, 3D, doujinshi… Truy cập ngay để trải nghiệm nội dung hentai hấp dẫn, không quảng cáo.",
+        "VinaHentai – Trang web đọc truyện 18+ đa dạng thể loại: NTR, MILF, 3D, doujinshi… Truy cập ngay để trải nghiệm nội dung hấp dẫn, không quảng cáo.",
     },
   ];
 };
@@ -81,7 +81,7 @@ export default function GioiThieuPage() {
         <div className="mb-10 flex flex-col gap-6 lg:mb-12 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-4 lg:w-3/5">
             <p className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500/10 to-rose-500/10 px-3 py-1 text-sm font-semibold uppercase tracking-wide text-fuchsia-300">
-              Vinahentai.com
+              Vinahentai.xyz
             </p>
             <div className="rounded-2xl border border-white/5 bg-bgc-layer2/60 p-4 text-sm leading-relaxed text-txt-secondary">
               <strong className="text-txt-primary">Cảnh báo 18+:</strong> Đây là trang web 18+, nghiêm cấm người dưới 18 tuổi truy cập.

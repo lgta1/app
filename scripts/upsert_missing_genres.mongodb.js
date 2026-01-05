@@ -4,13 +4,24 @@
 
 let col;
 try {
-  if (typeof db !== 'undefined') {
-    // Đang chạy trong phiên mongosh đã kết nối qua CLI URI
-    print('Using current mongosh connection. db =', db.getName());
-    col = db.getCollection('genres');
-  } else {
-    const uri = process.env.MONGO_URL || 'mongodb://localhost:27017/test';
-    const dbName = uri.split('/').pop().split('?')[0];
+  let usingCurrentConnection = false;
+  try {
+    if (typeof db !== 'undefined' && db && typeof db.getName === 'function') {
+      // Đang chạy trong phiên mongosh đã kết nối qua CLI URI
+      print('Using current mongosh connection. db =', db.getName());
+      col = db.getCollection('genres');
+      usingCurrentConnection = true;
+    }
+  } catch (_) {
+    usingCurrentConnection = false;
+  }
+
+  if (!usingCurrentConnection) {
+    const uri =
+      process.env.MONGO_URL ||
+      'mongodb://admin:yourpassword@localhost:27017/test?authSource=admin';
+    let dbName = uri.split('/').pop().split('?')[0];
+    if (!dbName) dbName = 'test';
     print('Connecting via script. db =', dbName);
     const conn = new Mongo(uri);
     const _db = conn.getDB(dbName);
@@ -78,7 +89,10 @@ const missing = [
   {slug:'vampire',name:'Vampire',description:'Ma cà rồng quyến rũ, kết hợp yếu tố hút máu và mê hoặc dục tính.'},
   {slug:'vtuber',name:'Vtuber',description:'Nhân vật ảo do streamer điều khiển, xuất hiện trong nội dung gợi cảm hoặc tương tác độc đáo.'},
   {slug:'wormhole',name:'Wormhole',description:'Quan hệ qua cổng không gian hoặc lối xuyên chiều, tăng tính kỳ ảo mới lạ.'},
-  {slug:'zombie',name:'Zombie',description:'Xác sống xuất hiện trong bối cảnh kinh dị, xen yếu tố tình dục kỳ quái hoặc đen tối.'}
+  {slug:'zombie',name:'Zombie',description:'Xác sống xuất hiện trong bối cảnh kinh dị, xen yếu tố tình dục kỳ quái hoặc đen tối.'},
+  {slug:'tu-tien',name:'Tu Tiên',description:'Thể loại tu luyện/tiên hiệp: luyện công, thăng cấp, thế giới huyền huyễn.'},
+  {slug:'cuckold',name:'Cuckold',description:'Chủ đề ngoại tình/“cắm sừng” (cuckold), thường gắn với NTR hoặc yếu tố tâm lý.'},
+  {slug:'ngot',name:'Ngọt',description:'Nội dung ngọt ngào, lãng mạn, nhẹ nhàng (sweet/romance).'}
 ];
 
 let inserted = 0, updated = 0, skipped = 0;

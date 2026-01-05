@@ -7,10 +7,15 @@ interface GifMemeDialogProps {
   onSelect: (url: string) => void;
   trigger?: React.ReactNode;
   // Optional override for base CDN path
-  baseUrl?: string; // e.g. https://cdn.vinahentai.com/gif-meme
+  baseUrl?: string; // e.g. https://cdn.vinahentai.xyz/gif-meme
 }
 
-const DEFAULT_BASE = "https://cdn.vinahentai.com/gif-meme";
+const DEFAULT_BASE =
+  ((import.meta as any)?.env?.VITE_CDN_BASE as string | undefined)
+    ? `${(import.meta as any).env.VITE_CDN_BASE}/gif-meme`
+    : ((globalThis as any)?.process?.env?.CDN_BASE as string | undefined)
+      ? `${(globalThis as any).process.env.CDN_BASE}/gif-meme`
+      : "https://cdn.vinahentai.xyz/gif-meme";
 
 export default function GifMemeDialog({
   isOpen,

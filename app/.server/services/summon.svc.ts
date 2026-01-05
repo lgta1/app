@@ -13,6 +13,7 @@ import { WaifuModel } from "~/database/models/waifu.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { cleanupUserSummonHistory } from "~/helpers/user.helper";
 import { updateUserExp } from "~/helpers/user-level.helper";
+import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
 const RATE_UP_PERCENT = 55;
 
@@ -89,6 +90,16 @@ export const summon = async (
 
     const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
 
+    try {
+      const nextImg = normalizeWaifuImageUrl((expItem as any)?.image);
+      if (expItem && nextImg) (expItem as any).image = nextImg;
+    } catch {}
+
+    if (expItem && typeof (expItem as any).image === "string") {
+      const nextImg = normalizeWaifuImageUrl((expItem as any).image);
+      if (nextImg) (expItem as any).image = nextImg;
+    }
+
     await cleanupUserSummonHistory(user.id, 50);
 
     // Debug: log exp item created
@@ -127,6 +138,16 @@ export const summon = async (
     const waifuCount = await WaifuModel.countDocuments({ stars: itemStar });
     const waifuIndex = Math.floor(Math.random() * waifuCount);
     waifu = await WaifuModel.findOne({ stars: itemStar }).skip(waifuIndex).lean();
+  }
+
+  try {
+    const nextImg = normalizeWaifuImageUrl((waifu as any)?.image);
+    if (waifu && nextImg) (waifu as any).image = nextImg;
+  } catch {}
+
+  if (waifu && typeof (waifu as any).image === "string") {
+    const nextImg = normalizeWaifuImageUrl((waifu as any).image);
+    if (nextImg) (waifu as any).image = nextImg;
   }
 
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");

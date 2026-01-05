@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { isMobile } from "react-device-detect";
-import { Eye, Heart } from "lucide-react";
+import { Eye } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
@@ -18,6 +18,13 @@ export default function RatingItem({
   /** Tên chương mới nhất (tùy chọn) để hiển thị pill hoặc text theo quy tắc */
   latestChapterTitle?: string | null;
 }) {
+  const THUMB_SCALE = 1.4;
+  const BASE_SQUARE_PX = 56; // 14 * 4px
+  const BASE_PORTRAIT_WIDTH_PX = 56;
+
+  const squareSizePx = BASE_SQUARE_PX;
+  const portraitWidthPx = BASE_PORTRAIT_WIDTH_PX * THUMB_SCALE;
+
   const color =
     (index === 1 && "text-[#FFE133]") ||
     (index === 2 && "text-[#5BD8FA]") ||
@@ -27,15 +34,23 @@ export default function RatingItem({
   const target = buildMangaUrl(manga);
   const linkProps = isMobile ? { href: target } : { to: target };
 
+  const ratingChaptersWithVotes = Number((manga as any)?.ratingChaptersWithVotes ?? 0);
+  const ratingTotalVotes = Number((manga as any)?.ratingTotalVotes ?? 0);
+  const ratingScore = Number((manga as any)?.ratingScore ?? 0);
+  const ratingDisplay =
+    ratingChaptersWithVotes < 3 || ratingTotalVotes < 5
+      ? "0.0/0"
+      : `${Math.max(0, Math.min(10, ratingScore)).toFixed(1)}/10`;
+
   return (
     <Wrapper {...linkProps} className="flex items-center gap-3 p-3">
       <span className={`w-5 text-center text-base font-semibold ${color}`}>{index}</span>
       <div
-        className={
-          usePortraitThumb
-            ? "h-[84px] w-[56px] flex-shrink-0 overflow-hidden rounded-lg bg-black/20"
-            : "h-14 w-14 flex-shrink-0 overflow-hidden rounded"
-        }
+        className={[
+          "flex-shrink-0 overflow-hidden bg-black/20",
+          usePortraitThumb ? "rounded-lg aspect-[2/3]" : "rounded aspect-square",
+        ].join(" ")}
+        style={{ width: usePortraitThumb ? portraitWidthPx : squareSizePx }}
       >
         <img
           src={manga.poster}
@@ -56,9 +71,8 @@ export default function RatingItem({
             </span>
           </div>
           <div className="flex items-center gap-1.5 backdrop-blur-md">
-            <Heart className="text-txt-primary h-3 w-3" />
             <span className="text-txt-primary text-xs font-medium">
-              {(manga.likeNumber ?? 0).toLocaleString("vi-VN")}
+              {ratingDisplay}
             </span>
           </div>
         </div>

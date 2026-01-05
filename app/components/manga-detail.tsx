@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
-import { Eye, Heart, Bookmark, BookmarkCheck, Info, Loader2, UploadCloud } from "lucide-react";
+import { Eye, Bookmark, BookmarkCheck, Info, Loader2, UploadCloud } from "lucide-react";
 
-import { FEATURED_GENRE_SLUGS } from "~/constants/featured-genres";
+import { FEATURED_GENRE_PRIORITY_RANK, FEATURED_GENRE_SLUGS } from "~/constants/featured-genres";
 import { MANGA_USER_STATUS } from "~/constants/manga";
 import type { ChapterType } from "~/database/models/chapter.model";
 import type { MangaType } from "~/database/models/manga.model";
@@ -180,8 +180,20 @@ function CollapsibleGenreChips({ genres, genreDisplayMap }: CollapsibleGenreChip
     return { label, slug, isFeatured: FEATURED_GENRE_SLUGS.has(slug) };
   });
   const ordered = list.slice().sort((a, b) => {
-    if (a.isFeatured === b.isFeatured) return 0;
-    return a.isFeatured ? -1 : 1;
+    const aIsFeatured = a.isFeatured;
+    const bIsFeatured = b.isFeatured;
+
+    if (aIsFeatured && bIsFeatured) {
+      const aRank = FEATURED_GENRE_PRIORITY_RANK[a.slug] ?? FEATURED_GENRE_PRIORITY_RANK[a.slug.replace(/-/g, "")] ?? Number.POSITIVE_INFINITY;
+      const bRank = FEATURED_GENRE_PRIORITY_RANK[b.slug] ?? FEATURED_GENRE_PRIORITY_RANK[b.slug.replace(/-/g, "")] ?? Number.POSITIVE_INFINITY;
+      if (aRank !== bRank) return aRank - bRank;
+      return a.slug.localeCompare(b.slug);
+    }
+
+    if (aIsFeatured !== bIsFeatured) return aIsFeatured ? -1 : 1;
+
+    // Non-featured: sort A–Z by slug
+    return a.slug.localeCompare(b.slug);
   });
   const showAll = ordered.length <= 10;
   const visible = showAll ? ordered : ordered.slice(0, 8);
@@ -455,6 +467,7 @@ export function MangaDetail({
     const slugs = Array.isArray((manga as any)?.authorSlugs)
       ? ((manga as any).authorSlugs as string[])
       : [];
+    const authorMangaCountBySlug = ((manga as any)?.authorMangaCountBySlug ?? {}) as Record<string, number>;
 
     if (names.length > 0) {
       return names
@@ -462,7 +475,10 @@ export function MangaDetail({
           const label = String(name || "").trim();
           if (!label) return null;
           const slug = String(slugs[idx] || toSlug(label));
-          return { label, slug };
+          const count = typeof authorMangaCountBySlug[String(slug).toLowerCase()] === "number"
+            ? authorMangaCountBySlug[String(slug).toLowerCase()]
+            : undefined;
+          return { label, slug, count };
         })
         .filter(Boolean) as Array<{ label: string; slug: string }>;
     }
@@ -471,7 +487,7 @@ export function MangaDetail({
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean)
-      .map((label) => ({ label, slug: toSlug(label) }));
+        .map((label) => ({ label, slug: toSlug(label), count: undefined }));
   }, [manga, author]);
   const doujinshiNames = Array.isArray((manga as any)?.doujinshiNames) ? (manga as any).doujinshiNames as string[] : [];
   const doujinshiSlugs = Array.isArray((manga as any)?.doujinshiSlugs) ? (manga as any).doujinshiSlugs as string[] : [];
@@ -551,9 +567,6 @@ export function MangaDetail({
   const [isFollowing, setIsFollowing] = useState(false);
   const [followCount, setFollowCount] = useState<number>(followNumber || 0);
   const [isLoadingFollow, setIsLoadingFollow] = useState(false);
-
-  const [isLiked, setIsLiked] = useState(false);
-  const [isLoadingLike, setIsLoadingLike] = useState(false);
 
   const canDropPoster = posterDropEnabled && typeof onPosterDrop === "function";
   const posterHintMessage = posterDropHint || "Thả ảnh để cập nhật";
@@ -683,19 +696,8 @@ export function MangaDetail({
       }
     };
 
-    const checkLikeStatus = async () => {
-      try {
-        const response = await fetch(`/api/manga-like?mangaId=${mangaIdSafe}`);
-        const data = await response.json();
-        if (response.ok) setIsLiked(data.isLiked);
-      } catch (error) {
-        console.error("Error checking like status:", error);
-      }
-    };
-
     if (mangaIdSafe) {
       checkFollowStatus();
-      checkLikeStatus();
     }
   }, [mangaIdSafe]);
 
@@ -824,39 +826,19 @@ useEffect(() => {
     }
   };
 
-  const handleLikeToggle = async () => {
-    if (isLoadingLike) return;
-    setIsLoadingLike(true);
-
-    const formData = new FormData();
-    formData.append("intent", isLiked ? "unlike" : "like");
-    formData.append("mangaId", mangaIdSafe);
-
-    try {
-      const response = await fetch("/api/manga-like", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setIsLiked(data.isLiked);
-        toast.success(data.message);
-      } else {
-        toast.error(data.error || "Có lỗi xảy ra");
-      }
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      toast.error("Có lỗi xảy ra khi xử lý yêu cầu");
-    } finally {
-      setIsLoadingLike(false);
-    }
-  };
-
   // Rating feature removed – handler deleted
+
+  const ratingChaptersWithVotes = Math.max(0, Number((manga as any)?.ratingChaptersWithVotes) || 0);
+  const ratingTotalVotes = Math.max(0, Number((manga as any)?.ratingTotalVotes) || 0);
+  const ratingScore = Math.max(0, Math.min(10, Number((manga as any)?.ratingScore) || 0));
+  const ratingDisplay = useMemo(() => {
+    if (ratingChaptersWithVotes < 3 || ratingTotalVotes < 5) return "0.0/0";
+    return `${ratingScore.toFixed(1)}/10`;
+  }, [ratingChaptersWithVotes, ratingTotalVotes, ratingScore]);
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-10 lg:flex-row">
+      <div className="flex flex-col gap-10 portrait:gap-6 sm:portrait:gap-10 lg:flex-row">
         {/* Ảnh bìa */}
         <div
           className={`relative flex flex-shrink-0 items-center justify-center ${
@@ -869,7 +851,9 @@ useEffect(() => {
           <img
             src={poster}
             alt={`Bìa truyện ${title}`}
-            className="h-96 w-64 rounded-lg object-cover"
+            width={256}
+            height={384}
+            className="h-96 w-64 portrait:w-72 sm:portrait:w-64 rounded-lg object-cover"
             loading="lazy"
             decoding="async"
           />
@@ -951,17 +935,25 @@ useEffect(() => {
                 <div className="text-txt-secondary w-28 text-base font-medium">Tác giả:</div>
                 {/* BEGIN <feature> AUTHORS_CHIP_RECT_BRAND_TINT */}
                 <div className="flex flex-wrap gap-2 justify-self-start">
-                  {authorItems.map(({ label: name, slug }) => {
+                  {authorItems.map(({ label: name, slug, count }: any) => {
+                    const countDisplay = typeof count === "number" ? Math.max(0, count) : null;
                     if (isMobile) {
                       return (
                         <a
                           key={slug}
                           href={`/authors/${slug}`}
-                          className={chipRectVariants.brandTint + " w-fit"}
+                          className="group inline-flex h-8 max-w-[220px] items-stretch overflow-hidden rounded-md border border-[rgba(211,115,255,.22)] text-[#EBD7FF]"
                           title={name}
                           aria-label={`Xem tác giả ${name}`}
                         >
-                          <span className="capitalize">{name}</span>
+                          <span className="flex min-w-0 items-center bg-[rgba(211,115,255,.10)] px-3 group-hover:bg-[rgba(211,115,255,.14)]">
+                            <span className="truncate capitalize">{name}</span>
+                          </span>
+                          {countDisplay !== null ? (
+                            <span className="flex items-center bg-[rgba(211,115,255,.18)] px-2 text-xs font-semibold tabular-nums text-[#EBD7FF]/90 group-hover:bg-[rgba(211,115,255,.22)]">
+                              {countDisplay}
+                            </span>
+                          ) : null}
                         </a>
                       );
                     }
@@ -969,11 +961,18 @@ useEffect(() => {
                       <Link
                         key={slug}
                         to={`/authors/${slug}`}
-                        className={chipRectVariants.brandTint + " w-fit"}
+                        className="group inline-flex h-8 max-w-[220px] items-stretch overflow-hidden rounded-md border border-[rgba(211,115,255,.22)] text-[#EBD7FF]"
                         title={name}
                         aria-label={`Xem tác giả ${name}`}
                       >
-                        <span className="capitalize">{name}</span>
+                        <span className="flex min-w-0 items-center bg-[rgba(211,115,255,.10)] px-3 group-hover:bg-[rgba(211,115,255,.14)]">
+                          <span className="truncate capitalize">{name}</span>
+                        </span>
+                        {countDisplay !== null ? (
+                          <span className="flex items-center bg-[rgba(211,115,255,.18)] px-2 text-xs font-semibold tabular-nums text-[#EBD7FF]/90 group-hover:bg-[rgba(211,115,255,.22)]">
+                            {countDisplay}
+                          </span>
+                        ) : null}
                       </Link>
                     );
                   })}
@@ -1097,21 +1096,14 @@ useEffect(() => {
           {/* Buttons (ẩn nếu hideActions) */}
           {!hideActions && (
           <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-            {/* Yêu thích (compact, giữ text-sm) */}
-            <button
-              onClick={handleLikeToggle}
-              disabled={isLoadingLike}
-              className={`border-lav-500 text-txt-focus hover:bg-lav-500/10 flex items-center justify-center gap-1 rounded-lg border px-3 py-2 transition-colors ${isLoadingLike ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
-              aria-pressed={isLiked}
-              aria-label={isLiked ? "Bỏ thích" : "Yêu thích"}
+            {/* Điểm truyện (tổng hợp từ đánh giá các chương) */}
+            <div
+              className="border-lav-500 text-txt-focus flex items-center justify-center gap-1 rounded-lg border px-3 py-2"
+              aria-label="Điểm truyện"
+              title="Dựa trên đánh giá từ các chương"
             >
-              <Heart
-                className={`h-4 w-4 ${isLiked ? "fill-txt-focus text-txt-focus" : ""}`}
-              />
-              <span className="text-sm font-semibold">
-                {isLiked ? "Đã thích" : "Yêu thích"}
-              </span>
-            </button>
+              <span className="text-sm font-semibold">{ratingDisplay}</span>
+            </div>
 
             {/* Theo dõi (compact, giữ text-sm) */}
             <button

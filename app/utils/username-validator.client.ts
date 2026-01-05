@@ -5,13 +5,11 @@ export interface UsernameValidationResult {
 
 export const USERNAME_CHANGE_COST = 2000;
 
-// Client-only validator: Unicode letters (\p{L}) + digits + spaces, 6–15 chars (by code points)
+// Client-only validator: Unicode letters (\p{L}) + digits + spaces, 1–15 chars (by code points)
 export function validateUsername(username: string): UsernameValidationResult {
-  if (!username) return { isValid: false, error: "Username là bắt buộc" };
-
-  const trimmed = username.trim().normalize("NFC");
+  const trimmed = (username ?? "").trim().normalize("NFC");
   const len = Array.from(trimmed).length;
-  if (len < 6) return { isValid: false, error: "Username phải có ít nhất 6 ký tự" };
+  if (len < 1) return { isValid: false, error: "Username là bắt buộc" };
   if (len > 15) return { isValid: false, error: "Username không được vượt quá 15 ký tự" };
 
   const unicodeLettersDigitsSpaces = /^[\p{L}0-9 ]+$/u;

@@ -1,9 +1,9 @@
 import {
-  type LoaderFunctionArgs,
-  type MetaFunction,
   useLoaderData,
   useSearchParams,
 } from "react-router-dom";
+
+import type { Route } from "./+types/genres.$slug";
 
 import {
   getTotalMangaCount,
@@ -17,7 +17,7 @@ import { MANGA_CONTENT_TYPE, MANGA_STATUS, MANGA_USER_STATUS } from "~/constants
 import { GenresModel, type GenresType } from "~/database/models/genres.model";
 import type { MangaType } from "~/database/models/manga.model";
 
-export const meta: MetaFunction = ({ data }: any) => {
+export const meta: Route.MetaFunction = ({ data }) => {
   if (!data?.genre) {
     return [
       { title: "Thể loại truyện | Vinahentai" },
@@ -35,12 +35,13 @@ export const meta: MetaFunction = ({ data }: any) => {
       content:
         data.genre.description || `Khám phá thể loại ${data.genre.name} tại Vinahentai`,
     },
-    data?.canonical ? { tagName: "link", rel: "canonical", href: data.canonical } : null,
-  ].filter(Boolean as any);
+    ...(data?.canonical ? [{ tagName: "link", rel: "canonical", href: data.canonical }] : []),
+  ];
 };
 
-export async function loader({ params, request }: LoaderFunctionArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   const { sharedTtlCache } = await import("~/.server/utils/ttl-cache");
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
 
   const { slug } = params;
   if (!slug) {
@@ -80,7 +81,9 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
         sort = { viewNumber: -1 };
         break;
       case "likeNumber":
-        sort = { likeNumber: -1 };
+        // Legacy: `likeNumber` previously meant "Được yêu thích".
+        // Now map it to rating-based ordering.
+        sort = { ratingScore: -1, ratingTotalVotes: -1, viewNumber: -1 };
         break;
       case "completed":
         query.userStatus = MANGA_USER_STATUS.COMPLETED;
@@ -115,10 +118,11 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     throw new Response("Không tìm thấy thể loại", { status: 404 });
   }
 
-  return Response.json({
+  const origin = getCanonicalOrigin(request as any);
+  return {
     ...cached,
-    canonical: `${url.origin}/genres/${cached.genre.slug}`,
-  });
+    canonical: `${origin}/genres/${cached.genre.slug}`,
+  };
 }
 
 export default function Genres() {
@@ -165,7 +169,7 @@ export default function Genres() {
                 { value: "updatedAt", label: "Mới cập nhật" },
                 { value: "oldest", label: "Cũ nhất" },
                 { value: "viewNumber", label: "Đọc nhiều" },
-                { value: "likeNumber", label: "Được yêu thích" },
+                { value: "likeNumber", label: "Đánh giá cao" },
                 { value: "completed", label: "Đã hoàn thành" },
               ]}
               value={sortParam}

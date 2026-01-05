@@ -19,20 +19,22 @@ body {
    These values are conservative defaults; adjust if your header/banner
    CSS changes. Using CSS vars ensures SSR and client render match. */
 :root {
-  /* increase header defaults slightly to match fixed header actual height
-     so the page content sits below the header and doesn't overlap */
-  /* bump mobile header height by +8px to push main content further down on small screens */
-  /* mobile default increased earlier; include the extra 4px offset here */
-  --site-header-height: 100px; /* mobile default (96 + 4) */
-  --site-banner-height: 36px;
+  /* Fixed header height (must be stable from first paint). */
+  --site-header-height-base: 96px;
+  --site-banner-height-base: 36px;
+
+  /* Derived vars used by layout spacers; may be overridden at runtime by
+     the Header component after hydration to match the measured height. */
+  --site-header-height: var(--site-header-height-base);
+  --site-banner-height: var(--site-banner-height-base);
 }
 
 @media (min-width: 768px) {
   :root {
-    /* desktop default - increased to ensure spacer covers both rows
-       include the extra 4px offset here */
-    --site-header-height: 124px; /* desktop default (120 + 4) */
-    --site-banner-height: 48px;
+    --site-header-height-base: 112px;
+    --site-banner-height-base: 48px;
+    --site-header-height: var(--site-header-height-base);
+    --site-banner-height: var(--site-banner-height-base);
   }
 
   /* Desktop/Tablet: stronger but still soft glow (center alpha ~0.3) */
@@ -47,5 +49,25 @@ body {
     );
     background-repeat: no-repeat;
     background-size: 120% 100%;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* Intentionally no default zoom on desktop.
+     Layout must be computed from viewport, not browser zoom/DPI. */
+}
+
+@media (min-width: 900px) {
+  /* Desktop scale: emulate ~90% browser zoom in a standards-based way.
+     Tailwind sizing is largely rem-based, so adjusting root font-size
+     gives a stable, cross-browser global scale without using `zoom`.
+     Keep SSR spacers consistent by scaling the fixed header/banner vars. */
+  html {
+    font-size: 90%;
+  }
+
+  :root {
+    --site-header-height: calc(var(--site-header-height-base) * 0.9);
+    --site-banner-height: calc(var(--site-banner-height-base) * 0.9);
   }
 }

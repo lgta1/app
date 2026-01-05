@@ -6,9 +6,12 @@ import LeaderboardUserWaifuItem from "~/components/leaderboard-user-waifu-item";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { Pagination } from "~/components/pagination";
 import { SummonNavigationBar } from "~/components/summon-navigation-bar";
+import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { usePagination } from "~/hooks/use-pagination";
 
-export async function loader() {
+import type { Route } from "./+types/waifu.leaderboard";
+
+export async function loader({}: Route.LoaderArgs) {
   try {
     const banners = await getAllOpenedBanners();
 
@@ -28,15 +31,15 @@ export async function loader() {
       id: "leaderboard",
     });
 
-    return { navItems };
+    return Response.json({ navItems });
   } catch (error) {
     console.error("Error loading banners:", error);
     throw redirect("/");
   }
 }
 
-export default function WaifuSummon() {
-  const { navItems } = useLoaderData<typeof loader>();
+export default function WaifuSummon({ loaderData }: Route.ComponentProps) {
+  const { navItems } = loaderData;
 
   const {
     data: leaderboardData,
@@ -45,7 +48,7 @@ export default function WaifuSummon() {
     isLoading,
     error,
     goToPage,
-  } = usePagination({
+  } = usePagination<UserWaifuLeaderboardType>({
     apiUrl: "/api/waifu/leaderboard",
     limit: 5,
   });

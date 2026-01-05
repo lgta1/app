@@ -1,4 +1,6 @@
-import { Link, type LoaderFunctionArgs, type MetaFunction, useLoaderData } from "react-router-dom";
+import { Link } from "react-router-dom";
+
+import type { Route } from "./+types/truyen-hentai._index";
 
 import type { MangaType } from "~/database/models/manga.model";
 
@@ -6,7 +8,7 @@ type PillarManga = Pick<MangaType, "id" | "slug" | "title" | "poster" | "updated
   latestChapterTitle?: string | null;
 };
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   // Dynamic imports keep server-only code out of client bundles.
   const [leaderboardQuery, mangaQuery] = await Promise.all([
     import("@/queries/leaderboad.query"),
@@ -16,7 +18,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { getLeaderboard } = leaderboardQuery as any;
   const { getNewManga } = mangaQuery as any;
 
-  const url = new URL(request.url);
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  const origin = getCanonicalOrigin(request as any);
 
   const [weeklyRaw, monthlyRaw, updatedRaw] = await Promise.all([
     getLeaderboard("weekly"),
@@ -63,14 +66,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const updatedCandidates = (updatedRaw?.manga ?? []) as any[];
   const updated = updatedCandidates.filter((m) => Number((m as any)?.chapters ?? 0) > 0).slice(0, 10) as PillarManga[];
 
-  return Response.json({
-    origin: url.origin,
+  return {
+    origin,
     featured,
     updated,
-  });
+  };
 }
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
+export const meta: Route.MetaFunction = ({ data }) => {
   const origin = data?.origin ?? "";
   const canonical = origin ? `${origin}/truyen-hentai` : "/truyen-hentai";
 
@@ -88,8 +91,8 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
   ];
 };
 
-export default function TruyenHentaiPillar() {
-  const { featured, updated, origin } = useLoaderData<typeof loader>();
+export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps) {
+  const { featured, updated, origin } = loaderData;
 
   const canonicalUrl = `${origin}/truyen-hentai`;
 

@@ -1,0 +1,27 @@
+== banners API ==
+status=200
+legacy_cdn_count=0
+sample_banner_id=68f4fcd1579f7dc74d18cbb3
+sample_imageUrl=https://cdn.vinahentai.xyz/banner-images/iomaya_1_4-1757344513567-dd6cb1db-1760885967764-f41c721f.webp
+sample_mobileImageUrl=https://cdn.vinahentai.xyz/banner-images/iomaya_1_4-1757344513567-dd6cb1db-1760885968045-8f163f6e.webp
+
+== /inventory HTML ==
+status=200
+legacy_cdn_count=0
+legacy_site_url_count=0
+
+== /waifu/summon/:id HTML ==
+status=200
+legacy_cdn_count=0
+legacy_site_url_count=0
+
+== static assets HEAD ==
+/videos/background.webp -> status=200 content-type=image/webp
+/videos/background.mp4 -> status=404 content-type=None
+/videos/summon.mp4 -> status=200 content-type=video/mp4
+/images/waifu/card-background.webp -> status=404 content-type=None
+/images/waifu/card-mask.webp -> status=404 content-type=None
+
+== summon POST (unauth) ==
+status=200
+body_preview=<!DOCTYPE html><html lang="vi"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="image" href="/images/logo2.webp"/><link rel="preload" as="image" href="/images/icons/waifu-icon.png"/><link rel="preload" as="image" href="/images/

@@ -25,6 +25,11 @@ import { useFileOperations } from "~/hooks/use-file-operations";
 import { resolveMangaHandle } from "~/database/helpers/manga-slug.helper";
 import { normalizePosterImage } from "~/utils/image-compression.utils";
 import { toSlug } from "~/utils/slug.utils";
+import {
+  ANTI_VANILLA_TAGS,
+  normalizeGenreSlug,
+  VANILLA_GENRE_SLUG,
+} from "~/constants/vanilla-anti-tags";
 
 export const meta: MetaFunction = () => {
   return [
@@ -66,6 +71,32 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const mangaId = String((target as any).id ?? (target as any)._id ?? "");
     const nextHandle = target.slug || mangaId;
 
+    // Normalize + validate genres payload (avoid generic errors when payload is malformed)
+    let parsedGenres: string[] = [];
+    try {
+      const raw = JSON.parse((formData.get("genres") as string) || "[]");
+      parsedGenres = Array.isArray(raw) ? raw : [];
+    } catch {
+      throw new BusinessError("Dữ liệu thể loại không hợp lệ");
+    }
+    parsedGenres = parsedGenres
+      .map((g: any) => {
+        if (typeof g === "string") return normalizeGenreSlug(g);
+        if (g && typeof g === "object") {
+          return normalizeGenreSlug((g as any).slug ?? (g as any).value ?? (g as any).id ?? "");
+        }
+        return "";
+      })
+      .filter(Boolean);
+
+    // Guard: vanilla can't coexist with any anti-vanilla tag
+    if (
+      parsedGenres.includes(VANILLA_GENRE_SLUG) &&
+      parsedGenres.some((g) => ANTI_VANILLA_TAGS.has(g))
+    ) {
+      throw new BusinessError("Có thể loại trái ngược với vanilla đã được chọn");
+    }
+
     const mangaData: Partial<MangaType> = {
       title: (formData.get("title") as string) || "",
       alternateTitle: (formData.get("alternateTitle") as string) || "",
@@ -75,7 +106,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       authorSlugs: JSON.parse((formData.get("authorSlugs") as string) || "[]"),
       keywords: (formData.get("keywords") as string) || "",
       userStatus: Number(formData.get("userStatus") || MANGA_USER_STATUS.ON_GOING),
-      genres: JSON.parse((formData.get("genres") as string) || "[]"),
+      genres: parsedGenres,
       contentType: isCosplay ? MANGA_CONTENT_TYPE.COSPLAY : MANGA_CONTENT_TYPE.MANGA,
       // Optional denormalized relation arrays (name + slug)
       doujinshiNames: JSON.parse((formData.get("doujinshiNames") as string) || "[]"),
@@ -92,9 +123,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     await updateManga(request, mangaId, mangaData);
     const overrideUpdatedAt = formData.get("overrideUpdatedAt");
     if (isAdmin(userInfo.role) && typeof overrideUpdatedAt === "string" && overrideUpdatedAt.trim()) {
-      const d = new Date(overrideUpdatedAt.trim());
-      if (!isNaN(d.getTime())) {
-        await MangaModel.findByIdAndUpdate(mangaId, { updatedAt: d }, { timestamps: false });
+      try {
+        const d = new Date(overrideUpdatedAt.trim());
+        if (!isNaN(d.getTime())) {
+          await MangaModel.findByIdAndUpdate(mangaId, { updatedAt: d }, { timestamps: false });
+        }
+      } catch (e) {
+        // Best-effort only: truyện đã cập nhật thành công, không nên báo lỗi cho user.
+        console.error("overrideUpdatedAt failed", e);
       }
     }
 
@@ -150,7 +186,15 @@ export default function EditStory() {
     author: manga.author || "",
     keywords: manga.keywords || "",
     userStatus: (manga as any).userStatus ?? MANGA_USER_STATUS.ON_GOING,
-    genres: manga.genres || [],
+    genres: (Array.isArray((manga as any).genres) ? (manga as any).genres : [])
+      .map((g: any) => {
+        if (typeof g === "string") return normalizeGenreSlug(g);
+        if (g && typeof g === "object") {
+          return normalizeGenreSlug((g as any).slug ?? (g as any).value ?? (g as any).id ?? "");
+        }
+        return "";
+      })
+      .filter(Boolean),
     poster: null,
     alternateTitle: (manga as any).alternateTitle || "",
   });
@@ -177,12 +221,34 @@ export default function EditStory() {
   const formRef = useRef<HTMLFormElement>(null);
 
   const handleGenreToggle = (genreSlug: string) => {
-    setFormData((prev: FormDataShape) => ({
-      ...prev,
-      genres: prev.genres.includes(genreSlug)
-        ? prev.genres.filter((g: string) => g !== genreSlug)
-        : [...prev.genres, genreSlug],
-    }));
+    const slug = normalizeGenreSlug(genreSlug);
+    setFormData((prev: FormDataShape) => {
+      const current = Array.isArray(prev.genres)
+        ? prev.genres.map(normalizeGenreSlug).filter(Boolean)
+        : [];
+      const isRemoving = current.includes(slug);
+
+      if (isRemoving) {
+        return { ...prev, genres: current.filter((g) => g !== slug) };
+      }
+
+      const hasVanilla = current.includes(VANILLA_GENRE_SLUG);
+      const hasAnti = current.some((g) => ANTI_VANILLA_TAGS.has(g));
+
+      // Block adding vanilla when anti-vanilla already exists
+      if (slug === VANILLA_GENRE_SLUG && hasAnti) {
+        toast.error("Có thể loại trái ngược với vanilla đã được chọn");
+        return prev;
+      }
+
+      // Block adding any anti-vanilla tag when vanilla already exists
+      if (hasVanilla && ANTI_VANILLA_TAGS.has(slug)) {
+        toast.error("truyện đã có vanilla, không được phép thêm thể loại trái ngược");
+        return prev;
+      }
+
+      return { ...prev, genres: [...current, slug] };
+    });
   };
 
   const handleInputChange = (field: keyof FormDataShape, value: string) => {

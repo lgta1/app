@@ -21,14 +21,15 @@ interface RecentCommentsFeedProps {
   initialPage?: number;
   initialTotalPages?: number;
   limit?: number; // số lượng tối đa muốn hiển thị mỗi lần tải (mặc định 5)
-  showPagination?: boolean; // ẩn/hiện phân trang (mặc định false cho Index)
+  showPagination?: boolean; // ẩn/hiện phân trang
 }
 
-export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages, limit = 5, showPagination = false }: RecentCommentsFeedProps) {
+export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages, limit = 5, showPagination = true }: RecentCommentsFeedProps) {
+  const pageSize = 5;
   const { data, isLoading, error, currentPage, totalPages, goToPage } =
     usePagination<FeedItem>({
       apiUrl: "/api/comments/recent",
-      limit,
+      limit: pageSize,
       initialData,
       initialPage,
       initialTotalPages,
@@ -122,12 +123,14 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
                     className="ml-2 flex flex-shrink-0 overflow-hidden rounded-md"
                     aria-label={c.manga?.title}
                   >
-                    <img
-                      src={c.manga.poster}
-                      alt=""
-                      className="h-10 w-7 object-cover opacity-80 sm:h-12 sm:w-8"
-                      loading="lazy"
-                    />
+                    <div className="w-[39.2px] sm:w-[44.8px] aspect-[2/3]">
+                      <img
+                        src={c.manga.poster}
+                        alt=""
+                        className="h-full w-full object-cover opacity-80"
+                        loading="lazy"
+                      />
+                    </div>
                   </Link>
                 ) : null}
               </li>
@@ -141,24 +144,22 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
       )}
 
       {!isLoading && showPagination && totalPages > 1 && (
-        <div className="flex items-center justify-center px-3 py-3">
-          <button
-              className="mr-2 rounded-md bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 disabled:opacity-40"
-            onClick={() => goToPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage <= 1}
-          >
-            Trước
-          </button>
-          <span className="text-xs text-white/60">
-            {currentPage}/{totalPages}
-          </span>
-          <button
-            className="ml-2 rounded-md bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 disabled:opacity-40"
-            onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage >= totalPages}
-          >
-            Sau
-          </button>
+        <div className="px-3 pb-2 pt-1">
+          {currentPage === 1 ? (
+            <button
+              onClick={() => goToPage(2)}
+              className="w-full rounded-md bg-white/5 py-2 text-sm font-medium text-white hover:bg-white/10"
+            >
+              Trang 2 ▸
+            </button>
+          ) : (
+            <button
+              onClick={() => goToPage(1)}
+              className="w-full rounded-md bg-white/5 py-2 text-sm font-medium text-white hover:bg-white/10"
+            >
+              ◂ Trang 1
+            </button>
+          )}
         </div>
       )}
     </div>

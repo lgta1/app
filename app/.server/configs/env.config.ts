@@ -34,6 +34,24 @@ export const ENV = {
     },
     MAX_ITEMS: Number(process.env.LEADERBOARD_MAX_ITEMS) || 10,
   },
+  CANONICAL_ORIGIN: (process.env.CANONICAL_ORIGIN || process.env.VITE_CANONICAL_ORIGIN || "").trim(),
+  COOKIE_DOMAIN: (() => {
+    const explicit = (process.env.COOKIE_DOMAIN || "").trim();
+    if (explicit) return explicit;
+
+    if (process.env.NODE_ENV !== "production") return undefined;
+
+    const origin = (process.env.CANONICAL_ORIGIN || process.env.VITE_CANONICAL_ORIGIN || "").trim();
+    if (!origin) return undefined;
+
+    try {
+      const hostname = new URL(origin).hostname;
+      if (!hostname || hostname === "localhost") return undefined;
+      return `.${hostname}`;
+    } catch {
+      return undefined;
+    }
+  })(),
   NODE_ENV: process.env.NODE_ENV || "development",
   IS_PRODUCTION: process.env.NODE_ENV === "production",
 };

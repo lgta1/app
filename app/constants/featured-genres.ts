@@ -3,65 +3,77 @@
 // Nếu trong tương lai genres lưu bằng tên hiển thị, cần map qua slug chuẩn trước khi so sánh.
 import { stripDiacritics } from "~/utils/text-normalize";
 
-export const FEATURED_GENRE_SLUGS: ReadonlySet<string> = new Set(
+// Thứ tự ưu tiên hiển thị featured genres (cao -> thấp).
+// Lưu dưới dạng slug để so khớp trực tiếp với MangaModel.genres và route `/genres/:slug`.
+export const FEATURED_GENRE_PRIORITY: readonly string[] = Object.freeze(
   [
-    // 🥇 ĐỊNH DẠNG TRUYỆN (FORMAT · BẮT BUỘC)
-    "3d-hentai",
-    "manhwa",
+    // Latest user-defined priority (high -> low)
+    "guro",
+    "scat",
     "anh-cosplay",
-
-    // ⚠️ So khớp format trước tiên, khác format = loại (mặc định)
+    "ai-generated",
+    "manhwa",
+    "3d-hentai",
+    "full-color",
+    "animal",
+    "bestiality",
+    "bdsm",
+    // DB uses `old-man`, but source labels may slugify to `dirty-old-man`
+    "old-man",
+    "dirty-old-man",
+    "tu-tien",
+    "ngot",
+    "vanilla",
+    "gender-bender",
+    "transformation",
+    "tsundere",
     "incest",
-    "soft-incest",
     "ntr",
-    "netori",
-    "rape",
-    "femdom",
-    "harem",
-    "gangbang",
-    "slave",
-    "mind-control",
-    "sister",
-    "brother",
+    "schoolgirl",
     "mother",
-    "daughter",
-    "milf",
     "loli",
     "shota",
-    "teacher",
-    "housewife",
-    "virgin",
-    "anal",
-    "blowjobs",
-    "paizuri",
-    "masturbation",
-    "double-penetration",
+    "futanari",
+    "rape",
+    "milf",
+    "succubus",
+    "elf",
     "humiliation",
     "exhibitionism",
     "mind-break",
+    "doujinshi",
+    "gangbang",
+    "slave",
+    "mind-control",
+    "virgin",
+    "teacher",
+    "masturbation",
+    "double-penetration",
     "time-stop",
     "drug",
-    "fantasy",
     "isekai",
     "supernatural",
     "monster",
     "demon",
-    "succubus",
-    "elf",
     "historical",
-    "futanari",
     "trap",
-    "gender-bender",
-    "transformation",
     "tentacles",
-    "vanilla",
-    "romance",
-    "drama",
     "horror",
-    "comedy",
-    "doujinshi",
-    "webtoon",
-  ].map((s) => s.trim().toLowerCase()),
+    // keep "co-che" but make it lowest priority
+    "co-che",
+  ].map((s) => s.trim().toLowerCase()).filter(Boolean),
+);
+
+export const FEATURED_GENRE_PRIORITY_RANK: Readonly<Record<string, number>> = Object.freeze(
+  FEATURED_GENRE_PRIORITY.reduce((acc, slug, idx) => {
+    acc[slug] = idx;
+    acc[slug.replace(/-/g, "")] = idx;
+    return acc;
+  }, {} as Record<string, number>),
+);
+
+export const FEATURED_GENRE_SLUGS: ReadonlySet<string> = new Set(
+  FEATURED_GENRE_PRIORITY,
 );
 
 // Ghi chú các mục chỉnh sửa so với yêu cầu ban đầu + bổ sung:

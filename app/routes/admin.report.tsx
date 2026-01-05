@@ -240,7 +240,7 @@ export default function AdminReport() {
       toast.error("Không tìm thấy thông tin người báo cáo để thưởng");
       return;
     }
-    setRewardDialog({ open: true, reporter });
+    setRewardDialog({ open: true, reporter: { ...reporter, email: reporter.email } });
   };
 
   const handleRewardConfirm = (amount: number, message: string) => {

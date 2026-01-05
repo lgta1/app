@@ -1,0 +1,9 @@
+## 2025-12-30T00:46:01Z
+$ ss -lntp | egrep ':(3001|3002|3003|3004)' || true
+
+LISTEN 0      511                *:3004             *:*    users:(("node",pid=1316628,fd=18))
+LISTEN 0      511                *:3001             *:*    users:(("node",pid=1316490,fd=18))
+LISTEN 0      511                *:3002             *:*    users:(("node",pid=1316482,fd=18))
+LISTEN 0      511                *:3003             *:*    users:(("node",pid=1316620,fd=18))
+
+[exit=0]

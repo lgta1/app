@@ -176,7 +176,7 @@ export default function Register() {
                     name="name"
                     value={name}
                     onChange={(e) => handleUsernameChange(e.target.value)}
-                    placeholder="6-15 ký tự, chữ cái hoặc số"
+                    placeholder="1-15 ký tự, chữ cái hoặc số"
                     className="text-txt-secondary w-full bg-transparent text-base leading-6 font-medium outline-none"
                     required
                   />
@@ -193,7 +193,7 @@ export default function Register() {
                 {/* Username format hint */}
                 {!usernameError && (
                   <div className="text-txt-secondary text-xs">
-                    6-15 ký tự, chỉ dùng chữ cái (a-z, A-Z) và số (0-9)
+                    1-15 ký tự, chỉ dùng chữ cái (a-z, A-Z) và số (0-9)
                   </div>
                 )}
               </div>

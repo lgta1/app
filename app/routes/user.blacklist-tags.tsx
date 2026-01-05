@@ -11,7 +11,7 @@ import type { GenresType } from "~/database/models/genres.model";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Lọc thể loại không xem - WW" },
+    { title: "Lọc thể loại không thích - WW" },
     { name: "description", content: "Chọn các thể loại bạn không muốn xem trong danh sách truyện." },
   ];
 };
@@ -131,8 +131,8 @@ export default function BlacklistTagsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[900px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-0">
-      <h1 className="text-txt-primary font-sans text-2xl leading-9 font-semibold">Lọc thể loại không xem</h1>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6">
+      <h1 className="text-txt-primary font-sans text-2xl leading-9 font-semibold">Lọc thể loại không thích</h1>
 
       {/* Current selection chips */}
       <div className="bg-bgc-layer1 border-bd-default rounded-xl border p-4 shadow-lg">

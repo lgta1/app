@@ -1,4 +1,6 @@
 import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
+import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
 export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
@@ -27,8 +29,23 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
 
   const userWaifusLeaderboard = await query.lean();
 
+  const normalized = userWaifusLeaderboard.map((row: any) => {
+    if (row && typeof row.userAvatar === "string") {
+      row.userAvatar = rewriteLegacyCdnUrl(row.userAvatar);
+    }
+
+    if (row && Array.isArray(row.waifuCollection)) {
+      row.waifuCollection = row.waifuCollection.map((w: any) => {
+        const nextImg = normalizeWaifuImageUrl(w?.image);
+        return nextImg ? { ...w, image: nextImg } : w;
+      });
+    }
+
+    return row;
+  });
+
   return {
-    data: userWaifusLeaderboard,
+    data: normalized,
     currentPage: page,
     totalPages,
     totalCount,

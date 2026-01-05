@@ -142,7 +142,7 @@ export function SummonHistoryDialog({
       const updatedGold = json?.data?.gold;
       if (typeof updatedGold === "number") {
         // Compute reward gold from config (prefer config over diff to avoid race)
-        const rewardCfg = MILESTONE_REWARDS[milestone]?.gold ?? 0;
+        const rewardCfg = MILESTONE_REWARDS[milestone as keyof typeof MILESTONE_REWARDS]?.gold ?? 0;
         setGoldAward(rewardCfg);
         setGoldAfter(updatedGold);
         // Infer before if not captured: updated - reward
@@ -156,7 +156,7 @@ export function SummonHistoryDialog({
         setIsRevealOpen(true);
       } else {
         setRevealItem(null);
-        setGoldReward(MILESTONE_REWARDS[milestone]?.gold ?? null);
+        setGoldReward(MILESTONE_REWARDS[milestone as keyof typeof MILESTONE_REWARDS]?.gold ?? null);
         setIsRevealOpen(true);
       }
       toast.success(json.message || "Nhận thưởng thành công");

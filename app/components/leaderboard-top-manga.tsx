@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Eye, Heart } from "lucide-react";
+import { Eye } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
 import { formatDistanceToNow } from "~/utils/date.utils";
@@ -11,6 +11,14 @@ interface LeaderboardTopMangaProps {
 
 export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
   if (!topManga || topManga.length < 3) return null;
+
+  const getScoreDisplay = (manga: any) => {
+    const chaptersWithVotes = Number(manga?.ratingChaptersWithVotes ?? 0);
+    const totalVotes = Number(manga?.ratingTotalVotes ?? 0);
+    const score = Number(manga?.ratingScore ?? 0);
+    if (chaptersWithVotes < 3 || totalVotes < 5) return "0.0/0";
+    return `${Math.max(0, Math.min(10, score)).toFixed(1)}/10`;
+  };
 
   return (
     <>
@@ -39,10 +47,9 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                       {(topManga[1]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
-                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
-                    <Heart className="text-txt-primary h-3 w-3" />
+                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {topManga[1]?.likeNumber ?? 0}
+                      {getScoreDisplay(topManga[1])}
                     </span>
                   </div>
                 </div>
@@ -78,10 +85,9 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                       {(topManga[0]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
-                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
-                    <Heart className="text-txt-primary h-3 w-3" />
+                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {topManga[0]?.likeNumber ?? 0}
+                      {getScoreDisplay(topManga[0])}
                     </span>
                   </div>
                 </div>
@@ -117,10 +123,9 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                       {(topManga[2]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
-                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
-                    <Heart className="text-txt-primary h-3 w-3" />
+                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {topManga[2]?.likeNumber ?? 0}
+                      {getScoreDisplay(topManga[2])}
                     </span>
                   </div>
                 </div>
@@ -158,10 +163,9 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                       {(topManga[0]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
-                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
-                    <Heart className="text-txt-primary h-3 w-3" />
+                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {topManga[0]?.likeNumber ?? 0}
+                      {getScoreDisplay(topManga[0])}
                     </span>
                   </div>
                 </div>
@@ -197,10 +201,9 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                       {(topManga[1]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
-                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
-                    <Heart className="text-txt-primary h-3 w-3" />
+                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {topManga[1]?.likeNumber ?? 0}
+                      {getScoreDisplay(topManga[1])}
                     </span>
                   </div>
                 </div>
@@ -236,10 +239,9 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                       {(topManga[2]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
-                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
-                    <Heart className="text-txt-primary h-3 w-3" />
+                  <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {topManga[2]?.likeNumber ?? 0}
+                      {getScoreDisplay(topManga[2])}
                     </span>
                   </div>
                 </div>

@@ -8,6 +8,8 @@ export function SameAuthorManga({ items }: { items: MangaType[] }) {
   if (!items || items.length === 0) return null;
   const list = items.slice(0, 5);
   const truncate = (s: string, n: number) => (s?.length > n ? s.slice(0, n).trimEnd() + "…" : s);
+  const THUMB_SCALE = 1.4;
+  const THUMB_W = 56 * THUMB_SCALE;
 
   return (
     <section className="mt-8">
@@ -25,7 +27,10 @@ export function SameAuthorManga({ items }: { items: MangaType[] }) {
               to={buildMangaUrl(m as any)}
               className="flex items-start gap-4 rounded-lg transition-colors hover:bg-white/5 p-2 -m-2"
             >
-              <div className="overflow-hidden rounded-lg bg-black/20" style={{ width: 56, height: 84 }}>
+              <div
+                className="aspect-[2/3] shrink-0 overflow-hidden rounded-lg bg-black/20"
+                style={{ width: THUMB_W }}
+              >
                 <img
                   src={(m as any).poster || (m as any).cover || (m as any).thumbnail || (m as any).image}
                   alt={(m as any).title}

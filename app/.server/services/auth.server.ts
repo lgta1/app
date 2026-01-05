@@ -153,7 +153,7 @@ export async function login({
 
     // Nếu ban đã hết hạn, tự động unban
     if (user.banExpiresAt && new Date(user.banExpiresAt) <= now) {
-      await UserModel.findByIdAndUpdate(user._id, {
+      await UserModel.findByIdAndUpdate((user as any)._id, {
         $unset: {
           banExpiresAt: 1,
           banMessage: 1,

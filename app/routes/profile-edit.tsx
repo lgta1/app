@@ -256,7 +256,7 @@ export default function ProfileEdit() {
                   className={`bg-bgc-layer2 border-bd-default text-txt-primary focus:border-lav-500 w-full rounded-xl border px-3 py-2.5 font-sans text-base font-medium outline-none ${
                     usernameError ? "border-red-500 focus:border-red-500" : ""
                   }`}
-                  placeholder="6-15 ký tự, chỉ chữ cái và số"
+                  placeholder="1-15 ký tự, chỉ chữ cái và số"
                 />
                 
                 {/* Username validation error */}
@@ -290,7 +290,7 @@ export default function ProfileEdit() {
                 {/* Username format hint */}
                 {!showUsernameCostWarning && !usernameError && (
                   <div className="text-txt-secondary text-xs">
-                    6-15 ký tự, chỉ được sử dụng chữ cái (a-z, A-Z) và số (0-9)
+                    1-15 ký tự, chỉ được sử dụng chữ cái (a-z, A-Z) và số (0-9)
                   </div>
                 )}
               </div>

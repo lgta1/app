@@ -261,7 +261,7 @@ function InlineComposerLine({
           w-full bg-transparent outline-none
           border-b border-txt-secondary
           focus:border-txt-primary
-          text-sm font-medium text-txt-primary
+          text-base font-medium text-txt-primary
           pb-1
           [white-space:pre-wrap] [word-break:break-word]
           empty:before:text-txt-secondary empty:before:content-[attr(data-placeholder)]
@@ -894,7 +894,7 @@ export default function CommentDetail({
   );
 
   return (
-    <div className="mt-8 flex flex-col items-start justify-start gap-6 self-stretch">
+    <div className="mt-8 flex flex-col items-start justify-start gap-6 self-stretch pb-24 sm:pb-0">
       {/* Header */}
       <div className="border-bd-default flex items-center justify-between self-stretch border-b pb-3">
         <div className="flex items-center justify-start gap-3">
@@ -926,7 +926,7 @@ export default function CommentDetail({
                 value={commentContent}
                 onChange={(e) => setCommentContent(e.target.value)}
                 placeholder="Mời đồng dâm vào chém gió về truyện..."
-                className="text-txt-primary placeholder:text-txt-secondary min-h-[60px] w-full resize-none bg-transparent font-sans text-sm leading-tight font-medium outline-none"
+                className="text-txt-primary placeholder:text-txt-secondary min-h-[60px] w-full resize-none bg-transparent font-sans text-base leading-snug font-medium outline-none"
                 maxLength={1000}
               />
               {composerGifs.length > 0 && (

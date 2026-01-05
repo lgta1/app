@@ -19,13 +19,13 @@ interface PosterNormalizationResult {
   height: number;
   steps: {
     croppedToThreeFour: boolean;
-    resizedTo900: boolean;
+    resizedToTarget: boolean;
     convertedToWebP: boolean;
     aspect: PosterAspect;
   };
 }
 
-const POSTER_TARGET_WIDTH = 900;
+const POSTER_TARGET_WIDTH = 625;
 const POSTER_ASPECT_TOLERANCE = 0.01;
 const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
@@ -454,7 +454,10 @@ const cropToThreeFour = async (file: File): Promise<{ file: File; width: number;
   return { file: croppedFile, width: cropWidth, height: cropHeight };
 };
 
-const resizePosterToWidth = async (file: File, targetWidth: number): Promise<{ file: File; width: number; height: number }> => {
+const resizePosterToWidth = async (
+  file: File,
+  targetWidth: number,
+): Promise<{ file: File; width: number; height: number }> => {
   const dataUrl = await imageCompression.getDataUrlFromFile(file);
   const img = await loadImage(dataUrl);
 
@@ -471,15 +474,25 @@ const resizePosterToWidth = async (file: File, targetWidth: number): Promise<{ f
 
   const mime = file.type || "image/jpeg";
   const isWebP = mime === "image/webp";
-  const nextFile = await canvasToFile(canvas, mime, isWebP ? createWebPFileName(file.name) : file.name, isWebP ? 0.95 : undefined);
+  const isJpeg = mime === "image/jpeg" || mime === "image/jpg";
+  const quality = isWebP ? 0.92 : isJpeg ? 0.9 : undefined;
+  const nextFile = await canvasToFile(
+    canvas,
+    mime,
+    isWebP ? createWebPFileName(file.name) : file.name,
+    quality,
+  );
   return { file: nextFile, width, height };
 };
 
 /**
  * Chuẩn hóa ảnh bìa (áp dụng cho upload mới):
  * - Nhận 3:4 hoặc 2:3; nếu khác → crop center về 3:4.
- * - PNG → WEBP quality 0.95, các định dạng khác giữ nguyên.
- * - Nếu width >= 900px sau bước crop → resize width=900, height theo tỉ lệ.
+ * - JPG/JPEG: giữ nguyên định dạng.
+ * - WEBP: giữ nguyên định dạng.
+ * - PNG: chuyển sang WEBP (không giữ PNG sau upload).
+ * - Nếu width > 625px sau bước crop/convert → resize width=625, height theo tỉ lệ.
+ * - Nếu width <= 625px → giữ nguyên kích thước (không resize).
  */
 export async function normalizePosterImage(file: File): Promise<PosterNormalizationResult> {
   const baseDims = await getImageDimensions(file);
@@ -509,7 +522,7 @@ export async function normalizePosterImage(file: File): Promise<PosterNormalizat
     convertedToWebP = true;
   }
 
-  if (width >= POSTER_TARGET_WIDTH) {
+  if (width > POSTER_TARGET_WIDTH) {
     const resizedResult = await resizePosterToWidth(working, POSTER_TARGET_WIDTH);
     working = resizedResult.file;
     width = resizedResult.width;
@@ -523,7 +536,7 @@ export async function normalizePosterImage(file: File): Promise<PosterNormalizat
     height,
     steps: {
       croppedToThreeFour: cropped,
-      resizedTo900: resized,
+      resizedToTarget: resized,
       convertedToWebP,
       aspect: aspect === "other" ? "3:4" : aspect,
     },

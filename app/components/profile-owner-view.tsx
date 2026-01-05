@@ -282,7 +282,6 @@ function WaifuInventoryPanel({ user }: any) {
               key={`${waifuId || "waifu"}-${index}`}
               name={waifu.name}
               imageUrl={waifu.image}
-              stars={waifu.stars}
               count={waifu.count ?? waifu.quantity ?? 1}
               status={isCurrent ? "active" : "inactive"}
               className={`transition-all duration-300 ${

@@ -124,9 +124,15 @@ export function MobileSearch() {
       return;
     }
 
+    // `/api/search` lowercases the query before calling `smartSearch`.
+    // Keep the same normalization here so we don't apply results for a different query.
+    if (data.resolvedQuery !== trimmedQuery.toLowerCase()) {
+      return;
+    }
+
     setHasMore(data.hasMore);
     setIsLoading(false);
-  hideLoadingStatus();
+    hideLoadingStatus();
     setOffset(data.nextOffset);
 
     if (data.requestedOffset === 0) {

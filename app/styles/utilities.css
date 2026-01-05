@@ -43,6 +43,18 @@
   }
 }
 
+/* Tablet / iPad portrait: keep content closer to edges (≈1vw gutters) */
+@media (min-width: 768px) and (max-width: 989px) {
+  .container-page,
+  .container-ad,
+  .container {
+    width: 98vw;
+    max-width: none;
+    margin-left: 1vw;
+    margin-right: 1vw;
+  }
+}
+
 @media (min-width: 1024px) {
   .container-ad {
     max-width: 900px;
@@ -70,6 +82,40 @@
 
   .container-page {
     max-width: 1320px;
+  }
+}
+
+/* Desktop layout rule (viewport-based, no max-width).
+   When CSS viewport >= 990px:
+   - left gutter: 11.5vw
+   - main content: fills remaining width (100vw - 2*gutter)
+   - right gutter: 11.5vw
+   This avoids per-device differences from max-width caps and keeps layout
+   stable across DPI/zoom as long as viewport CSS px >= 990.
+*/
+@media (min-width: 990px) {
+  :root {
+    --vh-desktop-gutter: 11.5vw;
+    --vh-desktop-main: calc(100vw - (2 * var(--vh-desktop-gutter)));
+  }
+
+  .container-page,
+  .container-ad,
+  .container {
+    width: var(--vh-desktop-main);
+    max-width: none;
+    margin-left: var(--vh-desktop-gutter);
+    margin-right: var(--vh-desktop-gutter);
+  }
+}
+
+/* iPad / small-desktop: keep content closer to edges (≈1vw gutters)
+   PC (>=1280px) vẫn giữ rule desktop 11.5vw ở trên.
+*/
+@media (min-width: 990px) and (max-width: 1279px) {
+  :root {
+    --vh-desktop-gutter: 1vw;
+    --vh-desktop-main: calc(100vw - (2 * var(--vh-desktop-gutter)));
   }
 }
 
@@ -130,4 +176,16 @@
 .no-scrollbar {
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
+}
+
+/* Apply hover effects only on hover-capable devices.
+   This avoids iOS Safari/WebView "first tap = hover" behavior that can make
+   router-driven links feel like they sometimes don't navigate.
+*/
+@media (hover: hover) and (pointer: fine) {
+  .vh-hover-scale-105:hover,
+  .vh-hover-scale-105:focus,
+  .vh-hover-scale-105:focus-visible {
+    transform: scale(1.05);
+  }
 }

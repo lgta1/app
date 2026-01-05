@@ -114,7 +114,7 @@ export default function LeaderboardIndex() {
             {(monthlyLeaderboard as MangaType[])
               ?.filter((manga) => !!manga)
               .map((manga, index) => (
-                <RatingItem key={manga.id} manga={manga} index={index + 1} />
+                <RatingItem key={manga.id} manga={manga} index={index + 1} usePortraitThumb />
               ))}
           </Tabs.Content>
 
@@ -122,7 +122,7 @@ export default function LeaderboardIndex() {
             {(weeklyLeaderboard as MangaType[])
               ?.filter((manga) => !!manga)
               .map((manga, index) => (
-                <RatingItem key={manga.id} manga={manga} index={index + 1} />
+                <RatingItem key={manga.id} manga={manga} index={index + 1} usePortraitThumb />
               ))}
           </Tabs.Content>
 
@@ -130,7 +130,7 @@ export default function LeaderboardIndex() {
             {(dailyLeaderboard as MangaType[])
               ?.filter((manga) => !!manga)
               .map((manga, index) => (
-                <RatingItem key={manga.id} manga={manga} index={index + 1} />
+                <RatingItem key={manga.id} manga={manga} index={index + 1} usePortraitThumb />
               ))}
           </Tabs.Content>
         </Tabs.Root>

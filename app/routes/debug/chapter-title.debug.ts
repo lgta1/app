@@ -1,7 +1,8 @@
 // Script debug edge cases cho cleanChapterTitle
 // Chạy bằng: node ./app/debug/chapter-title.debug.ts (transpile trước nếu cần)
 // Vì project là type: module, dùng import
-import { cleanChapterTitle, _debugSampleClean } from "../utils/chapter-title.utils";
+import { cleanChapterTitle, _debugSampleClean } from "../../utils/chapter-title.utils";
+
 
 const samples = [
   "Chap 12 END",

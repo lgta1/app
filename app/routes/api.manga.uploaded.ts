@@ -33,7 +33,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const [uploadedMangas, totalUploaded, totalViewsAgg] = await Promise.all([
       MangaModel.find(matchCondition)
         .select(
-          "title poster slug chapters viewNumber likeNumber followNumber status createdAt userStatus",
+          "title poster slug chapters viewNumber likeNumber followNumber ratingScore ratingTotalVotes ratingChaptersWithVotes status createdAt userStatus",
         )
         .sort({ createdAt: -1 })
         .skip(skip)

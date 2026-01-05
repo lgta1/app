@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useFetcher } from "react-router-dom";
-import { Edit, Eye, Heart, Plus, Trash2 } from "lucide-react";
+import { Edit, Eye, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 import { WarningActionDialog } from "~/components/dialog-warning-action";
@@ -102,12 +102,13 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
   // Lấy tổng số chương cho mỗi truyện hiển thị (nhẹ vì limit nhỏ)
   useEffect(() => {
     const fetchCounts = async () => {
-      const targets = uploadedMangas.filter((m) => !chapterCounts[m.id]);
+      // IMPORTANT: chapterCounts[id] can be 0, so only treat "missing" as undefined.
+      const targets = uploadedMangas.filter((m) => chapterCounts[m.id] === undefined);
       if (!targets.length) return;
       const entries = await Promise.all(
         targets.map(async (m) => {
           try {
-            const r = await fetch(`/api/chapters.list?mangaId=${m.id}`);
+            const r = await fetch(`/api/chapters/list?mangaId=${m.id}`);
             const j = await r.json();
             const count = Array.isArray(j?.chapters) ? j.chapters.length : m.chapters ?? 0;
             return [m.id, count] as [string, number];
@@ -263,10 +264,15 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                             {manga.viewNumber?.toLocaleString()}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
-                          <Heart className="text-txt-secondary h-3 w-3" />
-                          <span className="text-txt-secondary text-xs font-medium">
-                            {manga.likeNumber?.toLocaleString()}
+                        <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]" title="Điểm truyện">
+                          <span className="text-txt-secondary text-xs font-medium tabular-nums">
+                            {(() => {
+                              const chaptersWithVotes = Number((manga as any)?.ratingChaptersWithVotes ?? 0);
+                              const totalVotes = Number((manga as any)?.ratingTotalVotes ?? 0);
+                              const score = Number((manga as any)?.ratingScore ?? 0);
+                              if (chaptersWithVotes < 3 || totalVotes < 5) return "0.0/0";
+                              return `${Math.max(0, Math.min(10, score)).toFixed(1)}/10`;
+                            })()}
                           </span>
                         </div>
                       </div>
@@ -303,7 +309,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                             mangaId: manga.id,
                           });
                         }}
-                        title={
+                        aria-label={
                           canDelete
                             ? "Xóa truyện"
                             : "Bạn không thể xoá truyện đã đăng quá 7 ngày. Chỉ admin có thể xoá."

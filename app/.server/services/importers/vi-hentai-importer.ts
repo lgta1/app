@@ -1,4 +1,5 @@
-import { load, type CheerioAPI, type Cheerio, type Element } from "cheerio";
+import { load, type CheerioAPI, type Cheerio } from "cheerio";
+import type { Element } from "domhandler";
 import type { Model } from "mongoose";
 import { createRequire } from "node:module";
 
@@ -9,6 +10,7 @@ import { AuthorModel } from "~/database/models/author.model";
 import { DoujinshiModel } from "~/database/models/doujinshi.model";
 import { CharacterModel } from "~/database/models/character.model";
 import { TranslatorModel } from "~/database/models/translator.model";
+import { GenresModel } from "~/database/models/genres.model";
 import { slugify } from "~/utils/slug.utils";
 import { stripDiacritics } from "~/utils/text-normalize";
 import genresData from "~/../data/genres-full.json";
@@ -583,20 +585,56 @@ const parsePage = (html: string, url: string): ParsedViHentaiPage => {
   };
 };
 
-const mapGenres = (rawGenres: string[]) => {
+const mapGenres = async (rawGenres: string[]) => {
   const matched: string[] = [];
   const unknown: string[] = [];
+  const unresolved: Array<{ label: string; key: string }> = [];
 
   for (const label of rawGenres) {
     const key = slugify(label);
     if (!key) continue;
-    const slug = GENRE_LOOKUP.get(key);
+    const compactKey = key.replace(/-/g, "");
+    const slug = GENRE_LOOKUP.get(key) || GENRE_LOOKUP.get(compactKey);
     if (slug) {
       if (!matched.includes(slug)) {
         matched.push(slug);
       }
     } else {
-      unknown.push(label);
+      unresolved.push({ label, key });
+    }
+  }
+
+  // Fallback: nếu build runtime không load được scripts/genres.array.cjs,
+  // hãy thử map theo DB genres (slug) để tránh lỗi "Không map được: Bestiality".
+  if (unresolved.length) {
+    const uniqueKeys = Array.from(new Set(unresolved.map((it) => it.key))).filter(Boolean);
+    if (uniqueKeys.length) {
+      const docs = await GenresModel.find({ slug: { $in: uniqueKeys } })
+        .select({ slug: 1 })
+        .lean();
+
+      const found = new Set(
+        docs
+          .map((d: any) => String(d?.slug || "").trim().toLowerCase())
+          .filter(Boolean),
+      );
+
+      // cache vào lookup để các lần sau không query DB nữa
+      for (const slug of found) {
+        GENRE_LOOKUP.set(slug, slug);
+        GENRE_LOOKUP.set(slug.replace(/-/g, ""), slug);
+      }
+
+      for (const { label, key } of unresolved) {
+        const normalizedKey = String(key || "").trim().toLowerCase();
+        if (normalizedKey && found.has(normalizedKey)) {
+          if (!matched.includes(normalizedKey)) matched.push(normalizedKey);
+        } else {
+          unknown.push(label);
+        }
+      }
+    } else {
+      unresolved.forEach((it) => unknown.push(it.label));
     }
   }
 
@@ -887,13 +925,16 @@ export const buildMangaPayloadFromViHentai = async (
     slug,
   };
 };
+import { dropVanillaWhenAntiVanillaPresent } from "~/constants/vanilla-anti-tags";
 
 export async function importViHentaiManga(options: ViHentaiImportOptions): Promise<ViHentaiImportResult> {
   if (!options.url) throw new Error("Thiếu URL nguồn");
   if (!options.ownerId) throw new Error("Thiếu ownerId");
 
   const parsed = await fetchViHentaiPage(options.url);
-  const { matched, unknown } = mapGenres(parsed.rawGenres);
+  const mapped = await mapGenres(parsed.rawGenres);
+  const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
+  const unknown = mapped.unknown;
   if (!matched.length) {
     throw new Error(
       `Không map được thể loại hợp lệ. Nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}`,

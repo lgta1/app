@@ -3,6 +3,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { BookOpen, Eye, Users } from "lucide-react";
 
 import { getLeaderboard } from "@/queries/leaderboad.query";
+import { getHotCarouselLeaderboardWithScores, type HotCarouselScoreRow } from "@/queries/leaderboad.query";
 import { getStatistic } from "@/queries/statistic.query";
 
 import RatingItem from "~/components/rating-item";
@@ -15,6 +16,7 @@ interface StatisticData {
   dailyLeaderboard: MangaType[];
   weeklyLeaderboard: MangaType[];
   monthlyLeaderboard: MangaType[];
+  hotCarousel: HotCarouselScoreRow[];
 }
 
 export const meta: MetaFunction = () => {
@@ -30,12 +32,14 @@ export async function loader(): Promise<Response> {
   const dailyLeaderboard = await getLeaderboard("daily");
   const weeklyLeaderboard = await getLeaderboard("weekly");
   const monthlyLeaderboard = await getLeaderboard("monthly");
+  const hotCarousel = await getHotCarouselLeaderboardWithScores();
 
   return Response.json({
     ...statistic,
     dailyLeaderboard,
     weeklyLeaderboard,
     monthlyLeaderboard,
+    hotCarousel,
   });
 }
 
@@ -169,6 +173,75 @@ export default function AdminStatistic() {
             </Tabs.Content>
           ))}
         </Tabs.Root>
+      </div>
+
+      {/* Hot score breakdown table */}
+      <div className="border-bd-default bg-bgc-layer1 flex w-full flex-col rounded-xl border">
+        <div className="border-bd-default flex flex-col gap-1 border-b p-4">
+          <div className="text-txt-primary font-sans text-lg font-semibold">
+            Danh sách truyện HOT (kèm score + công thức tính)
+          </div>
+          <div className="text-txt-secondary font-sans text-xs">
+            {data.hotCarousel?.[0]?.formula ?? "adjusted = baseScore * (1 - (weeklyPenalty + monthlyPenalty)) * recentMultiplier * genreMultiplier"}
+          </div>
+          <div className="text-txt-secondary font-sans text-xs">
+            Lưu ý: nếu có genre <span className="font-semibold">manhwa</span> thì trừ <span className="font-semibold">35%</span> (nhân 0.65) và <span className="font-semibold">không áp dụng</span> bonus cập nhật gần đây (12h). Các truyện không phải manhwa nếu vừa cập nhật gần đây (12h) thì cộng <span className="font-semibold">25%</span> (nhân 1.25).
+          </div>
+        </div>
+
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[860px] table-auto">
+            <thead>
+              <tr className="border-bd-default border-b">
+                <th className="text-txt-secondary p-3 text-left text-xs font-medium">#</th>
+                <th className="text-txt-secondary p-3 text-left text-xs font-medium">Truyện</th>
+                <th className="text-txt-secondary p-3 text-left text-xs font-medium">Adjusted score</th>
+                <th className="text-txt-secondary p-3 text-left text-xs font-medium">Base score</th>
+                <th className="text-txt-secondary p-3 text-left text-xs font-medium">Chi tiết tính điểm</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.hotCarousel || []).length > 0 ? (
+                (data.hotCarousel || []).map((row) => {
+                  const story = row.story as MangaType & { slug?: string; title?: string };
+                  const href = story.slug ? `/truyen-hentai/${story.slug}` : undefined;
+                  return (
+                    <tr key={row.id} className="border-bd-default border-b last:border-b-0 align-top">
+                      <td className="text-txt-primary p-3 text-sm">{row.rank}</td>
+                      <td className="p-3">
+                        <div className="text-txt-primary text-sm font-medium">
+                          {href ? (
+                            <a href={href} className="hover:underline">
+                              {story.title || story.slug || row.id}
+                            </a>
+                          ) : (
+                            story.title || story.slug || row.id
+                          )}
+                        </div>
+                        <div className="text-txt-secondary text-xs">{row.lastInteractionAt ? `lastInteraction: ${row.lastInteractionAt}` : ""}</div>
+                      </td>
+                      <td className="text-txt-primary p-3 text-sm">{Number.isFinite(row.adjustedScore) ? row.adjustedScore.toFixed(4) : String(row.adjustedScore)}</td>
+                      <td className="text-txt-secondary p-3 text-sm">{Number.isFinite(row.baseScore) ? row.baseScore.toFixed(4) : String(row.baseScore)}</td>
+                      <td className="p-3">
+                        <div className="text-txt-secondary whitespace-pre-wrap text-xs leading-5">
+                          {(row.steps || []).join("\n")}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center">
+                    <div className="text-txt-secondary font-sans text-base">
+                      Không có dữ liệu HOT carousel
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

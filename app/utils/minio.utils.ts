@@ -269,11 +269,15 @@ export const getMinioClient = (): Minio.Client => {
 export const getPublicFileUrl = (fullPath: string): string => {
   const bucket = MINIO_CONFIG.DEFAULT_BUCKET;
 
+  const cdnBase =
+    (process.env.CDN_BASE ?? "").trim() ||
+    "https://cdn.vinahentai.xyz";
+
   // Nếu sử dụng Cloudflare R2, dùng R2 public URL format
   if (isUsingCloudflareR2()) {
     // R2 public URL format với r2.dev subdomain
     // Lưu ý: Cần enable public access trong Cloudflare Dashboard
-    return `https://cdn.vinahentai.com/${fullPath}`;
+    return `${cdnBase}/${fullPath}`;
   }
 
   // MinIO public URL format

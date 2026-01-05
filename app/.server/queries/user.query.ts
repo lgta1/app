@@ -1,8 +1,9 @@
 import { ROLES } from "~/constants/user";
 import { UserModel } from "~/database/models/user.model";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 
 export const getTopUser = async (limit: number = 10) => {
-  return await UserModel.find({
+  const users = await UserModel.find({
     role: ROLES.USER,
     isDeleted: false,
     isBanned: false,
@@ -11,6 +12,11 @@ export const getTopUser = async (limit: number = 10) => {
     .limit(Math.max(1, limit))
     .select("-password -salt")
     .lean();
+
+  return (users as any[]).map((u) => ({
+    ...u,
+    avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
+  }));
 };
 
 export const getListUser = async (
@@ -61,12 +67,17 @@ export const getListUser = async (
       sortOrder = { createdAt: -1 };
   }
 
-  return await UserModel.find(query)
+  const users = await UserModel.find(query)
     .sort(sortOrder)
     .select("-password -salt")
     .skip(skip)
     .limit(limit)
     .lean();
+
+  return (users as any[]).map((u) => ({
+    ...u,
+    avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
+  }));
 };
 
 export const getTotalUserCount = async (search?: string) => {
@@ -98,10 +109,15 @@ export const getListModAndAdmin = async (search?: string) => {
     ];
   }
 
-  return await UserModel.find(query)
+  const users = await UserModel.find(query)
     .sort({ createdAt: -1 })
     .select("-password -salt")
     .lean();
+
+  return (users as any[]).map((u) => ({
+    ...u,
+    avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
+  }));
 };
 
 export const getListDichGia = async (search?: string) => {
@@ -115,8 +131,13 @@ export const getListDichGia = async (search?: string) => {
       { email: { $regex: search, $options: 'i' } },
     ];
   }
-  return await UserModel.find(query)
+  const users = await UserModel.find(query)
     .sort({ createdAt: -1 })
     .select('-password -salt')
     .lean();
+
+  return (users as any[]).map((u) => ({
+    ...u,
+    avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
+  }));
 };

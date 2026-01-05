@@ -1,8 +1,8 @@
 // app/components/manga-card.tsx
-import { Link } from "react-router-dom";
 import { EyeOff } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
+import { AppLink } from "~/components/app-link";
 import { MANGA_USER_STATUS } from "~/constants/manga";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
 
@@ -104,13 +104,13 @@ export function MangaCard({
     }
   })();
   return (
-    <Link
+    <AppLink
       to={buildMangaUrl(manga as any)}
       className={[
         // add transform + scale on hover
-        "group bg-bgc-layer1 relative block overflow-hidden rounded-xl border border-bd-default transition-colors hover:border-bd-default transform transition-transform duration-200 ease-out will-change-transform",
-        // hover scale applied to the link itself (+ keyboard focus)
-        "hover:scale-105 focus:scale-105 focus-visible:scale-105",
+        "group bg-bgc-layer1 relative block overflow-hidden rounded-xl border border-bd-default transition-colors transform transition-transform duration-200 ease-out will-change-transform",
+        // Desktop-only hover scale (avoid iOS tap-to-hover swallowing the click)
+        "vh-hover-scale-105",
         isBannerDesktop && "banner-desktop-card",
         className,
       ]
@@ -152,9 +152,9 @@ export function MangaCard({
             alt={title}
             width={300}
             height={400}
-            loading={imgLoading}
+            loading={imgLoading === "auto" ? undefined : imgLoading}
             decoding="async"
-            fetchpriority={imgFetchPriority}
+            fetchPriority={imgFetchPriority}
             className="block h-full w-full object-cover object-top select-none pointer-events-none"
           />
           {!hideBottomOverlay && (
@@ -289,6 +289,6 @@ export function MangaCard({
           </h3>
         </div>
       </div>
-    </Link>
+    </AppLink>
   );
 }

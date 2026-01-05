@@ -4,7 +4,8 @@ import { FEATURED_GENRE_SLUGS } from "~/constants/featured-genres";
 import { GenresModel } from "~/database/models/genres.model";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const origin = new URL(request.url).origin;
+  const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  const origin = getCanonicalOrigin(request as any);
   const now = new Date();
 
   // SEO policy (crawl budget): strategic/hub sitemap.

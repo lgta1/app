@@ -385,13 +385,19 @@ function TopBannerBase(
 
   return (
     <div className="relative w-full" data-hot-banner="1" data-count={baseLen}>
+      <style>{`
+        [data-hot-banner="1"] { --tb-gap: 12px; --tb-cols: 3; }
+        @media (min-width: 1024px) {
+          [data-hot-banner="1"] { --tb-cols: 5; }
+        }
+      `}</style>
       <div ref={containerRef} className="overflow-hidden w-full pb-2">
         <div ref={trackRef} className="flex gap-3" style={{ willChange: "transform" }}>
           {items.map((m: MangaType, i: number) => (
             <div
               key={`${(m as any).id ?? (m as any)._id ?? "x"}-${i}`}
               className="shrink-0"
-              style={{ width: "calc((100% - 48px)/5)" }}
+              style={{ width: "calc((100% - (var(--tb-cols) - 1) * var(--tb-gap)) / var(--tb-cols))" }}
             >
               <TopBannerItem manga={m as any} className="w-full" />
             </div>

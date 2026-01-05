@@ -1,0 +1,50 @@
+## 2025-12-30T00:43:39Z
+$ git rev-parse HEAD
+
+6c51becc4baef555040c1a5beae06c6d6011d85a
+
+[exit=0]
+## 2025-12-30T00:43:39Z
+$ git log -1 --oneline
+
+6c51bec khôi phục background hình nền.
+
+[exit=0]
+## 2025-12-30T00:43:39Z
+$ git status --porcelain
+
+fatal: .git/index: index file open failed: Permission denied
+
+[exit=128]
+## 2025-12-30T00:43:39Z
+$ git diff | redact_stream
+
+bash: line 1: redact_stream: command not found
+fatal: .git/index: index file open failed: Permission denied
+
+[exit=127]
+## 2025-12-30T00:43:39Z
+$ git diff --staged | redact_stream
+
+bash: line 1: redact_stream: command not found
+fatal: .git/index: index file open failed: Permission denied
+
+[exit=127]
+## 2025-12-30T00:43:39Z
+$ git branch --show-current
+
+master
+
+[exit=0]
+## 2025-12-30T00:43:39Z
+$ git remote -v | redact_stream
+
+bash: line 1: redact_stream: command not found
+
+[exit=127]
+## 2025-12-30T00:43:39Z
+$ git ls-files --others --exclude-standard
+
+fatal: .git/index: index file open failed: Permission denied
+
+[exit=128]

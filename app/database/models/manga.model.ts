@@ -33,6 +33,13 @@ export type MangaType = {
   weeklyViews?: number;
   monthlyViews?: number;
   followNumber?: number;
+  // Chapter-based rating aggregates (cached)
+  ratingSumWeightedScore?: number;
+  ratingSumWeight?: number;
+  ratingTotalVotes?: number;
+  ratingChaptersWithVotes?: number;
+  ratingScore?: number; // 0..10
+  ratingUpdatedAt?: Date;
   translationTeam: string;
   ownerId: string;
   keywords?: string;
@@ -73,6 +80,13 @@ const MangaSchema = new Schema<MangaType>(
     weeklyViews: { type: Number, default: 0 },
     monthlyViews: { type: Number, default: 0 },
     followNumber: { type: Number, default: 0 },
+    // Rating aggregates for O(1) story score reads
+    ratingSumWeightedScore: { type: Number, default: 0 },
+    ratingSumWeight: { type: Number, default: 0 },
+    ratingTotalVotes: { type: Number, default: 0 },
+    ratingChaptersWithVotes: { type: Number, default: 0 },
+    ratingScore: { type: Number, default: 0 },
+    ratingUpdatedAt: { type: Date },
     translationTeam: { type: String, required: true },
     ownerId: { type: String, required: true },
     keywords: { type: String },
@@ -133,6 +147,10 @@ MangaSchema.index({ status: 1, genres: 1, userStatus: 1, updatedAt: -1 });
 // - Sort by view and like counts within a genre
 MangaSchema.index({ status: 1, genres: 1, viewNumber: -1 });
 MangaSchema.index({ status: 1, genres: 1, likeNumber: -1 });
+// - Sort by rating within a genre (legacy "Được yêu thích" now maps to rating)
+MangaSchema.index({ status: 1, genres: 1, ratingScore: -1, ratingTotalVotes: -1 });
+// Generic rating sort (used by several listing pages)
+MangaSchema.index({ status: 1, ratingScore: -1, ratingTotalVotes: -1 });
 // Index for daily leaderboard sorting
 MangaSchema.index({ status: 1, dailyViews: -1, updatedAt: -1 });
 // Indexes for weekly/monthly views sorting
