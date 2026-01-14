@@ -11,6 +11,7 @@ import CommentDetail from "~/components/comment-detail";
 import { MangaDetail } from "~/components/manga-detail";
 import RatingItem from "~/components/rating-item";
 import ShareButtons from "~/components/share-buttons";
+import { DisturbingTagsWarningDialog } from "~/components/dialog-warning-disturbing-tags";
 
 // Related list tại trang chapter vẫn dùng component riêng
 import RecommendedManga from "~/components/recommended-manga";
@@ -18,6 +19,7 @@ import { SameAuthorManga } from "~/components/same-author-manga";
 import React from "react"; // đảm bảo JSX types
 import LazyRender from "~/components/lazy-render";
 import ProfileUploaderCard from "~/components/profile-uploader-card";
+import { toSlug } from "~/utils/slug.utils";
 
 import type { MangaType } from "~/database/models/manga.model";
 // server helpers sẽ được import trong loader bằng dynamic import
@@ -261,8 +263,60 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   } = loaderData;
   const manageHandle = manga.slug || manga.id;
 
+  const disturbingTagSlugs = React.useMemo(() => {
+    const raw = Array.isArray((manga as any)?.genres) ? (manga as any).genres : [];
+    const normalized = raw
+      .map((item: any) => toSlug(String(item)))
+      .map((s: string) => s.toLowerCase())
+      .filter(Boolean);
+
+    const hit = new Set<string>();
+    for (const slug of normalized) {
+      if (slug === "guro" || slug === "scat") hit.add(slug);
+    }
+
+    return Array.from(hit);
+  }, [manga]);
+
+  const disturbingTagNames = React.useMemo(() => {
+    const map = (genreDisplayMap || {}) as Record<string, string>;
+    return disturbingTagSlugs.map((slug) => map[slug] || slug);
+  }, [disturbingTagSlugs, genreDisplayMap]);
+
+  const disturbingTagWarningKey = React.useMemo(
+    () => `disturbing_tags_warning_confirmed:${manga?.id || "unknown"}`,
+    [manga?.id],
+  );
+
+  const [isDisturbingTagWarningOpen, setIsDisturbingTagWarningOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!disturbingTagSlugs.length) return;
+    try {
+      if (sessionStorage.getItem(disturbingTagWarningKey) === "true") return;
+    } catch {
+      // ignore
+    }
+
+    setIsDisturbingTagWarningOpen(true);
+  }, [disturbingTagSlugs, disturbingTagWarningKey]);
+
   return (
     <div className="container-page mx-auto px-4 py-6">
+      <DisturbingTagsWarningDialog
+        open={isDisturbingTagWarningOpen}
+        onOpenChange={(open) => {
+          setIsDisturbingTagWarningOpen(open);
+          if (!open) {
+            try {
+              sessionStorage.setItem(disturbingTagWarningKey, "true");
+            } catch {
+              // ignore
+            }
+          }
+        }}
+        tags={disturbingTagNames}
+      />
       <Toaster position="bottom-right" />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_27vw] lg:grid-cols-[minmax(0,1fr)_22vw]">
         {/* ===== CỘT TRÁI: CHI TIẾT TRUYỆN ===== */}
