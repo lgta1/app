@@ -74,8 +74,12 @@ export async function getUserInfoFromSession(
 }
 
 export const setUserDataToSession = (session: Session, user: UserType) => {
+  // `UserModel.findOne(...).lean()` returns plain objects that often don't have
+  // the virtual `id` field. Ensure we always persist a stable string id.
+  const userId = String((user as unknown as { id?: unknown; _id?: unknown }).id ?? (user as unknown as { _id?: unknown })._id ?? "");
+
   session.set(USER_INFO_SESSION_KEY, {
-    id: user.id,
+    id: userId,
     name: user.name,
     email: user.email,
     faction: user.faction,
