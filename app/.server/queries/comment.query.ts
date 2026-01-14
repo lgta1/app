@@ -2,6 +2,43 @@ import { CommentModel } from "~/database/models/comment.model";
 import { ensureMangaSlug } from "~/database/helpers/manga-slug.helper";
 import { rewriteLegacyCdnUrl, rewriteLegacyCdnUrlsInText } from "~/.server/utils/cdn-url";
 
+const normalizeCommentDoc = (comment: any) => {
+  if (!comment || typeof comment !== "object") return comment;
+  const userId = (comment as any)?.userId;
+  const mangaId = (comment as any)?.mangaId;
+  const postId = (comment as any)?.postId;
+
+  const normalizedUser =
+    userId && typeof userId === "object"
+      ? {
+          ...userId,
+          avatar: typeof userId.avatar === "string" ? rewriteLegacyCdnUrl(userId.avatar) : userId.avatar,
+        }
+      : userId;
+
+  const normalizedManga =
+    mangaId && typeof mangaId === "object"
+      ? {
+          ...mangaId,
+          poster: typeof mangaId.poster === "string" ? rewriteLegacyCdnUrl(mangaId.poster) : mangaId.poster,
+        }
+      : mangaId;
+
+  const normalizedPost = postId && typeof postId === "object" ? { ...postId } : postId;
+
+  return {
+    ...(comment as any),
+    id: String((comment as any)?._id ?? (comment as any)?.id ?? ""),
+    content:
+      typeof (comment as any)?.content === "string"
+        ? rewriteLegacyCdnUrlsInText((comment as any).content)
+        : (comment as any)?.content,
+    userId: normalizedUser,
+    mangaId: normalizedManga,
+    postId: normalizedPost,
+  } as any;
+};
+
 // Generic function để get comments cho cả manga và post
 export const getComments = async (
   params: { mangaId?: string; postId?: string },
@@ -37,10 +74,10 @@ export const getComments = async (
   const commentsWithReplyCounts = await Promise.all(
     comments.map(async (comment) => {
       const replyCount = await CommentModel.countDocuments({ parentId: comment._id });
-      return {
+      return normalizeCommentDoc({
         ...comment,
         replyCount, // Thêm field replyCount
-      };
+      });
     }),
   );
 
@@ -95,7 +132,7 @@ export const getReplies = async (parentId: string) => {
     .sort({ createdAt: 1 }) // Sort theo thời gian tạo tăng dần cho replies
     .lean();
 
-  return replies;
+  return replies.map((c) => normalizeCommentDoc(c));
 };
 
 // Function để lấy comment với replies (dùng khi cần load cả parent và replies)
@@ -111,18 +148,19 @@ export const getCommentWithReplies = async (commentId: string) => {
   // Nếu là parent comment, lấy replies
   if (!comment.parentId) {
     const replies = await getReplies(commentId);
-    return { ...comment, replies };
+    return normalizeCommentDoc({ ...comment, replies });
   }
 
-  return comment;
+  return normalizeCommentDoc(comment);
 };
 
 export const getCommentById = async (commentId: string) => {
-  return await CommentModel.findById(commentId)
+  const doc = await CommentModel.findById(commentId)
     .populate("userId", "name avatar gender level faction waifuFilename")
     .populate("mangaId", "title")
     .populate("postId", "title")
     .lean();
+  return normalizeCommentDoc(doc);
 };
 
 export const getCommentsByUserId = async (
@@ -148,7 +186,7 @@ export const getCommentsByUserId = async (
     .lean();
 
   return {
-    data: comments,
+    data: comments.map((c) => normalizeCommentDoc(c)),
     totalPages,
     currentPage: page,
     totalCount,

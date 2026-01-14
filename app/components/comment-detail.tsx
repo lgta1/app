@@ -7,7 +7,6 @@ import {
   MessageCircle,
   MessagesSquare,
   MessageSquare,
-  RotateCcw,
   Send,
   Image as ImageIcon,
   ThumbsUp,
@@ -903,17 +902,6 @@ export default function CommentDetail({
             bình luận
           </div>
         </div>
-
-        {/* Reload */}
-        <button
-          onClick={() => loadComments(pagination.currentPage)}
-          disabled={pagination.isLoading}
-          className="text-txt-focus border-lav-500 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          title="Tải lại bình luận mới nhất"
-        >
-          <RotateCcw className={`h-4 w-4 ${pagination.isLoading ? "animate-spin" : ""}`} />
-          {pagination.isLoading ? "Đang tải..." : "Tải lại"}
-        </button>
       </div>
 
       {/* Content */}

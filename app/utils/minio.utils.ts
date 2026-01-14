@@ -271,7 +271,7 @@ export const getPublicFileUrl = (fullPath: string): string => {
 
   const cdnBase =
     (process.env.CDN_BASE ?? "").trim() ||
-    "https://cdn.vinahentai.xyz";
+    "https://cdn.hoangsatruongsalacuavietnam.site";
 
   // Nếu sử dụng Cloudflare R2, dùng R2 public URL format
   if (isUsingCloudflareR2()) {

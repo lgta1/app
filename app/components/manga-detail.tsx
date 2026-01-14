@@ -108,44 +108,44 @@ interface MangaDetailProps {
  * Tất cả đều có border subtle + hover tăng mờ/sáng rất nhẹ để hợp theme.
  */
 const chipBase =
-  "inline-flex items-center gap-1.5 rounded-full h-8 px-3 text-sm whitespace-nowrap max-w-[180px] truncate select-none transition-[background,box-shadow,border,color] duration-150";
+  "inline-flex items-center gap-2 rounded-full h-9 px-4 text-base whitespace-nowrap max-w-[220px] truncate select-none transition-[background,box-shadow,border,color] duration-150";
 
 // Rectangle base (same size/colors behavior, only shape changes to rounded-md)
 const chipRectBase =
-  "inline-flex items-center gap-1.5 rounded-md h-8 px-3 text-sm whitespace-nowrap max-w-[180px] truncate select-none transition-[background,box-shadow,border,color] duration-150";
+  "inline-flex items-center gap-2 rounded-md h-9 px-4 text-base whitespace-nowrap max-w-[220px] truncate select-none transition-[background,box-shadow,border,color] duration-150";
 
 const chipVariants = {
   /** Hoà nền: bề mặt tối + border subtle + text trắng 90% */
   surfaceBlend:
-    `${chipBase} bg-white/5 border border-white/10 text-white/90 ` +
-    `hover:bg-white/8 hover:border-white/15 ` +
+    `${chipBase} bg-black/25 border border-white/10 text-white/95 ` +
+    `hover:bg-black/30 hover:border-white/15 ` +
     `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/35`,
 
   /** Tím trong suốt: tạo điểm nhấn nhẹ cho "Tác giả" */
   brandTint:
-    `${chipBase} bg-[rgba(211,115,255,.10)] border border-[rgba(211,115,255,.22)] text-[#EBD7FF] ` +
-    `hover:bg-[rgba(211,115,255,.14)] hover:border-[rgba(211,115,255,.30)] ` +
+    `${chipBase} bg-[rgba(211,115,255,.08)] border border-[rgba(211,115,255,.22)] text-[#EBD7FF] ` +
+    `hover:bg-[rgba(211,115,255,.12)] hover:border-[rgba(211,115,255,.30)] ` +
     `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/45`,
 
   /** Viền mờ: dành cho "Thể loại", không chiếm nổi bật */
   outlineSubtle:
-    `${chipBase} bg-transparent border border-white/12 text-[#EBD7FF]/90 hover:border-[#D373FF]/35 hover:bg:white/[.04] ` +
+    `${chipBase} bg-black/20 border border-white/12 text-[#EBD7FF]/95 hover:border-[#D373FF]/35 hover:bg-black/26 ` +
     `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/30`,
 };
 
 // Rectangular variants: keep palette/size identical, only border-radius differs
 const chipRectVariants = {
   brandTint:
-    `${chipRectBase} bg-[rgba(211,115,255,.10)] border border-[rgba(211,115,255,.22)] text-[#EBD7FF] ` +
-    `hover:bg-[rgba(211,115,255,.14)] hover:border-[rgba(211,115,255,.30)] ` +
+    `${chipRectBase} bg-[rgba(211,115,255,.08)] border border-[rgba(211,115,255,.22)] text-[#EBD7FF] ` +
+    `hover:bg-[rgba(211,115,255,.12)] hover:border-[rgba(211,115,255,.30)] ` +
     `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/45`,
   outlineSubtle:
-    `${chipRectBase} bg-transparent border border-white/12 text-[#EBD7FF]/90 hover:border-[#D373FF]/35 hover:bg:white/[.04] ` +
+    `${chipRectBase} bg-black/20 border border-white/12 text-[#EBD7FF]/95 hover:border-[#D373FF]/35 hover:bg-black/26 ` +
     `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/30`,
 };
 /* == Shared square tag style used for Genres, Doujinshi, Characters == */
 const genreTagClass =
-  "inline-flex items-center rounded-md border border-white/20 px-2 py-1 text-xs leading-tight text-[#EBD7FF]/90 hover:border-[#D373FF]/35 hover:bg-white/[0.04] transition-colors";
+  "inline-flex items-center rounded-md border border-white/20 bg-black/20 px-3 py-1.5 text-sm leading-tight text-[#EBD7FF]/95 hover:border-[#D373FF]/35 hover:bg-black/26 transition-colors";
 /* ====================== END <feature> CHIP_STYLES_SURFACE_BLEND ====================== */
 
 const isPosterImageFile = (file?: File | null) => {
@@ -238,7 +238,7 @@ function CollapsibleGenreChips({ genres, genreDisplayMap }: CollapsibleGenreChip
             <button
               type="button"
               onClick={() => setOpen((v: boolean) => !v)}
-              className={genreTagClass + " w-fit text-white/80"}
+              className={genreTagClass + " w-fit text-txt-primary"}
               aria-haspopup="dialog"
               aria-expanded={open}
               aria-label={`Xem thêm ${rest.length} thể loại`}
@@ -351,7 +351,7 @@ function CollapsibleCharacterChips({ names, slugs = [], isMobile = false }: Coll
             <button
               type="button"
               onClick={() => setOpen((v: boolean) => !v)}
-              className={genreTagClass + " w-fit text-white/80"}
+              className={genreTagClass + " w-fit text-txt-primary"}
               aria-haspopup="dialog"
               aria-expanded={open}
               aria-label={`Xem thêm ${rest.length} nhân vật`}
@@ -671,20 +671,6 @@ export function MangaDetail({
     }
   };
 
-  const [copied, setCopied] = useState(false);
-  const handleCopyCode = async () => {
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code.toString());
-      setCopied(true);
-      toast.success("Đã sao chép mã truyện");
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error("Error copying to clipboard:", error);
-      toast.error("Không thể sao chép mã");
-    }
-  };
-
   useEffect(() => {
     const checkFollowStatus = async () => {
       try {
@@ -942,15 +928,15 @@ useEffect(() => {
                         <a
                           key={slug}
                           href={`/authors/${slug}`}
-                          className="group inline-flex h-8 max-w-[220px] items-stretch overflow-hidden rounded-md border border-[rgba(211,115,255,.22)] text-[#EBD7FF]"
+                          className="group inline-flex h-9 max-w-[260px] items-stretch overflow-hidden rounded-md border border-[rgba(211,115,255,.22)] text-[#EBD7FF]"
                           title={name}
                           aria-label={`Xem tác giả ${name}`}
                         >
-                          <span className="flex min-w-0 items-center bg-[rgba(211,115,255,.10)] px-3 group-hover:bg-[rgba(211,115,255,.14)]">
-                            <span className="truncate capitalize">{name}</span>
+                          <span className="flex min-w-0 items-center bg-[rgba(211,115,255,.08)] px-4 group-hover:bg-[rgba(211,115,255,.12)]">
+                            <span className="truncate capitalize text-base">{name}</span>
                           </span>
                           {countDisplay !== null ? (
-                            <span className="flex items-center bg-[rgba(211,115,255,.18)] px-2 text-xs font-semibold tabular-nums text-[#EBD7FF]/90 group-hover:bg-[rgba(211,115,255,.22)]">
+                            <span className="flex items-center bg-[rgba(211,115,255,.14)] px-2.5 text-sm font-semibold tabular-nums text-[#EBD7FF]/95 group-hover:bg-[rgba(211,115,255,.18)]">
                               {countDisplay}
                             </span>
                           ) : null}
@@ -961,15 +947,15 @@ useEffect(() => {
                       <Link
                         key={slug}
                         to={`/authors/${slug}`}
-                        className="group inline-flex h-8 max-w-[220px] items-stretch overflow-hidden rounded-md border border-[rgba(211,115,255,.22)] text-[#EBD7FF]"
+                        className="group inline-flex h-9 max-w-[260px] items-stretch overflow-hidden rounded-md border border-[rgba(211,115,255,.22)] text-[#EBD7FF]"
                         title={name}
                         aria-label={`Xem tác giả ${name}`}
                       >
-                        <span className="flex min-w-0 items-center bg-[rgba(211,115,255,.10)] px-3 group-hover:bg-[rgba(211,115,255,.14)]">
-                          <span className="truncate capitalize">{name}</span>
+                        <span className="flex min-w-0 items-center bg-[rgba(211,115,255,.08)] px-4 group-hover:bg-[rgba(211,115,255,.12)]">
+                          <span className="truncate capitalize text-base">{name}</span>
                         </span>
                         {countDisplay !== null ? (
-                          <span className="flex items-center bg-[rgba(211,115,255,.18)] px-2 text-xs font-semibold tabular-nums text-[#EBD7FF]/90 group-hover:bg-[rgba(211,115,255,.22)]">
+                          <span className="flex items-center bg-[rgba(211,115,255,.14)] px-2.5 text-sm font-semibold tabular-nums text-[#EBD7FF]/95 group-hover:bg-[rgba(211,115,255,.18)]">
                             {countDisplay}
                           </span>
                         ) : null}
@@ -1078,18 +1064,8 @@ useEffect(() => {
               {code ? (
                 <span className="text-txt-secondary inline-flex items-center gap-1.5 text-sm" title="Mã truyện">
                   <span className="text-txt-primary font-medium select-all">{code}</span>
-                  <button
-                    onClick={handleCopyCode}
-                    className="cursor-pointer rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs text-txt-secondary transition-colors hover:bg-black/40 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D373FF]/30"
-                    aria-label="Sao chép mã truyện"
-                  >
-                    {copied ? "Đã sao chép" : "Sao chép"}
-                  </button>
                 </span>
               ) : null}
-              <span className="sr-only" aria-live="polite">
-                {copied ? "Đã sao chép mã truyện" : ""}
-              </span>
             </div>
           </div>
 
@@ -1233,14 +1209,17 @@ useEffect(() => {
         </div>
 
         <div className="relative">
-          <div ref={chaptersListRef} className="flex max-h-[304px] flex-col gap-2 overflow-y-auto rounded-lg md:max-h-[400px] lg:max-h-[492px]">
+          <div
+            ref={chaptersListRef}
+            className="flex max-h-[304px] flex-col overflow-y-auto rounded-md border border-bd-default bg-bgc-layer1 divide-y divide-bd-default md:max-h-[400px] lg:max-h-[492px]"
+          >
             {chapters.map((chapter) => {
             const chapterSlug = String((chapter as any)?.slug || "").trim();
             const href = chapterSlug
               ? `/truyen-hentai/${mangaHandle}/${encodeURIComponent(chapterSlug)}`
               : `/truyen-hentai/${mangaHandle}`;
             const commonClass =
-              "bg-bgc-layer1 border-bd-default w-full rounded-xl border px-4 py-2 transition-colors hover:bg-white/5";
+              "block w-full px-4 py-2 transition-colors hover:bg-white/5";
 
             const titleClamp2 = {
               display: "-webkit-box",

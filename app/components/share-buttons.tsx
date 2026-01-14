@@ -13,7 +13,7 @@ export function ShareButtons({ title, className }: ShareButtonsProps) {
   const CANONICAL_ORIGIN =
     typeof window !== "undefined"
       ? window.location.origin
-      : ((import.meta as any)?.env?.VITE_CANONICAL_ORIGIN as string | undefined) ?? "https://vinahentai.xyz";
+      : ((import.meta as any)?.env?.VITE_CANONICAL_ORIGIN as string | undefined) ?? "https://vinahentai.top";
   const defaultUrl = `${CANONICAL_ORIGIN}${location.pathname}${location.search}`;
   const [shareUrl, setShareUrl] = React.useState(defaultUrl);
   const [copied, setCopied] = React.useState(false);
@@ -78,24 +78,30 @@ export function ShareButtons({ title, className }: ShareButtonsProps) {
   return (
     <div className={"mt-4 flex flex-col gap-1 " + (className || "")}>
       <div className="text-txt-secondary text-xs font-medium">Chia sẻ truyện này:</div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {items.map((item) => {
-          const commonClass = "flex items-center gap-1 rounded-md border border-bd-default bg-bgc-layer1 px-2 py-1 text-[11px] font-medium text-txt-secondary hover:text-txt-primary hover:bg-white/5 transition-colors";
-          if (item.onClick) {
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={item.onClick}
-                aria-label={item.aria}
-                className={commonClass}
-              >
-                {item.icon}
-                <span className="select-none">{item.label}</span>
-              </button>
-            );
-          }
-          return (
+      <div className="flex flex-wrap items-center gap-y-1">
+        {items.map((item, index) => {
+          const commonClass =
+            "flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-txt-secondary hover:text-txt-primary transition-colors";
+
+          const divider = (
+            <span
+              aria-hidden="true"
+              className="mx-1.5 h-3.5 w-px bg-bd-default opacity-60"
+            />
+          );
+
+          const node = item.onClick ? (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.onClick}
+              aria-label={item.aria}
+              className={commonClass}
+            >
+              {item.icon}
+              <span className="select-none">{item.label}</span>
+            </button>
+          ) : (
             <a
               key={item.label}
               href={item.href}
@@ -107,6 +113,13 @@ export function ShareButtons({ title, className }: ShareButtonsProps) {
               {item.icon}
               <span className="select-none">{item.label}</span>
             </a>
+          );
+
+          return (
+            <React.Fragment key={item.label}>
+              {index > 0 ? divider : null}
+              {node}
+            </React.Fragment>
           );
         })}
       </div>

@@ -1,4 +1,4 @@
-const DEFAULT_CDN_BASE = "https://cdn.vinahentai.xyz";
+const DEFAULT_CDN_BASE = "https://cdn.hoangsatruongsalacuavietnam.site";
 
 const splitCsv = (value: string | undefined): string[] =>
   (value ?? "")
@@ -8,24 +8,9 @@ const splitCsv = (value: string | undefined): string[] =>
 
 const stripWww = (hostname: string): string => hostname.replace(/^www\./i, "");
 
-const deriveCdnBaseFromCanonicalOrigin = (canonicalOrigin: string | undefined): string | undefined => {
-  try {
-    const origin = (canonicalOrigin ?? "").trim();
-    if (!origin) return undefined;
-    const hostname = stripWww(new URL(origin).hostname);
-    if (!hostname) return undefined;
-    return `https://cdn.${hostname}`;
-  } catch {
-    return undefined;
-  }
-};
-
 export const getCdnBase = (): string => {
   const fromEnv = (process.env.CDN_BASE ?? "").trim();
   if (fromEnv) return fromEnv;
-
-  const derived = deriveCdnBaseFromCanonicalOrigin(process.env.CANONICAL_ORIGIN);
-  if (derived) return derived;
 
   return DEFAULT_CDN_BASE;
 };

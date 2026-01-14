@@ -33,7 +33,7 @@ import { toastWarning } from "~/helpers/toast.helper";
 import { WAIFU_SUMMON_SHARE_IMAGE } from "~/constants/share-images";
 
 export function meta({ params }: Route.MetaArgs) {
-  const origin = "https://vinahentai.xyz";
+  const origin = "https://vinahentai.top";
   const canonicalPath = params.id ? `/waifu/summon/${params.id}` : "/waifu/summon";
   const canonicalUrl = `${origin}${canonicalPath}`;
   const title = "VinaHentai – Triệu hồi Waifu";

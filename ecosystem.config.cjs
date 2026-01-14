@@ -34,17 +34,18 @@ for (let i = 0; i < instances; i++) {
       LEADERBOARD_SCHEDULER: isPrimary ? "1" : "0",
       INTERNAL_JOB_TOKEN: "Lequoctruong98!",
 
-      CANONICAL_ORIGIN: "https://vinahentai.xyz",
-      VITE_CANONICAL_ORIGIN: "https://vinahentai.xyz",
-      CDN_BASE: "https://cdn.vinahentai.xyz",
-      VITE_CDN_BASE: "https://cdn.vinahentai.xyz",
+      CANONICAL_ORIGIN: "https://vinahentai.top",
+      VITE_CANONICAL_ORIGIN: "https://vinahentai.top",
+      CDN_BASE: "https://cdn.hoangsatruongsalacuavietnam.site",
+      VITE_CDN_BASE: "https://cdn.hoangsatruongsalacuavietnam.site",
 
       // Legacy hosts to rewrite out of SSR payloads / stored text.
       // Update these on future migrations instead of touching code.
       LEGACY_SITE_HOSTS: "vinahentai.com,www.vinahentai.com",
-      LEGACY_CDN_HOSTS: "cdn.vinahentai.com",
+      LEGACY_CDN_HOSTS: "cdn.vinahentai.com,cdn.vinahentai.xyz",
+      LEGACY_SITE_HOSTS: "vinahentai.xyz,www.vinahentai.xyz,vinahentai.com,www.vinahentai.com",
 
-      COOKIE_DOMAIN: ".vinahentai.xyz",
+      COOKIE_DOMAIN: ".vinahentai.top",
 
       MINIO_ENDPOINT: "f6de453e5fe8af5525fa232b5a6f498a.r2.cloudflarestorage.com",
       MINIO_USE_SSL: "true",

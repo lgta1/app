@@ -101,8 +101,8 @@ curl -I https://www.vinahentai.xyz/danh-sach | head
 - `CANONICAL_ORIGIN=https://vinahentai.xyz`
 - `VITE_CANONICAL_ORIGIN=https://vinahentai.xyz`
 - `COOKIE_DOMAIN=.vinahentai.xyz` (để cookie ổn định nếu user/bot chạm www)
-- `CDN_BASE=https://cdn.vinahentai.xyz`
-- `VITE_CDN_BASE=https://cdn.vinahentai.xyz`
+- `CDN_BASE=https://cdn.hoangsatruongsalacuavietnam.site`
+- `VITE_CDN_BASE=https://cdn.hoangsatruongsalacuavietnam.site`
 
 ### 3) Xử lý dữ liệu legacy CDN trong DB
 - Chạy migration rewrite URL (mặc định dry-run):

@@ -26,6 +26,17 @@ const withContentType = (
   return next;
 };
 
+const normalizeMangaMedia = (doc: any) => {
+  if (!doc) return doc;
+  const next = { ...(doc as any) };
+  next.id = String(next.id ?? next._id ?? "");
+  if (typeof next.poster === "string") next.poster = rewriteLegacyCdnUrl(next.poster);
+  if (typeof next.shareImage === "string") next.shareImage = rewriteLegacyCdnUrl(next.shareImage);
+  return next as any;
+};
+
+const normalizeMangaList = (docs: any[]) => (docs as any[]).map((d) => normalizeMangaMedia(d));
+
 export const getNewManga = async (
   page: number = 1,
   limit: number = 10,
@@ -71,13 +82,7 @@ export const getNewManga = async (
   await ensureSlugForDocs(mangaRaw as any[]);
 
   // Ensure each item has a stable `id` field for client keys/links (lean() doesn't include virtual id)
-  let manga = (mangaRaw as any[]).map((m) => ({
-    ...m,
-    id: String(m.id ?? m._id ?? ""),
-    poster: typeof m?.poster === "string" ? rewriteLegacyCdnUrl(m.poster) : m?.poster,
-    shareImage:
-      typeof m?.shareImage === "string" ? rewriteLegacyCdnUrl(m.shareImage) : m?.shareImage,
-  }));
+  let manga = normalizeMangaList(mangaRaw as any[]);
 
   // Append latestChapterTitle denormalized to reduce client requests
   {
@@ -248,7 +253,7 @@ export const searchMangaApprovedWithPagination = async ({
   sort?: Record<string, 1 | -1>;
 }) => {
   const attachLatestChapterTitles = async (docs: any[]) => {
-    const withId = (docs as any[]).map((d) => ({ ...d, id: String(d?.id ?? d?._id ?? "") }));
+    const withId = normalizeMangaList(docs as any[]);
     try {
       const ids = withId.map((m) => String((m as any).id ?? (m as any)._id));
       const titles = await getLatestChapterTitlesForMangaIds(ids);
@@ -315,7 +320,7 @@ export const getRelatedManga = async (manga: MangaType, limit: number = 10) => {
   })
     .limit(limit)
     .lean();
-  return (docs as any[]).map((d) => ({ ...d, id: String(d?.id ?? d?._id ?? "") }));
+  return normalizeMangaList(docs as any[]);
 };
 
 // Lấy tối đa `limit` truyện cùng tác giả (nếu có trường author), loại trừ truyện hiện tại
@@ -368,7 +373,7 @@ export const getMangaBySameAuthor = async (
       if (unique.length >= limit) break;
     }
 
-    const withId = unique.map((m) => ({ ...(m as any), id: String((m as any).id ?? (m as any)._id ?? "") }));
+    const withId = normalizeMangaList(unique);
     try {
       const ids = withId.map((m) => String((m as any).id ?? (m as any)._id));
       const titles = await getLatestChapterTitlesForMangaIds(ids);
@@ -426,7 +431,7 @@ export const getMangaBySameAuthor = async (
   }
   // Denormalize latest chapter titles for returned list
   // Bảo đảm mỗi item có id ổn định
-  const withId = unique.map((m) => ({ ...(m as any), id: String((m as any).id ?? (m as any)._id ?? "") }));
+  const withId = normalizeMangaList(unique);
   try {
     const ids = withId.map((m) => String((m as any).id ?? (m as any)._id));
     const titles = await getLatestChapterTitlesForMangaIds(ids);
@@ -516,7 +521,7 @@ export const getRecommendedByFeaturedGenres = async (
 
   // Denormalize latest chapter titles for returned recommendations
   // Chuẩn hóa id rồi đính kèm latestChapterTitle
-  const withId = results.map((m) => ({ ...(m as any), id: String((m as any).id ?? (m as any)._id ?? "") }));
+  const withId = normalizeMangaList(results);
   try {
     const ids = withId.map((m) => String((m as any).id ?? (m as any)._id));
     const titles = await getLatestChapterTitlesForMangaIds(ids);
@@ -566,16 +571,7 @@ export const getMangaPublishedById = async (handle: string, user?: UserType) => 
   };
 
   const normalize = (doc: any) => {
-    if (!doc) return doc;
-    return {
-      ...(doc as any),
-      id: String((doc as any).id ?? (doc as any)._id ?? ""),
-      poster: typeof (doc as any)?.poster === "string" ? rewriteLegacyCdnUrl((doc as any).poster) : (doc as any)?.poster,
-      shareImage:
-        typeof (doc as any)?.shareImage === "string"
-          ? rewriteLegacyCdnUrl((doc as any).shareImage)
-          : (doc as any)?.shareImage,
-    } as any;
+    return normalizeMangaMedia(doc);
   };
 
   if (manga?.status === MANGA_STATUS.APPROVED) {

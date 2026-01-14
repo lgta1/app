@@ -139,7 +139,7 @@ export function meta({ data }: any) {
     ? data.chapter.title
     : `Chap ${data.chapter.chapterNumber}`;
   const mangaTitle = data.mangaTitle ?? "VinaHentai";
-  const origin = data.origin || "https://vinahentai.xyz";
+  const origin = data.origin || "https://vinahentai.top";
 
   const mangaSlugOrId = data.chapter.mangaSlug || data.chapter.mangaId || "";
   const chapterSlug = data.chapter.slug || "";
@@ -168,7 +168,7 @@ export default function ChapterReader() {
   const { chapter, recommendedManga, isLoggedIn } = useLoaderData<typeof loader>();
 
   return (
-    <div className="container-page mx-auto px-4 py-6 sm:px-6">
+    <div className="container-page mx-auto overflow-x-hidden px-4 py-6 sm:px-6">
       <ChapterDetail
         chapter={{
           ...chapter,

@@ -57,7 +57,7 @@ export function meta({ data }: Route.MetaArgs) {
   const baseTitle = "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO";
   const description =
     "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN,... KHÔNG QUẢNG CÁO, cập nhật nhanh, đa dạng thể loại. Trải nghiệm ngay!";
-  const canonicalUrl = (data as any)?.canonicalUrl || (data as any)?.origin || "https://vinahentai.xyz";
+  const canonicalUrl = (data as any)?.canonicalUrl || (data as any)?.origin || "https://vinahentai.top";
   const image = DEFAULT_SHARE_IMAGE;
   return [
     { title: baseTitle },

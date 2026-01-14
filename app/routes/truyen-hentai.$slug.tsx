@@ -181,7 +181,7 @@ export function meta({ data }: Route.MetaArgs) {
     ];
   }
 
-  const origin = data.origin || "https://vinahentai.xyz";
+  const origin = data.origin || "https://vinahentai.top";
   const canonicalPath = data.manga.slug
     ? `/truyen-hentai/${data.manga.slug}`
     : `/truyen-hentai/${data.manga.id}`;
@@ -264,7 +264,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   return (
     <div className="container-page mx-auto px-4 py-6">
       <Toaster position="bottom-right" />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_27vw] lg:grid-cols-[minmax(0,1fr)_22vw]">
         {/* ===== CỘT TRÁI: CHI TIẾT TRUYỆN ===== */}
         <section className="md:mt-8">
           <nav aria-label="Breadcrumb" className="text-txt-focus font-sans text-sm font-medium mb-1.5">

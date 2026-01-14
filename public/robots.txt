@@ -4,4 +4,4 @@ Allow: /
 # Posts are disabled and should be removed from index.
 # Do NOT block via robots.txt, so crawlers can fetch and observe 410/404.
 
-Sitemap: https://vinahentai.xyz/sitemap.xml
+Sitemap: https://vinahentai.top/sitemap.xml

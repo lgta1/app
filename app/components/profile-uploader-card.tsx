@@ -24,15 +24,12 @@ export default function ProfileUploaderCard({
 
   return (
     <div
-      className="
-        relative rounded-xl border border-white/8 bg-white/[.035]
-        px-4 py-3 shadow-[0_4px_24px_-8px_rgba(0,0,0,.6)]
-      "
+      className="relative bg-bgc-layer1 border-bd-default rounded-2xl border px-4 py-3"
     >
       {/* Link nhỏ góc phải */}
       <a
         href={profileUrl}
-        className="absolute right-3 top-2 inline-flex items-center gap-1 text-[11px] text-white/70 hover:text-white/90 transition"
+        className="absolute right-3 top-2 inline-flex items-center gap-1 text-[11px] text-txt-secondary hover:text-txt-primary transition"
         aria-label="Xem trang cá nhân"
       >
         Xem trang cá nhân <ArrowUpRight className="h-3.5 w-3.5" />
@@ -41,7 +38,7 @@ export default function ProfileUploaderCard({
       {/* Hàng avatar + tên + info ngắn */}
       <div className="flex items-center gap-3 pr-24">
         {/* Avatar: dùng icon lucide khi chưa có ảnh hoặc lỗi ảnh */}
-        <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#121826] ring-1 ring-purple-400/40 md:h-16 md:w-16">
+        <div className="border-bd-default bg-bgc-layer2 relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border md:h-16 md:w-16">
           <UserIcon className="h-7 w-7 text-txt-primary md:h-8 md:w-8" />
           {avatarUrl ? (
             <img
@@ -58,7 +55,7 @@ export default function ProfileUploaderCard({
           <div className="flex items-center gap-1 min-w-0">
             <a
               href={profileUrl}
-              className="truncate text-[15px] font-semibold text-white hover:text-white/90"
+              className="text-txt-primary truncate text-[15px] font-semibold hover:opacity-90"
               title={displayName}
             >
               {displayName}
@@ -73,7 +70,7 @@ export default function ProfileUploaderCard({
           </div>
 
           {/* Cấp + số truyện trên cùng 1 dòng, không icon */}
-          <div className="mt-0.5 text-[12px] text-white/65">
+          <div className="text-txt-secondary mt-0.5 text-[12px]">
             {typeof level === "number" ? `Cấp ${level}` : "Cấp —"} · {totalManga} truyện
           </div>
         </div>
@@ -82,7 +79,7 @@ export default function ProfileUploaderCard({
       {/* Bio: HIỂN THỊ TRẦN — không box, không nền, không viền, không shadow */}
       {hasBio && (
         <div className="mt-3">
-          <p className="bg-transparent border-0 shadow-none p-0 m-0 text-[13px] leading-snug text-white/80 whitespace-pre-line">
+          <p className="text-txt-secondary bg-transparent border-0 shadow-none p-0 m-0 text-[13px] leading-snug whitespace-pre-line">
             {bio}
           </p>
         </div>

@@ -36,7 +36,9 @@ export const getLegacySiteHosts = (): string[] => {
   // For future migrations, add old site host(s) here, e.g.
   // LEGACY_SITE_HOSTS=vinahentai.com,www.vinahentai.com
   const fromEnv = splitCsv(process.env.LEGACY_SITE_HOSTS);
-  return fromEnv.length ? fromEnv : ["vinahentai.com", "www.vinahentai.com"];
+  return fromEnv.length
+    ? fromEnv
+    : ["vinahentai.xyz", "www.vinahentai.xyz", "vinahentai.com", "www.vinahentai.com"];
 };
 
 const getLegacySiteHostRegex = (legacyHosts: string[]): RegExp | undefined => {

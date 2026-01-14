@@ -81,6 +81,14 @@ export function ChapterDetail({
   const chapterIdResolved = normalizeObjectId((chapter as any)?._id ?? (chapter as any)?.id);
   const mangaIdResolved = normalizeObjectId((chapter as any)?.mangaId ?? (chapter as any)?.manga?._id ?? (chapter as any)?.manga?.id);
   const chapterSlugResolved = String((chapter as any)?.slug ?? "").trim();
+  const chapterIdentity = useMemo(() => {
+    if (chapterIdResolved) return `id:${chapterIdResolved}`;
+    const n = Number((chapter as any)?.chapterNumber);
+    const nKey = Number.isFinite(n) ? String(n) : "";
+    const slugKey = chapterSlugResolved || "";
+    const mangaKey = mangaIdResolved || String((chapter as any)?.mangaSlug ?? "").trim() || "";
+    return `k:${mangaKey}:${slugKey}:${nKey}`;
+  }, [chapterIdResolved, mangaIdResolved, chapterSlugResolved, chapter.chapterNumber, chapter.mangaSlug]);
   const mangaDetailUrl = chapter.mangaSlug
     ? `/truyen-hentai/${chapter.mangaSlug}`
     : mangaIdResolved
@@ -124,9 +132,11 @@ export function ChapterDetail({
 
   // === Sticky bottom auto hide/show ===
   const [hideBottomBar, setHideBottomBar] = useState(false);
+  const [isInBottomScrollZone, setIsInBottomScrollZone] = useState(false);
   const barRef = useRef<HTMLDivElement | null>(null);
   const lastYRef = useRef(0);
   const tickingRef = useRef(false);
+  const bottomZoneRef = useRef(false);
 
   // Anchor for scrollToBottom target
   const relatedRef = useRef<HTMLDivElement | null>(null);
@@ -134,7 +144,7 @@ export function ChapterDetail({
   useEffect(() => {
     const THRESHOLD = 1;
     const SENSITIVITY = 1;
-    const onScroll = () => {
+    const update = () => {
       if (tickingRef.current) return;
       tickingRef.current = true;
       requestAnimationFrame(() => {
@@ -148,11 +158,27 @@ export function ChapterDetail({
         }
 
         lastYRef.current = y;
+
+        const doc = document.documentElement;
+        const maxScroll = Math.max(0, (doc?.scrollHeight || 0) - window.innerHeight);
+        const progress = maxScroll > 0 ? Math.min(1, Math.max(0, y / maxScroll)) : 0;
+        const nextBottomZone = progress >= 0.8;
+        if (nextBottomZone !== bottomZoneRef.current) {
+          bottomZoneRef.current = nextBottomZone;
+          setIsInBottomScrollZone(nextBottomZone);
+        }
+
         tickingRef.current = false;
       });
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   // no static bar observer — single sticky bar only
@@ -209,13 +235,14 @@ export function ChapterDetail({
     }
   }, [chaptersFetcher.data]);
 
-  // Sync rating state when navigating between chapters
+  // Sync reaction state only when switching to a different chapter.
+  // Avoids overwriting optimistic/confirmed reaction with stale loader data during re-renders.
   useEffect(() => {
     setChapterLikeCount(Math.max(0, Number((chapter as any)?.likeNumber) || 0));
     setChapterDislikeCount(Math.max(0, Number((chapter as any)?.dislikeNumber) || 0));
     setChapterScore(Number((chapter as any)?.chapScore) || 0);
     setUserReaction(((chapter as any)?.userReaction as any) ?? null);
-  }, [chapter]);
+  }, [chapterIdentity]);
 
   const submitReaction = useCallback(
     async (reaction: "like" | "dislike") => {
@@ -792,7 +819,7 @@ useEffect(() => {
       </div>
 
       {/* Content */}
-      <div className="-mx-4 my-6 flex flex-col items-center justify-center sm:mx-0 sm:my-8 relative z-0">
+      <div className="relative z-0 -mx-4 my-6 flex flex-col items-center justify-center overflow-x-hidden sm:mx-0 sm:my-8">
         {chapter.contentUrls.map((url, index) => {
           const isLastImage = index === chapter.contentUrls.length - 1;
           const isImageLoaded = loadedImages.has(url);
@@ -1089,12 +1116,16 @@ useEffect(() => {
               height: "var(--ctrl-size)",
             }}
           >
-            <button onClick={scrollToTop} aria-label="Cuộn lên đầu" className="flex-1 flex items-center justify-center hover:opacity-80">
-              <ArrowUpToLine className="text-bgc-layer1 h-5 w-5" />
-            </button>
-            <div className="h-[1px] w-full bg-white/30"></div>
-            <button onClick={scrollToBottom} aria-label="Cuộn xuống cuối" className="flex-1 flex items-center justify-center hover:opacity-80">
-              <ArrowDownToLine className="text-bgc-layer1 h-5 w-5" />
+            <button
+              onClick={isInBottomScrollZone ? scrollToTop : scrollToBottom}
+              aria-label={isInBottomScrollZone ? "Cuộn lên đầu" : "Cuộn xuống cuối"}
+              className="flex h-full w-full items-center justify-center hover:opacity-80"
+            >
+              {isInBottomScrollZone ? (
+                <ArrowUpToLine className="text-bgc-layer1 h-5 w-5" />
+              ) : (
+                <ArrowDownToLine className="text-bgc-layer1 h-5 w-5" />
+              )}
             </button>
           </div>
         </div>

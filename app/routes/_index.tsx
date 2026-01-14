@@ -1,7 +1,7 @@
 // BEGIN <feature> HOT_SECTION_AUTOSCROLL_IMPORTS
 
 import { useEffect, useRef, useState } from "react";
-import { Flame } from "lucide-react";
+import { ChevronDown, ChevronUp, Flame, Trophy } from "lucide-react";
 import * as Tabs from "@radix-ui/react-tabs";
 // import { useSearchParams } from "react-router-dom";
 
@@ -21,7 +21,6 @@ import { TopBanner, type TopBannerHandle } from "~/components/top-banner";
 import TopBannerMobileGrid from "~/components/top-banner-mobile-grid";
 import RecentCommentsFeed from "~/components/recent-comments-feed";
 import type { MangaType } from "~/database/models/manga.model";
-import { ChevronUp, Trophy } from "lucide-react";
 import LazyRender from "~/components/lazy-render";
 import type { ReactNode } from "react";
 
@@ -87,7 +86,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export function meta({ data }: Route.MetaArgs) {
-  const origin = data?.origin ?? "https://vinahentai.xyz";
+  const origin = data?.origin ?? "https://vinahentai.top";
   const canonical = origin ? `${origin}/` : "/";
   return [
     { title: "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO" },
@@ -102,22 +101,47 @@ export function meta({ data }: Route.MetaArgs) {
 }
 function ScrollToTopButton() {
   const [visible, setVisible] = useState(false);
+  const [isPastHalf, setIsPastHalf] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 500); // hiện khi cuộn > 500px
+    const onScroll = () => {
+      const scrollTop = window.scrollY;
+      setVisible(scrollTop > 500); // hiện khi cuộn > 500px
+
+      const doc = document.documentElement;
+      const maxScroll = Math.max(0, doc.scrollHeight - window.innerHeight);
+      const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
+      setIsPastHalf(progress >= 0.5);
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   if (!visible) return null;
 
+  const handleClick = () => {
+    if (isPastHalf) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    const leaderboardEl = document.getElementById("home-leaderboard");
+    if (leaderboardEl) {
+      leaderboardEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  };
+
   return (
     <button
-      aria-label="Lên đầu trang"
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      className="lg:hidden fixed bottom-6 right-5 z-50 rounded-full bg-black/40 p-3 text-white shadow-md backdrop-blur-sm transition-all duration-300 hover:bg-black/60 active:scale-95"
+      aria-label={isPastHalf ? "Lên đầu trang" : "Đến bảng xếp hạng"}
+      onClick={handleClick}
+      className="lg:hidden fixed bottom-13 right-5 z-50 rounded-full bg-black/40 p-3 text-white shadow-md backdrop-blur-sm transition-all duration-300 hover:bg-black/60 active:scale-95"
     >
-      <ChevronUp className="h-5 w-5" />
+      {isPastHalf ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
     </button>
   );
 }
@@ -256,7 +280,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             {/* Bảng Xếp Hạng */}
             <ResponsiveLazyRender
               placeholder={
-                <div className="space-y-6">
+                <div
+                  id="home-leaderboard"
+                  className="space-y-6 scroll-mt-[calc(var(--site-header-height)+12px)]"
+                >
                   <div className="flex items-center gap-3">
                     <div className="relative h-[15px] w-[15px]">
                       <div className="h-4 w-4 rounded bg-[rgba(255,255,255,0.02)] animate-pulse" />
@@ -270,7 +297,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               }
               once
             >
-              <div className="space-y-6">
+              <div
+                id="home-leaderboard"
+                className="space-y-6 scroll-mt-[calc(var(--site-header-height)+12px)]"
+              >
               <div className="flex items-center gap-3">
                 <Trophy className="h-6 w-6 text-lav-500" />
                 <h2 className="text-txt-primary text-xl font-semibold uppercase">

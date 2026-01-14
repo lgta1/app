@@ -1,4 +1,4 @@
-const DEFAULT_CANONICAL_ORIGIN = "https://vinahentai.xyz";
+const DEFAULT_CANONICAL_ORIGIN = "https://vinahentai.top";
 
 const TRACKING_QUERY_KEYS = new Set([
   "fbclid",
@@ -33,8 +33,7 @@ function getKnownSiteCanonicalOriginForHost(hostname: string | undefined): strin
   const host = (hostname ?? "").trim().toLowerCase();
   if (!host) return undefined;
 
-  // Explicit mapping for this repo's live domains.
-  // If request is for one of these (including www), canonicalize to DEFAULT_CANONICAL_ORIGIN.
+  // Map legacy hosts to the current canonical origin.
   if (host === "vinahentai.xyz" || host === "www.vinahentai.xyz") return DEFAULT_CANONICAL_ORIGIN;
   if (host === "vinahentai.com" || host === "www.vinahentai.com") return DEFAULT_CANONICAL_ORIGIN;
 

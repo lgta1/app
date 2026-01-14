@@ -2,7 +2,7 @@
 export type SelectedWaifu = {
   id: string;
   name?: string;
-  filename?: string; // v� d?: "mitsuri vinahentai.xyz-1756571970280-47bb08f5.webp"
+  filename?: string; // e.g. "mitsuri cdn.hoangsatruongsalacuavietnam.site-1756571970280-47bb08f5.webp"
 };
 
 export const STORAGE_KEY = "selectedWaifu";

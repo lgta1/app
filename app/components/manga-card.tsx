@@ -276,14 +276,6 @@ export function MangaCard({
               .filter(Boolean)
               .join(" ")}
             title={title}
-            style={{
-              textShadow: `
-                1px 0 2px rgba(0,0,0,0.9),
-                -1px 0 2px rgba(0,0,0,0.9),
-                0 1px 2px rgba(0,0,0,0.9),
-                0 -1px 2px rgba(0,0,0,0.9)
-              `,
-            }}
           >
             {title}
           </h3>
