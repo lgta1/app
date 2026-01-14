@@ -67,41 +67,76 @@ interface ReplyVisibilityState {
 const MENTION_CLASS = "font-semibold text-[#B39AFB]";
 
 /* ===========================
- * Preview Modal (mobile tap)
+ * Mobile zoom modal (tap)
+ * - Fullscreen backdrop
+ * - Centered media
+ * - Tap outside to close
  * =========================== */
-function PreviewModal({
-  user,
+type MobileZoomPreview =
+  | {
+      kind: "waifu";
+      filename: string;
+      baseHeight: number;
+      title?: string;
+    }
+  | {
+      kind: "badge";
+      src: string;
+      alt: string;
+      baseHeight: number;
+    };
+
+function MobileZoomModal({
+  preview,
   onClose,
 }: {
-  user: UserType | null;
+  preview: MobileZoomPreview | null;
   onClose: () => void;
 }) {
-  if (!user) return null;
+  if (!preview) return null;
+
+  const zoom = 7;
+  const targetHeight = preview.baseHeight * zoom;
+
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 p-4"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className="relative rounded-xl bg-bgc-layer1 p-4 shadow-2xl"
+        className="relative"
         onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: "92vw", maxHeight: "92vh" }}
       >
         <button
           onClick={onClose}
-          className="absolute right-2 top-2 rounded-full p-1 text-txt-secondary hover:text-txt-primary focus:outline-none"
+          className="absolute -right-2 -top-2 rounded-full bg-black/60 p-2 text-white backdrop-blur"
           aria-label="Đóng"
         >
           <X className="h-5 w-5" />
         </button>
-        <div className="flex items-center gap-4">
-          <WaifuMeta filename={(user as any)?.waifuFilename ?? null} height={160} />
-          <div className="flex flex-col">
-            <div className="text-lg font-semibold">{user.name}</div>
-            <img src={getTitleImgPath(user)} alt="User badge" className="mt-2 h-16" />
+
+        {preview.kind === "waifu" ? (
+          <div className="rounded-xl bg-black/30 p-2">
+            <WaifuMeta filename={preview.filename} height={targetHeight} />
+            {preview.title ? (
+              <div className="mt-2 text-center text-sm font-semibold text-white/90">{preview.title}</div>
+            ) : null}
           </div>
-        </div>
+        ) : (
+          <div className="rounded-xl bg-black/30 p-2">
+            <img
+              src={preview.src}
+              alt={preview.alt}
+              style={{ height: targetHeight, maxHeight: "88vh", maxWidth: "88vw" }}
+              className="mx-auto block w-auto object-contain"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -376,7 +411,7 @@ export default function CommentDetail({
     prefillName?: string;
   } | null>(null);
 
-  const [previewUser, setPreviewUser] = useState<UserType | null>(null);
+  const [mobileZoomPreview, setMobileZoomPreview] = useState<MobileZoomPreview | null>(null);
   // Popover waifu (desktop hover / mobile tap)
   const [waifuPopover, setWaifuPopover] = useState<{
     filename: string;
@@ -387,8 +422,7 @@ export default function CommentDetail({
     if (typeof window === "undefined") return false;
     return matchMedia("(hover: none)").matches;
   }, []);
-  const openPreview = useCallback((u?: UserType) => setPreviewUser(u ?? null), []);
-  const closePreview = useCallback(() => setPreviewUser(null), []);
+  const closeMobileZoom = useCallback(() => setMobileZoomPreview(null), []);
   const closeWaifuPopover = useCallback(() => setWaifuPopover(null), []);
 
   useEffect(() => {
@@ -416,16 +450,23 @@ export default function CommentDetail({
     if (isTouch) return; // tránh flicker trên mobile (tap sẽ dùng toggle)
     setWaifuPopover(null);
   };
-  const handleWaifuClick = (e: React.MouseEvent, filename?: string | null) => {
+  const handleWaifuClick = (e: React.MouseEvent, filename?: string | null, baseHeight: number = 40, title?: string) => {
     if (!filename) return;
     e.stopPropagation();
     if (!isTouch) return; // desktop chỉ hover
-    // toggle
-    setWaifuPopover((prev) => (prev ? null : {
-      filename,
-      x: (e.currentTarget as HTMLElement).getBoundingClientRect().left + (e.currentTarget as HTMLElement).clientWidth / 2,
-      y: (e.currentTarget as HTMLElement).getBoundingClientRect().top - 8,
-    }));
+    setMobileZoomPreview({ kind: "waifu", filename, baseHeight, title });
+  };
+
+  const handleBadgeClick = (e: React.MouseEvent, user: UserType | undefined, baseHeight: number) => {
+    if (!user) return;
+    if (!isTouch) return;
+    e.stopPropagation();
+    setMobileZoomPreview({
+      kind: "badge",
+      src: getTitleImgPath(user),
+      alt: "User badge",
+      baseHeight,
+    });
   };
 
   // Validate props
@@ -793,15 +834,17 @@ export default function CommentDetail({
                 </Link>
                 <img
                   className="h-8 transition-transform duration-200 will-change-transform md:hover:scale-150 md:hover:z-10 relative"
-                  style={{ top: '-2px' }}
+                  style={{ top: "-2px" }}
                   src={getTitleImgPath(reply.userId)}
                   alt="User badge"
+                  role={isTouch ? "button" : undefined}
+                  onClick={(e) => handleBadgeClick(e, reply.userId, 32)}
                 />
                 <div
                   className="relative cursor-pointer select-none"
                   onMouseEnter={(e) => handleWaifuHover(e, (reply as any)?.userId?.waifuFilename)}
                   onMouseLeave={handleWaifuLeave}
-                  onClick={(e) => handleWaifuClick(e, (reply as any)?.userId?.waifuFilename)}
+                  onClick={(e) => handleWaifuClick(e, (reply as any)?.userId?.waifuFilename, 32, reply.userId?.name)}
                   role="button"
                   aria-label="Xem waifu"
                 >
@@ -1027,15 +1070,17 @@ export default function CommentDetail({
                               </Link>
                               <img
                                 className="h-10 transition-transform duration-200 will-change-transform md:hover:scale-150 md:hover:z-10 relative"
-                                style={{ top: '-2px' }}
+                                style={{ top: "-2px" }}
                                 src={getTitleImgPath(comment.userId)}
                                 alt="User badge"
+                                role={isTouch ? "button" : undefined}
+                                onClick={(e) => handleBadgeClick(e, comment.userId, 40)}
                               />
                               <div
                                 className="relative cursor-pointer select-none"
                                 onMouseEnter={(e) => handleWaifuHover(e, (comment as any)?.userId?.waifuFilename)}
                                 onMouseLeave={handleWaifuLeave}
-                                onClick={(e) => handleWaifuClick(e, (comment as any)?.userId?.waifuFilename)}
+                                onClick={(e) => handleWaifuClick(e, (comment as any)?.userId?.waifuFilename, 40, comment.userId?.name)}
                                 role="button"
                                 aria-label="Xem waifu"
                               >
@@ -1190,7 +1235,7 @@ export default function CommentDetail({
           setGifDialogOpen(false);
         }}
       />
-      {previewUser && <PreviewModal user={previewUser} onClose={closePreview} />}
+      {mobileZoomPreview && <MobileZoomModal preview={mobileZoomPreview} onClose={closeMobileZoom} />}
       {waifuPopover && (
         <div
           className="pointer-events-none fixed z-[2000] -translate-x-1/2 -translate-y-full animate-in fade-in zoom-in duration-150"
