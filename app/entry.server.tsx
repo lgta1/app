@@ -8,6 +8,7 @@ import { PassThrough } from "node:stream";
 
 import { ENV } from "@/configs/env.config";
 import { initLeaderboardScheduler } from "@/jobs/leaderboard.server";
+import { initSitemapScheduler } from "@/jobs/sitemap.server";
 import {
   getCanonicalHostname,
   rewriteLegacySiteHostsDeepInPlace,
@@ -24,6 +25,7 @@ initMongoDB();
 // Initialize Leaderboard Scheduler (chỉ chạy ở production)
 if (ENV.IS_PRODUCTION) {
   initLeaderboardScheduler();
+  initSitemapScheduler();
 }
 
 export default function handleRequest(
