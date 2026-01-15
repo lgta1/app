@@ -19,9 +19,9 @@ interface SummonHistoryDialogProps {
 
 /* ====== THÊM: mốc hiển thị UI & mốc cuối để tính phần trăm ====== */
 // Loại bỏ mốc 0 khỏi UI (đúng theo thiết kế)
-const UI_MILESTONES = [...GIFT_MILESTONES]; // [50, 100, 200, 400]
+const UI_MILESTONES = [...GIFT_MILESTONES]; // [50, 100, 200, 500]
 const LAST_MILESTONE =
-  GIFT_MILESTONES[GIFT_MILESTONES.length - 1] ?? 400; // mốc cuối cùng (400)
+  GIFT_MILESTONES[GIFT_MILESTONES.length - 1] ?? 500; // mốc cuối cùng (500)
 
 export function SummonHistoryDialog({
   open,
@@ -142,11 +142,22 @@ export function SummonHistoryDialog({
       const updatedGold = json?.data?.gold;
       if (typeof updatedGold === "number") {
         // Compute reward gold from config (prefer config over diff to avoid race)
-        const rewardCfg = MILESTONE_REWARDS[milestone as keyof typeof MILESTONE_REWARDS]?.gold ?? 0;
-        setGoldAward(rewardCfg);
-        setGoldAfter(updatedGold);
-        // Infer before if not captured: updated - reward
-        if (goldBefore === null) setGoldBefore(updatedGold - rewardCfg);
+        const rewardCfg =
+          MILESTONE_REWARDS[milestone as keyof typeof MILESTONE_REWARDS]?.gold ?? 0;
+        const rewardGold = typeof rewardCfg === "number" ? rewardCfg : 0;
+
+        // Only show gold-related UI when rewardGold > 0
+        if (rewardGold > 0) {
+          setGoldAward(rewardGold);
+          setGoldAfter(updatedGold);
+          // Infer before if not captured: updated - reward
+          if (goldBefore === null) setGoldBefore(updatedGold - rewardGold);
+        } else {
+          setGoldAward(null);
+          setGoldAfter(null);
+          setGoldBefore(null);
+        }
+
         setUserGold(updatedGold);
       }
       if (w && w.image && w.stars) {
@@ -182,7 +193,7 @@ export function SummonHistoryDialog({
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col items-center gap-4">
                   <h1 className="text-txt-primary text-center font-sans text-xl leading-9 font-semibold sm:text-3xl">
-                    Lịch sử triệu hồi
+                    Nhận Thưởng
                   </h1>
                   {/* Progress Bar + Milestones */}
                   <div className="relative mt-2 h-[120px] w-full">
@@ -288,7 +299,7 @@ export function SummonHistoryDialog({
                 )}
                 {!isLoading && !error && historyData.length === 0 && (
                   <div className="py-8 text-center">
-                    <div className="text-txt-secondary font-sans text-base leading-6 font-medium">Chưa có lịch sử triệu hồi</div>
+                    <div className="text-txt-secondary font-sans text-base leading-6 font-medium">Chưa có dữ liệu triệu hồi</div>
                   </div>
                 )}
                 {!isLoading &&

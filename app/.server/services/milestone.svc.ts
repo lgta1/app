@@ -31,11 +31,16 @@ export const awardMilestone = async (options: {
   }
 
   const reward = MILESTONE_REWARDS[milestone];
-  const inc: Record<string, number> = { gold: reward.gold };
+  const inc: Record<string, number> = {};
+  if (typeof reward.gold === "number" && reward.gold !== 0) {
+    inc.gold = reward.gold;
+  }
 
   const updated = await UserModel.findOneAndUpdate(
     { _id: userId, claimedMilestones: { $ne: milestone } },
-    { $inc: inc, $addToSet: { claimedMilestones: milestone } },
+    Object.keys(inc).length > 0
+      ? { $inc: inc, $addToSet: { claimedMilestones: milestone } }
+      : { $addToSet: { claimedMilestones: milestone } },
     { new: true },
   ).lean();
 
@@ -117,7 +122,10 @@ export const awardMilestone = async (options: {
 
   return {
     success: true,
-    message: `Nhận thưởng mốc ${milestone} thành công (+${reward.gold} Vàng)`,
+    message:
+      typeof reward.gold === "number" && reward.gold > 0
+        ? `Nhận thưởng mốc ${milestone} thành công (+${reward.gold} Vàng)`
+        : `Nhận thưởng mốc ${milestone} thành công`,
     data: { gold: updated.gold, milestone, waifu: bonusWaifu, sessionCookie },
   };
 };

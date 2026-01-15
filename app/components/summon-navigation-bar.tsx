@@ -45,7 +45,7 @@ export function SummonNavigationBar({ navItems, onGuideClick, onHistoryClick, us
               onClick={onHistoryClick}
               className="rounded-[32px] border border-white/70 bg-black/55 px-3 py-1.5 text-xs text-white shadow-[0_6px_24px_rgba(0,0,0,.35)] backdrop-blur-sm transition-colors hover:bg-black/70 sm:px-5 sm:py-3 sm:text-base"
             >
-              <div className="font-semibold">Lịch sử</div>
+              <div className="font-semibold">Nhận Thưởng</div>
             </button>
           )}
           {onGuideClick && (

@@ -30,6 +30,10 @@ export const summon = async (
   cum: PityCumulativeType,
   request?: Request,
 ) => {
+  const bannerIdStr =
+    (banner as any)?._id?.toString?.() ?? (banner as any)?.id?.toString?.() ?? "";
+  if (!bannerIdStr) throw new BusinessError("Thiếu bannerId");
+
   let reachedMilestone: number | false = false;
   let updatedSession = null;
 
@@ -109,7 +113,7 @@ export const summon = async (
     } catch {}
 
     await UserWaifuModel.create({
-      bannerId: banner.id,
+      bannerId: bannerIdStr,
       userId: user.id,
       waifuId: expItem?.id,
       waifuName: expItem?.name,
@@ -156,10 +160,82 @@ export const summon = async (
 
   await grantWaifu({
     userId: user.id,
-    bannerId: banner.id,
+    bannerId: bannerIdStr,
     waifuId: waifu.id,
     waifuName: waifu.name,
     waifuStars: waifu.stars,
+  });
+
+  return {
+    type: "waifu",
+    itemStar,
+    item: waifu,
+    updatedSession,
+    milestoneReached: reachedMilestone || null,
+  };
+};
+
+const summonForcedWaifuStar = async (
+  user: UserType,
+  banner: BannerType,
+  itemStar: number,
+  request?: Request,
+) => {
+  const bannerIdStr =
+    (banner as any)?._id?.toString?.() ?? (banner as any)?.id?.toString?.() ?? "";
+  if (!bannerIdStr) throw new BusinessError("Thiếu bannerId");
+  if (itemStar < 3) throw new BusinessError("Forced waifu phải từ 3 sao trở lên");
+
+  let reachedMilestone: number | false = false;
+  let updatedSession = null;
+
+  if (banner.isRateUp) {
+    const userFull = await UserModel.findOneAndUpdate(
+      { _id: user.id },
+      { $inc: { summonCount: 1 } },
+      { new: true },
+    ).lean();
+    reachedMilestone = await checkEligibleGift(userFull?.summonCount ?? 0);
+  }
+
+  let waifu: any = null;
+
+  // Rate-up selection (still applies, but fixed star)
+  if (banner?.isRateUp && Math.random() * 100 < RATE_UP_PERCENT) {
+    const waifuRateUpList = (banner.waifuList || []).filter((w: any) => w.stars === itemStar);
+    if (waifuRateUpList.length > 0) {
+      waifu = waifuRateUpList[Math.floor(Math.random() * waifuRateUpList.length)];
+    }
+  }
+
+  // Global pool fallback
+  if (!waifu) {
+    const waifuCount = await WaifuModel.countDocuments({ stars: itemStar });
+    if (waifuCount <= 0) throw new BusinessError("Không tìm thấy waifu phù hợp");
+    const waifuIndex = Math.floor(Math.random() * waifuCount);
+    waifu = await WaifuModel.findOne({ stars: itemStar }).skip(waifuIndex).lean();
+  }
+
+  try {
+    const nextImg = normalizeWaifuImageUrl((waifu as any)?.image);
+    if (waifu && nextImg) (waifu as any).image = nextImg;
+  } catch {}
+
+  if (waifu && typeof (waifu as any).image === "string") {
+    const nextImg = normalizeWaifuImageUrl((waifu as any).image);
+    if (nextImg) (waifu as any).image = nextImg;
+  }
+
+  if (!waifu) throw new BusinessError("Không tìm thấy waifu");
+
+  await cleanupUserSummonHistory(user.id, 50);
+
+  await grantWaifu({
+    userId: user.id,
+    bannerId: bannerIdStr,
+    waifuId: (waifu as any)?.id ?? (waifu as any)?._id?.toString?.() ?? "",
+    waifuName: (waifu as any)?.name,
+    waifuStars: (waifu as any)?.stars,
   });
 
   return {
@@ -246,7 +322,7 @@ export const summonGuaranteedWaifu = async (
     itemStar: starWanted,
     item: waifu,
     milestoneReached: reachedMilestone,
-    createdUserWaifuId: (created as any)?._id?.toString?.() ?? null,
+    createdUserWaifuId: null,
   };
 };
 
@@ -257,14 +333,25 @@ export const multiSummon = async (
   count: number,
   request?: Request,
 ) => {
-  const summons = Array(count).fill(null);
-
   const summonResults: any[] = [];
 
-  await Promise.each(summons, async () => {
-    const result = await summon(user, banner, cum, request);
-    summonResults.push(result);
-  });
+  // Special offer for 10-roll (cost 9): guarantee exactly one 3★ waifu in a random position.
+  if (count === 10) {
+    const guaranteedIndex = Math.floor(Math.random() * 10);
+    for (let i = 0; i < 10; i++) {
+      const result =
+        i === guaranteedIndex
+          ? await summonForcedWaifuStar(user, banner, 3, request)
+          : await summon(user, banner, cum, request);
+      summonResults.push(result);
+    }
+  } else {
+    const summons = Array(count).fill(null);
+    await Promise.each(summons, async () => {
+      const result = await summon(user, banner, cum, request);
+      summonResults.push(result);
+    });
+  }
 
   // Tìm session đã được update (nếu có)
   const updatedSession =

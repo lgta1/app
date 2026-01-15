@@ -9,9 +9,9 @@ interface WaifuGuideDialogProps {
 export function WaifuGuideDialog({ open, onOpenChange, banner }: WaifuGuideDialogProps) {
   const milestoneRewards: Array<{ threshold: number; reward: string }> = [
     { threshold: 50, reward: "+5 Vàng" },
-    { threshold: 100, reward: "+10 Vàng + 1 Waifu 3★ (khi mở quà)" },
-    { threshold: 200, reward: "+20 Vàng + 1 Waifu 4★ (khi mở quà)" },
-    { threshold: 400, reward: "+40 Vàng + 1 Waifu 5★ (khi mở quà)" },
+    { threshold: 100, reward: "1 Waifu 3★ (khi mở quà)" },
+    { threshold: 200, reward: "1 Waifu 4★ (khi mở quà)" },
+    { threshold: 500, reward: "1 Waifu 5★ (khi mở quà)" },
   ];
 
   return (
@@ -50,7 +50,11 @@ export function WaifuGuideDialog({ open, onOpenChange, banner }: WaifuGuideDialo
                   </li>
                   <li>
                     <span>10 lượt: </span>
-                    <span className="text-txt-focus font-medium">tốn 9 Dâm Ngọc</span>
+                    <span className="text-txt-focus font-medium">tốn 9 Dâm Ngọc và chắc chắn ra waifu 3 sao</span>
+                  </li>
+                  <li>
+                    <span className="text-txt-focus font-medium">Ghi chú: </span>
+                    Tỉ lệ Triệu Hồi sẽ tăng dần theo Tu Vi, ví dụ tại cảnh giới Lọ Vương, tỉ lệ ra WF5S cao gấp 4 lần so với Nhập Lọ
                   </li>
                   <li>
                     <span className="text-txt-focus font-medium">Đặc biệt: </span>
