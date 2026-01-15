@@ -41,6 +41,8 @@ type Props = {
   imgFetchPriority?: "high" | "low" | "auto";
   /** Ẩn gradient nền dưới (dưới phần ảnh và meta) để tránh flicker ở carousel mobile */
   hideBottomOverlay?: boolean;
+  /** Make the <1h time badge stick to the top-right corner (only for LatestUpdates on index). */
+  cornerTimeBadge?: boolean;
 };
 
 export function MangaCard({
@@ -53,6 +55,7 @@ export function MangaCard({
   imgLoading = "lazy",
   imgFetchPriority = "high",
   hideBottomOverlay = false,
+  cornerTimeBadge = false,
 }: Props) {
   const matches = useMatches();
   const rootData: any = matches.find((m) => m.id === "root")?.data;
@@ -93,6 +96,10 @@ export function MangaCard({
     if (diffMin < 60) return `${diffMin}p trc`;
     return undefined; // >=1h: không hiển thị
   })();
+
+  const timeBadgeClassName = cornerTimeBadge
+    ? "pointer-events-none absolute top-0 right-0 z-[4] select-none rounded-none rounded-bl-lg px-2 py-0.5 text-xs font-semibold text-white shadow-[0_1px_6px_rgba(0,0,0,0.55)]"
+    : "pointer-events-none absolute top-2 right-2 z-[4] select-none rounded-full px-2 py-0.5 text-xs font-semibold text-white shadow-[0_1px_6px_rgba(0,0,0,0.55)]";
 
   const isBannerDesktop = variant === "bannerDesktop";
   // Blacklist overlay:
@@ -197,7 +204,7 @@ export function MangaCard({
           {/* Thời gian ở góc phải với shimmer đỏ chậm */}
           {timeLabel ? (
             <span
-              className="pointer-events-none absolute top-2 right-2 z-[4] select-none rounded-full px-2 py-0.5 text-xs font-semibold text-white shadow-[0_1px_6px_rgba(0,0,0,0.55)]"
+              className={timeBadgeClassName}
               style={{
                 backgroundImage:
                   "linear-gradient(100deg, rgba(244,63,94,0.4) 0%, rgba(244,63,94,0.95) 20%, rgba(244,63,94,0.4) 40%, rgba(244,63,94,0.95) 60%, rgba(244,63,94,0.4) 80%)",

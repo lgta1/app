@@ -195,6 +195,7 @@ export function LatestUpdates({
                   manga={manga}
                   compact
                   boostTitle
+                  cornerTimeBadge={indexMode}
                   imgLoading="lazy"
                   imgFetchPriority={useLazyCards ? "high" : "auto"}
                 />
