@@ -23,6 +23,7 @@ import {
 import { useFileOperations } from "~/hooks/use-file-operations"; // giống chapter.create
 import { MangaDetail } from "~/components/manga-detail";
 import { compressMultipleImages, normalizePosterImage } from "~/utils/image-compression.utils";
+import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
 
 import { getChaptersByMangaId } from "@/queries/chapter.query";
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
@@ -601,21 +602,23 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         // upload 1 lần cho cả chapter (sau nén nếu có)
         let results: Array<{ url?: string; path?: string; location?: string; key?: string }>;
         try {
-          const selectWatermarkIndexes = (total: number, ratio: number) => {
-            const count = Math.floor(total / ratio);
-            if (count <= 0) return new Set<number>();
-            const indexes = Array.from({ length: total }, (_, i) => i);
-            for (let i = indexes.length - 1; i > 0; i--) {
-              const randArray = typeof crypto !== "undefined" && crypto.getRandomValues ? crypto.getRandomValues(new Uint32Array(1))[0] : Math.floor(Math.random() * 0xffffffff);
-              const j = randArray % (i + 1);
-              [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+          const watermarkIndexes = selectWatermarkIndexes(effectiveList.length);
+
+          let watermarkOrder = 0;
+          const filesToUpload = effectiveList.map((f, idx) => {
+            const shouldWatermark = watermarkIndexes.has(idx);
+            if (!shouldWatermark) {
+              return { file: f, options: { prefixPath: "manga-images" } };
             }
-            return new Set(indexes.slice(0, count));
-          };
 
-          const watermarkIndexes = selectWatermarkIndexes(effectiveList.length, 5);
+            watermarkOrder += 1;
+            const watermarkVariant = watermarkOrder % 2 === 1 ? (1 as const) : (2 as const);
 
-          const filesToUpload = effectiveList.map((f, idx) => ({ file: f, options: { prefixPath: "manga-images", watermark: watermarkIndexes.has(idx) } }));
+            return {
+              file: f,
+              options: { prefixPath: "manga-images", watermark: true, watermarkVariant },
+            };
+          });
           results = await uploadMultipleFiles(filesToUpload);
         } catch (err: any) {
           console.error("[bulk] Upload failed at", chap, err);

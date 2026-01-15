@@ -15,6 +15,7 @@ import {
   formatFileSize,
   validateImageFile,
 } from "~/utils/image-compression.utils";
+import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
 
 // BEGIN <feature> CHAPTER_LOADER_IMPORTS_PERMISSION>
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
@@ -427,29 +428,28 @@ export default function CreateChapter() {
 
     setIsSubmitting(true);
 
-    const selectWatermarkIndexes = (total: number, ratio: number) => {
-      const count = Math.floor(total / ratio);
-      if (count <= 0) return new Set<number>();
-      const indexes = Array.from({ length: total }, (_, i) => i);
-      // Fisher-Yates shuffle using crypto when available
-      for (let i = indexes.length - 1; i > 0; i--) {
-        const randArray = typeof crypto !== "undefined" && crypto.getRandomValues ? crypto.getRandomValues(new Uint32Array(1))[0] : Math.floor(Math.random() * 0xffffffff);
-        const j = randArray % (i + 1);
-        [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
-      }
-      return new Set(indexes.slice(0, count));
-    };
-
-    const watermarkIndexes = selectWatermarkIndexes(contents.length, 5);
+    const watermarkIndexes = selectWatermarkIndexes(contents.length);
 
     // Prepare files for upload - only content pages
-    const filesToUpload = contents.map((file, idx) => ({
-      file,
-      options: {
-        prefixPath: "manga-images",
-        watermark: watermarkIndexes.has(idx),
-      },
-    }));
+    let watermarkOrder = 0;
+    const filesToUpload = contents.map((file, idx) => {
+      const shouldWatermark = watermarkIndexes.has(idx);
+      if (!shouldWatermark) {
+        return { file, options: { prefixPath: "manga-images" } };
+      }
+
+      watermarkOrder += 1;
+      const watermarkVariant = watermarkOrder % 2 === 1 ? (1 as const) : (2 as const);
+
+      return {
+        file,
+        options: {
+          prefixPath: "manga-images",
+          watermark: true,
+          watermarkVariant,
+        },
+      };
+    });
 
     setUploadProgress({ current: 0, total: filesToUpload.length, active: true });
 

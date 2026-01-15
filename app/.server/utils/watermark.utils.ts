@@ -15,6 +15,7 @@ const LIMIT_PIXELS = 20000 * 20000; // guardrail against huge images
 
 const watermarkPath = path.join(process.cwd(), "public", "images", "logo-watermark.webp");
 let cachedWatermark: Buffer | null = null;
+let cachedWatermarkMeta: sharp.Metadata | null = null;
 
 async function loadWatermarkBuffer(): Promise<Buffer | null> {
   if (cachedWatermark) return cachedWatermark;
@@ -28,8 +29,25 @@ async function loadWatermarkBuffer(): Promise<Buffer | null> {
   }
 }
 
-export async function applyWatermark(buffer: Buffer): Promise<WatermarkResult> {
+async function loadWatermarkMeta(): Promise<sharp.Metadata | null> {
+  if (cachedWatermarkMeta) return cachedWatermarkMeta;
+  const buf = await loadWatermarkBuffer();
+  if (!buf) return null;
+  try {
+    cachedWatermarkMeta = await sharp(buf, { limitInputPixels: LIMIT_PIXELS }).metadata();
+    return cachedWatermarkMeta;
+  } catch (error) {
+    console.error("[watermark] cannot read watermark metadata", error);
+    return null;
+  }
+}
 
+export async function applyWatermark(
+  buffer: Buffer,
+  opts?: {
+    variant?: 1 | 2;
+  },
+): Promise<WatermarkResult> {
   let image = sharp(buffer, { limitInputPixels: LIMIT_PIXELS });
   let metadata;
   try {
@@ -47,32 +65,196 @@ export async function applyWatermark(buffer: Buffer): Promise<WatermarkResult> {
   const watermark = await loadWatermarkBuffer();
   if (!watermark) return { buffer, applied: false };
 
+  const watermarkMeta = await loadWatermarkMeta();
+  if (!watermarkMeta) return { buffer, applied: false };
+
   const width = metadata.width ?? 0;
-  if (width < 200) {
+  const height = metadata.height ?? 0;
+  if (width < 200 || height < 200) {
     return { buffer, applied: false };
   }
 
-  const targetWidth = Math.min(Math.round(width * 0.15), width - 1);
-  let watermarkResized: Buffer;
+  // Re-decode via sharp to ensure consistent processing; do NOT draw directly on the original image.
+  image = sharp(buffer, { limitInputPixels: LIMIT_PIXELS });
+
+  // 1) Decide strip height based on logo height.
+  // Spec: stripHeight = logoHeight.
+  const baseLogoW = watermarkMeta.width ?? 0;
+  const baseLogoH = watermarkMeta.height ?? 0;
+  if (!baseLogoW || !baseLogoH) {
+    return { buffer, applied: false };
+  }
+  const logoAspect = baseLogoW / baseLogoH;
+
+  const maxGroupWidth = Math.floor(width * 0.95);
+  const messages = [
+    "Truyện được đăng và đã cập nhật chương sau tại",
+    "Đọc Hentai KHÔNG QUẢNG CÁO làm phiền tại",
+  ] as const;
+  const message = opts?.variant === 2 ? messages[1] : messages[0];
+
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+  // Layout tuning
+  const charFactor = 0.55; // rough width/height ratio for sans fonts
+  const minFont = 12;
+  const minLogoH = 24;
+  const maxLogoH = 110;
+
+  // IMPORTANT: size watermark based on the (already-optimized) uploaded image,
+  // not the watermark asset's native pixels. This keeps consistent proportions
+  // across same aspect ratio but different resolutions.
+  // ~5.5% of image height, clamped.
+  let logoH = clamp(Math.round(height * 0.055), minLogoH, maxLogoH);
+  let stripHeight = Math.max(1, Math.ceil(logoH));
+  let fontSize = clamp(Math.floor(stripHeight * 0.6), minFont, Math.max(minFont, stripHeight - 4));
+  let gap = 0;
+  let logoW = Math.max(1, Math.floor(logoH * logoAspect));
+  let textW = Math.ceil(message.length * fontSize * charFactor);
+  let groupW = textW + gap + logoW;
+
+  // Keep some padding so it never clips at the edges.
+  const maxIters = 6;
+  for (let i = 0; i < maxIters && groupW > maxGroupWidth; i++) {
+    const scale = maxGroupWidth / groupW;
+    logoH = Math.max(minLogoH, Math.floor(logoH * scale));
+    stripHeight = Math.max(1, Math.ceil(logoH));
+    fontSize = clamp(Math.floor(stripHeight * 0.6), minFont, Math.max(minFont, stripHeight - 4));
+    gap = 0;
+    logoW = Math.max(1, Math.floor(logoH * logoAspect));
+    textW = Math.ceil(message.length * fontSize * charFactor);
+    groupW = textW + gap + logoW;
+  }
+
+  const canvasHeight = height + stripHeight;
+
+  // 2) Build blurred strip background from the original image.
+  const cropH = Math.max(1, Math.min(height, stripHeight));
+  let stripBg: Buffer;
   try {
-    watermarkResized = await sharp(watermark, { limitInputPixels: LIMIT_PIXELS })
-      .resize(targetWidth, undefined, { fit: "inside", withoutEnlargement: true })
+    stripBg = await sharp(buffer, { limitInputPixels: LIMIT_PIXELS })
+      .extract({ left: 0, top: 0, width, height: cropH })
+      .resize(width, stripHeight, { fit: "cover" })
+      .blur(12)
       .png()
       .toBuffer();
   } catch (error) {
-    console.error("[watermark] resize failed", error);
+    console.error("[watermark] strip background failed", error);
     return { buffer, applied: false };
   }
 
-  const margin = 0;
-
+  // 3) Resize logo to fit inside strip (keep aspect). Keep it sharp (no blur).
+  let logoBuf: Buffer;
   try {
-    const composited = await sharp(buffer, { limitInputPixels: LIMIT_PIXELS })
-      .composite([{ input: watermarkResized, left: margin, top: margin }])
-      .toFormat(format as any)
-      .toBuffer();
+    const logo = sharp(watermark, { limitInputPixels: LIMIT_PIXELS }).resize(undefined, logoH, {
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+    logoBuf = await logo.png().toBuffer();
+  } catch (error) {
+    console.error("[watermark] logo resize failed", error);
+    return { buffer, applied: false };
+  }
 
-    return { buffer: composited, applied: true, format };
+  // Use actual resized logo dimensions (avoid any mismatch due to fit/rounding).
+  let actualLogoW = 0;
+  let actualLogoH = 0;
+  try {
+    const meta = await sharp(logoBuf, { limitInputPixels: LIMIT_PIXELS }).metadata();
+    actualLogoW = meta.width ?? 0;
+    actualLogoH = meta.height ?? 0;
+  } catch {
+    // ignore
+  }
+  if (!actualLogoW || !actualLogoH) return { buffer, applied: false };
+
+  // 5) Pick text color based on blurred strip average luminance.
+  let isBgLight = false;
+  try {
+    const { data, info } = await sharp(stripBg).resize(1, 1, { fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
+    if (info.channels >= 3 && data.length >= 3) {
+      const r = data[0] ?? 0;
+      const g = data[1] ?? 0;
+      const b = data[2] ?? 0;
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      isBgLight = luminance > 140;
+    }
+  } catch {
+    // ignore and default to white text
+  }
+
+  const fill = isBgLight ? "#111111" : "#FFFFFF";
+  const stroke = isBgLight ? "#FFFFFF" : "#000000";
+
+  // 6) Place text + logo as one centered row.
+  // Text size ~75–80% logo height (already derived via fontSize above).
+  // Keep a small padding to avoid clipping.
+  const padX = Math.max(10, Math.floor(width * 0.02));
+  const groupWidth = Math.min(maxGroupWidth, textW + gap + actualLogoW);
+  const startX = Math.max(padX, Math.floor((width - groupWidth) / 2));
+  const textX = startX;
+  const textY = Math.floor(stripHeight / 2);
+  const logoX = Math.min(width - padX - actualLogoW, Math.floor(textX + textW + gap));
+  const logoY = Math.max(0, Math.floor((stripHeight - actualLogoH) / 2));
+
+  // 7) Render text as SVG overlay (with thin outline + shadow).
+  const strokeWidth = Math.max(1, Math.floor(fontSize * 0.08));
+  const escapeXml = (s: string) =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const textSvg = Buffer.from(
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}">\n` +
+      `  <defs>\n` +
+      `    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">\n` +
+      `      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="${stroke}" flood-opacity="0.55"/>\n` +
+      `    </filter>\n` +
+      `  </defs>\n` +
+      `  <text x="${textX}" y="${textY}" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="700" dominant-baseline="middle" text-anchor="start"\n` +
+      `        fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" paint-order="stroke" filter="url(#shadow)">\n` +
+      `    ${escapeXml(message)}\n` +
+      `  </text>\n` +
+      `</svg>\n`,
+    "utf-8",
+  );
+
+  // 8) Compose: [strip bg] + [original image] + [text] + [logo].
+  try {
+    const base = sharp({
+      create: {
+        width,
+        height: canvasHeight,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+      limitInputPixels: LIMIT_PIXELS,
+    });
+
+    const composited = base
+      .composite([
+        { input: stripBg, left: 0, top: 0 },
+        { input: buffer, left: 0, top: stripHeight },
+        { input: textSvg, left: 0, top: 0 },
+        { input: logoBuf, left: logoX, top: logoY },
+      ]);
+
+    let out: Buffer;
+    if (format === "jpeg" || format === "jpg") {
+      out = await composited.jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+    } else if (format === "webp") {
+      out = await composited.webp({ quality: 92, effort: 4 }).toBuffer();
+    } else if (format === "png") {
+      out = await composited.png({ compressionLevel: 9 }).toBuffer();
+    } else {
+      out = await composited.toFormat(format as any).toBuffer();
+    }
+
+    return { buffer: out, applied: true, format };
   } catch (error) {
     console.error("[watermark] composite failed", error);
     return { buffer, applied: false };

@@ -99,12 +99,14 @@ export async function action({ request }: Route.ActionArgs) {
     let file: File;
     let prefixPath: string;
     let watermarkFlagRaw: FormDataEntryValue | null = null;
+    let watermarkVariantRaw: FormDataEntryValue | null = null;
 
     try {
       formData = await request.formData();
       file = formData.get("file") as File;
       prefixPath = (formData.get("prefixPath") as string) || "uploads";
       watermarkFlagRaw = formData.get("watermark");
+      watermarkVariantRaw = formData.get("watermarkVariant");
     } catch (error) {
       console.error("Error parsing form data:", error);
       return Response.json(
@@ -176,7 +178,16 @@ export async function action({ request }: Route.ActionArgs) {
     // Apply server-side watermark only for manga page uploads when explicitly requested
     const shouldWatermark = validPrefixPath.startsWith("manga-images");
     const watermarkRequested = typeof watermarkFlagRaw === "string" && ["true", "1", "yes"].includes(watermarkFlagRaw.toLowerCase());
-    const watermarkResult = shouldWatermark && watermarkRequested ? await applyWatermark(buffer) : { buffer, applied: false };
+    const watermarkVariant =
+      typeof watermarkVariantRaw === "string" && /^\d+$/.test(watermarkVariantRaw)
+        ? Number.parseInt(watermarkVariantRaw, 10)
+        : undefined;
+    const watermarkResult =
+      shouldWatermark && watermarkRequested
+        ? await applyWatermark(buffer, {
+            variant: watermarkVariant === 2 ? 2 : watermarkVariant === 1 ? 1 : undefined,
+          })
+        : { buffer, applied: false };
     const effectiveBuffer = watermarkResult.buffer;
     const effectiveContentType =
       watermarkResult.applied && watermarkResult.format

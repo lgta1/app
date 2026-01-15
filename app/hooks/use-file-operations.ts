@@ -9,6 +9,7 @@ interface UploadFileOptions {
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
   watermark?: boolean;
+  watermarkVariant?: 1 | 2;
 }
 
 interface UploadedFileResult {
@@ -101,6 +102,10 @@ export function useFileOperations() {
 
       if (options.watermark) {
         formData.append("watermark", "true");
+
+        if (options.watermarkVariant) {
+          formData.append("watermarkVariant", String(options.watermarkVariant));
+        }
       }
 
       submit(formData, {
@@ -124,6 +129,10 @@ export function useFileOperations() {
 
       if (options.watermark) {
         formData.append("watermark", "true");
+
+        if (options.watermarkVariant) {
+          formData.append("watermarkVariant", String(options.watermarkVariant));
+        }
       }
 
       // Store callbacks before submitting
@@ -243,6 +252,10 @@ export function useFileOperations() {
 
           if (options.watermark) {
             formData.append("watermark", "true");
+
+            if (options.watermarkVariant) {
+              formData.append("watermarkVariant", String(options.watermarkVariant));
+            }
           }
 
           const response = await fetch("/api/files/upload", {
@@ -310,6 +323,10 @@ export function useFileOperations() {
 
         if (options.watermark) {
           formData.append("watermark", "true");
+
+          if (options.watermarkVariant) {
+            formData.append("watermarkVariant", String(options.watermarkVariant));
+          }
         }
 
         const response = await fetch("/api/files/upload", {
