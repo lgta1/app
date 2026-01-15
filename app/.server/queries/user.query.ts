@@ -15,6 +15,7 @@ export const getTopUser = async (limit: number = 10) => {
 
   return (users as any[]).map((u) => ({
     ...u,
+    id: u?.id ?? u?._id?.toString?.() ?? String(u?._id ?? ""),
     avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
   }));
 };
@@ -76,6 +77,7 @@ export const getListUser = async (
 
   return (users as any[]).map((u) => ({
     ...u,
+    id: u?.id ?? u?._id?.toString?.() ?? String(u?._id ?? ""),
     avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
   }));
 };
@@ -116,6 +118,7 @@ export const getListModAndAdmin = async (search?: string) => {
 
   return (users as any[]).map((u) => ({
     ...u,
+    id: u?.id ?? u?._id?.toString?.() ?? String(u?._id ?? ""),
     avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
   }));
 };
@@ -138,6 +141,7 @@ export const getListDichGia = async (search?: string) => {
 
   return (users as any[]).map((u) => ({
     ...u,
+    id: u?.id ?? u?._id?.toString?.() ?? String(u?._id ?? ""),
     avatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
   }));
 };
