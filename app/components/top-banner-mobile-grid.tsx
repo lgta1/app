@@ -88,7 +88,7 @@ export default function TopBannerMobileGrid({
   const Skeleton = () => {
     const dots = Math.max(3, Math.min(6, Math.ceil(Math.max(1, columns.length || 3))));
     return (
-      <div className="relative w-full" data-mobile-hot-grid>
+      <div className="relative -mx-2 overflow-hidden sm:mx-0" data-mobile-hot-grid>
         <div
           className="grid grid-cols-2"
           style={{ columnGap: spaceX, rowGap: spaceY }}
@@ -116,7 +116,7 @@ export default function TopBannerMobileGrid({
 
   // Each slide = 1 column => 5 slides => 5 bullets. Autoplay moves 1 column.
   return (
-    <div className="relative w-full overflow-hidden" data-mobile-hot-grid>
+    <div className="relative overflow-hidden -mx-2 sm:mx-0" data-mobile-hot-grid>
   {/* No extra keyframes: HOT badge uses static gradient (no shimmer) */}
       <Swiper
         onSwiper={(instance) => {
@@ -224,6 +224,35 @@ export default function TopBannerMobileGrid({
           backdrop-filter: blur(4px);
           border-radius: 12px;
           transform: translateY(-3px); /* nudge up */
+        }
+
+        /* Flush to the carousel edges (Swiper defaults to an inset). */
+        .swiper_columns .swiper-button-prev { left: 0; }
+        .swiper_columns .swiper-button-next { right: 0; }
+
+        /* Mobile usability: expand tap hitbox without changing visuals/layout.
+           Requirement: W x H = 66 x 99 (x2 width, x3 height vs 33px visual button). */
+        @media (pointer: coarse) {
+          .swiper_columns .swiper-button-prev:before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 66px;
+            height: 99px;
+            background: transparent;
+          }
+          .swiper_columns .swiper-button-next:before {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 66px;
+            height: 99px;
+            background: transparent;
+          }
         }
         .swiper_columns .swiper-button-next:after, .swiper_columns .swiper-button-prev:after {
           font-size: 16px;

@@ -128,14 +128,30 @@ export async function applyWatermark(
 
   const canvasHeight = height + stripHeight;
 
-  // 2) Build blurred strip background from the original image.
-  const cropH = Math.max(1, Math.min(height, stripHeight));
+  // 2) Build blurred strip background.
+  // New rule (15/01/2026): use the overflow from a 1.5x scaled version of the original image
+  // as the background for the extra strip.
+  // Then increase blur strength by +40%.
   let stripBg: Buffer;
   try {
+    const scale = 1.5;
+    const scaledW = Math.max(1, Math.round(width * scale));
+    const scaledH = Math.max(1, Math.round(height * scale));
+
+    // If we draw the scaled image centered on the original image area (which starts at y=stripHeight),
+    // the scaled image overflows above the strip. Map that overflow to a crop inside the scaled image.
+    const idealLeft = (scaledW - width) / 2; // 0.25w when scale=1.5
+    const idealTop = (scaledH - height) / 2 - stripHeight; // 0.25h - stripHeight when scale=1.5
+
+    const extractLeft = Math.max(0, Math.min(Math.round(idealLeft), Math.max(0, scaledW - width)));
+    const extractTop = Math.max(0, Math.min(Math.round(idealTop), Math.max(0, scaledH - stripHeight)));
+
+    const blurSigma = 12 * 1.4;
+
     stripBg = await sharp(buffer, { limitInputPixels: LIMIT_PIXELS })
-      .extract({ left: 0, top: 0, width, height: cropH })
-      .resize(width, stripHeight, { fit: "cover" })
-      .blur(12)
+      .resize(scaledW, scaledH, { fit: "fill" })
+      .extract({ left: extractLeft, top: extractTop, width, height: stripHeight })
+      .blur(blurSigma)
       .png()
       .toBuffer();
   } catch (error) {

@@ -195,9 +195,9 @@ export function SummonResultOverlay({
         {/* ===== DESKTOP (5+5, auto-fit) ===== */}
         <div className="summon-desktop-fit-wrap hidden sm:block">
           <div className="summon-desktop-fit">
-            <div className="relative z-10 flex w-full max-w-7xl flex-col items-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+            <div className="relative z-10 flex w-full max-w-[1536px] flex-col items-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
               {/* First row */}
-              <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+              <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-10 2xl:gap-16">
                 {firstRow.map((item, index) => (
                   <SummonCard
                     key={index}
@@ -214,7 +214,7 @@ export function SummonResultOverlay({
               </div>
 
               {/* Second row */}
-              <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-12 2xl:gap-16">
+              <div className="flex items-center justify-center gap-4 lg:gap-9 xl:gap-10 2xl:gap-16">
                 {secondRow.map((item, index) => {
                   const idx = index + 5;
                   return (

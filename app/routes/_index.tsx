@@ -223,7 +223,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       </div>
       <section className="min-w-0">
         {/* Mobile/Tablet: 2x2 grid carousel */}
-        <div className="relative md:hidden -mx-2">
+        <div className="relative md:hidden">
           <div className="mx-auto w-full">
             <TopBannerMobileGrid items={bannerSource} />
           </div>
