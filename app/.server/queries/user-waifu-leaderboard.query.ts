@@ -1,21 +1,28 @@
-import { Types } from "mongoose";
-
 import { UserModel } from "../../database/models/user.model";
 import { UserWaifuInventoryModel } from "../../database/models/user-waifu-inventory";
 import { WaifuModel } from "../../database/models/waifu.model";
 import { getUserWaifuInventoryCollection } from "./user-waifu-inventory.query";
 import { rewriteLegacyCdnUrl } from "../utils/cdn-url";
 import { normalizeWaifuImageUrl } from "../utils/waifu-image";
+import { ROLES } from "../../constants/user";
 
 export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
 
   const waifuCollectionName = WaifuModel.collection.name;
+  const userCollectionName = UserModel.collection.name;
+  const objectIdLike = /^[a-f\d]{24}$/i;
 
   // Aggregate unique waifu counts per user from canonical inventory.
   // Note: inventory stores ids as strings; $lookup requires ObjectId, so we cast with $toObjectId.
   const agg = await UserWaifuInventoryModel.aggregate([
-    { $match: { count: { $gt: 0 } } },
+    {
+      $match: {
+        count: { $gt: 0 },
+        userId: { $type: "string", $regex: objectIdLike },
+        waifuId: { $type: "string", $regex: objectIdLike },
+      },
+    },
     {
       $addFields: {
         waifuObjId: { $toObjectId: "$waifuId" },
@@ -53,6 +60,27 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
       },
     },
     {
+      $addFields: {
+        userObjId: { $toObjectId: "$_id" },
+      },
+    },
+    {
+      $lookup: {
+        from: userCollectionName,
+        localField: "userObjId",
+        foreignField: "_id",
+        as: "user",
+      },
+    },
+    { $unwind: "$user" },
+    {
+      $match: {
+        "user.isDeleted": false,
+        "user.isBanned": false,
+        "user.role": { $ne: ROLES.ADMIN },
+      },
+    },
+    {
       $sort: {
         totalWaifu5Stars: -1,
         totalWaifu4Stars: -1,
@@ -72,29 +100,12 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
   const totalCount = Number(agg?.[0]?.totalCount?.[0]?.count ?? 0);
   const totalPages = Math.ceil(totalCount / limit);
 
-  const userIds = rows.map((r: any) => String(r?._id || "")).filter(Boolean);
-  const userObjectIds = userIds
-    .filter((id) => Types.ObjectId.isValid(id))
-    .map((id) => new Types.ObjectId(id));
-
-  const users = userObjectIds.length
-    ? await UserModel.find({ _id: { $in: userObjectIds } })
-        .select(["_id", "name", "avatar", "level", "faction", "gender"])
-        .lean()
-    : [];
-
-  const userById = new Map<string, any>();
-  for (const u of users || []) {
-    const key = String((u as any)?._id || (u as any)?.id || "");
-    if (key) userById.set(key, u);
-  }
-
   const startRank = skip + 1;
 
   const normalized = await Promise.all(
     rows.map(async (row: any, idx: number) => {
       const userId = String(row?._id || "");
-      const u = userById.get(userId);
+      const u = row?.user;
       const rank = startRank + idx;
 
       const base: any = {
@@ -110,8 +121,8 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
         totalWaifu5Stars: row?.totalWaifu5Stars ?? 0,
       };
 
-      // Keep behavior: only include waifuCollection for global top 3.
-      if (rank <= 3) {
+      // Keep behavior: only include waifuCollection for global top 5.
+      if (rank <= 5) {
         const inv = await getUserWaifuInventoryCollection(userId);
         base.waifuCollection = (inv?.waifuCollection || []).map((w: any) => {
           const nextImg = normalizeWaifuImageUrl(w?.image);

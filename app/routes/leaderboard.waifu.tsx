@@ -1,7 +1,6 @@
 import { type MetaFunction, NavLink } from "react-router-dom";
 
 import LeaderboardUserWaifuItem from "~/components/leaderboard-user-waifu-item";
-import { Pagination } from "~/components/pagination";
 import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
 import { usePagination } from "~/hooks/use-pagination";
 
@@ -18,14 +17,11 @@ export const meta: MetaFunction = () => {
 export default function LeaderboardWaifu() {
   const {
     data: leaderboardData,
-    currentPage,
-    totalPages,
     isLoading,
     error,
-    goToPage,
   } = usePagination<UserWaifuLeaderboardType>({
     apiUrl: "/api/waifu/leaderboard",
-    limit: 5,
+    limit: 100,
   });
 
   return (
@@ -91,19 +87,13 @@ export default function LeaderboardWaifu() {
           !error &&
           leaderboardData.map((leaderboard, index) => (
             <LeaderboardUserWaifuItem
-              key={leaderboard.id}
+              key={leaderboard.userId}
               leaderboard={leaderboard}
-              index={(currentPage - 1) * 5 + index + 1}
+              index={index + 1}
+              expandTopN={5}
             />
           ))}
       </div>
-
-      {/* Pagination */}
-      {!isLoading && !error && totalPages > 1 && (
-        <div className="mt-6 mb-8 flex flex-col items-center justify-center">
-          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={goToPage} />
-        </div>
-      )}
     </div>
   );
 }

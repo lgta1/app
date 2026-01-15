@@ -95,7 +95,7 @@ export default function WaifuSummon({ loaderData }: Route.ComponentProps) {
           !error &&
           leaderboardData.map((leaderboard, index) => (
             <LeaderboardUserWaifuItem
-              key={leaderboard.id}
+              key={leaderboard.userId}
               leaderboard={leaderboard}
               index={(currentPage - 1) * 5 + index + 1}
             />

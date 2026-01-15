@@ -8,9 +8,11 @@ import { getTitleImgPath } from "~/helpers/user.helper";
 export default function LeaderboardUserWaifuItem({
   leaderboard,
   index,
+  expandTopN = 3,
 }: {
   leaderboard: UserWaifuLeaderboardType;
   index: number;
+  expandTopN?: number;
 }) {
   const color =
     (index === 1 && "text-[#FFE133] text-2xl") ||
@@ -19,7 +21,7 @@ export default function LeaderboardUserWaifuItem({
     "text-txt-primary text-base";
 
   const renderWaifuList = () => {
-    if (![1, 2, 3].includes(index)) return null;
+    if (index < 1 || index > expandTopN) return null;
 
     const waifuList = leaderboard.waifuCollection?.sort((a, b) => b.stars - a.stars);
     const topWaifu = isMobile ? waifuList?.slice(0, 3) : waifuList?.slice(0, 6);
