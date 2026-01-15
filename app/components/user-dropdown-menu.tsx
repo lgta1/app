@@ -12,6 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useRandomCooldown } from "~/hooks/use-random-cooldown";
 
 export function UserDropdownMenu({
   setIsUserMenuOpen,
@@ -20,6 +21,7 @@ export function UserDropdownMenu({
   setIsUserMenuOpen: (isOpen: boolean) => void;
   isMobile?: boolean;
 }) {
+  const { isLocked: isRandomLocked, tryStartCooldown: tryStartRandomCooldown } = useRandomCooldown();
   type MenuEntry = {
     href: string;
     label: string;
@@ -66,12 +68,30 @@ export function UserDropdownMenu({
     const sharedClasses = `${rowBackgroundClass} group flex w-full items-center justify-start gap-3 border-b border-white/8 px-5 py-3.5 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C084FC] focus-visible:ring-offset-0 hover:bg-bgc-layer2/80 active:bg-bgc-layer2 md:border-b-0 ${gapPaddingClass}`;
 
     if (isMobile) {
+      const isRandomItem = href === "/random";
+      const locked = isRandomItem ? isRandomLocked : false;
+
       return (
         <Popover.Close asChild>
           <a
             href={href}
             className={sharedClasses}
             data-user-menu-item="true"
+            aria-disabled={locked}
+            tabIndex={locked ? -1 : 0}
+            style={locked ? { opacity: 0.6, userSelect: "none", cursor: "not-allowed" } : undefined}
+            onClick={(event) => {
+              if (!isRandomItem) return;
+              if (locked) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+              if (!tryStartRandomCooldown()) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
           >
             <Icon className="h-5 w-5 text-[#BFC5E6] transition-colors group-hover:text-white" strokeWidth={2.25} />
             <span className={`text-[#D6DAE6] group-hover:text-white leading-6 font-semibold ${labelClassName} whitespace-nowrap`}>{label}</span>

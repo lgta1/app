@@ -10,6 +10,7 @@ import { UserMenu } from "./user-menu";
 import { ADMIN_NAVIGATION_ITEMS, NAVIGATION_ITEMS } from "~/constants/header";
 import type { GenresType } from "~/database/models/genres.model";
 import type { UserType } from "~/database/models/user.model";
+import { useRandomCooldown } from "~/hooks/use-random-cooldown";
 
 interface HeaderProps {
   isAdmin?: boolean;
@@ -74,16 +75,37 @@ const getNavigationItems = (
     });
 };
 
-const RandomNavButton = () => (
-  <a
-    key="nav-random-button"
-    href="/random"
-    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#C084FC] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(124,58,237,0.35)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(124,58,237,0.45)]"
-  >
-    <Shuffle className="h-4 w-4" />
-    <span>Random</span>
-  </a>
-);
+function RandomNavButton() {
+  const { isLocked, tryStartCooldown } = useRandomCooldown();
+
+  const className = isLocked
+    ? "inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#C084FC] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(124,58,237,0.35)] opacity-60 cursor-not-allowed select-none"
+    : "inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#C084FC] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(124,58,237,0.35)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(124,58,237,0.45)]";
+
+  return (
+    <a
+      key="nav-random-button"
+      href="/random"
+      aria-disabled={isLocked}
+      tabIndex={isLocked ? -1 : 0}
+      className={className}
+      onClick={(event) => {
+        if (isLocked) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        if (!tryStartCooldown()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
+      <Shuffle className="h-4 w-4" />
+      <span>Random</span>
+    </a>
+  );
+}
 
 
 export function Header({ user, isAdmin = false, genres = [], hideBanner = false, disableAutoHide = false, isFixed = true, autoPrefetchNotifications = false }: HeaderProps) {
@@ -258,7 +280,7 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
         {/* Desktop nav links */}
         <nav className="hidden items-center justify-center gap-8 overflow-hidden bg-[rgba(9,16,26,0.8)] px-8 py-[0.55rem] lg:flex lg:w-full -mt-1.5">
           {getNavigationItems(false, isAdmin, genres)}
-          {RandomNavButton()}
+          <RandomNavButton />
         </nav>
 
         {/* Mobile nav menu */}

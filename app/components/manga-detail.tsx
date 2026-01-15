@@ -649,6 +649,11 @@ export function MangaDetail({
       ? Math.max(...chapters.map((c) => Number(c.chapterNumber) || 0))
       : 1;
 
+  const hasOneshotGenre = useMemo(
+    () => Array.isArray(genres) && genres.some((g) => String(g).toLowerCase() === "oneshot"),
+    [genres]
+  );
+
   // ==== Tính chương để "Đọc tiếp" (không vượt quá chap mới nhất) ====
   const continueChapter =
     typeof lastReadChapter === "number" && lastReadChapter >= 1
@@ -717,6 +722,12 @@ useEffect(() => {
       return;
     }
 
+    // Oneshot: không cần tiến độ "đang dở" → không đọc localStorage, không gọi API.
+    if (hasOneshotGenre) {
+      if (!canceled) setLastReadChapter(null);
+      return;
+    }
+
     // Khi chưa đăng nhập (hoặc trang preview ẩn actions), chỉ dùng localStorage.
     // Tránh gọi /api/manga-progress gây 401 và tốn CPU.
     if (!isLoggedIn || hideActions) {
@@ -779,7 +790,7 @@ useEffect(() => {
   return () => {
     canceled = true;
   };
-}, [mangaIdSafe, isLoggedIn, hideActions]);
+}, [mangaIdSafe, isLoggedIn, hideActions, hasOneshotGenre]);
 // ==== END GET tiến độ đọc ====
 
 
@@ -1100,7 +1111,7 @@ useEffect(() => {
             </button>
 
             {/* ==== Nút Đọc tiếp (nếu có tiến độ) ==== */}
-{continueChapter ? (
+{continueChapter && !hasOneshotGenre ? (
   <a
     href={(() => {
       const target = chapters.find((c) => Number((c as any).chapterNumber) === Number(continueChapter));

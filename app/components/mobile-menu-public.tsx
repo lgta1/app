@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 // unmounts the popover before a client-side router handler runs (fixes iOS timing issue).
 import * as Popover from "@radix-ui/react-popover";
 import { Menu, X } from "lucide-react";
+import { useRandomCooldown } from "~/hooks/use-random-cooldown";
 
 interface MobileMenuProps {
   className?: string;
@@ -13,6 +14,7 @@ interface MobileMenuProps {
 // can introduce click ordering/race issues on mobile (touch events + popover close).
 export function MobileMenuPublic({ className = "" }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { isLocked: isRandomLocked, tryStartCooldown: tryStartRandomCooldown } = useRandomCooldown();
 
   useEffect(() => {
     if (typeof document === "undefined" || !isOpen) {
@@ -68,7 +70,24 @@ export function MobileMenuPublic({ className = "" }: MobileMenuProps) {
         >
           <div className="flex flex-col gap-2">
             <Popover.Close asChild>
-              <a href="/random" data-mobile-menu-item="true" className="flex w-full items-center justify-between rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#C084FC] px-3 py-2 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(123,97,255,0.35)] transition hover:opacity-95">
+              <a
+                href="/random"
+                data-mobile-menu-item="true"
+                aria-disabled={isRandomLocked}
+                tabIndex={isRandomLocked ? -1 : 0}
+                className={`flex w-full items-center justify-between rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#C084FC] px-3 py-2 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(123,97,255,0.35)] ${isRandomLocked ? "opacity-60 cursor-not-allowed select-none" : "transition hover:opacity-95"}`}
+                onClick={(event) => {
+                  if (isRandomLocked) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                  }
+                  if (!tryStartRandomCooldown()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }
+                }}
+              >
                 <span>Random</span>
               </a>
             </Popover.Close>
