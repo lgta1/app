@@ -1,5 +1,9 @@
 import { NavLink } from "react-router-dom";
 
+import { InfoTooltip } from "./info-tooltip";
+
+import { DAM_NGOC_TOOLTIP_CONTENT } from "~/constants/dam-ngoc-tooltip";
+
 interface NavigationBarProps {
   navItems: Array<{ label: string; to: string; id: string }>;
   onGuideClick?: () => void;
@@ -37,6 +41,12 @@ export function SummonNavigationBar({ navItems, onGuideClick, onHistoryClick, us
                 <div className="text-txt-primary font-sans text-xs leading-normal font-semibold sm:text-base">
                   {userGold}
                 </div>
+                <InfoTooltip
+                  ariaLabel="Thông tin về Dâm Ngọc"
+                  content={DAM_NGOC_TOOLTIP_CONTENT}
+                  side="bottom"
+                  align="end"
+                />
               </div>
             </div>
           )}

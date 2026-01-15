@@ -1,9 +1,22 @@
 import { UserModel } from "~/database/models/user.model";
-import {
-  validateUsernameChangeCost,
-  USERNAME_CHANGE_COST,
-  type UsernameValidationResult,
-} from "./username-validator.client";
+
+export interface UsernameValidationResult {
+  isValid: boolean;
+  error?: string;
+}
+
+// NOTE: This must be defined server-side (do not import from *.client).
+export const USERNAME_CHANGE_COST = 2000;
+
+export function validateUsernameChangeCost(userGold: number): UsernameValidationResult {
+  if (userGold < USERNAME_CHANGE_COST) {
+    return {
+      isValid: false,
+      error: `Bạn cần ${USERNAME_CHANGE_COST} Ngọc để đổi username. Hiện tại bạn có ${userGold} Ngọc.`,
+    };
+  }
+  return { isValid: true };
+}
 
 // Server-side local sanitizer to avoid bundler re-export/interop issues.
 // Mirrors client behavior: NFC-normalize, strip non-ASCII letters/digits/spaces,
@@ -22,8 +35,6 @@ export function sanitizeUsername(username: string): string {
     return (username ?? "").toString().trim();
   }
 }
-
-export { validateUsernameChangeCost, USERNAME_CHANGE_COST };
 
 export async function checkUsernameUniqueness(
   username: string,

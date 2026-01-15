@@ -1,9 +1,12 @@
 import { NavLink } from "react-router-dom";
 import { Edit3, User as UserIcon } from "lucide-react";
 
+import { InfoTooltip } from "./info-tooltip";
+
 import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";
 import { getLevelDisplayTitle, getMaxExp, MAX_LEVEL } from "~/helpers/user-level.helper";
 import { formatDate } from "~/utils/date.utils";
+import { DAM_NGOC_TOOLTIP_CONTENT } from "~/constants/dam-ngoc-tooltip";
 
 interface ProfileInfoProps {
   user: any;
@@ -140,6 +143,10 @@ export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {
               <div className="text-txt-primary text-base font-semibold">
                 {user.gold?.toLocaleString()}
               </div>
+              <InfoTooltip
+                ariaLabel="Thông tin về Dâm Ngọc"
+                content={DAM_NGOC_TOOLTIP_CONTENT}
+              />
             </div>
             <div className="text-txt-secondary text-xs font-medium">Dâm Ngọc</div>
           </div>

@@ -1064,12 +1064,13 @@ useEffect(() => {
                   {(viewNumber ?? 0).toLocaleString("vi-VN")}
                 </span>
               </span>
-              {/* 🔖 Lượt theo dõi */}
-              <span className="text-txt-secondary inline-flex items-center gap-1.5 text-sm" title="Người theo dõi">
-                <Bookmark className="h-4 w-4" />
-                <span className="text-txt-primary font-medium">
-                  {(followCount ?? 0).toLocaleString("vi-VN")}
-                </span>
+              {/* ⭐ Điểm truyện (tổng hợp từ đánh giá các chương) */}
+              <span
+                className="text-txt-secondary inline-flex items-center text-sm"
+                title="Dựa trên đánh giá từ các chương"
+                aria-label="Điểm truyện"
+              >
+                <span className="text-txt-focus font-semibold">{ratingDisplay}</span>
               </span>
               {/* # Mã + nút "copy" chữ xám */}
               {code ? (
@@ -1083,15 +1084,6 @@ useEffect(() => {
           {/* Buttons (ẩn nếu hideActions) */}
           {!hideActions && (
           <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-            {/* Điểm truyện (tổng hợp từ đánh giá các chương) */}
-            <div
-              className="border-lav-500 text-txt-focus flex items-center justify-center gap-1 rounded-lg border px-3 py-2"
-              aria-label="Điểm truyện"
-              title="Dựa trên đánh giá từ các chương"
-            >
-              <span className="text-sm font-semibold">{ratingDisplay}</span>
-            </div>
-
             {/* Theo dõi (compact, giữ text-sm) */}
             <button
               onClick={handleFollowToggle}
@@ -1106,7 +1098,7 @@ useEffect(() => {
                 <Bookmark className="h-4 w-4" />
               )}
               <span className="text-sm font-semibold">
-                {isFollowing ? "Bỏ theo dõi" : "Theo dõi"}
+                {isFollowing ? "Đã theo dõi" : "Theo dõi"} ({(followCount ?? 0).toLocaleString("vi-VN")})
               </span>
             </button>
 
@@ -1120,7 +1112,7 @@ useEffect(() => {
         ? `/truyen-hentai/${mangaHandle}/${encodeURIComponent(slug)}`
         : `/truyen-hentai/${mangaHandle}`;
     })()}
-    className="flex min-w-36 justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
+    className="flex min-w-[7.65rem] justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-[0.85rem] py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
     aria-label={`Đọc tiếp (chương ${continueChapter})`}
     title={`Đang dở: Ch. ${continueChapter}${
       continueChapter < latestChapterNumber ? ` (có ${latestChapterNumber - continueChapter} chương mới)` : ""
@@ -1141,7 +1133,7 @@ useEffect(() => {
                   ? `/truyen-hentai/${mangaHandle}/${encodeURIComponent(slug)}`
                   : `/truyen-hentai/${mangaHandle}`;
               })()}
-              className="flex min-w-36 justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
+              className="flex min-w-[7.65rem] justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-[0.85rem] py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
               aria-label="Đọc từ đầu"
             >
               <span className="text-base font-semibold">Đọc từ đầu</span>
@@ -1156,7 +1148,7 @@ useEffect(() => {
                   ? `/truyen-hentai/${mangaHandle}/${encodeURIComponent(slug)}`
                   : `/truyen-hentai/${mangaHandle}`;
               })()}
-              className="flex min-w-36 justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
+              className="flex min-w-[7.65rem] justify-center rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-[0.85rem] py-3 text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-transform hover:scale-105"
               aria-label="Đọc mới nhất"
             >
               <span className="text-base font-semibold">Đọc mới nhất</span>
