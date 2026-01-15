@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 
+const CARD_BACK_4S_WEBP = new URL("../hooks/card vang.webp", import.meta.url).href;
+const CARD_BACK_5S_WEBP = new URL("../hooks/card 5s.webp", import.meta.url).href;
+
 interface SummonItem {
   type: "waifu";
   itemStar: number;
@@ -84,6 +87,9 @@ export function SummonCard({
   const [imgSrc, setImgSrc] = useState<string>(item.item.image || FALLBACK_IMAGE);
   const [errorCount, setErrorCount] = useState(0);
 
+  const specialCardBackSrc =
+    item?.itemStar >= 5 ? CARD_BACK_5S_WEBP : item?.itemStar === 4 ? CARD_BACK_4S_WEBP : null;
+
   useEffect(() => {
     // Reset src when item or runId changes
     setImgSrc(item.item.image || FALLBACK_IMAGE);
@@ -114,25 +120,36 @@ export function SummonCard({
       {/* Card back (mặt sấp) */}
       {!localIsRevealed && (
         <div className={`absolute inset-0 ${isFlipping ? "animate-card-flip" : ""}`}>
-          <picture>
-            {/* Mobile ưu tiên */}
-            <source
-              media="(max-width: 640px)"
-              type="image/webp"
-              srcSet="/images/waifu/card.mobile.webp"
-            />
-            {/* Desktop */}
-            <source type="image/webp" srcSet="/images/waifu/card.webp" />
-            {/* Fallback */}
+          {specialCardBackSrc ? (
             <img
-              src="/images/waifu/card.png"
-              alt="Card back"
+              src={specialCardBackSrc}
+              alt={item?.itemStar >= 5 ? "Card back 5 stars" : "Card back 4 stars"}
               className="h-full w-full rounded-lg shadow-xl"
               draggable={false}
               loading="lazy"
               decoding="async"
             />
-          </picture>
+          ) : (
+            <picture>
+              {/* Mobile ưu tiên */}
+              <source
+                media="(max-width: 640px)"
+                type="image/webp"
+                srcSet="/images/waifu/card.mobile.webp"
+              />
+              {/* Desktop */}
+              <source type="image/webp" srcSet="/images/waifu/card.webp" />
+              {/* Fallback */}
+              <img
+                src="/images/waifu/card.png"
+                alt="Card back"
+                className="h-full w-full rounded-lg shadow-xl"
+                draggable={false}
+                loading="lazy"
+                decoding="async"
+              />
+            </picture>
+          )}
         </div>
       )}
 
