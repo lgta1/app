@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { Edit3, User as UserIcon } from "lucide-react";
 
 import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";
-import { getLevelTitle, getMaxExp, MAX_LEVEL } from "~/helpers/user-level.helper";
+import { getLevelDisplayTitle, getMaxExp, MAX_LEVEL } from "~/helpers/user-level.helper";
 import { formatDate } from "~/utils/date.utils";
 
 interface ProfileInfoProps {
@@ -13,7 +13,7 @@ interface ProfileInfoProps {
 export function ProfileInfo({ user, isOwner = true }: ProfileInfoProps) {
   const avatarUrl: string = getAvatarPath(user);
   let showIcon = !avatarUrl;
-  const levelTitle = getLevelTitle(user.level);
+  const levelTitle = getLevelDisplayTitle(user.level, user.exp);
   const displayName = levelTitle ? `${user.name} - ${levelTitle}` : user.name;
   const level = Math.max(1, Number(user.level) || 1);
   const expValue = Math.max(0, Number(user.exp) || 0);

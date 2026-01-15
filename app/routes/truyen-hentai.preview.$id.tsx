@@ -115,13 +115,16 @@ export async function action({ request, params }: Route.ActionArgs) {
         break;
       }
       case "shiftPublishedMonths": {
-        // Backward-compatible: months-only UI (older)
         const { user, mangaId } = await ensureEditableManga(request, id);
-        if (!isAdmin(user.role)) throw new BusinessError("Chỉ admin mới có quyền cập nhật thời gian đăng");
+        if (!isAdmin(user.role)) {
+          throw new BusinessError("Chỉ admin mới có quyền cập nhật thời gian đăng");
+        }
 
         const monthsRaw = Number(formData.get("months"));
         const months = Number.isFinite(monthsRaw) ? Math.trunc(monthsRaw) : 0;
-        if (months <= 0 || months > 600) throw new BusinessError("Số tháng không hợp lệ (1–600)");
+        if (months <= 0 || months > 600) {
+          throw new BusinessError("Số tháng không hợp lệ (1–600)");
+        }
 
         const shifted = new Date();
         shifted.setMonth(shifted.getMonth() - months);
@@ -135,53 +138,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         result = {
           success: true,
           message: `Đã cập nhật thời gian đăng: lùi ${months} tháng`,
-          createdAt: shifted.toISOString(),
-          updatedAt: shifted.toISOString(),
-        };
-        break;
-      }
-      case "shiftPublishedTime": {
-        const { user, mangaId } = await ensureEditableManga(request, id);
-        if (!isAdmin(user.role)) {
-          throw new BusinessError("Chỉ admin mới có quyền cập nhật thời gian đăng");
-        }
-
-        const unit = String(formData.get("unit") || "month").toLowerCase();
-        const amountRaw = Number(formData.get("amount"));
-        const amount = Number.isFinite(amountRaw) ? Math.trunc(amountRaw) : 0;
-
-        const limits: Record<string, number> = {
-          minute: 525600, // 1 năm
-          hour: 8760, // 1 năm
-          day: 3650, // 10 năm
-          month: 600, // 50 năm
-        };
-
-        const max = limits[unit];
-        if (!max) {
-          throw new BusinessError("Đơn vị không hợp lệ (phút/giờ/ngày/tháng)");
-        }
-        if (amount <= 0 || amount > max) {
-          const label = unit === "minute" ? "phút" : unit === "hour" ? "giờ" : unit === "day" ? "ngày" : "tháng";
-          throw new BusinessError(`Số ${label} không hợp lệ (1–${max})`);
-        }
-
-        const shifted = new Date();
-        if (unit === "minute") shifted.setMinutes(shifted.getMinutes() - amount);
-        else if (unit === "hour") shifted.setHours(shifted.getHours() - amount);
-        else if (unit === "day") shifted.setDate(shifted.getDate() - amount);
-        else shifted.setMonth(shifted.getMonth() - amount);
-
-        await MangaModel.findByIdAndUpdate(
-          mangaId,
-          { $set: { createdAt: shifted, updatedAt: shifted } },
-          { timestamps: false },
-        );
-
-        const label = unit === "minute" ? "phút" : unit === "hour" ? "giờ" : unit === "day" ? "ngày" : "tháng";
-        result = {
-          success: true,
-          message: `Đã cập nhật thời gian đăng: lùi ${amount} ${label}`,
           createdAt: shifted.toISOString(),
           updatedAt: shifted.toISOString(),
         };
@@ -342,8 +298,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const posterUpdateInFlightRef = useRef(false);
   const statusUpdateInFlightRef = useRef(false);
 
-  const [shiftAmount, setShiftAmount] = useState<string>("");
-  const [shiftUnit, setShiftUnit] = useState<"minute" | "hour" | "day" | "month">("month");
+  const [shiftMonths, setShiftMonths] = useState<string>("");
   const [isShiftingPublished, setIsShiftingPublished] = useState(false);
   const createChapterHref = `/truyen-hentai/chapter/create/${mangaHandle}${isSkipCompression ? "?skipCompression=1" : ""}`;
   const canBulk = canBulkDownloadChapters(userRole, isOwner);
@@ -541,18 +496,17 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     setIsShiftingPublished(false);
   }, [isShiftingPublished, shiftPublishedFetcher.state, shiftPublishedFetcher.data, navigate]);
 
-  const submitShiftPublishedTime = () => {
+  const submitShiftPublishedMonths = () => {
     if (!isAdminUser || isShiftingPublished) return;
-    const n = Number(shiftAmount);
+    const n = Number(shiftMonths);
     if (!Number.isFinite(n) || n <= 0) {
-      toast.error("Vui lòng nhập số hợp lệ");
+      toast.error("Vui lòng nhập số tháng hợp lệ");
       return;
     }
     setIsShiftingPublished(true);
     const formData = new FormData();
-    formData.append("actionType", "shiftPublishedTime");
-    formData.append("unit", shiftUnit);
-    formData.append("amount", String(Math.trunc(n)));
+    formData.append("actionType", "shiftPublishedMonths");
+    formData.append("months", String(Math.trunc(n)));
     shiftPublishedFetcher.submit(formData, { method: "POST", action: `/truyen-hentai/preview/${mangaHandle}` });
   };
 
@@ -884,34 +838,22 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
             {isAdminUser ? (
               <div className="flex flex-col gap-2">
-                <p className="text-sm font-semibold text-txt-primary">Lùi thời gian đăng</p>
+                <p className="text-sm font-semibold text-txt-primary">Lùi thời gian đăng (tháng)</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={shiftUnit}
-                    onChange={(e) => setShiftUnit(e.target.value as any)}
-                    disabled={isShiftingPublished}
-                    className="rounded-lg border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm font-semibold text-txt-primary outline-none focus:ring-2 focus:ring-primary/40"
-                  >
-                    <option value="minute">Phút</option>
-                    <option value="hour">Giờ</option>
-                    <option value="day">Ngày</option>
-                    <option value="month">Tháng</option>
-                  </select>
-
                   <input
                     type="number"
                     inputMode="numeric"
                     min={1}
-                    max={shiftUnit === "minute" ? 525600 : shiftUnit === "hour" ? 8760 : shiftUnit === "day" ? 3650 : 600}
-                    placeholder={shiftUnit === "minute" ? "Ví dụ: 5" : shiftUnit === "hour" ? "Ví dụ: 1" : shiftUnit === "day" ? "Ví dụ: 10" : "Ví dụ: 24"}
-                    value={shiftAmount}
-                    onChange={(e) => setShiftAmount(e.target.value)}
+                    max={600}
+                    placeholder="Ví dụ: 24"
+                    value={shiftMonths}
+                    onChange={(e) => setShiftMonths(e.target.value)}
                     className="w-28 rounded-lg border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm text-txt-primary outline-none focus:ring-2 focus:ring-primary/40"
                   />
 
                   <button
                     type="button"
-                    onClick={submitShiftPublishedTime}
+                    onClick={submitShiftPublishedMonths}
                     disabled={isShiftingPublished}
                     className="rounded-lg border border-bd-default bg-bgc-layer2 px-4 py-2 text-sm font-semibold text-txt-primary hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
                   >

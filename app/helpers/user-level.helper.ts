@@ -9,11 +9,11 @@ export const LEVEL_THRESHOLDS = [
   250, // Cấp 2
   1000, // Cấp 3
   2500, // Cấp 4
-  7500, // Cấp 5
-  15000, // Cấp 6
-  25000, // Cấp 7
-  40000, // Cấp 8
-  80000, // Cấp 9
+  5500, // Cấp 5
+  17500, // Cấp 6
+  35500, // Cấp 7
+  62500, // Cấp 8
+  102500, // Cấp 9
   Infinity, // Giới hạn
 ];
 
@@ -23,12 +23,40 @@ export const LEVEL_TITLES: Record<number, string> = {
   1: "Nhập Lọ",
   2: "Luyện Lọ",
   3: "Cuồng Lọ",
-  4: "Lọ Vương",
-  5: "Lọ Vương Bất Tử",
+  4: "Bá Lọ",
+  5: "Lọ Vương",
   6: "Lọ Đế",
   7: "Lọ Thánh",
   8: "Lọ Thánh Chí Tôn",
   9: "Thần Lọ Vĩnh Hằng",
+};
+
+const SUB_REALMS: Record<
+  number,
+  Array<{
+    suffix: string;
+    maxExpExclusive: number;
+  }>
+> = {
+  // exp-in-level ranges
+  // Level 5: 3k -> 4k -> 5k (total 12k)
+  5: [
+    { suffix: "Sơ Kỳ", maxExpExclusive: 3000 },
+    { suffix: "Trung Kỳ", maxExpExclusive: 3000 + 4000 },
+    { suffix: "Hậu Kỳ", maxExpExclusive: 3000 + 4000 + 5000 },
+  ],
+  // Level 6: 5k -> 6k -> 7k (total 18k)
+  6: [
+    { suffix: "Sơ Kỳ", maxExpExclusive: 5000 },
+    { suffix: "Trung Kỳ", maxExpExclusive: 5000 + 6000 },
+    { suffix: "Hậu Kỳ", maxExpExclusive: 5000 + 6000 + 7000 },
+  ],
+  // Level 7: 8k -> 9k -> 10k (total 27k)
+  7: [
+    { suffix: "Sơ Kỳ", maxExpExclusive: 8000 },
+    { suffix: "Trung Kỳ", maxExpExclusive: 8000 + 9000 },
+    { suffix: "Hậu Kỳ", maxExpExclusive: 8000 + 9000 + 10000 },
+  ],
 };
 
 /**
@@ -122,5 +150,22 @@ export const getMaxExp = (level: number) => {
 export function getLevelTitle(level: number | null | undefined): string {
   const normalized = Math.max(1, Math.min(MAX_LEVEL, Math.floor(level || 1)));
   return LEVEL_TITLES[normalized] || "";
+}
+
+export function getLevelDisplayTitle(
+  level: number | null | undefined,
+  expInLevel?: number | null,
+): string {
+  const normalized = Math.max(1, Math.min(MAX_LEVEL, Math.floor(level || 1)));
+  const base = LEVEL_TITLES[normalized] || "";
+  if (!base) return "";
+  if (normalized >= MAX_LEVEL) return base;
+
+  const realms = SUB_REALMS[normalized];
+  if (!realms) return base;
+
+  const exp = Math.max(0, Number(expInLevel) || 0);
+  const realm = realms.find((r) => exp < r.maxExpExclusive) ?? realms[realms.length - 1];
+  return `${base} ${realm.suffix}`;
 }
 

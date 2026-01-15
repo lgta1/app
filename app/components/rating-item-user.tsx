@@ -4,7 +4,7 @@ import { User as UserIcon } from "lucide-react";
 
 import type { UserType } from "~/database/models/user.model";
 import { getAvatarPath, getTitleImgPath } from "~/helpers/user.helper";
-import { getLevelTitle, getMaxExp, MAX_LEVEL } from "~/helpers/user-level.helper";
+import { getLevelDisplayTitle, getMaxExp, MAX_LEVEL } from "~/helpers/user-level.helper";
 
 export default function RatingItemUser({
   user,
@@ -20,7 +20,7 @@ export default function RatingItemUser({
     "text-txt-primary";
 
   const avatarUrl = getAvatarPath(user);
-  const levelTitle = getLevelTitle(user.level);
+  const levelTitle = getLevelDisplayTitle(user.level, (user as any).exp);
   const displayName = levelTitle ? `${user.name} - ${levelTitle}` : user.name;
 
   const level = Math.max(1, Number(user.level) || 1);

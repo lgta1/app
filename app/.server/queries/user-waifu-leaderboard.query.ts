@@ -1,29 +1,18 @@
 import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
-import { UserModel } from "~/database/models/user.model";
-import { ROLES } from "~/constants/user";
 import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
 export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
 
-  // Exclude admins from waifu leaderboard
-  const adminRows = await UserModel.find({ role: ROLES.ADMIN, isDeleted: false })
-    .select("_id")
-    .lean();
-  const adminIds = (adminRows as any[])
-    .map((u) => String(u?._id ?? u?.id ?? ""))
-    .filter(Boolean);
-  const baseFilter = adminIds.length > 0 ? { userId: { $nin: adminIds } } : {};
-
-  const totalCount = await UserWaifuLeaderboardModel.countDocuments(baseFilter);
+  const totalCount = await UserWaifuLeaderboardModel.countDocuments();
   const totalPages = Math.ceil(totalCount / limit);
 
   // Tính toán xem có user nào trong top 3 không
   const startRank = skip + 1;
   const includeWaifuCollection = startRank <= 3;
 
-  const query = UserWaifuLeaderboardModel.find(baseFilter)
+  const query = UserWaifuLeaderboardModel.find()
     .sort({
       totalWaifu5Stars: -1,
       totalWaifu4Stars: -1,
