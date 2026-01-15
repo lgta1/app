@@ -302,10 +302,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   }, [disturbingTagSlugs, disturbingTagWarningKey]);
 
   return (
-    <div className="container-page mx-auto px-4 py-6">
+    <div className="container-page mx-auto px-4 pb-6 pt-3 md:py-6">
       <DisturbingTagsWarningDialog
         open={isDisturbingTagWarningOpen}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
           setIsDisturbingTagWarningOpen(open);
           if (!open) {
             try {
@@ -318,10 +318,42 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         tags={disturbingTagNames}
       />
       <Toaster position="bottom-right" />
+
+      {/* Header row (Tablet/Desktop): breadcrumb + manage button */}
+      <div className="mb-4 hidden items-start justify-between gap-4 md:flex">
+        <nav aria-label="Breadcrumb" className="text-txt-focus font-sans text-sm font-medium">
+          <ol className="flex flex-wrap items-center gap-0.5 sm:gap-1">
+            <li className="flex items-center gap-0.5 sm:gap-1">
+              <Link to="/" className="transition-colors hover:text-lav-500">
+                Trang chủ
+              </Link>
+              <span className="text-txt-secondary/60 px-0.5">/</span>
+            </li>
+            <li>
+              <span className="text-txt-focus" title={manga.title || "Manga"}>
+                {(manga.title || "Manga").length > 20
+                  ? (manga.title || "Manga").slice(0, 19).trimEnd() + "…"
+                  : (manga.title || "Manga")}
+              </span>
+            </li>
+          </ol>
+        </nav>
+
+        {canManageManga ? (
+          <Link
+            to={`/truyen-hentai/preview/${manageHandle}`}
+            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(225,29,72,0.35)] transition-transform hover:scale-[1.02]"
+          >
+            Quản lý
+          </Link>
+        ) : null}
+      </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_27vw] lg:grid-cols-[minmax(0,1fr)_22vw]">
         {/* ===== CỘT TRÁI: CHI TIẾT TRUYỆN ===== */}
-        <section className="md:mt-8">
-          <nav aria-label="Breadcrumb" className="text-txt-focus font-sans text-sm font-medium mb-1.5">
+        <section>
+          {/* Mobile: keep existing breadcrumb + manage button placement */}
+          <nav aria-label="Breadcrumb" className="text-txt-focus font-sans text-sm font-medium mb-1 md:hidden">
             <ol className="flex flex-wrap items-center gap-0.5 sm:gap-1">
               <li className="flex items-center gap-0.5 sm:gap-1">
                 <Link to="/" className="transition-colors hover:text-lav-500">
@@ -339,8 +371,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             </ol>
           </nav>
 
-          {canManageManga && (
-            <div className="mb-4 flex justify-end">
+          {canManageManga ? (
+            <div className="mb-4 flex justify-end md:hidden">
               <Link
                 to={`/truyen-hentai/preview/${manageHandle}`}
                 className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(225,29,72,0.35)] transition-transform hover:scale-[1.02]"
@@ -348,7 +380,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                 Quản lý
               </Link>
             </div>
-          )}
+          ) : null}
+
           <MangaDetail manga={manga} chapters={chapters} genreDisplayMap={genreDisplayMap} isLoggedIn={isLoggedIn} />
           <ShareButtons title={manga.title} />
 
@@ -373,7 +406,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         </section>
 
         {/* ===== CỘT PHẢI: UPLOADER CARD + BXH TRUYỆN ===== */}
-        <section className="mt-8">
+        <section className="mt-8 md:mt-0">
           <div className="space-y-10">
             {uploader ? (
               <div className="hidden md:block">

@@ -824,12 +824,12 @@ useEffect(() => {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-10 portrait:gap-6 sm:portrait:gap-10 lg:flex-row">
+      <div className="flex flex-col gap-10 portrait:gap-6 sm:portrait:gap-10 lg:flex-row lg:items-start">
         {/* Ảnh bìa */}
         <div
           className={`relative flex flex-shrink-0 items-center justify-center ${
             canDropPoster ? "group cursor-copy" : ""
-          }`}
+          } lg:self-start`}
           onDrop={canDropPoster ? handlePosterDropEvent : undefined}
           onDragOver={canDropPoster ? handlePosterDragOver : undefined}
           onDragLeave={canDropPoster ? handlePosterDragLeave : undefined}
