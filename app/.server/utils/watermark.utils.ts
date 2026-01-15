@@ -146,7 +146,7 @@ export async function applyWatermark(
     const extractLeft = Math.max(0, Math.min(Math.round(idealLeft), Math.max(0, scaledW - width)));
     const extractTop = Math.max(0, Math.min(Math.round(idealTop), Math.max(0, scaledH - stripHeight)));
 
-    const blurSigma = 12 * 1.4;
+    const blurSigma = 30;
 
     stripBg = await sharp(buffer, { limitInputPixels: LIMIT_PIXELS })
       .resize(scaledW, scaledH, { fit: "fill" })

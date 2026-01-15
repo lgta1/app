@@ -838,7 +838,7 @@ useEffect(() => {
       <div className="flex flex-col gap-10 portrait:gap-6 sm:portrait:gap-10 md:flex-row md:items-start md:gap-5">
         {/* Ảnh bìa */}
         <div
-          className={`relative flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg h-96 w-64 portrait:w-72 sm:portrait:w-64 md:mt-[5px] md:w-[min(280px,36vw)] md:h-auto md:aspect-[2/3] ${
+          className={`relative mx-auto flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg h-96 w-64 portrait:w-72 sm:portrait:w-64 md:mx-0 md:mt-[5px] md:w-[min(280px,36vw)] md:h-auto md:aspect-[2/3] ${
             canDropPoster ? "group cursor-copy" : ""
           } md:self-start`}
           onDrop={canDropPoster ? handlePosterDropEvent : undefined}
