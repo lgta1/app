@@ -32,6 +32,8 @@ export type UserType = {
   claimedMilestones?: number[];
   // User's hidden content preferences: list of genre slugs to hide/dim
   blacklistTags?: string[];
+  // Whether the user has ever configured blacklistTags (used to apply defaults once)
+  hasConfiguredBlacklistTags?: boolean;
 };
 
 const UserSchema = new Schema<UserType>(
@@ -62,6 +64,8 @@ const UserSchema = new Schema<UserType>(
     claimedMilestones: { type: [Number], default: [] },
     // Blacklist tags (genre slugs) that the user doesn't want to see
     blacklistTags: { type: [String], default: [] },
+    // Marker: has the user ever explicitly configured their blacklist?
+    hasConfiguredBlacklistTags: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

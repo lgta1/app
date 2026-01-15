@@ -8,6 +8,7 @@ import { requireLogin } from "@/services/auth.server";
 import { getAllGenres } from "@/queries/genres.query";
 import { UserModel } from "~/database/models/user.model";
 import type { GenresType } from "~/database/models/genres.model";
+import { getDefaultBlacklistTagSlugs, normalizeBlacklistTag } from "~/constants/blacklist-tags";
 
 export const meta: MetaFunction = () => {
   return [
@@ -19,8 +20,26 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await requireLogin(request);
   const genres = await getAllGenres();
-  const userDoc = await UserModel.findById(user.id).select("blacklistTags").lean();
-  const blacklist = (userDoc?.blacklistTags || []) as string[];
+  const userDoc = await UserModel.findById(user.id)
+    .select("blacklistTags hasConfiguredBlacklistTags")
+    .lean();
+
+  const current = (userDoc?.blacklistTags || []) as string[];
+  const configured = Boolean((userDoc as any)?.hasConfiguredBlacklistTags);
+
+  // If user never configured, auto-apply defaults (still editable).
+  let blacklist = Array.isArray(current) ? current : [];
+  if (!configured && blacklist.length === 0) {
+    const defaults = getDefaultBlacklistTagSlugs();
+    blacklist = defaults;
+    try {
+      await UserModel.findByIdAndUpdate(user.id, {
+        $set: { blacklistTags: defaults, hasConfiguredBlacklistTags: true },
+      });
+    } catch {
+      // ignore: still return defaults for this request
+    }
+  }
   return { genres, blacklist };
 }
 
@@ -31,11 +50,13 @@ export async function action({ request }: ActionFunctionArgs) {
   let list: string[] = [];
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) list = parsed.map((s) => String(s).trim().toLowerCase());
+    if (Array.isArray(parsed)) list = parsed.map((s) => normalizeBlacklistTag(s));
   } catch {}
   // Deduplicate and trim
   const uniq = Array.from(new Set(list.filter(Boolean)));
-  await UserModel.findByIdAndUpdate(user.id, { $set: { blacklistTags: uniq } });
+  await UserModel.findByIdAndUpdate(user.id, {
+    $set: { blacklistTags: uniq, hasConfiguredBlacklistTags: true },
+  });
   return redirect("/user/blacklist-tags");
 }
 

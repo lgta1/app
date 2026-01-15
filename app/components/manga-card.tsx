@@ -1,10 +1,12 @@
 // app/components/manga-card.tsx
-import { EyeOff } from "lucide-react";
+import { ShieldBan } from "lucide-react";
+import { useMatches } from "react-router";
 
 import type { MangaType } from "~/database/models/manga.model";
 import { AppLink } from "~/components/app-link";
 import { MANGA_USER_STATUS } from "~/constants/manga";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { DEFAULT_BLACKLIST_TAGS, normalizeBlacklistTag } from "~/constants/blacklist-tags";
 
 type Props = {
   manga: Pick<
@@ -52,12 +54,16 @@ export function MangaCard({
   imgFetchPriority = "high",
   hideBottomOverlay = false,
 }: Props) {
+  const matches = useMatches();
+  const rootData: any = matches.find((m) => m.id === "root")?.data;
+  const isLoggedIn = Boolean(rootData?.user?.id);
+
   const { id, title, poster, chapters, createdAt, updatedAt, genres, userStatus } = manga as any;
   const effectiveLatestTitle = (latestChapterTitle ?? (manga as any).latestChapterTitle ?? null) as string | null;
 
   // genres là slug string
   const genreSlugs: string[] = Array.isArray(genres)
-    ? genres.map((g) => String(g).trim().toLowerCase())
+    ? genres.map((g) => normalizeBlacklistTag(g))
     : [];
 
   // ONESHOT: nhận các biến thể slug phổ biến
@@ -89,23 +95,43 @@ export function MangaCard({
   })();
 
   const isBannerDesktop = variant === "bannerDesktop";
-  // Blacklist overlay: read from localStorage (client-only) and check intersection with manga genres
+  // Blacklist overlay:
+  // - Logged-in: use root loader's user.blacklistTags (server authoritative), fallback to localStorage.
+  // - Guest: always apply DEFAULT_BLACKLIST_TAGS, ignore localStorage.
   const isBlacklisted = (() => {
     try {
+      const listFromRoot = rootData?.user?.blacklistTags;
+      if (isLoggedIn && Array.isArray(listFromRoot)) {
+        const set = new Set((listFromRoot as any[]).map((s) => normalizeBlacklistTag(s)).filter(Boolean));
+        if (set.size === 0) return false;
+        return genreSlugs.some((g) => set.has(g));
+      }
+
+      if (!isLoggedIn) {
+        const set = new Set(DEFAULT_BLACKLIST_TAGS.map((s) => normalizeBlacklistTag(s)).filter(Boolean));
+        if (set.size === 0) return false;
+        return genreSlugs.some((g) => set.has(g));
+      }
+
+      // Logged-in fallback: localStorage (client-only)
       if (typeof window === "undefined") return false;
       const raw = window.localStorage.getItem("vh_blacklist_tags");
       if (!raw) return false;
       const arr = JSON.parse(raw);
       if (!Array.isArray(arr) || arr.length === 0) return false;
-      const set = new Set((arr as string[]).map((s) => String(s).toLowerCase()));
-      return genreSlugs.some((g) => set.has(String(g).toLowerCase()));
+      const set = new Set((arr as any[]).map((s) => normalizeBlacklistTag(s)).filter(Boolean));
+      if (set.size === 0) return false;
+      return genreSlugs.some((g) => set.has(g));
     } catch {
       return false;
     }
   })();
+
+  const mangaUrl = buildMangaUrl(manga as any);
+  const linkTo = isBlacklisted && !isLoggedIn ? `/login?redirect=${encodeURIComponent(mangaUrl)}` : mangaUrl;
   return (
     <AppLink
-      to={buildMangaUrl(manga as any)}
+      to={linkTo}
       className={[
         // add transform + scale on hover
         "group bg-bgc-layer1 relative block overflow-hidden rounded-xl border border-bd-default transition-colors transform transition-transform duration-200 ease-out will-change-transform",
@@ -124,9 +150,13 @@ export function MangaCard({
           className="pointer-events-none absolute inset-0 z-[50] flex flex-col items-center justify-center gap-2 px-4 text-center"
           style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
         >
-          <EyeOff className="h-8 w-8 text-white/80" aria-hidden="true" />
           <div className="text-white/85 text-sm font-semibold leading-snug">
-            Ảnh bị che do chứa thể loại bạn đã chặn
+            <div>Ảnh bị che do chứa thể loại bị ẩn</div>
+            <div>Cài đặt thêm/bớt tại</div>
+            <div className="mt-0.5 inline-flex items-center justify-center gap-1.5">
+              <ShieldBan className="h-4 w-4 text-white/80" aria-hidden="true" />
+              <span>Lọc thể loại</span>
+            </div>
           </div>
         </div>
       ) : null}

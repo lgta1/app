@@ -4,6 +4,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { UserModel } from "~/database/models/user.model";
 import { WaifuModel } from "~/database/models/waifu.model";
+import { getDefaultBlacklistTagSlugs } from "~/constants/blacklist-tags";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -11,9 +12,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (!user) {
       return Response.json({ success: true, data: null });
     }
-    const userFull = await UserModel.findById(user?.id)
+    let userFull: any = await UserModel.findById(user?.id)
       .select("-password -salt")
       .lean();
+
+    // Auto-apply defaults once for users who never configured the blacklist.
+    try {
+      const configured = Boolean(userFull?.hasConfiguredBlacklistTags);
+      const list = Array.isArray(userFull?.blacklistTags) ? (userFull.blacklistTags as any[]) : [];
+      if (!configured && list.length === 0) {
+        const defaults = getDefaultBlacklistTagSlugs();
+        await UserModel.findByIdAndUpdate(user?.id, {
+          $set: { blacklistTags: defaults, hasConfiguredBlacklistTags: true },
+        });
+        userFull = { ...userFull, blacklistTags: defaults, hasConfiguredBlacklistTags: true };
+      }
+    } catch {
+      // ignore
+    }
+
     return Response.json({ success: true, data: userFull });
   } catch (error) {
     return Response.json(

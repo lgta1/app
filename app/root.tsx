@@ -24,6 +24,7 @@ import { DEFAULT_SHARE_IMAGE } from "~/constants/share-images";
 import { isAdmin } from "~/helpers/user.helper";
 import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
 import { json } from "~/utils/json.server";
+import { getDefaultBlacklistTagSlugs } from "~/constants/blacklist-tags";
 
 import appStylesheetUrl from "./app.css?url";
 
@@ -239,6 +240,33 @@ export async function loader({ request }: Route.LoaderArgs) {
   responseHeaders.set("Vary", "Cookie");
 
   if (user) {
+    // Enrich session user with blacklist tags (used by MangaCard), and apply defaults once if never configured.
+    try {
+      const { UserModel } = await import("~/database/models/user.model");
+      const doc: any = await UserModel.findById(user.id)
+        .select("blacklistTags hasConfiguredBlacklistTags")
+        .lean();
+
+      const configured = Boolean(doc?.hasConfiguredBlacklistTags);
+      const list = Array.isArray(doc?.blacklistTags) ? (doc.blacklistTags as string[]) : [];
+
+      if (!configured && list.length === 0) {
+        const defaults = getDefaultBlacklistTagSlugs();
+        try {
+          await UserModel.findByIdAndUpdate(user.id, {
+            $set: { blacklistTags: defaults, hasConfiguredBlacklistTags: true },
+          });
+        } catch {}
+        (user as any).blacklistTags = defaults;
+        (user as any).hasConfiguredBlacklistTags = true;
+      } else {
+        (user as any).blacklistTags = list;
+        (user as any).hasConfiguredBlacklistTags = configured;
+      }
+    } catch {
+      // ignore
+    }
+
     let unreadCount = 0;
     try {
       await pruneNotificationsForUser(user.id);
