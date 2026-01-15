@@ -1,5 +1,5 @@
 // app/root.tsx
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Links,
   Meta,
@@ -31,6 +31,9 @@ import appStylesheetUrl from "./app.css?url";
 const BAN_CHECK_INTERVAL_MINUTES = 1;
 const BAN_CHECK_INTERVAL_MS = BAN_CHECK_INTERVAL_MINUTES * 60 * 1000;
 const LAST_BAN_CHECK_KEY = "lastBanCheck";
+
+const GA4_MEASUREMENT_ID = "G-BDQQK9ZZBJ";
+const ENABLE_GA4 = import.meta.env.PROD;
 
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: appStylesheetUrl },
@@ -86,6 +89,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}
+        {ENABLE_GA4 ? (
+          <>
+            {/* Google tag (gtag.js) */}
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}`} />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${GA4_MEASUREMENT_ID}', { send_page_view: false });
+                `,
+              }}
+            />
+          </>
+        ) : null}
         {/* Early toggle: allow disabling external Google Fonts via ?nofonts=1 or localStorage */}
         <script
           dangerouslySetInnerHTML={{
@@ -296,6 +315,12 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const lastPathRef = useRef<string | null>(null);
+  const lastNavFromPathRef = useRef<string | null>(null);
+  const lastUserIdRef = useRef<string | null>(null);
+  const firedLoginRef = useRef(false);
+  const firedSignUpRef = useRef(false);
+
   // Đặt cờ hydration CHÍNH XÁC sau khi toàn bộ cây đã hydrate (effects chạy)
   useEffect(() => {
     try {
@@ -304,6 +329,162 @@ export default function App() {
       console.debug("[client] hydration HOÀN TẤT tại", performance.now(), "ms");
     } catch {}
   }, []);
+
+  // GA4 page_view for client-side navigations (SPA).
+  useEffect(() => {
+    if (!ENABLE_GA4) return;
+    if (isBot) return;
+    try {
+      const gtag = (window as any).gtag as undefined | ((...args: any[]) => void);
+      if (typeof gtag !== "function") return;
+
+      const page_path = `${location.pathname}${location.search}${location.hash}`;
+      const page_location = window.location.href;
+      const page_title = document.title;
+
+      // Optional debug: ?ga_debug=1 or localStorage.vh_ga_debug=1
+      const debug_mode = (() => {
+        try {
+          return /(?:^|[?&])ga_debug=1(?:&|$)/.test(location.search || "") || localStorage.getItem("vh_ga_debug") === "1";
+        } catch {
+          return false;
+        }
+      })();
+
+      // Track SPA navigation boundaries
+      lastNavFromPathRef.current = lastPathRef.current;
+      lastPathRef.current = page_path;
+
+      // In SPA mode we disable the automatic page_view in the initial config
+      // and manually send page_view on route changes to avoid double counting.
+      gtag("event", "page_view", {
+        page_path,
+        page_location,
+        page_title,
+        ...(debug_mode ? { debug_mode: true } : {}),
+      });
+
+      // Standard GA4 web event: view_search_results
+      try {
+        const pathname = location.pathname || "";
+        if (pathname === "/search/advanced") {
+          const sp = new URLSearchParams(location.search || "");
+          const q = (sp.get("q") || "").trim();
+          const isApplied = sp.get("apply") === "1";
+          if (q && isApplied) {
+            gtag("event", "view_search_results", {
+              search_term: q,
+              ...(debug_mode ? { debug_mode: true } : {}),
+            });
+          }
+        }
+      } catch {}
+
+      // Domain events: manga/chapter views (URL-based, no PII)
+      try {
+        const pathname = location.pathname || "";
+        const isMangaDetailPage =
+          /^\/truyen-hentai\/[^/]+$/.test(pathname) &&
+          !pathname.startsWith("/truyen-hentai/create") &&
+          !pathname.startsWith("/truyen-hentai/edit") &&
+          !pathname.startsWith("/truyen-hentai/manage") &&
+          !pathname.startsWith("/truyen-hentai/uploaded") &&
+          !pathname.startsWith("/truyen-hentai/preview") &&
+          !pathname.startsWith("/truyen-hentai/chapter/");
+
+        const isChapterReadPage =
+          /^\/truyen-hentai\/[^/]+\/[^/]+$/.test(pathname) && !pathname.startsWith("/truyen-hentai/chapter/");
+
+        if (isMangaDetailPage) {
+          const slug = pathname.split("/")[2] || "";
+          if (slug) {
+            gtag("event", "view_item", {
+              items: [
+                {
+                  item_id: slug,
+                  item_name: slug,
+                  item_category: "manga",
+                },
+              ],
+              ...(debug_mode ? { debug_mode: true } : {}),
+            });
+          }
+        } else if (isChapterReadPage) {
+          const parts = pathname.split("/");
+          const mangaSlug = parts[2] || "";
+          const chapterSlug = parts[3] || "";
+          if (mangaSlug && chapterSlug) {
+            gtag("event", "view_item", {
+              items: [
+                {
+                  item_id: mangaSlug,
+                  item_name: mangaSlug,
+                  item_category: "manga",
+                  item_variant: chapterSlug,
+                },
+              ],
+              ...(debug_mode ? { debug_mode: true } : {}),
+            });
+            // Custom event for easier analysis (can be marked as a conversion if needed)
+            gtag("event", "read_chapter", {
+              manga_slug: mangaSlug,
+              chapter_slug: chapterSlug,
+              ...(debug_mode ? { debug_mode: true } : {}),
+            });
+          }
+        }
+      } catch {}
+
+      // Heuristic: sign_up completion (register redirects to /login?registerSuccess=true)
+      try {
+        if (!firedSignUpRef.current && location.pathname === "/login") {
+          const sp = new URLSearchParams(location.search || "");
+          if (sp.get("registerSuccess") === "true") {
+            firedSignUpRef.current = true;
+            gtag("event", "sign_up", {
+              method: "email",
+              ...(debug_mode ? { debug_mode: true } : {}),
+            });
+          }
+        }
+      } catch {}
+    } catch {}
+  }, [location.pathname, location.search, location.hash, isBot]);
+
+  // GA4 identity enrichment (non-PII): user_id + user properties
+  useEffect(() => {
+    if (!ENABLE_GA4) return;
+    if (isBot) return;
+    try {
+      const gtag = (window as any).gtag as undefined | ((...args: any[]) => void);
+      if (typeof gtag !== "function") return;
+
+      const userId = user && (user as any).id != null ? String((user as any).id) : null;
+      const role = user && (user as any).role != null ? String((user as any).role) : undefined;
+
+      if (userId) {
+        gtag("set", { user_id: userId });
+        gtag("set", "user_properties", {
+          is_admin: isAdmin ? 1 : 0,
+          user_role: role,
+        });
+
+        // Heuristic: successful login (user becomes available after navigating from /login)
+        if (!lastUserIdRef.current && lastNavFromPathRef.current?.startsWith("/login") && !firedLoginRef.current) {
+          firedLoginRef.current = true;
+          gtag("event", "login", { method: "password" });
+        }
+      } else {
+        // Best-effort reset (gtag doesn't guarantee clearing user_id, but this prevents our own re-use)
+        gtag("set", { user_id: undefined });
+        gtag("set", "user_properties", {
+          is_admin: 0,
+        });
+      }
+
+      lastUserIdRef.current = userId;
+    } catch {}
+  }, [user, isAdmin, isBot]);
 
   // ✅ Quy ước hiển thị
   const isHome = location.pathname === "/";

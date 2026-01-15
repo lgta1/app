@@ -28,7 +28,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           to={buildMangaUrl(topManga[1])}
           className="relative m-8 flex flex-col items-center"
         >
-          <div className="relative h-[300px] w-[207px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
+          <div className="relative h-[360px] w-[248px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
             <img
               src={topManga[1]?.poster}
               alt={topManga[1]?.title}
@@ -66,7 +66,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           to={buildMangaUrl(topManga[0])}
           className="relative m-8 flex flex-col items-center"
         >
-          <div className="relative h-[305px] w-[208px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
+          <div className="relative h-[366px] w-[250px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
             <img
               src={topManga[0]?.poster}
               alt={topManga[0]?.title}
@@ -104,7 +104,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           to={buildMangaUrl(topManga[2])}
           className="relative m-8 flex flex-col items-center"
         >
-          <div className="relative h-[305px] w-[207px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
+          <div className="relative h-[366px] w-[248px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
             <img
               src={topManga[2]?.poster}
               alt={topManga[2]?.title}
@@ -144,7 +144,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           to={buildMangaUrl(topManga[0])}
           className="relative m-6 flex flex-col items-center"
         >
-          <div className="relative h-[470px] w-[320px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
+          <div className="relative h-[564px] w-[384px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
             <img
               src={topManga[0]?.poster}
               alt={topManga[0]?.title}
@@ -182,7 +182,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           to={buildMangaUrl(topManga[1])}
           className="relative m-6 flex flex-col items-center"
         >
-          <div className="relative h-[470px] w-[320px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
+          <div className="relative h-[564px] w-[384px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
             <img
               src={topManga[1]?.poster}
               alt={topManga[1]?.title}
@@ -220,7 +220,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
           to={buildMangaUrl(topManga[2])}
           className="relative m-6 flex flex-col items-center"
         >
-          <div className="relative h-[470px] w-[320px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
+          <div className="relative h-[564px] w-[384px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
             <img
               src={topManga[2]?.poster}
               alt={topManga[2]?.title}

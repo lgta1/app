@@ -8,7 +8,8 @@ export function SameAuthorManga({ items }: { items: MangaType[] }) {
   if (!items || items.length === 0) return null;
   const list = items.slice(0, 5);
   const truncate = (s: string, n: number) => (s?.length > n ? s.slice(0, n).trimEnd() + "…" : s);
-  const THUMB_SCALE = 1.4;
+  const THUMB_UPSCALE = 1.2;
+  const THUMB_SCALE = 1.4 * THUMB_UPSCALE;
   const THUMB_W = 56 * THUMB_SCALE;
 
   return (

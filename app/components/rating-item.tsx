@@ -18,11 +18,12 @@ export default function RatingItem({
   /** Tên chương mới nhất (tùy chọn) để hiển thị pill hoặc text theo quy tắc */
   latestChapterTitle?: string | null;
 }) {
-  const THUMB_SCALE = 1.4;
+  const THUMB_UPSCALE = 1.2;
+  const THUMB_SCALE = 1.4 * THUMB_UPSCALE;
   const BASE_SQUARE_PX = 56; // 14 * 4px
   const BASE_PORTRAIT_WIDTH_PX = 56;
 
-  const squareSizePx = BASE_SQUARE_PX;
+  const squareSizePx = BASE_SQUARE_PX * THUMB_UPSCALE;
   const portraitWidthPx = BASE_PORTRAIT_WIDTH_PX * THUMB_SCALE;
 
   const color =

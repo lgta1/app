@@ -270,7 +270,7 @@ export default function RecommendedManga({ mangaList, variant = "detail-vertical
           >
             <div
               className="flex-shrink-0 overflow-hidden rounded-lg bg-black/20 aspect-[2/3]"
-              style={{ width: 56 * 1.4 }}
+              style={{ width: 56 * 1.68 }}
             >
               <img
                 src={(m as any).poster || (m as any).cover || (m as any).thumbnail || (m as any).image}
