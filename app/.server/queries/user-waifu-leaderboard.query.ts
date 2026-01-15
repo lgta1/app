@@ -1,48 +1,127 @@
-import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
-import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
-import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
+import { Types } from "mongoose";
+
+import { UserModel } from "../../database/models/user.model";
+import { UserWaifuInventoryModel } from "../../database/models/user-waifu-inventory";
+import { WaifuModel } from "../../database/models/waifu.model";
+import { getUserWaifuInventoryCollection } from "./user-waifu-inventory.query";
+import { rewriteLegacyCdnUrl } from "../utils/cdn-url";
+import { normalizeWaifuImageUrl } from "../utils/waifu-image";
 
 export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
 
-  const totalCount = await UserWaifuLeaderboardModel.countDocuments();
+  const waifuCollectionName = WaifuModel.collection.name;
+
+  // Aggregate unique waifu counts per user from canonical inventory.
+  // Note: inventory stores ids as strings; $lookup requires ObjectId, so we cast with $toObjectId.
+  const agg = await UserWaifuInventoryModel.aggregate([
+    { $match: { count: { $gt: 0 } } },
+    {
+      $addFields: {
+        waifuObjId: { $toObjectId: "$waifuId" },
+      },
+    },
+    {
+      $lookup: {
+        from: waifuCollectionName,
+        localField: "waifuObjId",
+        foreignField: "_id",
+        as: "waifu",
+      },
+    },
+    { $unwind: "$waifu" },
+    { $match: { "waifu.stars": { $gte: 3 } } },
+    {
+      $group: {
+        _id: "$userId",
+        totalWaifu: { $sum: 1 },
+        totalWaifu3Stars: {
+          $sum: {
+            $cond: [{ $eq: ["$waifu.stars", 3] }, 1, 0],
+          },
+        },
+        totalWaifu4Stars: {
+          $sum: {
+            $cond: [{ $eq: ["$waifu.stars", 4] }, 1, 0],
+          },
+        },
+        totalWaifu5Stars: {
+          $sum: {
+            $cond: [{ $eq: ["$waifu.stars", 5] }, 1, 0],
+          },
+        },
+      },
+    },
+    {
+      $sort: {
+        totalWaifu5Stars: -1,
+        totalWaifu4Stars: -1,
+        totalWaifu3Stars: -1,
+        totalWaifu: -1,
+      },
+    },
+    {
+      $facet: {
+        data: [{ $skip: skip }, { $limit: limit }],
+        totalCount: [{ $count: "count" }],
+      },
+    },
+  ]);
+
+  const rows: any[] = agg?.[0]?.data ?? [];
+  const totalCount = Number(agg?.[0]?.totalCount?.[0]?.count ?? 0);
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Tính toán xem có user nào trong top 3 không
-  const startRank = skip + 1;
-  const includeWaifuCollection = startRank <= 3;
+  const userIds = rows.map((r: any) => String(r?._id || "")).filter(Boolean);
+  const userObjectIds = userIds
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
 
-  const query = UserWaifuLeaderboardModel.find()
-    .sort({
-      totalWaifu5Stars: -1,
-      totalWaifu4Stars: -1,
-      totalWaifu3Stars: -1,
-      totalWaifu: -1,
-    })
-    .skip(skip)
-    .limit(limit);
+  const users = userObjectIds.length
+    ? await UserModel.find({ _id: { $in: userObjectIds } })
+        .select(["_id", "name", "avatar", "level", "faction", "gender"])
+        .lean()
+    : [];
 
-  // Chỉ exclude waifuCollection nếu không có user nào trong top 3
-  if (!includeWaifuCollection) {
-    query.select("-waifuCollection");
+  const userById = new Map<string, any>();
+  for (const u of users || []) {
+    const key = String((u as any)?._id || (u as any)?.id || "");
+    if (key) userById.set(key, u);
   }
 
-  const userWaifusLeaderboard = await query.lean();
+  const startRank = skip + 1;
 
-  const normalized = userWaifusLeaderboard.map((row: any) => {
-    if (row && typeof row.userAvatar === "string") {
-      row.userAvatar = rewriteLegacyCdnUrl(row.userAvatar);
-    }
+  const normalized = await Promise.all(
+    rows.map(async (row: any, idx: number) => {
+      const userId = String(row?._id || "");
+      const u = userById.get(userId);
+      const rank = startRank + idx;
 
-    if (row && Array.isArray(row.waifuCollection)) {
-      row.waifuCollection = row.waifuCollection.map((w: any) => {
-        const nextImg = normalizeWaifuImageUrl(w?.image);
-        return nextImg ? { ...w, image: nextImg } : w;
-      });
-    }
+      const base: any = {
+        userId,
+        userName: u?.name,
+        userAvatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
+        userLevel: u?.level,
+        userFaction: u?.faction,
+        userGender: u?.gender,
+        totalWaifu: row?.totalWaifu ?? 0,
+        totalWaifu3Stars: row?.totalWaifu3Stars ?? 0,
+        totalWaifu4Stars: row?.totalWaifu4Stars ?? 0,
+        totalWaifu5Stars: row?.totalWaifu5Stars ?? 0,
+      };
 
-    return row;
-  });
+      // Keep behavior: only include waifuCollection for global top 3.
+      if (rank <= 3) {
+        const inv = await getUserWaifuInventoryCollection(userId);
+        base.waifuCollection = (inv?.waifuCollection || []).map((w: any) => {
+          const nextImg = normalizeWaifuImageUrl(w?.image);
+          return nextImg ? { ...w, image: nextImg } : w;
+        });
+      }
+
+      return base;
+    }),
+  );
 
   return {
     data: normalized,

@@ -7,7 +7,8 @@ import {
   setUserDataToSession,
 } from "~/.server/services/session.svc";
 import { UserModel, type UserType } from "~/database/models/user.model";
-import { UserWaifuModel } from "~/database/models/user-waifu";
+import { UserWaifuInventoryModel } from "~/database/models/user-waifu-inventory";
+import { WaifuModel } from "~/database/models/waifu.model";
 import { updateUserExp } from "~/helpers/user-level.helper";
 
 // Bảng quy đổi theo cấp sao (Dâm Ngọc chi phí + EXP nhận)
@@ -38,11 +39,14 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Đếm số lượng waifu hiện có
-    const waifuCount = await UserWaifuModel.countDocuments({
+    // Canonical inventory count
+    const inv = await UserWaifuInventoryModel.findOne({
       userId: user.id,
-      waifuId: waifuId,
-    });
+      waifuId,
+    })
+      .select(["count"])
+      .lean();
+    const waifuCount = Number((inv as any)?.count || 0);
 
     // Validate: phải có ít nhất 2 waifu (giữ lại 1)
     if (waifuCount < 2) {
@@ -64,20 +68,17 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Lấy thông tin waifu để biết số sao
-    const waifuInfo = await UserWaifuModel.findOne({
-      userId: user.id,
-      waifuId: waifuId,
-    }).lean();
-
+    // Lấy thông tin waifu chuẩn để biết số sao
+    const waifuInfo = await WaifuModel.findById(waifuId)
+      .select(["name", "stars"])
+      .lean();
     if (!waifuInfo) {
       return Response.json(
         { success: false, error: "Không tìm thấy thông tin waifu" },
         { status: 404 },
       );
     }
-
-    const waifuStars = waifuInfo.waifuStars as 3 | 4 | 5;
+    const waifuStars = Number((waifuInfo as any)?.stars || 0) as 3 | 4 | 5;
 
     // Validate cấp sao hợp lệ
     if (![3, 4, 5].includes(waifuStars)) {
@@ -105,33 +106,29 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Lấy danh sách waifu để xóa (lấy theo thời gian tạo mới nhất)
-    const waifusToSacrifice = await UserWaifuModel.find({
-      userId: user.id,
-      waifuId: waifuId,
-    })
-      .sort({ createdAt: -1 })
-      .limit(sacrificeAmount)
-      .lean();
-
-    if (waifusToSacrifice.length !== sacrificeAmount) {
-      return Response.json(
-        { success: false, error: "Không thể tìm đủ waifu để hiến tế" },
-        { status: 400 },
-      );
-    }
-
-    // Thực hiện hiến tế
-    const waifuIdsToDelete = waifusToSacrifice.map((w) => w._id);
-
     // Tính toán exp và level trước khi cập nhật database
     const { newExp, newLevel, didLevelUp } = updateUserExp(
       currentUser as UserType,
       totalExp,
     );
 
-    // Xóa waifu và cập nhật user
-    await UserWaifuModel.deleteMany({ _id: { $in: waifuIdsToDelete } });
+    // Giảm inventory (giữ lại tối thiểu 1)
+    const invUpdated = await UserWaifuInventoryModel.findOneAndUpdate(
+      {
+        userId: user.id,
+        waifuId,
+        count: { $gte: sacrificeAmount + 1 },
+      },
+      { $inc: { count: -sacrificeAmount } },
+      { new: true },
+    ).lean();
+
+    if (!invUpdated) {
+      return Response.json(
+        { success: false, error: "Không đủ waifu để hiến tế (phải giữ lại ít nhất 1)" },
+        { status: 400 },
+      );
+    }
 
     let updatedSession = null;
     if (didLevelUp) {
@@ -169,7 +166,7 @@ export async function action({ request }: ActionFunctionArgs) {
         expGained: totalExp,
         goldSpent: totalGoldCost,
         waifuSacrificed: sacrificeAmount,
-        waifuName: waifuInfo.waifuName,
+        waifuName: (waifuInfo as any)?.name,
         waifuStars: waifuStars,
       },
     };

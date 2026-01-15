@@ -15,7 +15,7 @@ import { useClientPagination } from "~/hooks/use-client-pagination";
 const ITEMS_PER_PAGE = 24;
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const [auth, userModelMod, userFollowMod, userReadMod, userWaifuMod, leaderboardMod, lvlMod, cdnMod, waifuImgMod] =
+  const [auth, userModelMod, userFollowMod, userReadMod, userWaifuMod, leaderboardMod, waifuMod, invQueryMod, lvlMod, cdnMod, waifuImgMod] =
     await Promise.all([
       import("@/services/auth.server"),
       import("~/database/models/user.model"),
@@ -23,6 +23,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       import("~/database/models/user-read-chapter.model"),
       import("~/database/models/user-waifu"),
       import("~/database/models/user-waifu-leaderboard.model"),
+      import("~/database/models/waifu.model"),
+      import("~/.server/queries/user-waifu-inventory.query"),
       import("~/helpers/user-level.helper"),
       import("~/.server/utils/cdn-url"),
       import("~/.server/utils/waifu-image"),
@@ -52,35 +54,78 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const chaptersRead = await userReadMod.UserReadChapterModel.countDocuments({ userId: userSession.id });
   const mangasFollowing = await userFollowMod.UserFollowMangaModel.countDocuments({ userId: userSession.id });
 
-  const userWaifuLeaderboard = await leaderboardMod.UserWaifuLeaderboardModel.findOne({ userId: userSession.id })
-    .select("waifuCollection totalWaifu")
-    .lean();
+  // Prefer canonical inventory
+  let waifuCollection: any[] = [];
+  let waifuCount = 0;
 
-  let waifuCollection =
-    userWaifuLeaderboard?.waifuCollection.sort((a: any, b: any) => (b?.stars || 0) - (a?.stars || 0)) || [];
-
-  if (waifuCollection.length) {
-    waifuCollection = waifuCollection.map((w: any) => {
-      const nextImg = waifuImgMod.normalizeWaifuImageUrl(w?.image);
-      return nextImg ? { ...w, image: nextImg } : w;
-    });
+  try {
+    const inv = await invQueryMod.getUserWaifuInventoryCollection(userSession.id);
+    waifuCollection = Array.isArray(inv?.waifuCollection) ? inv.waifuCollection : [];
+    waifuCount = Number(inv?.waifuCount || 0);
+  } catch {
+    // ignore and fallback
   }
 
-  waifuCollection = await Promise.all(
-    waifuCollection.map(async (waifu: any) => {
-      const waifuCount = await userWaifuMod.UserWaifuModel.countDocuments({
-        userId: userSession.id,
-        waifuId: waifu.waifuId,
-      });
+  // Safety fallback (pre-backfill): rebuild from summon history and merge metadata
+  if (!waifuCollection.length) {
+    const userWaifuLeaderboard = await leaderboardMod.UserWaifuLeaderboardModel.findOne({ userId: userSession.id })
+      .select("waifuCollection")
+      .lean();
 
-      return {
-        ...waifu,
-        count: waifuCount,
-      };
-    }),
-  );
+    const historyAgg = await userWaifuMod.UserWaifuModel.aggregate([
+      { $match: { userId: userSession.id, waifuStars: { $gte: 3 } } },
+      { $group: { _id: "$waifuId", count: { $sum: 1 }, waifuStars: { $max: "$waifuStars" } } },
+    ]);
 
-  const waifuCount = userWaifuLeaderboard?.totalWaifu || 0;
+    const countsById = new Map<string, number>();
+    const uniqueWaifuIds: string[] = [];
+    for (const row of historyAgg || []) {
+      const id = String((row as any)?._id || "");
+      if (!id) continue;
+      uniqueWaifuIds.push(id);
+      countsById.set(id, Number((row as any)?.count || 0));
+    }
+
+    const cacheList = Array.isArray(userWaifuLeaderboard?.waifuCollection)
+      ? userWaifuLeaderboard?.waifuCollection
+      : [];
+
+    const cacheById = new Map<string, any>();
+    for (const w of cacheList) {
+      const key = String((w as any)?.waifuId || "");
+      if (key) cacheById.set(key, w);
+    }
+
+    const waifuDocs = uniqueWaifuIds.length
+      ? await waifuMod.WaifuModel.find({ _id: { $in: uniqueWaifuIds } })
+          .select(["_id", "name", "image", "stars", "expBuff", "goldBuff"])
+          .lean()
+      : [];
+    const waifuDocById = new Map<string, any>();
+    for (const w of waifuDocs || []) {
+      const key = String((w as any)?._id || (w as any)?.id || "");
+      if (key) waifuDocById.set(key, w);
+    }
+
+    waifuCollection = uniqueWaifuIds
+      .map((waifuId) => {
+        const cached = cacheById.get(waifuId);
+        const doc = waifuDocById.get(waifuId);
+        const base = cached || doc || { waifuId };
+        const nextImg = waifuImgMod.normalizeWaifuImageUrl((base as any)?.image);
+        return {
+          waifuId,
+          name: (base as any)?.name,
+          image: nextImg ?? (base as any)?.image,
+          stars: (base as any)?.stars ?? (doc as any)?.stars,
+          expBuff: (base as any)?.expBuff ?? (doc as any)?.expBuff,
+          goldBuff: (base as any)?.goldBuff ?? (doc as any)?.goldBuff,
+          count: countsById.get(waifuId) ?? 0,
+        };
+      })
+      .sort((a: any, b: any) => (b?.stars || 0) - (a?.stars || 0));
+    waifuCount = waifuCollection.length;
+  }
 
   return {
     ...(userData as any),

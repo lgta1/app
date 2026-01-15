@@ -75,6 +75,32 @@ export const awardMilestone = async (options: {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("Guaranteed summon for milestone failed:", e);
+
+      // Roll back gold + claimed milestone, and (best-effort) rollback the free-roll summonCount if it was incremented.
+      const rollback: any = {
+        $inc: { gold: -reward.gold },
+        $pull: { claimedMilestones: milestone },
+      };
+
+      try {
+        const latest = await UserModel.findById(userId).select("summonCount").lean();
+        const afterClaimSummonCount = Number((updated as any)?.summonCount || 0);
+        const latestSummonCount = Number((latest as any)?.summonCount || 0);
+        if (latestSummonCount > afterClaimSummonCount) {
+          rollback.$inc.summonCount = -1;
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        await UserModel.updateOne({ _id: userId }, rollback);
+      } catch (rollbackErr) {
+        // eslint-disable-next-line no-console
+        console.error("Milestone rollback failed:", rollbackErr);
+      }
+
+      return { success: false, message: "Nhận waifu mốc thất bại, vui lòng thử lại" };
     }
   }
 

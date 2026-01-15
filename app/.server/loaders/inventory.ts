@@ -5,9 +5,8 @@ import { requireLogin } from "@/services/auth.server";
 import { UserModel } from "~/database/models/user.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
-import { UserWaifuModel } from "~/database/models/user-waifu";
-import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
 import { getMaxExp } from "~/helpers/user-level.helper";
+import { getUserWaifuInventoryCollection } from "~/.server/queries/user-waifu-inventory.query";
 import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
@@ -37,34 +36,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const chaptersRead = await UserReadChapterModel.countDocuments({ userId: userSession.id });
   const mangasFollowing = await UserFollowMangaModel.countDocuments({ userId: userSession.id });
 
-  const userWaifuLeaderboard = await UserWaifuLeaderboardModel.findOne({ userId: userSession.id })
-    .select("waifuCollection totalWaifu")
-    .lean();
-
-  let waifuCollection = userWaifuLeaderboard?.waifuCollection.sort((a, b) => b.stars - a.stars) || [];
-
-  if (waifuCollection.length) {
-    waifuCollection = waifuCollection.map((w: any) => {
-      const nextImg = normalizeWaifuImageUrl(w?.image);
-      return nextImg ? { ...w, image: nextImg } : w;
-    });
-  }
-
-  waifuCollection = await Promise.all(
-    waifuCollection.map(async (waifu: any) => {
-      const waifuCount = await UserWaifuModel.countDocuments({
-        userId: userSession.id,
-        waifuId: waifu.waifuId,
-      });
-
-      return {
-        ...waifu,
-        count: waifuCount,
-      };
-    }),
-  );
-
-  const waifuCount = userWaifuLeaderboard?.totalWaifu || 0;
+  const inv = await getUserWaifuInventoryCollection(userSession.id);
+  const waifuCollection = Array.isArray(inv?.waifuCollection) ? inv.waifuCollection : [];
+  const waifuCount = Number(inv?.waifuCount || 0);
 
   return {
     ...(userData as any),

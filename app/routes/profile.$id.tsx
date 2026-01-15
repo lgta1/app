@@ -1,4 +1,4 @@
-import { isValidObjectId } from "mongoose";
+import { isValidObjectId, Types } from "mongoose";
 import { type LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { useState } from "react";
@@ -10,8 +10,9 @@ import { ProfileMangaUploadedPublic } from "~/components/profile-manga-uploaded-
 import { UserModel } from "~/database/models/user.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
-import { UserWaifuLeaderboardModel } from "~/database/models/user-waifu-leaderboard.model";
 import { UserWaifuModel } from "~/database/models/user-waifu";
+import { WaifuModel } from "~/database/models/waifu.model";
+import { getUserWaifuInventoryCollection } from "~/.server/queries/user-waifu-inventory.query";
 import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
@@ -39,40 +40,44 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     userId,
   });
 
-  const userWaifuLeaderboard = await UserWaifuLeaderboardModel.findOne({
-    userId,
-  })
-    .select("waifuCollection totalWaifu")
-    .lean();
-
-  let waifuCollection = Array.isArray(userWaifuLeaderboard?.waifuCollection)
-    ? [...userWaifuLeaderboard.waifuCollection].sort((a: any, b: any) => (b?.stars || 0) - (a?.stars || 0))
+  const inventoryResult = await getUserWaifuInventoryCollection(userId);
+  let waifuCollection = Array.isArray(inventoryResult?.waifuCollection)
+    ? [...inventoryResult.waifuCollection]
     : [];
 
-  if (waifuCollection.length) {
-    waifuCollection = waifuCollection.map((w: any) => {
-      const nextImg = normalizeWaifuImageUrl(w?.image);
-      return nextImg ? { ...w, image: nextImg } : w;
+  // Fallback: nếu cache leaderboard rỗng/mất thì dựng trực tiếp từ lịch sử summon (>= 3 sao)
+  if (!waifuCollection.length) {
+    const distinctWaifuIds = await UserWaifuModel.distinct("waifuId", {
+      userId,
+      waifuStars: { $gte: 3 },
     });
-  }
 
-  if (waifuCollection.length && isOwner) {
-    waifuCollection = await Promise.all(
-      waifuCollection.map(async (waifu: any) => {
-        const waifuCount = await UserWaifuModel.countDocuments({
-          userId,
-          waifuId: waifu.waifuId,
-        });
+    const waifuObjectIds = distinctWaifuIds
+      .filter((id: any) => typeof id === "string" && isValidObjectId(id))
+      .map((id: string) => new Types.ObjectId(id));
 
+    const waifus = waifuObjectIds.length
+      ? await WaifuModel.find({ _id: { $in: waifuObjectIds } })
+          .select(["_id", "name", "image", "stars", "expBuff", "goldBuff"])
+          .lean()
+      : [];
+
+    waifuCollection = (waifus || [])
+      .map((w: any) => {
+        const nextImg = normalizeWaifuImageUrl(w?.image);
         return {
-          ...waifu,
-          count: waifuCount,
+          waifuId: w?._id?.toString?.() ?? w?.id,
+          name: w?.name,
+          image: nextImg ?? w?.image,
+          stars: w?.stars,
+          expBuff: w?.expBuff,
+          goldBuff: w?.goldBuff,
         };
-      }),
-    );
+      })
+      .sort((a: any, b: any) => (b?.stars || 0) - (a?.stars || 0));
   }
 
-  const waifuCount = userWaifuLeaderboard?.totalWaifu || 0;
+  const waifuCount = inventoryResult?.waifuCount || waifuCollection.length || 0;
   const userFull = await UserModel.findById(userId)
     .select("currentWaifu")
     .populate("currentWaifu")

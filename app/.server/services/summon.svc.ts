@@ -1,6 +1,6 @@
 import Promise from "bluebird";
 
-import { checkWaifuToUpdate } from "@/mutations/user-waifu-leaderboard";
+import { grantWaifu } from "@/services/waifu-inventory.svc";
 
 import { getUserSession, setUserDataToSession } from "./session.svc";
 
@@ -152,30 +152,15 @@ export const summon = async (
 
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");
 
-  try {
-    // Debug: log before checking/updating leaderboard
-    // eslint-disable-next-line no-console
-    console.log(`[summon.svc] will checkWaifuToUpdate user=${user.id} waifuId=${waifu?.id} name=${waifu?.name} image=${waifu?.image}`);
-  } catch {}
-
-  await checkWaifuToUpdate(user.id, waifu.id);
-
   await cleanupUserSummonHistory(user.id, 50);
 
-
-  const created = await UserWaifuModel.create({
-    bannerId: banner.id,
+  await grantWaifu({
     userId: user.id,
+    bannerId: banner.id,
     waifuId: waifu.id,
     waifuName: waifu.name,
     waifuStars: waifu.stars,
   });
-
-  try {
-    // Debug: confirm creation and show the stored waifuId (string)
-    // eslint-disable-next-line no-console
-    console.log(`[summon.svc] created UserWaifu id=${(created as any)?._id?.toString()} waifuId=${(created as any)?.waifuId} for user=${user.id}`);
-  } catch {}
 
   return {
     type: "waifu",
@@ -235,23 +220,19 @@ export const summonGuaranteedWaifu = async (
 
   const waifuIdStr = (waifu as any)?._id?.toString?.() ?? (waifu as any)?.id;
   if (!waifuIdStr) throw new BusinessError("Thiếu mã waifu");
-  await checkWaifuToUpdate(user.id, waifuIdStr);
+
   await cleanupUserSummonHistory(user.id, 50);
 
   const bannerIdStr = (banner as any)?._id?.toString?.() ?? (banner as any)?.id;
   if (!bannerIdStr) throw new BusinessError("Thiếu bannerId");
-  const created = await UserWaifuModel.create({
-    bannerId: bannerIdStr,
+
+  await grantWaifu({
     userId: user.id,
+    bannerId: bannerIdStr,
     waifuId: waifuIdStr,
     waifuName: waifu.name,
     waifuStars: waifu.stars,
   });
-
-  try {
-    // eslint-disable-next-line no-console
-    console.log(`[summonGuaranteedWaifu] created UserWaifu id=${(created as any)?._id?.toString()} waifuId=${(created as any)?.waifuId}`);
-  } catch {}
 
   // Check if new milestone reached due to this free roll
   const reachedMilestone = await (async () => {

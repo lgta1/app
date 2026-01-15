@@ -5,6 +5,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import { UserModel } from "~/database/models/user.model";
 import { WaifuModel } from "~/database/models/waifu.model";
 import { getDefaultBlacklistTagSlugs } from "~/constants/blacklist-tags";
+import { UserWaifuInventoryModel } from "~/database/models/user-waifu-inventory";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -70,6 +71,21 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({
           success: false,
           error: "Không tìm thấy waifu",
+        });
+      }
+
+      const inv = await UserWaifuInventoryModel.findOne({
+        userId: user.id,
+        waifuId,
+        count: { $gt: 0 },
+      })
+        .select(["count"])
+        .lean();
+
+      if (!inv) {
+        return Response.json({
+          success: false,
+          error: "Bạn chưa sở hữu waifu này",
         });
       }
 
