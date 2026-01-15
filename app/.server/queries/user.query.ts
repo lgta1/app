@@ -4,7 +4,7 @@ import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 
 export const getTopUser = async (limit: number = 10) => {
   const users = await UserModel.find({
-    role: ROLES.USER,
+    role: { $in: [ROLES.USER, ROLES.DICHGIA] },
     isDeleted: false,
     isBanned: false,
   })

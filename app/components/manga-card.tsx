@@ -43,6 +43,8 @@ type Props = {
   hideBottomOverlay?: boolean;
   /** Make the <1h time badge stick to the top-right corner (only for LatestUpdates on index). */
   cornerTimeBadge?: boolean;
+  /** Render the HOT badge attached to the top-left corner (only for banner items). */
+  cornerHotBadge?: boolean;
 };
 
 export function MangaCard({
@@ -56,6 +58,7 @@ export function MangaCard({
   imgFetchPriority = "high",
   hideBottomOverlay = false,
   cornerTimeBadge = false,
+  cornerHotBadge = false,
 }: Props) {
   const matches = useMatches();
   const rootData: any = matches.find((m) => m.id === "root")?.data;
@@ -100,6 +103,9 @@ export function MangaCard({
   const timeBadgeClassName = cornerTimeBadge
     ? "pointer-events-none absolute top-0 right-0 z-[4] select-none rounded-none rounded-bl-lg px-2 py-0.5 text-xs font-semibold text-white shadow-[0_1px_6px_rgba(0,0,0,0.55)]"
     : "pointer-events-none absolute top-2 right-2 z-[4] select-none rounded-full px-2 py-0.5 text-xs font-semibold text-white shadow-[0_1px_6px_rgba(0,0,0,0.55)]";
+
+  const hotBadgeClassName =
+    "pointer-events-none absolute top-0 left-0 z-[4] select-none rounded-none rounded-tl-xl rounded-br-lg px-2 py-0.5 text-sm font-semibold text-white shadow-[0_1px_6px_rgba(0,0,0,0.55)]";
 
   const isBannerDesktop = variant === "bannerDesktop";
   // Blacklist overlay:
@@ -184,6 +190,20 @@ export function MangaCard({
           className="absolute left-0 top-0 w-full overflow-hidden"
           style={{ aspectRatio: "3 / 4" }}
         >
+          {cornerHotBadge ? (
+            <span
+              className={hotBadgeClassName}
+              style={{
+                backgroundImage:
+                  "linear-gradient(100deg, rgba(244,63,94,0.35) 0%, rgba(244,63,94,0.95) 20%, rgba(244,63,94,0.35) 40%, rgba(244,63,94,0.95) 60%, rgba(244,63,94,0.35) 80%)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer-red 4s linear infinite",
+                border: "1px solid rgba(248,113,113,0.45)",
+              }}
+            >
+              Hot
+            </span>
+          ) : null}
           <img
             src={poster}
             alt={title}

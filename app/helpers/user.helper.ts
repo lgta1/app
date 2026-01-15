@@ -28,6 +28,9 @@ export const getTitleImgPath = (user: UserType) => {
     }
     return `/images/title/0/${user.level}.webp`;
   } else if (user.faction === 1) {
+    if (user.level === 4) {
+      return `/images/title/1/unnamed%20(4).webp`;
+    }
     return `/images/title/1/${user.level}.webp`;
   }
 };
