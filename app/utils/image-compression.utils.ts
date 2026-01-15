@@ -31,14 +31,17 @@ const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
 
 /**
- * QUY TẮC NÉN (cập nhật theo yêu cầu 17/12/2025):
+ * QUY TẮC NÉN (cập nhật theo yêu cầu 15/01/2026):
  * 1) GIF
  *    - Giữ nguyên, không nén, không đổi định dạng.
  * 2) PNG
  *    - LUÔN chuyển sang WEBP (quality 0.95), sau đó áp dụng quy tắc (3).
  * 3) JPG / JPEG / WEBP / AVIF (và PNG sau khi convert)
- *    - ≤ 1.8MB: giữ nguyên.
- *    - > 1.8MB & ≤ 2.85MB: scale còn 75%.
+ *    - ≤ 2MB: giữ nguyên.
+ *    - > 2MB & ≤ 2.85MB:
+ *        (a) Thử nén giảm chất lượng -10% trước.
+ *            Nếu file mới < file hiện tại và < 2MB → dùng file mới.
+ *        (b) Nếu (a) không đạt → scale còn 75% dựa trên file gốc (chưa bị giảm chất lượng).
  *    - > 2.85MB & ≤ 3.5MB: scale còn 65%.
  *    - > 3.5MB & ≤ 5MB: scale còn 55%.
  *    - > 5MB & ≤ 7MB: scale còn 45%.
@@ -105,28 +108,85 @@ async function scaleByRule(currentFile: File, originalSize: number): Promise<Com
   const MB = 1024 * 1024;
   const size = currentFile.size;
 
-  const tiers: Array<{ max: number; ratio: number }> = [
-    { max: 1.8 * MB, ratio: 1 },
-    { max: 2.85 * MB, ratio: 0.75 },
-    { max: 3.5 * MB, ratio: 0.65 },
-    { max: 5 * MB, ratio: 0.55 },
-    { max: 7 * MB, ratio: 0.45 },
-  ];
+  const KEEP_UNDER_BYTES = 2 * MB;
+  const TRY_QUALITY_UNDER_BYTES = 2.85 * MB;
 
-  let scaleRatio = 0.35; // default for >7MB
-  const tier = tiers.find((t) => size <= t.max);
-  if (tier) {
-    if (tier.ratio === 1) {
-      return {
-        compressedFile: currentFile,
-        originalSize,
-        compressedSize: currentFile.size,
-        compressionRatio: ((originalSize - currentFile.size) / originalSize) * 100,
-      };
-    }
-    scaleRatio = tier.ratio;
+  // ≤ 2MB: keep
+  if (size <= KEEP_UNDER_BYTES) {
+    return {
+      compressedFile: currentFile,
+      originalSize,
+      compressedSize: currentFile.size,
+      compressionRatio: ((originalSize - currentFile.size) / originalSize) * 100,
+    };
   }
 
+  // 2MB–2.85MB: try quality -10% first; if not good enough, scale 75% based on original (no quality reduction chained).
+  if (size <= TRY_QUALITY_UNDER_BYTES) {
+    const maybe = await tryReduceQualityMinus10(currentFile, originalSize, KEEP_UNDER_BYTES);
+    if (maybe) return maybe;
+    return await scaleByRatio(currentFile, originalSize, 0.75);
+  }
+
+  // Remaining tiers keep existing ratios
+  if (size <= 3.5 * MB) return await scaleByRatio(currentFile, originalSize, 0.65);
+  if (size <= 5 * MB) return await scaleByRatio(currentFile, originalSize, 0.55);
+  if (size <= 7 * MB) return await scaleByRatio(currentFile, originalSize, 0.45);
+  return await scaleByRatio(currentFile, originalSize, 0.35);
+
+}
+
+async function tryReduceQualityMinus10(
+  currentFile: File,
+  originalSize: number,
+  mustBeUnderBytes: number,
+): Promise<CompressionResult | null> {
+  const mime = currentFile.type;
+
+  // browser-image-compression only supports quality for JPEG/WebP reliably.
+  const supportsQuality =
+    mime === "image/jpeg" ||
+    mime === "image/jpg" ||
+    mime === "image/webp";
+  if (!supportsQuality) return null;
+
+  // Rule: -10% quality
+  // - JPEG/JPG: 0.90
+  // - WebP (including PNG->WebP converted earlier): 0.85 (matches 0.95 - 0.10)
+  const trialQuality01 = mime === "image/webp" ? 0.85 : 0.9;
+
+  try {
+    const recompressed = await reencodeKeepResolution(currentFile, trialQuality01);
+    if (recompressed.size < currentFile.size && recompressed.size < mustBeUnderBytes) {
+      return {
+        compressedFile: recompressed,
+        originalSize,
+        compressedSize: recompressed.size,
+        compressionRatio: ((originalSize - recompressed.size) / originalSize) * 100,
+      };
+    }
+  } catch (e) {
+    console.warn(`Quality trial failed for "${currentFile.name}":`, e);
+  }
+
+  return null;
+}
+
+async function reencodeKeepResolution(file: File, quality01: number): Promise<File> {
+  const mime = file.type;
+  const options = {
+    useWebWorker: true,
+    fileType: mime as any,
+    initialQuality: quality01,
+    maxWidthOrHeight: await inferMaxDim(file),
+    alwaysKeepResolution: true,
+    exifOrientation: 1,
+  };
+  const blob = await imageCompression(file, options);
+  return new File([blob], file.name, { type: mime, lastModified: Date.now() });
+}
+
+async function scaleByRatio(currentFile: File, originalSize: number, scaleRatio: number): Promise<CompressionResult> {
   try {
     const { width, height } = await getImageDimensions(currentFile);
     const maxDim = Math.max(width, height);
@@ -150,6 +210,7 @@ async function scaleByRule(currentFile: File, originalSize: number): Promise<Com
       compressionRatio: ((originalSize - currentFile.size) / originalSize) * 100,
     };
   }
+
 }
 
 /** Chuyển bất kỳ File ảnh sang WEBP với quality (0..1). */
