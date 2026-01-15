@@ -824,12 +824,12 @@ useEffect(() => {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-10 portrait:gap-6 sm:portrait:gap-10 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-10 portrait:gap-6 sm:portrait:gap-10 md:flex-row md:items-start md:gap-5">
         {/* Ảnh bìa */}
         <div
-          className={`relative flex flex-shrink-0 items-center justify-center ${
+          className={`relative flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg h-96 w-64 portrait:w-72 sm:portrait:w-64 md:mt-[5px] md:w-[min(280px,36vw)] md:h-auto md:aspect-[2/3] ${
             canDropPoster ? "group cursor-copy" : ""
-          } lg:self-start`}
+          } md:self-start`}
           onDrop={canDropPoster ? handlePosterDropEvent : undefined}
           onDragOver={canDropPoster ? handlePosterDragOver : undefined}
           onDragLeave={canDropPoster ? handlePosterDragLeave : undefined}
@@ -839,7 +839,7 @@ useEffect(() => {
             alt={`Bìa truyện ${title}`}
             width={256}
             height={384}
-            className="h-96 w-64 portrait:w-72 sm:portrait:w-64 rounded-lg object-cover"
+            className="h-full w-full object-cover"
             loading="lazy"
             decoding="async"
           />
@@ -891,7 +891,7 @@ useEffect(() => {
         </div>
 
         {/* Thông tin chi tiết */}
-        <div className="flex w-full flex-col gap-4">
+        <div className="flex w-full min-w-0 flex-col gap-4 md:flex-1">
           {/* Tiêu đề (rating removed) */}
           <div className="flex flex-col gap-1.5">
             <h1 className="text-txt-primary text-2xl leading-snug font-semibold">

@@ -185,7 +185,7 @@ export default function AdminStatistic() {
             {data.hotCarousel?.[0]?.formula ?? "adjusted = baseScore * (1 - (weeklyPenalty + monthlyPenalty)) * recentMultiplier * genreMultiplier"}
           </div>
           <div className="text-txt-secondary font-sans text-xs">
-            Lưu ý: nếu có genre <span className="font-semibold">manhwa</span> thì trừ <span className="font-semibold">35%</span> (nhân 0.65) và <span className="font-semibold">không áp dụng</span> bonus cập nhật gần đây (12h). Các truyện không phải manhwa nếu vừa cập nhật gần đây (12h) thì cộng <span className="font-semibold">25%</span> (nhân 1.25).
+            Lưu ý: nếu có genre <span className="font-semibold">manhwa</span> thì trừ <span className="font-semibold">35%</span> (nhân 0.65) và <span className="font-semibold">không áp dụng</span> bonus cập nhật gần đây (12h). Nếu có tag <span className="font-semibold">guro</span>/<span className="font-semibold">scat</span> thì <span className="font-semibold">không áp dụng</span> bonus cập nhật gần đây (12h) và bị trừ <span className="font-semibold">50%</span> điểm (nhân 0.5). Các truyện không thuộc các nhóm trên nếu vừa cập nhật gần đây (12h) thì cộng <span className="font-semibold">25%</span> (nhân 1.25).
           </div>
         </div>
 
