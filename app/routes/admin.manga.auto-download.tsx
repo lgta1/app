@@ -1,4 +1,4 @@
-import { Link, useFetcher } from "react-router-dom";
+import { Link, useFetcher, useLoaderData } from "react-router-dom";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, type MetaFunction } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -86,6 +86,39 @@ type PollBatchLoaderResult =
     }
   | { ok: false; error: string };
 
+type InitialLoaderResult =
+  | {
+      ok: true;
+      activeBatchId: string | null;
+      jobs: Array<{
+        jobId: string;
+        url: string;
+        status: ViHentaiAutoDownloadJobStatus;
+        paused?: boolean;
+        startedAt?: string;
+        finishedAt?: string;
+        progress?: {
+          stage?: string;
+          message?: string;
+          chapterIndex?: number;
+          chapterCount?: number;
+          chapterTitle?: string;
+          imageIndex?: number;
+          imageCount?: number;
+        };
+        result?: {
+          message?: string;
+          createdId?: string;
+          createdSlug?: string;
+          chaptersImported?: number;
+          imagesUploaded?: number;
+          chapterErrors?: number;
+        };
+        errorMessage?: string;
+      }>;
+    }
+  | { ok: false; error: string };
+
 type ExtractListingActionResult =
   | { ok: true; url: string; links: string[]; count: number; capped?: boolean }
   | { ok: false; error: string };
@@ -102,7 +135,84 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const intent = url.searchParams.get("intent") || "";
 
   if (intent !== "pollBatch") {
-    return null;
+    try {
+      const activeJob = await ViHentaiAutoDownloadJobModel.findOne({
+        status: { $in: ["queued", "running"] },
+      })
+        .sort({ createdAt: -1 })
+        .select({ batchId: 1 })
+        .lean();
+
+      const latestJob =
+        activeJob ??
+        (await ViHentaiAutoDownloadJobModel.findOne({})
+          .sort({ createdAt: -1 })
+          .select({ batchId: 1 })
+          .lean());
+
+      const activeBatchId = latestJob?.batchId ? String(latestJob.batchId) : null;
+
+      if (!activeBatchId) {
+        const body: InitialLoaderResult = { ok: true, activeBatchId: null, jobs: [] };
+        return Response.json(body, { status: 200 });
+      }
+
+      const jobs = await ViHentaiAutoDownloadJobModel.find({ batchId: activeBatchId })
+        .sort({ createdAt: 1 })
+        .select({
+          _id: 1,
+          url: 1,
+          status: 1,
+          paused: 1,
+          startedAt: 1,
+          finishedAt: 1,
+          progress: 1,
+          result: 1,
+          errorMessage: 1,
+        })
+        .lean();
+
+      const body: InitialLoaderResult = {
+        ok: true,
+        activeBatchId,
+        jobs: jobs.map((j) => ({
+          jobId: String(j._id),
+          url: String(j.url || ""),
+          status: j.status as ViHentaiAutoDownloadJobStatus,
+          paused: Boolean((j as any).paused),
+          startedAt: j.startedAt ? new Date(j.startedAt).toISOString() : undefined,
+          finishedAt: j.finishedAt ? new Date(j.finishedAt).toISOString() : undefined,
+          progress: j.progress
+            ? {
+                stage: (j.progress as any).stage,
+                message: (j.progress as any).message,
+                chapterIndex: (j.progress as any).chapterIndex,
+                chapterCount: (j.progress as any).chapterCount,
+                chapterTitle: (j.progress as any).chapterTitle,
+                imageIndex: (j.progress as any).imageIndex,
+                imageCount: (j.progress as any).imageCount,
+              }
+            : undefined,
+          result: (j as any).result
+            ? {
+                message: (j as any).result?.message,
+                createdId: (j as any).result?.createdId,
+                createdSlug: (j as any).result?.createdSlug,
+                chaptersImported: (j as any).result?.chaptersImported,
+                imagesUploaded: (j as any).result?.imagesUploaded,
+                chapterErrors: (j as any).result?.chapterErrors,
+              }
+            : undefined,
+          errorMessage: (j as any).errorMessage || undefined,
+        })),
+      };
+
+      return Response.json(body, { status: 200 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể tải trạng thái auto-load";
+      const body: InitialLoaderResult = { ok: false, error: message };
+      return Response.json(body, { status: 200 });
+    }
   }
 
   const batchId = (url.searchParams.get("batchId") || "").trim();
@@ -454,6 +564,7 @@ const formatSuccessResult = (result: ViHentaiAutoDownloadResult) => {
 };
 
 export default function AdminMangaAutoDownload() {
+  const loaderData = useLoaderData() as InitialLoaderResult | null;
   const fetcher = useFetcher<ActionResult>();
   const listingFetcher = useFetcher<ExtractListingActionResult>();
   const enqueueFetcher = useFetcher<EnqueueBatchActionResult>();
@@ -474,6 +585,8 @@ export default function AdminMangaAutoDownload() {
 
   const storageKey = "admin:autoDownloadViHentai:queue:v1";
   const storageKeySettings = "admin:autoDownloadViHentai:settings:v1";
+
+  const hydratedFromServerRef = useRef(false);
 
   const makeId = () => {
     try {
@@ -506,8 +619,94 @@ export default function AdminMangaAutoDownload() {
     rowsRef.current = rows;
   }, [rows]);
 
+  // Hydrate from server so the page is live/persistent across devices.
+  useEffect(() => {
+    if (!loaderData) return;
+    if (!loaderData.ok) return;
+    if (hydratedFromServerRef.current) return;
+
+    hydratedFromServerRef.current = true;
+
+    if (!loaderData.activeBatchId) {
+      return;
+    }
+
+    const batchId = loaderData.activeBatchId;
+    activeBatchIdRef.current = batchId;
+    setActiveBatchId(batchId);
+
+    const rowsFromServer: QueueRow[] = loaderData.jobs.map((job) => {
+      const progressText = (() => {
+        const p = job.progress;
+        if (!p) return "";
+        const parts: string[] = [];
+        if (typeof p.chapterIndex === "number" && typeof p.chapterCount === "number") {
+          parts.push(`Chương ${p.chapterIndex}/${p.chapterCount}`);
+        }
+        if (typeof p.imageIndex === "number" && typeof p.imageCount === "number") {
+          parts.push(`Ảnh ${p.imageIndex}/${p.imageCount}`);
+        }
+        if (p.chapterTitle) parts.push(p.chapterTitle);
+        if (p.message) parts.push(p.message);
+        return parts.filter(Boolean).join(" · ");
+      })();
+
+      if (job.status === "queued" || job.status === "running") {
+        return {
+          id: makeId(),
+          url: job.url,
+          jobId: job.jobId,
+          status: "running",
+          message: job.paused
+            ? "Đã pause (đang chờ)"
+            : progressText || (job.status === "queued" ? "Đang chờ..." : "Đang chạy..."),
+          startedAt: job.startedAt,
+        };
+      }
+
+      if (job.status === "succeeded") {
+        return {
+          id: makeId(),
+          url: job.url,
+          jobId: job.jobId,
+          status: "done",
+          message:
+            job.result?.message ||
+            `Xong · ${job.result?.chaptersImported ?? 0} chương · ${job.result?.imagesUploaded ?? 0} ảnh`,
+          startedAt: job.startedAt,
+          finishedAt: job.finishedAt,
+          lastResult: job.result?.createdId
+            ? ({ status: "created", createdId: job.result.createdId } as any)
+            : undefined,
+        };
+      }
+
+      return {
+        id: makeId(),
+        url: job.url,
+        jobId: job.jobId,
+        status: "error",
+        message: job.errorMessage || "Lỗi",
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+      };
+    });
+
+    setRows(rowsFromServer.length ? rowsFromServer : [{ id: makeId(), url: "", status: "idle" }]);
+
+    const anyRunning = loaderData.jobs.some((j) => j.status === "queued" || j.status === "running");
+    setIsRunning(anyRunning);
+
+    // Start polling immediately for live progress.
+    pollFetcher.load(`/admin/manga/auto-download?intent=pollBatch&batchId=${encodeURIComponent(batchId)}`);
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    pollTimerRef.current = setInterval(() => pollBatch(batchId), 5_000);
+  }, [loaderData]);
+
   useEffect(() => {
     try {
+      // If server snapshot exists, do not override queue rows from localStorage.
+      if (!hydratedFromServerRef.current) {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -525,6 +724,7 @@ export default function AdminMangaAutoDownload() {
             }))
           );
         }
+      }
       }
       const settingsRaw = localStorage.getItem(storageKeySettings);
       if (settingsRaw) {

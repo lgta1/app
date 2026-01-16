@@ -1,5 +1,18 @@
 #!/bin/bash
 
+set -Eeuo pipefail
+
+PM2_USER="${PM2_USER:-devuser}"
+
+# Safety: this script is legacy; ensure it never runs PM2 as root.
+if [[ "$(id -un)" != "$PM2_USER" ]]; then
+    script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+    echo "[deploy][legacy] Re-exec as $PM2_USER (current: $(id -un))" >&2
+    exec sudo -iu "$PM2_USER" bash -lc "$(printf '%q' "$script_path")"
+fi
+
+export PM2_HOME="/home/${PM2_USER}/.pm2"
+
 echo "=== Deploy ứng dụng lên Ubuntu Server ==="
 
 # Dừng PM2 nếu đang chạy
