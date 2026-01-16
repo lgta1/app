@@ -195,6 +195,72 @@ export const createChapter = async (
   }
 };
 
+// Internal/system chapter creation (no session cookie required).
+// Intended for background workers where we already trust the job source.
+export const createChapterAsAdmin = async (
+  chapter: Omit<ChapterType, "id" | "createdAt" | "updatedAt">,
+) => {
+  const manga = await MangaModel.findById(chapter.mangaId);
+  if (!manga) {
+    throw new BusinessError("Không tìm thấy manga");
+  }
+
+  const contentUrls = (Array.isArray(chapter.contentUrls) ? chapter.contentUrls : []).map((u) =>
+    rewriteLegacyCdnUrl(u),
+  );
+
+  let totalBytes = 0;
+  if (typeof (chapter as any).contentBytes === "number" && (chapter as any).contentBytes > 0) {
+    totalBytes = (chapter as any).contentBytes;
+  } else {
+    totalBytes = await calculateChapterContentBytes(contentUrls);
+  }
+
+  const finalNumber = (manga.chapters || 0) + 1;
+
+  const rawTitle = (chapter.title ?? "").trim();
+  const isPlaceholder = rawTitle === "...";
+  const finalTitle = rawTitle ? rawTitle : `Chap ${finalNumber}`;
+
+  let chapterSlug = await generateUniqueChapterSlug(
+    String(chapter.mangaId),
+    isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+  );
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const newChapter = await ChapterModel.create({
+        ...chapter,
+        contentUrls,
+        contentBytes: totalBytes,
+        title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+        chapterNumber: finalNumber,
+        slug: chapterSlug,
+      });
+
+      await MangaModel.updateOne(
+        { _id: manga.id },
+        { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
+        { timestamps: false },
+      );
+
+      notifyNewChapter(newChapter, manga);
+      return newChapter;
+    } catch (e: any) {
+      const code = Number(e?.code);
+      const msg = String(e?.message || "");
+      const isDup = code === 11000 || msg.includes("E11000");
+      if (!isDup) throw e;
+      chapterSlug = await generateUniqueChapterSlug(
+        String(chapter.mangaId),
+        isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+      );
+    }
+  }
+
+  throw new BusinessError("Không thể tạo slug chương duy nhất, vui lòng thử lại");
+};
+
 // Update chapter: if title provided but blank/placeholder => normalize to auto-number.
 export const updateChapter = async (
   request: Request,

@@ -2,6 +2,9 @@ import { load, type CheerioAPI, type Cheerio } from "cheerio";
 import type { Element } from "domhandler";
 import type { Model } from "mongoose";
 import { createRequire } from "node:module";
+import sharp from "sharp";
+
+import { uploadBufferWithValidation, encodeForMetadata } from "@/services/file-upload.service";
 
 import { MANGA_CONTENT_TYPE, MANGA_STATUS, MANGA_USER_STATUS, type MangaContentType } from "~/constants/manga";
 import { generateUniqueMangaSlug } from "~/database/helpers/manga-slug.helper";
@@ -13,6 +16,7 @@ import { TranslatorModel } from "~/database/models/translator.model";
 import { GenresModel } from "~/database/models/genres.model";
 import { slugify } from "~/utils/slug.utils";
 import { stripDiacritics } from "~/utils/text-normalize";
+import { deleteFiles as deletePublicFiles } from "~/utils/minio.utils";
 import genresData from "~/../data/genres-full.json";
 import supplementalGenresData from "~/../data/genres-missing-upsert.json";
 
@@ -69,6 +73,8 @@ const sanitizeWhitespace = (value?: string | null) => {
   if (!value) return "";
   return value.replace(/\s+/g, " ").trim();
 };
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const stripBranding = (value?: string | null) => {
   let result = sanitizeWhitespace(value);
@@ -247,6 +253,8 @@ export type ParsedViHentaiPage = {
   followNumber?: number;
   chapterCount: number;
   codeLabel?: string;
+  lastUpdatedText?: string;
+  lastUpdatedAt?: Date;
   url: string;
 };
 
@@ -260,6 +268,31 @@ export type ViHentaiImportOptions = {
   skipIfExists?: boolean;
   contentType?: MangaContentType;
   userStatusOverride?: number;
+};
+
+export type ViHentaiAutoDownloadOptions = ViHentaiImportOptions & {
+  request: Request;
+  downloadPoster?: boolean;
+  downloadChapters?: boolean;
+  asSystem?: boolean;
+  maxChapters?: number;
+  maxImagesPerChapter?: number;
+  continueOnChapterError?: boolean;
+  imageDelayMs?: number;
+  imageTimeoutMs?: number;
+  imageRetries?: number;
+  chapterDelayMs?: number;
+  onProgress?: (progress: {
+    stage: "manga" | "poster" | "chapters" | "chapter" | "image" | "done";
+    message?: string;
+    chapterIndex?: number;
+    chapterCount?: number;
+    chapterTitle?: string;
+    chapterUrl?: string;
+    imageIndex?: number;
+    imageCount?: number;
+    imageUrl?: string;
+  }) => void | Promise<void>;
 };
 
 export type ViHentaiImportResult = {
@@ -294,6 +327,12 @@ export type ViHentaiImportResult = {
   createdSlug?: string;
 };
 
+export type ViHentaiAutoDownloadResult = ViHentaiImportResult & {
+  chaptersImported: number;
+  imagesUploaded: number;
+  chapterErrors: Array<{ chapterUrl: string; message: string }>;
+};
+
 const fetchHtml = async (url: string) => {
   const response = await fetch(url, { headers: HEADERS });
   if (!response.ok) {
@@ -301,6 +340,471 @@ const fetchHtml = async (url: string) => {
   }
   return response.text();
 };
+
+const contentTypeToExtension = (contentType?: string | null) => {
+  const ct = String(contentType || "").toLowerCase().split(";")[0].trim();
+  if (ct === "image/jpeg" || ct === "image/jpg") return ".jpg";
+  if (ct === "image/png") return ".png";
+  if (ct === "image/webp") return ".webp";
+  if (ct === "image/avif") return ".avif";
+  if (ct === "image/gif") return ".gif";
+  if (ct === "image/svg+xml") return ".svg";
+  return ".jpg";
+};
+
+const formatToContentType = (format?: string | null): string | null => {
+  const f = String(format || "").toLowerCase();
+  if (f === "jpeg" || f === "jpg") return "image/jpeg";
+  if (f === "png") return "image/png";
+  if (f === "webp") return "image/webp";
+  if (f === "gif") return "image/gif";
+  if (f === "avif") return "image/avif";
+  return null;
+};
+
+const normalizeFilenameForContentType = (filename: string, contentType?: string | null) => {
+  const ext = contentTypeToExtension(contentType);
+  if (!filename) return filename;
+  const lastDot = filename.lastIndexOf(".");
+  if (lastDot <= 0) return `${filename}${ext}`;
+  return `${filename.slice(0, lastDot)}${ext}`;
+};
+
+// Server-side re-implementation of the client rules in `app/utils/image-compression.utils.ts`.
+// - Chapter images: size-based scaling + PNG->WebP + small quality trial.
+// - Posters: crop to 3:4 when needed + width<=625 + PNG->WebP.
+const IMAGE_LIMIT_PIXELS = 64_000_000;
+const MB = 1024 * 1024;
+
+type PosterAspect = "3:4" | "2:3" | "other";
+const POSTER_TARGET_WIDTH = 625;
+const POSTER_ASPECT_TOLERANCE = 0.01;
+const ASPECT_THREE_FOUR = 3 / 4;
+const ASPECT_TWO_THREE = 2 / 3;
+
+const classifyPosterAspect = (ratio: number): PosterAspect => {
+  if (Math.abs(ratio - ASPECT_THREE_FOUR) <= POSTER_ASPECT_TOLERANCE) return "3:4";
+  if (Math.abs(ratio - ASPECT_TWO_THREE) <= POSTER_ASPECT_TOLERANCE) return "2:3";
+  return "other";
+};
+
+async function normalizePosterBuffer(
+  buffer: Buffer,
+  input: { contentType: string | null },
+): Promise<{ buffer: Buffer; contentType: string | null }> {
+  try {
+    const base = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS }).rotate();
+    const meta = await base.metadata();
+    const width = meta.width ?? 0;
+    const height = meta.height ?? 0;
+    const format = (meta.format || "").toLowerCase();
+
+    if (!width || !height) {
+      return { buffer, contentType: input.contentType };
+    }
+
+    const aspect = classifyPosterAspect(width / height);
+    const needsCrop = aspect === "other";
+    const needsResize = width > POSTER_TARGET_WIDTH;
+    const needsPngConvert = format === "png";
+
+    // Match client behavior: if no changes needed (and not PNG conversion), keep as-is.
+    if (!needsCrop && !needsResize && !needsPngConvert) {
+      return { buffer, contentType: input.contentType || formatToContentType(format) };
+    }
+
+    let pipeline = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS }).rotate();
+
+    // Crop center to 3:4 if not 3:4 or 2:3
+    if (needsCrop) {
+      const targetRatio = ASPECT_THREE_FOUR;
+      if (width / height > targetRatio) {
+        const cropWidth = Math.max(1, Math.floor(height * targetRatio));
+        const left = Math.max(0, Math.floor((width - cropWidth) / 2));
+        pipeline = pipeline.extract({ left, top: 0, width: cropWidth, height });
+      } else {
+        const cropHeight = Math.max(1, Math.floor(width / targetRatio));
+        const top = Math.max(0, Math.floor((height - cropHeight) / 2));
+        pipeline = pipeline.extract({ left: 0, top, width, height: cropHeight });
+      }
+    }
+
+    // Resize to width=625 if larger.
+    if (needsResize) {
+      pipeline = pipeline.resize({ width: POSTER_TARGET_WIDTH, withoutEnlargement: true });
+    }
+
+    // Convert PNG -> WebP (quality 95). JPG/WEBP keep.
+    if (format === "png") {
+      const out = await pipeline.webp({ quality: 95, effort: 4 }).toBuffer();
+      return { buffer: out, contentType: "image/webp" };
+    }
+
+    // Keep input format but do a deterministic encode.
+    if (format === "jpeg" || format === "jpg") {
+      const out = await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+      return { buffer: out, contentType: "image/jpeg" };
+    }
+    if (format === "webp") {
+      const out = await pipeline.webp({ quality: 92, effort: 4 }).toBuffer();
+      return { buffer: out, contentType: "image/webp" };
+    }
+    if (format === "avif") {
+      const out = await pipeline.avif({ quality: 60, effort: 4 }).toBuffer();
+      return { buffer: out, contentType: "image/avif" };
+    }
+
+    // Fallback: passthrough (unknown format)
+    return { buffer, contentType: input.contentType || formatToContentType(format) };
+  } catch {
+    return { buffer, contentType: input.contentType };
+  }
+}
+
+async function reencodeKeepResolutionMinus10(
+  buffer: Buffer,
+  format: string,
+): Promise<{ buffer: Buffer; contentType: string | null } | null> {
+  const f = String(format || "").toLowerCase();
+  try {
+    const pipeline = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS }).rotate();
+    if (f === "jpeg" || f === "jpg") {
+      const out = await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+      return { buffer: out, contentType: "image/jpeg" };
+    }
+    if (f === "webp") {
+      const out = await pipeline.webp({ quality: 85, effort: 4 }).toBuffer();
+      return { buffer: out, contentType: "image/webp" };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function scaleByRatioKeepFormat(
+  buffer: Buffer,
+  format: string,
+  ratio: number,
+): Promise<{ buffer: Buffer; contentType: string | null }> {
+  if (!Number.isFinite(ratio) || ratio >= 1) {
+    return { buffer, contentType: formatToContentType(format) };
+  }
+
+  try {
+    const base = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS }).rotate();
+    const meta = await base.metadata();
+    const width = meta.width ?? 0;
+    const height = meta.height ?? 0;
+    if (!width || !height) return { buffer, contentType: formatToContentType(format) };
+
+    const targetW = Math.max(1, Math.floor(width * ratio));
+    const targetH = Math.max(1, Math.floor(height * ratio));
+    let pipeline = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS })
+      .rotate()
+      .resize(targetW, targetH, { fit: "fill" });
+
+    const f = String(format || "").toLowerCase();
+    if (f === "jpeg" || f === "jpg") {
+      return { buffer: await pipeline.jpeg({ quality: 92, mozjpeg: true }).toBuffer(), contentType: "image/jpeg" };
+    }
+    if (f === "webp") {
+      return { buffer: await pipeline.webp({ quality: 92, effort: 4 }).toBuffer(), contentType: "image/webp" };
+    }
+    if (f === "avif") {
+      return { buffer: await pipeline.avif({ quality: 60, effort: 4 }).toBuffer(), contentType: "image/avif" };
+    }
+    if (f === "png") {
+      return { buffer: await pipeline.png({ compressionLevel: 9 }).toBuffer(), contentType: "image/png" };
+    }
+
+    return { buffer: await pipeline.toBuffer(), contentType: formatToContentType(f) };
+  } catch {
+    return { buffer, contentType: formatToContentType(format) };
+  }
+}
+
+async function normalizeChapterImageBuffer(input: {
+  url: string;
+  buffer: Buffer;
+  contentType: string | null;
+}): Promise<{ buffer: Buffer; contentType: string | null }> {
+  const { url } = input;
+
+  // Match client rule: GIF keep as-is.
+  if (isGif(url, input.contentType, input.buffer)) {
+    return { buffer: input.buffer, contentType: input.contentType || "image/gif" };
+  }
+
+  try {
+    const meta = await sharp(input.buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS }).metadata();
+    const detectedFormat = (meta.format || "").toLowerCase();
+
+    let workingBuffer = input.buffer;
+    let workingFormat = detectedFormat;
+
+    // Client rule: PNG always converts to WebP first (quality 0.95).
+    if (workingFormat === "png") {
+      workingBuffer = await sharp(workingBuffer, { limitInputPixels: IMAGE_LIMIT_PIXELS })
+        .rotate()
+        .webp({ quality: 95, effort: 4 })
+        .toBuffer();
+      workingFormat = "webp";
+    }
+
+    const size = workingBuffer.length;
+    if (size <= 2 * MB) {
+      return { buffer: workingBuffer, contentType: formatToContentType(workingFormat) || input.contentType };
+    }
+
+    // 2MB–2.85MB: try -10% quality first; if not good enough, scale 75%.
+    if (size <= 2.85 * MB) {
+      const trial = await reencodeKeepResolutionMinus10(workingBuffer, workingFormat);
+      if (trial && trial.buffer.length < workingBuffer.length && trial.buffer.length < 2 * MB) {
+        return trial;
+      }
+      return await scaleByRatioKeepFormat(workingBuffer, workingFormat, 0.75);
+    }
+
+    // Remaining tiers
+    if (size <= 3.5 * MB) return await scaleByRatioKeepFormat(workingBuffer, workingFormat, 0.65);
+    if (size <= 5 * MB) return await scaleByRatioKeepFormat(workingBuffer, workingFormat, 0.55);
+    if (size <= 7 * MB) return await scaleByRatioKeepFormat(workingBuffer, workingFormat, 0.45);
+    return await scaleByRatioKeepFormat(workingBuffer, workingFormat, 0.35);
+  } catch {
+    // If sharp can't read metadata, fall back to original.
+    return { buffer: input.buffer, contentType: input.contentType };
+  }
+}
+
+const CHAPTER_IMAGE_FILTERS = {
+  watermarkDims: new Set(["1798x2544", "2544x1798"]),
+  watermarkMinBytes: 311 * 1024,
+  watermarkMaxBytes: 315 * 1024,
+  minWidthPx: 151,
+  minHeightPx: 601,
+  minBytes: 20 * 1024,
+  minGifBytes: 70 * 1024,
+};
+
+const looksLikeHtml = (buffer: Buffer) => {
+  if (!buffer?.length) return true;
+  const head = buffer.subarray(0, Math.min(buffer.length, 512)).toString("utf8").trimStart();
+  if (!head.startsWith("<")) return false;
+  return /<(?:!doctype\s+html|html|head|body)\b/i.test(head);
+};
+
+const isGifBySignature = (buffer: Buffer) => {
+  if (!buffer || buffer.length < 6) return false;
+  return buffer.subarray(0, 6).toString("ascii") === "GIF89a" || buffer.subarray(0, 6).toString("ascii") === "GIF87a";
+};
+
+const isGif = (url: string, contentType: string | null, buffer: Buffer) => {
+  const ct = String(contentType || "").toLowerCase();
+  if (ct.includes("image/gif")) return true;
+  try {
+    const u = new URL(url);
+    if (u.pathname.toLowerCase().endsWith(".gif")) return true;
+  } catch {
+    if (url.toLowerCase().includes(".gif")) return true;
+  }
+  return isGifBySignature(buffer);
+};
+
+const shouldSkipByUrl = (url: string) => {
+  return url.toLowerCase().includes("/cover/");
+};
+
+const safeFilenameFromUrl = (rawUrl: string, fallbackBase: string, contentType?: string | null) => {
+  try {
+    const u = new URL(rawUrl);
+    const last = u.pathname.split("/").filter(Boolean).pop() || fallbackBase;
+    // If it already has an extension, keep.
+    if (last.includes(".")) return last;
+    return `${last}${contentTypeToExtension(contentType)}`;
+  } catch {
+    return `${fallbackBase}${contentTypeToExtension(contentType)}`;
+  }
+};
+
+async function fetchRemoteBuffer(
+  url: string,
+  options: { timeoutMs?: number; headers?: Record<string, string> } = {},
+): Promise<{ buffer: Buffer; contentType: string | null }> {
+  const timeoutMs = options.timeoutMs ?? 30_000;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      headers: options.headers ?? HEADERS,
+      redirect: "follow",
+      signal: ac.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Không thể tải ảnh (${response.status} ${response.statusText})`);
+    }
+    const contentType = response.headers.get("content-type");
+    const arrayBuffer = await response.arrayBuffer();
+    return { buffer: Buffer.from(arrayBuffer), contentType };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchRemoteBufferWithRetry(
+  url: string,
+  options: {
+    timeoutMs?: number;
+    headers?: Record<string, string>;
+    retries?: number;
+    retryDelayMs?: number;
+  } = {},
+): Promise<{ buffer: Buffer; contentType: string | null }> {
+  const retries = Number.isFinite(options.retries) ? Math.max(0, options.retries ?? 0) : 0;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      if (attempt > 0 && (options.retryDelayMs ?? 0) > 0) {
+        await sleep(options.retryDelayMs ?? 0);
+      }
+      return await fetchRemoteBuffer(url, {
+        timeoutMs: options.timeoutMs,
+        headers: options.headers,
+      });
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error(`Không thể tải ảnh sau ${retries + 1} lần thử`);
+}
+
+type UploadedRemoteFile = {
+  url: string;
+  fullPath: string;
+  sizeBytes: number;
+};
+
+async function uploadImageBuffer(
+  remoteUrl: string,
+  buffer: Buffer,
+  contentType: string | null,
+  options: {
+    prefixPath: string;
+    filenameHintBase: string;
+    maxSizeInBytes?: number;
+  },
+): Promise<UploadedRemoteFile> {
+  const originalFilenameRaw = safeFilenameFromUrl(remoteUrl, options.filenameHintBase, contentType);
+  const originalFilename = normalizeFilenameForContentType(originalFilenameRaw, contentType);
+
+  const result = await uploadBufferWithValidation({
+    buffer,
+    originalFilename,
+    prefixPath: options.prefixPath,
+    contentType: contentType?.split(";")[0] || undefined,
+    metadata: {
+      "x-amz-meta-source-url": encodeForMetadata(remoteUrl, "url"),
+    },
+    maxSizeInBytes: options.maxSizeInBytes,
+    generateUniqueFileName: true,
+  });
+
+  return {
+    url: result.url,
+    fullPath: result.fullPath,
+    sizeBytes: buffer.length,
+  };
+}
+
+async function getImageDimensions(buffer: Buffer): Promise<{ width?: number; height?: number }> {
+  try {
+    const meta = await sharp(buffer, { limitInputPixels: 64_000_000 }).metadata();
+    return { width: meta.width ?? undefined, height: meta.height ?? undefined };
+  } catch {
+    return {};
+  }
+}
+
+async function shouldKeepChapterImage(options: {
+  url: string;
+  buffer: Buffer;
+  contentType: string | null;
+}): Promise<{ keep: true; width?: number; height?: number } | { keep: false; reason: string }> {
+  const { url, buffer, contentType } = options;
+
+  if (shouldSkipByUrl(url)) {
+    return { keep: false, reason: "url_contains_/cover/" };
+  }
+
+  if (!buffer?.length) {
+    return { keep: false, reason: "empty_body" };
+  }
+
+  if (looksLikeHtml(buffer)) {
+    return { keep: false, reason: "html_body" };
+  }
+
+  const bytes = buffer.length;
+  if (bytes < CHAPTER_IMAGE_FILTERS.minBytes) {
+    return { keep: false, reason: `too_small_bytes(<${CHAPTER_IMAGE_FILTERS.minBytes})` };
+  }
+
+  const gif = isGif(url, contentType, buffer);
+  if (gif && bytes < CHAPTER_IMAGE_FILTERS.minGifBytes) {
+    return { keep: false, reason: `gif_too_small_bytes(<${CHAPTER_IMAGE_FILTERS.minGifBytes})` };
+  }
+
+  const { width, height } = await getImageDimensions(buffer);
+
+  if (typeof width === "number" && typeof height === "number") {
+    const dimKey = `${width}x${height}`;
+    if (
+      CHAPTER_IMAGE_FILTERS.watermarkDims.has(dimKey) &&
+      bytes >= CHAPTER_IMAGE_FILTERS.watermarkMinBytes &&
+      bytes <= CHAPTER_IMAGE_FILTERS.watermarkMaxBytes
+    ) {
+      return { keep: false, reason: "watermark_signature(1798x2544|2544x1798,311-315KB)" };
+    }
+  }
+
+  if (typeof width === "number" && width < CHAPTER_IMAGE_FILTERS.minWidthPx) {
+    return { keep: false, reason: `width_too_small(<${CHAPTER_IMAGE_FILTERS.minWidthPx})` };
+  }
+  if (typeof height === "number" && height < CHAPTER_IMAGE_FILTERS.minHeightPx) {
+    return { keep: false, reason: `height_too_small(<${CHAPTER_IMAGE_FILTERS.minHeightPx})` };
+  }
+
+  return { keep: true, width, height };
+}
+
+async function uploadRemoteImage(
+  remoteUrl: string,
+  options: {
+    prefixPath: string;
+    filenameHintBase: string;
+    maxSizeInBytes?: number;
+    timeoutMs?: number;
+    retries?: number;
+    headers?: Record<string, string>;
+  },
+): Promise<UploadedRemoteFile> {
+  const { buffer, contentType } = await fetchRemoteBufferWithRetry(remoteUrl, {
+    timeoutMs: options.timeoutMs,
+    headers: options.headers,
+    retries: options.retries,
+    retryDelayMs: 800,
+  });
+
+  return uploadImageBuffer(remoteUrl, buffer, contentType, {
+    prefixPath: options.prefixPath,
+    filenameHintBase: options.filenameHintBase,
+    maxSizeInBytes: options.maxSizeInBytes,
+  });
+}
 
 const findLabelSection = ($: CheerioAPI, label: string) => {
   const normalized = label.trim().toLowerCase();
@@ -417,12 +921,308 @@ const parseChapterCount = ($: CheerioAPI) => {
     .filter((_, el) => $(el).find("span").first().text().trim().startsWith("Danh sách chương"))
     .first();
   if (!header.length) return 0;
+  const headerText = sanitizeWhitespace(header.text());
+  const headerCountMatch = headerText.match(/\((\d+)\)/);
+  if (headerCountMatch?.[1]) {
+    const n = Number.parseInt(headerCountMatch[1], 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
   const list = header.nextAll("ul").first();
   if (!list.length) return 0;
   const anchorCount = list.find("a").length;
   if (anchorCount > 0) return anchorCount;
   return list.find("li").length;
 };
+
+type ViHentaiChapterEntry = {
+  title: string;
+  url: string;
+  updatedText?: string;
+};
+
+type ViHentaiChapterListResult = {
+  entries: ViHentaiChapterEntry[];
+  expectedCount?: number;
+  sourceOrder: "asc" | "desc" | "unknown";
+};
+
+const extractChapterNumber = (value?: string) => {
+  const text = sanitizeWhitespace(value).toLowerCase();
+  if (!text) return undefined;
+  const m = text.match(/(?:chuong|ch\s*ương|chapter|chap)\s*(\d+(?:\.\d+)?)/i);
+  if (m?.[1]) return Number.parseFloat(m[1]);
+  const m2 = text.match(/\b(\d+(?:\.\d+)?)\b/);
+  if (m2?.[1]) return Number.parseFloat(m2[1]);
+  return undefined;
+};
+
+const extractChapterNumberFromUrl = (url: string) => {
+  const m = url.match(/(?:chapter|chuong|chap)[^0-9]*(\d+(?:\.\d+)?)/i);
+  if (m?.[1]) return Number.parseFloat(m[1]);
+  return undefined;
+};
+
+const detectChapterListOrder = (entries: ViHentaiChapterEntry[]) => {
+  if (entries.length < 2) return "unknown" as const;
+  const first = extractChapterNumber(entries[0].title) ?? extractChapterNumberFromUrl(entries[0].url);
+  const last =
+    extractChapterNumber(entries[entries.length - 1].title) ??
+    extractChapterNumberFromUrl(entries[entries.length - 1].url);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return "unknown" as const;
+  if ((first as number) < (last as number)) return "asc" as const;
+  if ((first as number) > (last as number)) return "desc" as const;
+  return "unknown" as const;
+};
+
+const findChapterListUl = ($: CheerioAPI) => {
+  const header = $("div")
+    .filter((_, el) => $(el).find("span").first().text().trim().startsWith("Danh sách chương"))
+    .first();
+
+  if (!header.length) return { header: null as Cheerio<Element> | null, list: null as Cheerio<Element> | null };
+
+  const candidates = [
+    header.nextAll("ul").first(),
+    header.parent().nextAll("ul").first(),
+    header.closest("section,div").find("ul").first(),
+  ].filter((it) => it && it.length);
+
+  const list = candidates[0] ?? null;
+  return { header, list };
+};
+
+const isViHentaiChapterUrl = (candidateUrl: string, baseUrl: string) => {
+  // Most chapters are /chapter-xx, /chap-xx, /chuong-xx, but some are /oneshot.
+  if (/chuong|chapter|chap/i.test(candidateUrl)) return true;
+  try {
+    const base = new URL(baseUrl);
+    const u = new URL(candidateUrl, baseUrl);
+    const mangaPath = base.pathname.replace(/\/+$/, "");
+    const candidatePath = u.pathname.replace(/\/+$/, "");
+    if (!mangaPath || !candidatePath.startsWith(`${mangaPath}/`)) return false;
+    const rest = candidatePath.slice(mangaPath.length + 1);
+    // Expect exactly one segment under the manga path (e.g. /truyen/foo/oneshot).
+    if (!rest || rest.includes("/")) return false;
+    // Avoid misclassifying the manga page itself.
+    if (rest === "#" || rest === "?" || rest === "") return false;
+    // Be conservative: only accept same-host links.
+    if (u.host && base.host && u.host !== base.host) return false;
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const getVisibleChapterTitle = ($: CheerioAPI, anchor: Cheerio<Element>) => {
+  // Prefer the actual visible chapter title element in the list (avoids view counts / icons / timeago).
+  const direct = sanitizeWhitespace(anchor.find(".text-ellipsis").first().text());
+  if (direct) return direct;
+
+  const cloned = anchor.clone();
+  cloned.find("time").remove();
+  cloned.find(".time").remove();
+  cloned.find(".timeago").remove();
+  cloned.find(".abbreviation-number").remove();
+  cloned.find("svg").remove();
+  cloned.find("small").remove();
+  const text = sanitizeWhitespace(cloned.text()) || sanitizeWhitespace(anchor.attr("title"));
+  return text;
+};
+
+const parseChapterList = ($: CheerioAPI, baseUrl: string): ViHentaiChapterListResult => {
+  const collected: ViHentaiChapterEntry[] = [];
+
+  const { header, list } = findChapterListUl($);
+  if (!header || !list || !list.length) {
+    throw new Error("Không tìm thấy danh sách chương (ul) từ mục 'Danh sách chương'");
+  }
+
+  const expectedCount = parseChapterCount($) || undefined;
+
+  const add = (href: string | undefined, title: string, updatedText?: string) => {
+    const h = sanitizeWhitespace(href);
+    if (!h) return;
+    let url: string;
+    try {
+      url = new URL(h, baseUrl).toString();
+    } catch {
+      url = h;
+    }
+    if (!url) return;
+    // Always use the real href; this function only validates that the href is plausibly a chapter.
+    if (!isViHentaiChapterUrl(url, baseUrl)) return;
+    collected.push({ title: sanitizeWhitespace(title) || "", url, updatedText: sanitizeWhitespace(updatedText) || undefined });
+  };
+
+  // Source of truth: actual <a href> inside the chapter list.
+  // This avoids ever “guessing” the URL from the title.
+  const anchors = list
+    .find("a[href]")
+    .filter((_, el) => {
+      const href = $(el).attr("href") || "";
+      if (!href) return false;
+      const h = href.trim().toLowerCase();
+      if (!h || h.startsWith("javascript:")) return false;
+      // Usually the chapter list is rendered as <ul><a><li>..</li></a></ul>.
+      // Keep anchors that are part of list items.
+      return $(el).find("li").length > 0 || $(el).parent("li").length > 0;
+    })
+    .toArray();
+
+  for (const el of anchors) {
+    const a = $(el);
+    const href = a.attr("href");
+    if (!href) continue;
+
+    const li = a.find("li").first().length ? a.find("li").first() : a.closest("li");
+    const title = getVisibleChapterTitle($, a) || "";
+    const updatedText =
+      sanitizeWhitespace(li.find("time").first().attr("datetime")) ||
+      sanitizeWhitespace(li.find("time").first().text()) ||
+      sanitizeWhitespace(li.find(".timeago").first().attr("datetime")) ||
+      sanitizeWhitespace(li.find(".time").first().text()) ||
+      sanitizeWhitespace(a.find("time").first().attr("datetime")) ||
+      sanitizeWhitespace(a.find(".timeago").first().attr("datetime"));
+
+    add(href, title, updatedText);
+  }
+
+  // Deduplicate by URL while preserving order.
+  const seen = new Set<string>();
+  const entries = collected.filter((it) => {
+    const key = it.url;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (!entries.length) {
+    throw new Error("Danh sách chương rỗng (không lấy được link chương từ mục 'Danh sách chương')");
+  }
+
+  if (expectedCount && entries.length !== expectedCount) {
+    throw new Error(`Số chương không khớp: header=${expectedCount}, parsed=${entries.length}. Không tiếp tục để tránh sai dữ liệu.`);
+  }
+
+  const sourceOrder = detectChapterListOrder(entries);
+
+  return { entries, expectedCount, sourceOrder };
+};
+
+export async function fetchViHentaiChapterList(url: string): Promise<ViHentaiChapterListResult> {
+  const html = await fetchHtml(url);
+  const $ = load(html);
+  return parseChapterList($, url);
+}
+
+const parseViHentaiDatetime = (raw?: string | null) => {
+  const value = sanitizeWhitespace(raw);
+  if (!value) return undefined;
+  // Most pages use: "YYYY-MM-DD HH:mm:ss" (no timezone). Treat as Asia/Ho_Chi_Minh (+07:00).
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) {
+    const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? "00"}+07:00`;
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  // Fallback: dd/mm/yyyy or dd-mm-yyyy (optionally time)
+  const m2 = value.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m2) {
+    const dd = m2[1].padStart(2, "0");
+    const mm = m2[2].padStart(2, "0");
+    const yyyy = m2[3];
+    const hh = (m2[4] ?? "00").padStart(2, "0");
+    const min = m2[5] ?? "00";
+    const ss = (m2[6] ?? "00").padStart(2, "0");
+    const iso = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}+07:00`;
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  return undefined;
+};
+
+const normalizeAnyUrl = (value?: string | null) => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  return trimmed;
+};
+
+const parseChapterImagesFromHtml = (html: string, baseUrl: string): string[] => {
+  const $ = load(html);
+  const urls: string[] = [];
+
+  const selectors = [
+    ".reading-content img",
+    ".chapter-content img",
+    ".reader img",
+    ".content img",
+    "article img",
+    "img",
+  ];
+
+  const pushUrl = (raw?: string | null) => {
+    const normalized = normalizeAnyUrl(raw);
+    if (!normalized) return;
+    let abs = normalized;
+    try {
+      abs = new URL(normalized, baseUrl).toString();
+    } catch {
+      // ignore
+    }
+    if (!/^https?:/i.test(abs)) return;
+    urls.push(abs);
+  };
+
+  for (const selector of selectors) {
+    $(selector)
+      .toArray()
+      .forEach((el) => {
+        const img = $(el);
+        const attrs = ["data-src", "data-original", "data-lazy", "data-lazy-src", "src"] as const;
+        for (const attr of attrs) {
+          const v = img.attr(attr);
+          if (v) {
+            pushUrl(v);
+            return;
+          }
+        }
+        const srcset = img.attr("srcset")?.split(",")[0]?.trim().split(" ")[0];
+        if (srcset) pushUrl(srcset);
+      });
+    if (urls.length) break;
+  }
+
+  // Dedup preserve order
+  const seen = new Set<string>();
+  return urls.filter((u) => {
+    if (seen.has(u)) return false;
+    seen.add(u);
+    return true;
+  });
+};
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  const workers = new Array(Math.max(1, limit)).fill(null).map(async () => {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const current = nextIndex++;
+      if (current >= items.length) break;
+      results[current] = await fn(items[current], current);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 const parseFollowNumber = ($: CheerioAPI) => {
   const button = $("button")
@@ -565,6 +1365,14 @@ const parsePage = (html: string, url: string): ParsedViHentaiPage => {
   const followNumber = parseFollowNumber($);
   const codeLabel = extractLabeledText($, "Code");
 
+  const lastUpdateSection = findLabelSection($, "Lần cuối");
+  const lastUpdatedText = sanitizeWhitespace(lastUpdateSection?.text()) || undefined;
+  const lastUpdatedDatetime =
+    lastUpdateSection?.find("[datetime]").first().attr("datetime") ||
+    lastUpdateSection?.find(".timeago").first().attr("datetime") ||
+    undefined;
+  const lastUpdatedAt = parseViHentaiDatetime(lastUpdatedDatetime) || undefined;
+
   return {
     title,
     alternateTitle,
@@ -581,6 +1389,8 @@ const parsePage = (html: string, url: string): ParsedViHentaiPage => {
     followNumber,
     chapterCount,
     codeLabel,
+    lastUpdatedText,
+    lastUpdatedAt,
     url,
   };
 };
@@ -995,4 +1805,387 @@ export async function importViHentaiManga(options: ViHentaiImportOptions): Promi
     createdId: String(doc._id),
     createdSlug: doc.slug,
   };
+}
+
+export async function autoDownloadViHentaiManga(
+  options: ViHentaiAutoDownloadOptions,
+): Promise<ViHentaiAutoDownloadResult> {
+  const {
+    request,
+    downloadPoster = true,
+    downloadChapters = true,
+    asSystem = false,
+    maxChapters = 200,
+    maxImagesPerChapter = 300,
+    continueOnChapterError = true,
+    imageDelayMs = 300,
+    imageTimeoutMs = 30_000,
+    imageRetries = 2,
+    chapterDelayMs = 5_000,
+    onProgress,
+    ...importOptions
+  } = options;
+
+  const emitProgress = async (payload: Parameters<NonNullable<typeof onProgress>>[0]) => {
+    if (!onProgress) return;
+    try {
+      await onProgress(payload);
+    } catch {
+      // Progress must never break the download flow.
+    }
+  };
+
+  // Step 1: create Manga (same as import)
+  await emitProgress({ stage: "manga", message: "Đang tải trang truyện..." });
+  const parsed = await fetchViHentaiPage(importOptions.url);
+  await emitProgress({ stage: "manga", message: `Đã parse truyện: ${parsed.title || ""}`.trim() });
+  const mapped = await mapGenres(parsed.rawGenres);
+  const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
+  const unknown = mapped.unknown;
+  if (!matched.length) {
+    throw new Error(
+      `Không map được thể loại hợp lệ. Nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}`,
+    );
+  }
+
+  const basePayload = prepareBaseMangaPayload(parsed, importOptions, matched);
+
+  if (importOptions.skipIfExists) {
+    const existing = await MangaModel.findOne({ title: parsed.title })
+      .select({ _id: 1, slug: 1 })
+      .lean();
+    if (existing) {
+      return {
+        url: importOptions.url,
+        parsed,
+        matchedGenres: matched,
+        unknownGenres: unknown,
+        payload: {
+          ...basePayload,
+          slug: String(existing.slug || existing._id),
+        },
+        mode: "skipped",
+        message: "Bỏ qua vì đã tồn tại truyện cùng tên",
+        createdSlug: String(existing.slug || existing._id),
+        chaptersImported: 0,
+        imagesUploaded: 0,
+        chapterErrors: [],
+      };
+    }
+  }
+
+  let payload = await buildMangaPayloadFromViHentai(parsed, importOptions, matched, basePayload);
+
+  // Optional: download poster to our storage and store CDN URL
+  if (downloadPoster) {
+    await emitProgress({ stage: "poster", message: "Đang tải poster..." });
+    try {
+      const fetchedPoster = await fetchRemoteBufferWithRetry(parsed.poster, {
+        timeoutMs: imageTimeoutMs,
+        retries: imageRetries,
+        retryDelayMs: 800,
+        headers: {
+          ...HEADERS,
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          Referer: importOptions.url,
+          Origin: new URL(importOptions.url).origin,
+        },
+      });
+
+      const normalizedPoster = await normalizePosterBuffer(fetchedPoster.buffer, {
+        contentType: fetchedPoster.contentType,
+      });
+
+      const uploaded = await uploadImageBuffer(parsed.poster, normalizedPoster.buffer, normalizedPoster.contentType, {
+        prefixPath: "manga-posters",
+        filenameHintBase: "poster",
+        maxSizeInBytes: 9 * 1024 * 1024,
+      });
+
+      payload = { ...payload, poster: uploaded.url };
+      await emitProgress({ stage: "poster", message: "Poster OK" });
+    } catch (e) {
+      // Keep original remote poster as fallback
+      console.warn("[autoDownloadViHentaiManga] poster download failed", e);
+      await emitProgress({ stage: "poster", message: "Poster lỗi (fallback dùng link nguồn)" });
+    }
+  }
+
+  if (importOptions.dryRun) {
+    return {
+      url: importOptions.url,
+      parsed,
+      matchedGenres: matched,
+      unknownGenres: unknown,
+      payload,
+      mode: "dry-run",
+      message: "Dry-run: chỉ hiển thị payload, không ghi DB",
+      chaptersImported: 0,
+      imagesUploaded: 0,
+      chapterErrors: [],
+    };
+  }
+
+  payload = await ensureTranslatorDocuments(payload);
+  payload = await ensureAuthorDocuments(payload);
+  payload = await ensureDoujinshiDocuments(payload);
+  payload = await ensureCharacterDocuments(payload);
+
+  const doc = await MangaModel.create(payload);
+
+  const resultBase: ViHentaiAutoDownloadResult = {
+    url: importOptions.url,
+    parsed,
+    matchedGenres: matched,
+    unknownGenres: unknown,
+    payload,
+    mode: "created",
+    message: "Tạo truyện thành công",
+    createdId: String(doc._id),
+    createdSlug: doc.slug,
+    chaptersImported: 0,
+    imagesUploaded: 0,
+    chapterErrors: [],
+  };
+
+  if (!downloadChapters) {
+    return {
+      ...resultBase,
+      message: "Tạo truyện thành công (không tải chương)",
+    };
+  }
+
+  // Step 2: fetch chapter list and import from oldest -> newest
+  await emitProgress({ stage: "chapters", message: "Đang lấy danh sách chương..." });
+  const chapterList = await fetchViHentaiChapterList(importOptions.url);
+  const chapters = chapterList.entries;
+  if (!chapters.length) {
+    throw new Error("Danh sách chương rỗng");
+  }
+
+  const limit = maxChapters && maxChapters > 0 ? Math.min(chapters.length, maxChapters) : chapters.length;
+
+  // Prefer oldest N chapters.
+  // - If source is desc (newest -> oldest): oldest are at the end
+  // - If source is asc (oldest -> newest): oldest are at the beginning
+  const limited =
+    limit >= chapters.length
+      ? chapters
+      : chapterList.sourceOrder === "asc"
+        ? chapters.slice(0, limit)
+        : chapters.slice(-limit);
+
+  // Ensure import order is oldest -> newest
+  const ordered =
+    chapterList.sourceOrder === "asc" ? limited.slice() : limited.slice().reverse();
+
+  await emitProgress({
+    stage: "chapters",
+    message: `Sẽ tải ${ordered.length} chương (oldest → newest)`,
+    chapterCount: ordered.length,
+  });
+
+  // Lazy import to avoid circular dependency at module load.
+  const { createChapter, createChapterAsAdmin } = await import("~/.server/mutations/chapter.mutation");
+
+  for (let chapterIndex = 0; chapterIndex < ordered.length; chapterIndex += 1) {
+    const chapterEntry = ordered[chapterIndex];
+    const chapterUrl = chapterEntry.url;
+    const chapterPrefix = `manga-images/${String(doc._id)}/${String(chapterIndex + 1).padStart(4, "0")}`;
+
+    await emitProgress({
+      stage: "chapter",
+      message: `Đang tải chương ${chapterIndex + 1}/${ordered.length}`,
+      chapterIndex: chapterIndex + 1,
+      chapterCount: ordered.length,
+      chapterTitle: sanitizeWhitespace(chapterEntry.title) || undefined,
+      chapterUrl,
+    });
+
+    try {
+      const html = await fetchHtml(chapterUrl);
+      const imageUrls = parseChapterImagesFromHtml(html, chapterUrl);
+      if (!imageUrls.length) {
+        throw new Error("Không tìm thấy ảnh trong trang chương");
+      }
+      if (imageUrls.length > maxImagesPerChapter) {
+        throw new Error(`Số ảnh vượt giới hạn: ${imageUrls.length}/${maxImagesPerChapter}`);
+      }
+
+      const uploaded: UploadedRemoteFile[] = [];
+      const skipped: Array<{ url: string; reason: string }> = [];
+      let keptIndex = 0;
+
+      for (let imageIndex = 0; imageIndex < imageUrls.length; imageIndex += 1) {
+        const imgUrl = imageUrls[imageIndex];
+
+        await emitProgress({
+          stage: "image",
+          message: `Ảnh ${imageIndex + 1}/${imageUrls.length}`,
+          chapterIndex: chapterIndex + 1,
+          chapterCount: ordered.length,
+          chapterTitle: sanitizeWhitespace(chapterEntry.title) || undefined,
+          chapterUrl,
+          imageIndex: imageIndex + 1,
+          imageCount: imageUrls.length,
+          imageUrl: imgUrl,
+        });
+
+        if (imageIndex > 0 && imageDelayMs > 0) {
+          await sleep(imageDelayMs);
+        }
+
+        // 1) Skip obvious non-content images early
+        if (shouldSkipByUrl(imgUrl)) {
+          skipped.push({ url: imgUrl, reason: "url_contains_/cover/" });
+          continue;
+        }
+
+        // 2) Download (with retries) and apply content filters
+        let fetched: { buffer: Buffer; contentType: string | null } | null = null;
+        try {
+          fetched = await fetchRemoteBufferWithRetry(imgUrl, {
+            timeoutMs: imageTimeoutMs,
+            retries: imageRetries,
+            retryDelayMs: 800,
+            headers: {
+              ...HEADERS,
+              Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+              Referer: chapterUrl,
+              Origin: new URL(chapterUrl).origin,
+            },
+          });
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          skipped.push({ url: imgUrl, reason: `fetch_error:${message}` });
+          continue;
+        }
+
+        const decision = await shouldKeepChapterImage({
+          url: imgUrl,
+          buffer: fetched.buffer,
+          contentType: fetched.contentType,
+        });
+        if (!decision.keep) {
+          skipped.push({ url: imgUrl, reason: decision.reason });
+          continue;
+        }
+
+        keptIndex += 1;
+        try {
+          const normalized = await normalizeChapterImageBuffer({
+            url: imgUrl,
+            buffer: fetched.buffer,
+            contentType: fetched.contentType,
+          });
+
+          const uploadedOne = await uploadImageBuffer(imgUrl, normalized.buffer, normalized.contentType, {
+            prefixPath: chapterPrefix,
+            filenameHintBase: `page-${String(keptIndex).padStart(3, "0")}`,
+            maxSizeInBytes: 9 * 1024 * 1024,
+          });
+          uploaded.push(uploadedOne);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          skipped.push({ url: imgUrl, reason: `upload_error:${message}` });
+          continue;
+        }
+      }
+
+      if (!uploaded.length) {
+        const sample = skipped.slice(0, 5).map((s) => `${s.reason}`).join(", ");
+        throw new Error(
+          `Không còn ảnh hợp lệ sau khi lọc (đã loại ${skipped.length}/${imageUrls.length}).` +
+            (sample ? ` Ví dụ lý do: ${sample}` : ""),
+        );
+      }
+
+      if (skipped.length) {
+        console.warn(
+          "[autoDownloadViHentaiManga] filtered chapter images",
+          JSON.stringify(
+            {
+              chapterUrl,
+              total: imageUrls.length,
+              kept: uploaded.length,
+              skipped: skipped.length,
+              sample: skipped.slice(0, 5),
+            },
+            null,
+            0,
+          ),
+        );
+      }
+
+      const contentUrls = uploaded.map((u) => u.url);
+      const fullPaths = uploaded.map((u) => u.fullPath).filter(Boolean);
+      const totalBytes = uploaded.reduce((sum, u) => sum + (u.sizeBytes || 0), 0);
+
+      try {
+        if (asSystem) {
+          await createChapterAsAdmin({
+            mangaId: String(doc._id),
+            title: sanitizeWhitespace(chapterEntry.title) || "",
+            contentUrls,
+            contentBytes: totalBytes,
+          } as any);
+        } else {
+          await createChapter(request, {
+            mangaId: String(doc._id),
+            title: sanitizeWhitespace(chapterEntry.title) || "",
+            contentUrls,
+            contentBytes: totalBytes,
+          } as any);
+        }
+
+        resultBase.chaptersImported += 1;
+        resultBase.imagesUploaded += uploaded.length;
+      } catch (e) {
+        // Rollback uploaded files for this chapter
+        try {
+          if (fullPaths.length) await deletePublicFiles(fullPaths);
+        } catch (cleanupError) {
+          console.warn("[autoDownloadViHentaiManga] cleanup uploaded chapter files failed", cleanupError);
+        }
+        throw e;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      resultBase.chapterErrors.push({ chapterUrl, message });
+      if (!continueOnChapterError) {
+        resultBase.message = `Tạo truyện thành công nhưng lỗi khi tải chương: ${message}`;
+        return resultBase;
+      }
+      // continue
+    } finally {
+      if (chapterIndex < ordered.length - 1 && chapterDelayMs > 0) {
+        await sleep(chapterDelayMs);
+      }
+    }
+  }
+
+  // Step 3: update Manga.updatedAt based on source "Lần cuối".
+  // Do it at the end (after chapter imports) per requested flow.
+  if (parsed.lastUpdatedAt) {
+    try {
+      await MangaModel.updateOne(
+        { _id: doc._id },
+        { $set: { updatedAt: parsed.lastUpdatedAt } },
+        // Prevent mongoose timestamps plugin from overriding updatedAt.
+        { timestamps: false } as any,
+      );
+    } catch (e) {
+      console.warn("[autoDownloadViHentaiManga] set updatedAt failed", e);
+    }
+  }
+
+  if (resultBase.chapterErrors.length) {
+    resultBase.message = `Tạo truyện thành công, tải chương xong (${resultBase.chaptersImported}/${ordered.length}) nhưng có lỗi.`;
+  } else {
+    resultBase.message = `Tạo truyện + tải chương thành công (${resultBase.chaptersImported} chương, ${resultBase.imagesUploaded} ảnh)`;
+  }
+
+  await emitProgress({ stage: "done", message: resultBase.message });
+
+  return resultBase;
 }

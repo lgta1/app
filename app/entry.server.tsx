@@ -9,6 +9,7 @@ import { PassThrough } from "node:stream";
 import { ENV } from "@/configs/env.config";
 import { initLeaderboardScheduler } from "@/jobs/leaderboard.server";
 import { initSitemapScheduler } from "@/jobs/sitemap.server";
+import { initViHentaiAutoDownloadQueueWorker } from "@/jobs/vi-hentai-auto-download-queue.server";
 import {
   getCanonicalHostname,
   rewriteLegacySiteHostsDeepInPlace,
@@ -26,6 +27,7 @@ initMongoDB();
 if (ENV.IS_PRODUCTION) {
   initLeaderboardScheduler();
   initSitemapScheduler();
+  initViHentaiAutoDownloadQueueWorker();
 }
 
 export default function handleRequest(
