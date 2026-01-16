@@ -183,7 +183,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const downloadPoster = formData.get("downloadPoster") === "on";
     const contentType = formData.get("contentType")?.toString() || "MANGA";
     const userStatus = formData.get("userStatus")?.toString() || "auto";
-    const maxChapters = Number(formData.get("maxChapters")?.toString() || "200");
+    const maxChapters = Number(formData.get("maxChapters")?.toString() || "500");
 
     if (!batchId) {
       const body: EnqueueBatchActionResult = { ok: false, error: "Thiếu batchId" };
@@ -222,7 +222,7 @@ export async function action({ request }: ActionFunctionArgs) {
       downloadPoster,
       contentType,
       userStatus,
-      maxChapters: Number.isFinite(maxChapters) && maxChapters > 0 ? maxChapters : 200,
+      maxChapters: Number.isFinite(maxChapters) && maxChapters > 0 ? maxChapters : 500,
       status: "queued" as const,
       paused: false,
     }));
@@ -285,7 +285,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json(body, { status: 400 });
     }
 
-    const MAX_LINKS = 200;
+    const MAX_LINKS = 500;
 
     const res = await fetch(listingUrl.toString(), {
       method: "GET",
@@ -396,7 +396,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const shouldSkipIfExists = formData.get("skipIfExists") === "on";
   const shouldDownloadPoster = formData.get("downloadPoster") === "on";
   const maxChaptersRaw = formData.get("maxChapters")?.toString().trim();
-  const maxChapters = maxChaptersRaw ? Number(maxChaptersRaw) : 200;
+  const maxChapters = maxChaptersRaw ? Number(maxChaptersRaw) : 500;
 
   try {
     const result = await autoDownloadViHentaiManga({
@@ -411,7 +411,7 @@ export async function action({ request }: ActionFunctionArgs) {
       userStatusOverride,
       downloadPoster: shouldDownloadPoster,
       downloadChapters: true,
-      maxChapters: Number.isFinite(maxChapters) && maxChapters > 0 ? maxChapters : 200,
+      maxChapters: Number.isFinite(maxChapters) && maxChapters > 0 ? maxChapters : 500,
     });
 
     const body: ActionResult = {
@@ -489,7 +489,7 @@ export default function AdminMangaAutoDownload() {
   const [translationTeam, setTranslationTeam] = useState<string>("");
   const [contentType, setContentType] = useState<string>("MANGA");
   const [userStatus, setUserStatus] = useState<string>("auto");
-  const [maxChapters, setMaxChapters] = useState<number>(200);
+  const [maxChapters, setMaxChapters] = useState<number>(500);
   const [approve, setApprove] = useState<boolean>(false);
   const [dryRun, setDryRun] = useState<boolean>(false);
   const [skipIfExists, setSkipIfExists] = useState<boolean>(true);
@@ -533,7 +533,7 @@ export default function AdminMangaAutoDownload() {
         setTranslationTeam(typeof s?.translationTeam === "string" ? s.translationTeam : "");
         setContentType(typeof s?.contentType === "string" ? s.contentType : "MANGA");
         setUserStatus(typeof s?.userStatus === "string" ? s.userStatus : "auto");
-        setMaxChapters(typeof s?.maxChapters === "number" ? s.maxChapters : 200);
+        setMaxChapters(typeof s?.maxChapters === "number" ? s.maxChapters : 500);
         setApprove(Boolean(s?.approve));
         setDryRun(Boolean(s?.dryRun));
         setSkipIfExists(s?.skipIfExists !== false);
@@ -748,20 +748,23 @@ export default function AdminMangaAutoDownload() {
   // After enqueue returns, store jobIds per row.
   useEffect(() => {
     if (enqueueFetcher.state !== "idle") return;
-    if (!enqueueFetcher.data) return;
-    if (!enqueueFetcher.data.ok) {
-      alert(enqueueFetcher.data.error);
+    const data = enqueueFetcher.data;
+    if (!data) return;
+    if (!data.ok) {
+      alert(data.error);
       setIsRunning(false);
       setRows((prev) => prev.map((r) => (r.status === "running" ? { ...r, status: "idle", message: undefined } : r)));
       return;
     }
 
-    const batchId = enqueueFetcher.data.batchId;
+    const batchId = data.batchId;
     activeBatchIdRef.current = batchId;
     setActiveBatchId(batchId);
 
     setRows((prev) => {
-      const map = new Map(enqueueFetcher.data.ok ? enqueueFetcher.data.items.map((x) => [x.rowId, x]) : []);
+      const map = new Map<string, { rowId: string; jobId: string; url: string }>(
+        data.items.map((item) => [item.rowId, item]),
+      );
       return prev.map((r) => {
         const matched = map.get(r.id);
         if (!matched) return r;
@@ -1131,7 +1134,7 @@ export default function AdminMangaAutoDownload() {
               value={String(maxChapters)}
               onChange={(e) => setMaxChapters(Number(e.target.value) || 0)}
               className="w-full rounded-lg border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm text-txt-primary"
-              placeholder="200"
+              placeholder="500"
             />
             <p className="text-[11px] text-txt-secondary">Tránh request quá lâu (có thể tăng nếu cần).</p>
           </div>

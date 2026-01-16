@@ -38,6 +38,9 @@ export function WaifuGuideDialog({ open, onOpenChange, banner }: WaifuGuideDialo
                 <div className="text-txt-secondary font-medium">
                   Hãy bắt đầu hành trình sưu tầm và mở rộng bộ sưu tập waifu mơ ước ngay hôm nay!
                 </div>
+                <div className="text-txt-secondary font-medium">
+                  Dâm ngọc rơi ngẫu nhiên khi đọc truyện.
+                </div>
               </div>
 
               {/* Banner Thường */}

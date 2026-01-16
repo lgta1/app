@@ -90,8 +90,14 @@ export function NotificationPopup({
                       (notification as any).type === "follow-release-author" ||
                       (notification as any).type === "follow-release-translator";
                     const isGoldReward = (notification as any).type === "gold-reward";
+                    const isDamNgocReward =
+                      isGoldReward ||
+                      /dâm\s*ngọc/i.test(`${notification.title || ""} ${notification.subtitle || ""}`) ||
+                      (typeof notification.imgUrl === "string" && /\/images\/noti\/gold\.png$/i.test(notification.imgUrl));
                     const targetUrl = resolveTargetUrl(notification);
                     const showGoButton = Boolean(targetUrl);
+                    const showSummonWaifuButton = isDamNgocReward;
+                    const waifuSummonUrl = "/waifu/summon";
 
                     const titleClassName = isFollowRelease
                       ? "text-success-success"
@@ -133,16 +139,28 @@ export function NotificationPopup({
                           <span className="text-txt-primary font-sans text-xs font-medium uppercase tracking-wide opacity-70">
                             {notification.createdAt && formatDistanceToNow(notification.createdAt)}
                           </span>
-                          {showGoButton && targetUrl ? (
-                            <a
-                              href={targetUrl}
-                              onClick={() => onNavigate(notification)}
-                              className="text-txt-focus flex items-center gap-1 rounded-full border border-transparent px-3 py-1 text-xs font-semibold transition hover:border-txt-focus hover:bg-bgc-layer2"
-                            >
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                              Đi tới
-                            </a>
-                          ) : null}
+                          <div className="flex items-center gap-2">
+                            {showSummonWaifuButton ? (
+                              <a
+                                href={waifuSummonUrl}
+                                onClick={() => onNavigate(notification)}
+                                className="text-txt-focus flex items-center gap-1 rounded-full border border-transparent px-3 py-1 text-xs font-semibold transition hover:border-txt-focus hover:bg-bgc-layer2"
+                              >
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                                Đi Triệu Hồi Waifu
+                              </a>
+                            ) : null}
+                            {showGoButton && targetUrl ? (
+                              <a
+                                href={targetUrl}
+                                onClick={() => onNavigate(notification)}
+                                className="text-txt-focus flex items-center gap-1 rounded-full border border-transparent px-3 py-1 text-xs font-semibold transition hover:border-txt-focus hover:bg-bgc-layer2"
+                              >
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                                Đi tới
+                              </a>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     );

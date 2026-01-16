@@ -1,7 +1,7 @@
 export const DAM_NGOC_TOOLTIP_CONTENT =
   "1. Cách nhận Dâm Ngọc\n\n" +
-  "Dâm Ngọc rơi ngẫu nhiên trong quá trình đọc truyện khi dâm khí quy thân.\n\n" +
-  "Hoặc có thể nhận Dâm Ngọc khi: Báo lỗi hợp lệ, tham gia event,...\n\n" +
+  "Dâm Ngọc rơi ngẫu nhiên trong quá trình đọc truyện khi dâm khí hội tụ.\n\n" +
+  "Hoặc có thể nhận Dâm Ngọc khi: Là người đầu tiên Báo Lỗi hợp lệ, tham gia event,...\n\n" +
   "2. Hành vi không được tính\n\n" +
   "❌ Spam chương, cày chap,... sẽ không làm rơi Dâm Ngọc.\n\n" +
   "3. Mục đích sử dụng\n\n" +

@@ -1815,13 +1815,13 @@ export async function autoDownloadViHentaiManga(
     downloadPoster = true,
     downloadChapters = true,
     asSystem = false,
-    maxChapters = 200,
+    maxChapters = 500,
     maxImagesPerChapter = 300,
     continueOnChapterError = true,
-    imageDelayMs = 300,
+    imageDelayMs = 100,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
-    chapterDelayMs = 5_000,
+    chapterDelayMs = 2_000,
     onProgress,
     ...importOptions
   } = options;
