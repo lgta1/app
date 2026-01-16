@@ -835,10 +835,10 @@ useEffect(() => {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-10 portrait:gap-6 sm:portrait:gap-10 md:flex-row md:items-start md:gap-5">
+      <div className="flex flex-col gap-6 portrait:gap-[0.9rem] sm:portrait:gap-10 md:flex-row md:items-start md:gap-5">
         {/* Ảnh bìa */}
         <div
-          className={`relative mx-auto flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg h-96 w-64 portrait:w-72 sm:portrait:w-64 md:mx-0 md:mt-[5px] md:w-[min(280px,36vw)] md:h-auto md:aspect-[2/3] ${
+          className={`relative mx-auto flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg h-[403px] w-[269px] portrait:w-[302px] sm:portrait:w-[269px] md:mx-0 md:mt-[5px] md:w-[min(280px,36vw)] md:h-auto md:aspect-[2/3] ${
             canDropPoster ? "group cursor-copy" : ""
           } md:self-start`}
           onDrop={canDropPoster ? handlePosterDropEvent : undefined}
@@ -848,8 +848,8 @@ useEffect(() => {
           <img
             src={poster}
             alt={`Bìa truyện ${title}`}
-            width={256}
-            height={384}
+            width={269}
+            height={403}
             className="h-full w-full object-cover"
             loading="lazy"
             decoding="async"
@@ -904,16 +904,16 @@ useEffect(() => {
         {/* Thông tin chi tiết */}
         <div className="flex w-full min-w-0 flex-col gap-4 md:flex-1">
           {/* Tiêu đề (rating removed) */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1 md:gap-1.5">
             <h1 className="text-txt-primary text-2xl leading-snug font-semibold">
               {title}
             </h1>
             {alternateTitle ? (
-              <div className="text-txt-secondary text-sm mt-1">{alternateTitle}</div>
+              <div className="text-txt-secondary text-sm mt-0.5 md:mt-1">{alternateTitle}</div>
             ) : null}
           </div>
 
-          <div className="border-bd-default h-0 border-t" />
+          <div className="border-bd-default h-0 border-t mt-[-0.3rem] md:mt-0" />
 
           {/* Thông tin chi tiết */}
           <div className="grid grid-cols-[auto_1fr] gap-y-3 gap-x-[0.6rem] md:gap-x-[0.45rem]">

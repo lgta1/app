@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
   User as UserIcon,
@@ -807,17 +806,25 @@ export default function CommentDetail({
     <div className="flex items-start justify-start gap-4 self-stretch">
       {/* Avatar */}
       {reply.userId?.avatar ? (
-        <Link to={getProfilePath(reply.userId)} aria-label={`Xem trang của ${reply.userId?.name}`}>
+        <a
+          href={getProfilePath(reply.userId)}
+          aria-label={`Xem trang của ${reply.userId?.name}`}
+          className="touch-manipulation [touch-action:manipulation]"
+        >
           <img
             className="mt-1.5 h-8 w-8 flex-shrink-0 rounded-full"
             src={reply.userId?.avatar}
             alt={`${reply.userId?.name} avatar`}
           />
-        </Link>
+        </a>
       ) : (
-        <Link to={getProfilePath(reply.userId)} aria-label={`Xem trang của ${reply.userId?.name}`}>
+        <a
+          href={getProfilePath(reply.userId)}
+          aria-label={`Xem trang của ${reply.userId?.name}`}
+          className="touch-manipulation [touch-action:manipulation]"
+        >
           <UserIcon className="mt-1.5 h-8 w-8 flex-shrink-0" />
-        </Link>
+        </a>
       )}
 
       {/* Content */}
@@ -827,16 +834,16 @@ export default function CommentDetail({
           <div className="flex flex-col items-start justify-start gap-1.5 self-stretch px-3 py-1.5">
             <div className="flex items-center justify-between self-stretch">
                           <div className="flex items-center justify-start" style={{ gap: '1px' }}>
-                <Link
-                  to={getProfilePath(reply.userId)}
-                              className="text-txt-primary font-sans text-[1.0rem] leading-tight font-medium hover:underline focus:underline flex items-center"
+                <a
+                  href={getProfilePath(reply.userId)}
+                  className="text-txt-primary font-sans text-[1.0rem] leading-tight font-medium hover:underline focus:underline flex items-center touch-manipulation [touch-action:manipulation]"
                   title={`Xem trang của ${reply.userId?.name}`}
                 >
                   {reply.userId?.name}
                   {isDichGia(reply.userId?.role || "") && (
                     <span className="ml-1 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent font-semibold">– Dịch giả</span>
                   )}
-                </Link>
+                </a>
                 <img
                   className="h-8 transition-transform duration-200 will-change-transform md:hover:scale-150 md:hover:z-10 relative"
                   style={{ top: "-2px" }}
@@ -1043,17 +1050,25 @@ export default function CommentDetail({
                   <div key={comment.id} className="flex items-start justify-start gap-4 self-stretch">
                     {/* Avatar */}
                     {comment.userId?.avatar ? (
-                      <Link to={getProfilePath(comment.userId)} aria-label={`Xem trang của ${comment.userId?.name}`}>
+                      <a
+                        href={getProfilePath(comment.userId)}
+                        aria-label={`Xem trang của ${comment.userId?.name}`}
+                        className="touch-manipulation [touch-action:manipulation]"
+                      >
                         <img
                           className="mt-1.5 h-10 w-10 flex-shrink-0 rounded-full"
                           src={comment.userId?.avatar}
                           alt={`${comment.userId?.name} avatar`}
                         />
-                      </Link>
+                      </a>
                     ) : (
-                      <Link to={getProfilePath(comment.userId)} aria-label={`Xem trang của ${comment.userId?.name}`}>
+                      <a
+                        href={getProfilePath(comment.userId)}
+                        aria-label={`Xem trang của ${comment.userId?.name}`}
+                        className="touch-manipulation [touch-action:manipulation]"
+                      >
                         <UserIcon className="mt-1.5 h-10 w-10 flex-shrink-0" />
-                      </Link>
+                      </a>
                     )}
 
                     {/* Content */}
@@ -1063,16 +1078,16 @@ export default function CommentDetail({
                         <div className="flex flex-col items-start justify-start gap-1.5 self-stretch px-3 py-1.5">
                           <div className="flex items-center justify-between self-stretch">
                             <div className="flex items-center justify-start" style={{ gap: '1px' }}>
-                              <Link
-                                to={getProfilePath(comment.userId)}
-                                className="text-txt-primary font-sans text-[1.0rem] leading-tight font-medium hover:underline focus:underline flex items-center"
+                              <a
+                                href={getProfilePath(comment.userId)}
+                                className="text-txt-primary font-sans text-[1.0rem] leading-tight font-medium hover:underline focus:underline flex items-center touch-manipulation [touch-action:manipulation]"
                                 title={`Xem trang của ${comment.userId?.name}`}
                               >
                                 {comment.userId?.name}
                                 {isDichGia(comment.userId?.role || "") && (
                                   <span className="ml-1 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent font-semibold">– Dịch giả</span>
                                 )}
-                              </Link>
+                              </a>
                               <img
                                 className="h-10 transition-transform duration-200 will-change-transform md:hover:scale-150 md:hover:z-10 relative"
                                 style={{ top: "-2px" }}

@@ -302,7 +302,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   }, [disturbingTagSlugs, disturbingTagWarningKey]);
 
   return (
-    <div className="container-page mx-auto px-4 pb-6 pt-3 md:py-6">
+    <div className="container-page mx-auto px-4 pb-6 pt-1 md:py-6">
       <DisturbingTagsWarningDialog
         open={isDisturbingTagWarningOpen}
         onOpenChange={(open: boolean) => {
@@ -353,7 +353,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         {/* ===== CỘT TRÁI: CHI TIẾT TRUYỆN ===== */}
         <section>
           {/* Mobile: keep existing breadcrumb + manage button placement */}
-          <nav aria-label="Breadcrumb" className="text-txt-focus font-sans text-sm font-medium mb-1 md:hidden">
+          <nav aria-label="Breadcrumb" className="text-txt-focus font-sans text-sm font-medium mb-3 md:hidden">
             <ol className="flex flex-wrap items-center gap-0.5 sm:gap-1">
               <li className="flex items-center gap-0.5 sm:gap-1">
                 <Link to="/" className="transition-colors hover:text-lav-500">
