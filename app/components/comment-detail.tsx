@@ -145,7 +145,12 @@ function MobileZoomModal({
 /* ===========================
  * Helpers
  * =========================== */
-const getProfilePath = (u?: UserType) => (u?.id ? `/profile/${u.id}` : "/profile");
+const getProfilePath = (u?: UserType | string | null) => {
+  if (!u) return "/profile";
+  if (typeof u === "string") return u ? `/profile/${u}` : "/profile";
+  const id = (u as any)?.id ?? (u as any)?._id;
+  return id ? `/profile/${id}` : "/profile";
+};
 
 /** Hiển thị tím cho:
  *  - legacy “Trả lời Name: …” (render thành @Name)

@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { InfoTooltip } from "./info-tooltip";
 
@@ -12,24 +12,28 @@ interface NavigationBarProps {
 }
 
 export function SummonNavigationBar({ navItems, onGuideClick, onHistoryClick, userGold }: NavigationBarProps) {
+  const { pathname } = useLocation();
+
   return (
     <div className="flex w-full items-center justify-between gap-2 px-3 py-2 sm:gap-4">
       <div className="flex items-center gap-2 sm:gap-4">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.id}
-            to={item.to}
-            className={({ isActive }) =>
-              `${
+        {navItems.map((item) => {
+          const isActive = pathname === item.to;
+          return (
+            <a
+              key={item.id}
+              href={item.to}
+              aria-current={isActive ? "page" : undefined}
+              className={`${
                 isActive
                   ? "bg-btn-primary text-txt-inverse"
                   : "bg-bgc-layer-semi-neutral text-txt-primary"
-              } rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
+              } rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+            >
+              {item.label}
+            </a>
+          );
+        })}
       </div>
 
       {(onGuideClick || onHistoryClick || typeof userGold === "number") && (

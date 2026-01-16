@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { User as UserIcon, MessageSquare } from "lucide-react";
 import { usePagination } from "~/hooks/use-pagination";
 import { LoadingSpinner } from "~/components/loading-spinner";
-import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { buildMangaUrl, getMangaHandle } from "~/utils/manga-url.utils";
 // import { formatDistanceToNow } from "~/utils/date.utils"; // replaced by compact formatAgo()
 
 interface FeedItem {
@@ -66,7 +66,8 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
         <ul className="divide-bd-default border-bd-default flex max-h-[520px] flex-col divide-y overflow-auto">
           {items.map((c: FeedItem) => {
             const avatarUrl = c.user?.avatar || "";
-            const mangaHref = c.manga ? buildMangaUrl(c.manga as any) : "#";
+            const mangaHandle = c.manga ? getMangaHandle(c.manga as any) : null;
+            const mangaHref = mangaHandle ? buildMangaUrl(c.manga as any) : null;
             return (
               <li key={c.id} className="flex items-start gap-3 px-3 py-3">
                 {/* Avatar */}
@@ -90,12 +91,17 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
                   <div className="flex items-center gap-2 text-xs text-white/60">
                     <span className="truncate max-w-[40%] font-medium text-white/80">{c.user?.name ?? "Ẩn danh"}</span>
                     <span className="text-white/50">→</span>
-                    <Link
-                      to={mangaHref}
-                      className="truncate max-w-[40%] text-lav-300 hover:text-lav-200"
-                    >
-                      {c.manga?.title ?? "?"}
-                    </Link>
+                    {mangaHref ? (
+                      <Link
+                        to={mangaHref}
+                        prefetch="intent"
+                        className="truncate max-w-[40%] text-lav-300 hover:text-lav-200 [touch-action:manipulation]"
+                      >
+                        {c.manga?.title ?? "?"}
+                      </Link>
+                    ) : (
+                      <span className="truncate max-w-[40%] text-white/60">{c.manga?.title ?? "?"}</span>
+                    )}
                   </div>
                   <div className="mt-1 text-sm leading-5 text-white/90">
                     {stripGifLinks(c.content)}
@@ -118,20 +124,34 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
 
                 {/* Optional small poster for quick visual context */}
                 {c.manga?.poster ? (
-                  <Link
-                    to={mangaHref}
-                    className="ml-2 flex flex-shrink-0 overflow-hidden rounded-md"
-                    aria-label={c.manga?.title}
-                  >
-                    <div className="w-[39.2px] sm:w-[44.8px] aspect-[2/3]">
-                      <img
-                        src={c.manga.poster}
-                        alt=""
-                        className="h-full w-full object-cover opacity-80"
-                        loading="lazy"
-                      />
+                  mangaHref ? (
+                    <Link
+                      to={mangaHref}
+                      prefetch="intent"
+                      className="ml-2 flex flex-shrink-0 overflow-hidden rounded-md [touch-action:manipulation]"
+                      aria-label={c.manga?.title}
+                    >
+                      <div className="w-[39.2px] sm:w-[44.8px] aspect-[2/3]">
+                        <img
+                          src={c.manga.poster}
+                          alt=""
+                          className="h-full w-full object-cover opacity-80"
+                          loading="lazy"
+                        />
+                      </div>
+                    </Link>
+                  ) : (
+                    <div className="ml-2 flex flex-shrink-0 overflow-hidden rounded-md opacity-70" aria-hidden>
+                      <div className="w-[39.2px] sm:w-[44.8px] aspect-[2/3]">
+                        <img
+                          src={c.manga.poster}
+                          alt=""
+                          className="h-full w-full object-cover opacity-80"
+                          loading="lazy"
+                        />
+                      </div>
                     </div>
-                  </Link>
+                  )
                 ) : null}
               </li>
             );

@@ -1,4 +1,4 @@
-import { type MetaFunction, NavLink, useLoaderData } from "react-router-dom";
+import { type MetaFunction, useLoaderData, useLocation } from "react-router-dom";
 import { isMobile } from "react-device-detect";
 import * as Tabs from "@radix-ui/react-tabs";
 
@@ -34,6 +34,7 @@ export async function loader() {
 export default function LeaderboardIndex() {
   const { dailyLeaderboard, weeklyLeaderboard, monthlyLeaderboard } =
     useLoaderData<typeof loader>();
+  const { pathname } = useLocation();
   
 
   return (
@@ -42,36 +43,51 @@ export default function LeaderboardIndex() {
       <div className="flex items-center justify-start gap-2 sm:gap-4">
         {isMobile ? (
           <>
-            <a href="/leaderboard/manga" className="rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base bg-bgc-layer-semi-neutral text-txt-primary">Top Truyện hentai</a>
-            <a href="/leaderboard/member" className="rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base bg-bgc-layer-semi-neutral text-txt-primary">Thánh Lọ Bảng</a>
-            <a href="/leaderboard/waifu" className="rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base bg-bgc-layer-semi-neutral text-txt-primary">Top Harem</a>
+            <a
+              href="/leaderboard/manga"
+              aria-current={pathname === "/leaderboard/manga" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/manga" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+            >
+              Top Truyện hentai
+            </a>
+            <a
+              href="/leaderboard/member"
+              aria-current={pathname === "/leaderboard/member" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/member" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+            >
+              Thánh Lọ Bảng
+            </a>
+            <a
+              href="/leaderboard/waifu"
+              aria-current={pathname === "/leaderboard/waifu" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/waifu" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+            >
+              Top Harem
+            </a>
           </>
         ) : (
           <>
-            <NavLink
-              to="/leaderboard/manga"
-              className={({ isActive }) =>
-                `${isActive ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
-              }
+            <a
+              href="/leaderboard/manga"
+              aria-current={pathname === "/leaderboard/manga" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/manga" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
             >
               Top Truyện hentai
-            </NavLink>
-            <NavLink
-              to="/leaderboard/member"
-              className={({ isActive }) =>
-                `${isActive ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
-              }
+            </a>
+            <a
+              href="/leaderboard/member"
+              aria-current={pathname === "/leaderboard/member" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/member" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
             >
               Thánh Lọ Bảng
-            </NavLink>
-            <NavLink
-              to="/leaderboard/waifu"
-              className={({ isActive }) =>
-                `${isActive ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base`
-              }
+            </a>
+            <a
+              href="/leaderboard/waifu"
+              aria-current={pathname === "/leaderboard/waifu" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/waifu" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
             >
               Top Harem
-            </NavLink>
+            </a>
           </>
         )}
       </div>

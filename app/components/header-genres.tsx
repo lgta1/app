@@ -1,6 +1,5 @@
 // app/components/header-genres.tsx
-import { useMemo, useState, type MouseEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { ChevronDown, X } from "lucide-react";
 
@@ -25,7 +24,24 @@ const foldVN = (s: string) =>
 
 export function HeaderGenres({ genres }: HeaderGenresProps) {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
+
+  const debugTap = (msg: string, extra?: Record<string, unknown>) => {
+    try {
+      const qs = window.location?.search || "";
+      const enabled =
+        /(?:^|[?&])debug=1(?:&|$)/.test(qs) || localStorage.getItem("vh_debug_overlay") === "1";
+      if (!enabled) return;
+      // eslint-disable-next-line no-console
+      console.debug(
+        `[genres-dropdown] ${msg}`,
+        {
+          t: Math.round(performance.now()),
+          hydrated: Boolean((window as any).__APP_HYDRATED__),
+          ...extra,
+        },
+      );
+    } catch {}
+  };
 
   // BEGIN unify with MangaCreate genre search
   const [q, setQ] = useState("");
@@ -111,14 +127,19 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         {/* ⬇️ Thêm responsive font cho trigger: to hơn từ laptop/desktop */}
-        <div className="flex cursor-pointer items-center justify-start gap-1 text-sm lg:text-[17px] whitespace-nowrap">
+        <button
+          type="button"
+          className="flex items-center justify-start gap-1 text-sm lg:text-[17px] whitespace-nowrap touch-manipulation"
+          onPointerDown={() => debugTap("trigger pointerdown")}
+          onClick={() => debugTap("trigger click")}
+        >
           <div className="text-txt-primary text-sm lg:text-[17px] leading-tight font-semibold whitespace-nowrap text-outline-purple">
             Thể loại
           </div>
           <span className="inline-flex text-outline-purple-thin lg:text-outline-purple">
             <ChevronDown className="text-txt-primary h-3 w-3 lg:h-4 lg:w-4" />
           </span>
-        </div>
+        </button>
       </Popover.Trigger>
 
       <Popover.Portal>
@@ -181,18 +202,18 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
                       const name = (genre as any).name as string;
                       const slug = (genre as any).slug as string;
                       const href = `/genres/${slug}`;
+                      const key =
+                        (genre as any)._id?.toString?.() || (genre as any).id || slug;
                       return (
                         <a
-                          key={(genre as any)._id?.toString?.() || (genre as any).id || slug}
+                          key={key}
                           href={href}
-                          className="block break-inside-avoid py-1"
+                          className="block break-inside-avoid py-1 touch-manipulation [touch-action:manipulation]"
                           title={((genre as any).description as string) || undefined}
-                          onClick={(e: MouseEvent<HTMLAnchorElement>) => {
-                            const hydrated = (window as any)?.__APP_HYDRATED__ === true;
+                          onPointerDown={() => debugTap("item pointerdown", { href })}
+                          onClick={() => {
+                            debugTap("item click", { href });
                             setOpen(false);
-                            if (!hydrated) return; // để browser điều hướng tự nhiên
-                            e.preventDefault();
-                            requestAnimationFrame(() => navigate(href));
                           }}
                         >
                           <div className="text-txt-primary hover:text-txt-focus text-xs [@media(min-width:427px)]:text-[15px] sm:text-[15px] font-medium">
