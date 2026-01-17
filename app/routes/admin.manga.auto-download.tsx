@@ -1,4 +1,4 @@
-import { Link, useFetcher, useLoaderData } from "react-router-dom";
+import { Link, useFetcher, useLoaderData, useRevalidator } from "react-router-dom";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, type MetaFunction } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -17,6 +17,7 @@ import {
   ViHentaiAutoDownloadJobModel,
   type ViHentaiAutoDownloadJobStatus,
 } from "~/database/models/vi-hentai-auto-download-job.model";
+import { ViHentaiListingExtractHistoryModel } from "~/database/models/vi-hentai-listing-extract-history.model";
 
 type ActionResult = {
   ok: boolean;
@@ -51,6 +52,10 @@ type EnqueueBatchActionResult =
 
 type PauseBatchActionResult =
   | { ok: true; batchId: string; paused: boolean }
+  | { ok: false; error: string };
+
+type BatchControlActionResult =
+  | { ok: true; batchId: string; action: "stop" | "delete" }
   | { ok: false; error: string };
 
 type PollBatchLoaderResult =
@@ -90,6 +95,14 @@ type InitialLoaderResult =
   | {
       ok: true;
       activeBatchId: string | null;
+      recentListingUrls: Array<{ url: string; ok?: boolean; linksCount?: number; capped?: boolean; createdAt: string; errorMessage?: string }>;
+      batches: Array<{
+        batchId: string;
+        status: "queued" | "running" | "stopped" | "succeeded" | "failed";
+        createdAt: string;
+        lastActivityAt: string;
+        counts: { total: number; queued: number; running: number; succeeded: number; failed: number; pausedQueued: number };
+      }>;
       jobs: Array<{
         jobId: string;
         url: string;
@@ -136,45 +149,126 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   if (intent !== "pollBatch") {
     try {
-      const activeJob = await ViHentaiAutoDownloadJobModel.findOne({
-        status: { $in: ["queued", "running"] },
-      })
-        .sort({ createdAt: -1 })
-        .select({ batchId: 1 })
-        .lean();
-
-      const latestJob =
-        activeJob ??
-        (await ViHentaiAutoDownloadJobModel.findOne({})
+      const [activeJob, latestJob] = await Promise.all([
+        ViHentaiAutoDownloadJobModel.findOne({ status: { $in: ["queued", "running"] } })
           .sort({ createdAt: -1 })
           .select({ batchId: 1 })
-          .lean());
+          .lean(),
+        ViHentaiAutoDownloadJobModel.findOne({})
+          .sort({ createdAt: -1 })
+          .select({ batchId: 1 })
+          .lean(),
+      ]);
 
-      const activeBatchId = latestJob?.batchId ? String(latestJob.batchId) : null;
+      const batchIdFromActive = activeJob?.batchId ? String(activeJob.batchId) : null;
+      const batchIdFromLatest = latestJob?.batchId ? String(latestJob.batchId) : null;
+      const activeBatchId = batchIdFromActive || batchIdFromLatest;
 
-      if (!activeBatchId) {
-        const body: InitialLoaderResult = { ok: true, activeBatchId: null, jobs: [] };
-        return Response.json(body, { status: 200 });
-      }
+      const [jobs, listingHistory, batchSummariesRaw] = await Promise.all([
+        activeBatchId
+          ? ViHentaiAutoDownloadJobModel.find({ batchId: activeBatchId })
+              .sort({ createdAt: 1 })
+              .select({
+                _id: 1,
+                url: 1,
+                status: 1,
+                paused: 1,
+                startedAt: 1,
+                finishedAt: 1,
+                progress: 1,
+                result: 1,
+                errorMessage: 1,
+              })
+              .lean()
+          : Promise.resolve([] as any[]),
+        ViHentaiListingExtractHistoryModel.find({ url: { $exists: true, $ne: "" } })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .select({ url: 1, ok: 1, linksCount: 1, capped: 1, createdAt: 1, errorMessage: 1 })
+          .lean(),
+        ViHentaiAutoDownloadJobModel.aggregate([
+          { $match: { batchId: { $exists: true, $ne: "" } } },
+          {
+            $group: {
+              _id: "$batchId",
+              createdAt: { $min: "$createdAt" },
+              lastCreatedAt: { $max: "$createdAt" },
+              lastStartedAt: { $max: "$startedAt" },
+              lastFinishedAt: { $max: "$finishedAt" },
+              total: { $sum: 1 },
+              queued: { $sum: { $cond: [{ $eq: ["$status", "queued"] }, 1, 0] } },
+              running: { $sum: { $cond: [{ $eq: ["$status", "running"] }, 1, 0] } },
+              succeeded: { $sum: { $cond: [{ $eq: ["$status", "succeeded"] }, 1, 0] } },
+              failed: { $sum: { $cond: [{ $eq: ["$status", "failed"] }, 1, 0] } },
+              pausedQueued: {
+                $sum: {
+                  $cond: [
+                    { $and: [{ $eq: ["$status", "queued"] }, { $eq: ["$paused", true] }] },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+          { $sort: { lastCreatedAt: -1 } },
+          { $limit: 50 },
+        ]),
+      ]);
 
-      const jobs = await ViHentaiAutoDownloadJobModel.find({ batchId: activeBatchId })
-        .sort({ createdAt: 1 })
-        .select({
-          _id: 1,
-          url: 1,
-          status: 1,
-          paused: 1,
-          startedAt: 1,
-          finishedAt: 1,
-          progress: 1,
-          result: 1,
-          errorMessage: 1,
-        })
-        .lean();
+      const recentListingUrls = listingHistory
+        .map((h) => ({
+          url: String((h as any).url || ""),
+          ok: typeof (h as any).ok === "boolean" ? Boolean((h as any).ok) : undefined,
+          linksCount: typeof (h as any).linksCount === "number" ? Number((h as any).linksCount) : undefined,
+          capped: typeof (h as any).capped === "boolean" ? Boolean((h as any).capped) : undefined,
+          createdAt: (h as any).createdAt ? new Date((h as any).createdAt).toISOString() : new Date().toISOString(),
+          errorMessage: (h as any).errorMessage ? String((h as any).errorMessage) : undefined,
+        }))
+        .filter((x) => x.url);
+
+      const batches = (batchSummariesRaw as any[]).map((b) => {
+        const queued = Number(b.queued || 0);
+        const running = Number(b.running || 0);
+        const failed = Number(b.failed || 0);
+        const succeeded = Number(b.succeeded || 0);
+        const pausedQueued = Number(b.pausedQueued || 0);
+
+        const lastActivity = b.lastFinishedAt || b.lastStartedAt || b.lastCreatedAt || b.createdAt;
+        const status: "queued" | "running" | "stopped" | "succeeded" | "failed" =
+          running > 0
+            ? "running"
+            : queued > 0 && pausedQueued >= queued
+              ? "stopped"
+              : queued > 0
+                ? "queued"
+                : failed > 0
+                  ? "failed"
+                  : succeeded > 0
+                    ? "succeeded"
+                    : "queued";
+
+        return {
+          batchId: String(b._id || ""),
+          status,
+          createdAt: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString(),
+          lastActivityAt: lastActivity ? new Date(lastActivity).toISOString() : new Date().toISOString(),
+          counts: {
+            total: Number(b.total || 0),
+            queued,
+            running,
+            succeeded,
+            failed,
+            pausedQueued,
+          },
+        };
+      }).filter((x) => x.batchId);
 
       const body: InitialLoaderResult = {
         ok: true,
         activeBatchId,
+        recentListingUrls,
+        batches,
         jobs: jobs.map((j) => ({
           jobId: String(j._id),
           url: String(j.url || ""),
@@ -376,6 +470,43 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json(body, { status: 200 });
   }
 
+  if (intent === "stopBatch") {
+    const batchId = (formData.get("batchId") || "").toString().trim();
+    if (!batchId) {
+      const body: BatchControlActionResult = { ok: false, error: "Thiếu batchId" };
+      return Response.json(body, { status: 400 });
+    }
+
+    // Soft-stop: pause all queued jobs. Running job (if any) will finish.
+    await ViHentaiAutoDownloadJobModel.updateMany(
+      { batchId, status: "queued" },
+      { $set: { paused: true } },
+    );
+
+    const body: BatchControlActionResult = { ok: true, batchId, action: "stop" };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "deleteBatch") {
+    const batchId = (formData.get("batchId") || "").toString().trim();
+    if (!batchId) {
+      const body: BatchControlActionResult = { ok: false, error: "Thiếu batchId" };
+      return Response.json(body, { status: 400 });
+    }
+
+    const running = await ViHentaiAutoDownloadJobModel.findOne({ batchId, status: "running" })
+      .select({ _id: 1 })
+      .lean();
+    if (running) {
+      const body: BatchControlActionResult = { ok: false, error: "Batch đang chạy, vui lòng dừng/pause trước" };
+      return Response.json(body, { status: 400 });
+    }
+
+    await ViHentaiAutoDownloadJobModel.deleteMany({ batchId });
+    const body: BatchControlActionResult = { ok: true, batchId, action: "delete" };
+    return Response.json(body, { status: 200 });
+  }
+
   // ---- Extract links from listing/genre page ----
   if (intent === "extractListing") {
     const listingUrlRaw = formData.get("listingUrl");
@@ -406,27 +537,35 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const MAX_LINKS = 2000;
 
-    const res = await fetch(listingUrl.toString(), {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-        "Accept-Language": "vi,en;q=0.9",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
+    const history = await ViHentaiListingExtractHistoryModel.create({
+      url: listingUrl.toString(),
+      ok: undefined,
     });
 
-    if (!res.ok) {
-      const body: ExtractListingActionResult = {
-        ok: false,
-        error: `Không thể tải trang (${res.status} ${res.statusText})`,
-      };
-      return Response.json(body, { status: 200 });
-    }
+    try {
+      const res = await fetch(listingUrl.toString(), {
+        method: "GET",
+        redirect: "follow",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+          "Accept-Language": "vi,en;q=0.9",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
 
-    const html = await res.text();
-    const $ = load(html);
+      if (!res.ok) {
+        const error = `Không thể tải trang (${res.status} ${res.statusText})`;
+        await ViHentaiListingExtractHistoryModel.updateOne(
+          { _id: (history as any)._id },
+          { $set: { ok: false, errorMessage: error } },
+        );
+        const body: ExtractListingActionResult = { ok: false, error };
+        return Response.json(body, { status: 200 });
+      }
+
+      const html = await res.text();
+      const $ = load(html);
 
     const isMangaPathname = (pathname: string) => {
       // Only accept /truyen/<slug> (optionally trailing slash).
@@ -465,14 +604,29 @@ export async function action({ request }: ActionFunctionArgs) {
         links.push(normalized);
       });
 
-    const body: ExtractListingActionResult = {
-      ok: true,
-      url: listingUrl.toString(),
-      links,
-      count: links.length,
-      capped: links.length >= MAX_LINKS,
-    };
-    return Response.json(body, { status: 200 });
+      const capped = links.length >= MAX_LINKS;
+      await ViHentaiListingExtractHistoryModel.updateOne(
+        { _id: (history as any)._id },
+        { $set: { ok: true, linksCount: links.length, capped }, $unset: { errorMessage: 1 } },
+      );
+
+      const body: ExtractListingActionResult = {
+        ok: true,
+        url: listingUrl.toString(),
+        links,
+        count: links.length,
+        capped,
+      };
+      return Response.json(body, { status: 200 });
+    } catch (e) {
+      const error = e instanceof Error ? e.message : "Không thể trích xuất link";
+      await ViHentaiListingExtractHistoryModel.updateOne(
+        { _id: (history as any)._id },
+        { $set: { ok: false, errorMessage: error } },
+      );
+      const body: ExtractListingActionResult = { ok: false, error };
+      return Response.json(body, { status: 200 });
+    }
   }
 
   const urlRaw = formData.get("url") ?? formData.get("urls");
@@ -574,11 +728,13 @@ const formatSuccessResult = (result: ViHentaiAutoDownloadResult) => {
 
 export default function AdminMangaAutoDownload() {
   const loaderData = useLoaderData() as InitialLoaderResult | null;
+  const revalidator = useRevalidator();
   const fetcher = useFetcher<ActionResult>();
   const listingFetcher = useFetcher<ExtractListingActionResult>();
   const enqueueFetcher = useFetcher<EnqueueBatchActionResult>();
   const pollFetcher = useFetcher<PollBatchLoaderResult>();
   const pauseFetcher = useFetcher<PauseBatchActionResult>();
+  const batchControlFetcher = useFetcher<BatchControlActionResult>();
 
   type QueueRowStatus = "idle" | "running" | "done" | "error";
   type QueueRow = {
@@ -843,6 +999,24 @@ export default function AdminMangaAutoDownload() {
     pauseFetcher.submit(fd, { method: "post" });
   };
 
+  const stopBatchOnServer = (batchId: string) => {
+    const ok = confirm("Dừng batch này? (Job đang chạy sẽ chạy xong; các job còn lại sẽ bị pause)");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "stopBatch");
+    fd.set("batchId", batchId);
+    batchControlFetcher.submit(fd, { method: "post" });
+  };
+
+  const deleteBatchOnServer = (batchId: string) => {
+    const ok = confirm("Xóa batch này khỏi server? (sẽ xóa toàn bộ lịch sử job trong batch)");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "deleteBatch");
+    fd.set("batchId", batchId);
+    batchControlFetcher.submit(fd, { method: "post" });
+  };
+
   const submitExtractListing = (url: string) => {
     const fd = new FormData();
     fd.set("intent", "extractListing");
@@ -953,6 +1127,17 @@ export default function AdminMangaAutoDownload() {
     }
     setIsRunning(false);
   };
+
+  // Refresh server batch lists after control actions.
+  useEffect(() => {
+    if (batchControlFetcher.state !== "idle") return;
+    if (!batchControlFetcher.data) return;
+    if (!batchControlFetcher.data.ok) {
+      alert(batchControlFetcher.data.error);
+      return;
+    }
+    revalidator.revalidate();
+  }, [batchControlFetcher.state, batchControlFetcher.data]);
 
   // After enqueue returns, store jobIds per row.
   useEffect(() => {
@@ -1124,6 +1309,164 @@ export default function AdminMangaAutoDownload() {
       </div>
 
       <div className="space-y-4 rounded-xl border border-bd-default bg-bgc-layer1 p-6 shadow">
+        {loaderData && loaderData.ok ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-bd-default bg-bgc-layer2/30 p-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-txt-primary">10 trang tổng/thể loại gần nhất</div>
+                <button
+                  type="button"
+                  onClick={() => revalidator.revalidate()}
+                  className="rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80"
+                >
+                  Refresh
+                </button>
+              </div>
+              {loaderData.recentListingUrls.length ? (
+                <ul className="space-y-1 text-xs">
+                  {loaderData.recentListingUrls.map((it) => (
+                    <li key={`${it.createdAt}:${it.url}`} className="flex flex-col gap-1 rounded-md border border-bd-default/60 bg-bgc-layer1/40 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-semibold text-txt-primary">
+                          {it.ok === true ? "OK" : it.ok === false ? "Lỗi" : "Đang xử lý"}
+                          {typeof it.linksCount === "number" ? ` · ${it.linksCount} link` : ""}
+                          {it.capped ? " · capped" : ""}
+                        </div>
+                        <div className="text-txt-secondary">{new Date(it.createdAt).toLocaleString()}</div>
+                      </div>
+                      <div className="break-all text-txt-secondary">{it.url}</div>
+                      {it.errorMessage ? (
+                        <div className="text-[11px] text-red-200">{it.errorMessage}</div>
+                      ) : null}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="truncate text-txt-secondary">Dùng để trích xuất link truyện</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setListingUrlInput(it.url);
+                            submitExtractListing(it.url);
+                          }}
+                          className="rounded-lg border border-bd-default px-3 py-1 text-[11px] font-semibold text-txt-primary hover:bg-bgc-layer2/80"
+                        >
+                          Trích xuất lại
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-xs text-txt-secondary">Chưa có dữ liệu.</div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-bd-default bg-bgc-layer2/30 p-4">
+              <div className="mb-2 text-sm font-semibold text-txt-primary">Batch trên server</div>
+              {loaderData.batches.length ? (
+                <div className="overflow-hidden rounded-lg border border-bd-default">
+                  <table className="w-full text-xs">
+                    <thead className="bg-bgc-layer2 text-txt-secondary">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Batch</th>
+                        <th className="w-24 px-3 py-2 text-left">Trạng thái</th>
+                        <th className="w-28 px-3 py-2 text-right">Queue</th>
+                        <th className="w-48 px-3 py-2 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-bd-default">
+                      {loaderData.batches.map((b) => {
+                        const canDelete = b.counts.running === 0;
+                        const isBusy = batchControlFetcher.state !== "idle";
+                        const pausedAllQueued = b.counts.queued > 0 && b.counts.pausedQueued >= b.counts.queued;
+
+                        return (
+                          <tr key={b.batchId} className={activeBatchId === b.batchId ? "bg-bgc-layer2/60" : ""}>
+                            <td className="px-3 py-2">
+                              <div className="font-semibold text-txt-primary">{b.batchId}</div>
+                              <div className="text-[11px] text-txt-secondary">
+                                {new Date(b.createdAt).toLocaleString()} · last: {new Date(b.lastActivityAt).toLocaleString()}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="font-semibold text-txt-primary">{b.status}</div>
+                              {pausedAllQueued ? (
+                                <div className="text-[11px] text-txt-secondary">(paused)</div>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-2 text-right text-txt-secondary">
+                              <div>{b.counts.total} jobs</div>
+                              <div className="text-[11px]">
+                                Q:{b.counts.queued} R:{b.counts.running} OK:{b.counts.succeeded} F:{b.counts.failed}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <div className="flex flex-wrap justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    activeBatchIdRef.current = b.batchId;
+                                    setActiveBatchId(b.batchId);
+                                    pollFetcher.load(`/admin/manga/auto-download?intent=pollBatch&batchId=${encodeURIComponent(b.batchId)}`);
+                                    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                                    pollTimerRef.current = setInterval(() => pollBatch(b.batchId), 5_000);
+                                  }}
+                                  className="rounded-lg border border-bd-default px-3 py-1 text-[11px] font-semibold text-txt-primary hover:bg-bgc-layer2/80"
+                                >
+                                  Xem
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => pauseBatch(b.batchId, true)}
+                                  disabled={pauseFetcher.state !== "idle"}
+                                  className="rounded-lg border border-bd-default px-3 py-1 text-[11px] font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+                                >
+                                  Pause
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => pauseBatch(b.batchId, false)}
+                                  disabled={pauseFetcher.state !== "idle"}
+                                  className="rounded-lg border border-bd-default px-3 py-1 text-[11px] font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+                                >
+                                  Resume
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => stopBatchOnServer(b.batchId)}
+                                  disabled={isBusy}
+                                  className="rounded-lg border border-bd-default px-3 py-1 text-[11px] font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+                                >
+                                  Dừng
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => deleteBatchOnServer(b.batchId)}
+                                  disabled={!canDelete || isBusy}
+                                  className="rounded-lg border border-red-500/30 px-3 py-1 text-[11px] font-semibold text-red-200 hover:bg-red-500/10 disabled:opacity-50"
+                                  title={!canDelete ? "Không thể xóa khi đang có job running" : "Xóa batch"}
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-xs text-txt-secondary">Chưa có batch nào.</div>
+              )}
+              <div className="mt-2 text-[11px] text-txt-secondary">
+                Gợi ý: Dừng/Pause để tránh chạy nhầm song song. Xóa chỉ áp dụng khi không có job running.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="space-y-2">
           <label className="text-sm font-semibold text-txt-primary">Thêm nhanh từ trang thể loại / trang tổng</label>
           <div className="flex flex-col gap-2 sm:flex-row">
