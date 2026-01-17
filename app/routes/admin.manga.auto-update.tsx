@@ -3,9 +3,14 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { requireAdminLogin } from "@/services/auth.server";
-import { runViHentaiAutoUpdateOnce } from "@/jobs/vi-hentai-auto-update.server";
+import {
+  createViHentaiAutoUpdateQueue,
+  getViHentaiAutoUpdateEnabled,
+  setViHentaiAutoUpdateEnabled,
+  startViHentaiAutoUpdateQueue,
+} from "@/jobs/vi-hentai-auto-update.server";
 
-import { ViHentaiAutoUpdateRunModel } from "~/database/models/vi-hentai-auto-update-run.model";
+import { ViHentaiAutoUpdateQueueModel } from "~/database/models/vi-hentai-auto-update-queue.model";
 
 export const meta: MetaFunction = () => {
   return [
@@ -15,15 +20,16 @@ export const meta: MetaFunction = () => {
 };
 
 type LoaderResult =
-  | ({ ok: true; runs: RunSummary[]; latestRun?: RunDetail } & Record<string, unknown>)
+  | ({ ok: true; enabled: boolean; queues: QueueSummary[]; latestQueue?: QueueDetail } & Record<string, unknown>)
   | { ok: false; error: string };
 
-type RunSummary = {
+type QueueSummary = {
   id: string;
   status: string;
   listUrl: string;
-  startedAt: string;
+  startedAt?: string;
   finishedAt?: string;
+  maxManga: number;
   processed: number;
   created: number;
   updated: number;
@@ -35,7 +41,7 @@ type RunSummary = {
   itemsCount: number;
 };
 
-type RunItem = {
+type QueueItem = {
   index: number;
   url: string;
   status: string;
@@ -48,31 +54,33 @@ type RunItem = {
   message?: string;
 };
 
-type RunDetail = {
+type QueueDetail = {
   id: string;
   status: string;
   listUrl: string;
-  startedAt: string;
+  startedAt?: string;
   finishedAt?: string;
+  maxManga: number;
   processed: number;
   created: number;
   updated: number;
   noop: number;
   chaptersAdded: number;
   imagesUploaded: number;
-  items: RunItem[];
+  items: QueueItem[];
 };
 
 type ActionResult =
-  | { ok: true; runId?: string }
+  | { ok: true; queueId?: string; enabled?: boolean }
   | { ok: false; error: string };
 
 type PollResult =
-  | { ok: true; run: RunDetail }
+  | { ok: true; queue: QueueDetail }
   | { ok: false; error: string };
 
 const DEFAULT_OWNER_ID = "68f0f839b69df690049aba65";
 const DEFAULT_LIST_URL = "https://vi-hentai.pro/danh-sach?page=1";
+const DEFAULT_MAX_MANGA = 30;
 
 const formatMs = (ms: number) => {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -93,31 +101,34 @@ const getNextHourTick = (now: Date) => {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireAdminLogin(request);
 
+  const enabled = await getViHentaiAutoUpdateEnabled();
+
   const url = new URL(request.url);
   const intent = String(url.searchParams.get("intent") || "");
-  if (intent === "poll") {
-    const runId = String(url.searchParams.get("runId") || "").trim();
-    if (!runId) return Response.json({ ok: false, error: "Thiếu runId" } satisfies PollResult, { status: 400 });
+  if (intent === "pollQueue") {
+    const queueId = String(url.searchParams.get("queueId") || "").trim();
+    if (!queueId) return Response.json({ ok: false, error: "Thiếu queueId" } satisfies PollResult, { status: 400 });
 
-    const run = await ViHentaiAutoUpdateRunModel.findById(runId).lean();
-    if (!run) return Response.json({ ok: false, error: "Không tìm thấy run" } satisfies PollResult, { status: 404 });
+    const queue = await ViHentaiAutoUpdateQueueModel.findById(queueId).lean();
+    if (!queue) return Response.json({ ok: false, error: "Không tìm thấy queue" } satisfies PollResult, { status: 404 });
 
     const body: PollResult = {
       ok: true,
-      run: {
-        id: String((run as any)._id),
-        status: String((run as any).status),
-        listUrl: String((run as any).listUrl || ""),
-        startedAt: (run as any).startedAt ? new Date((run as any).startedAt).toISOString() : "",
-        finishedAt: (run as any).finishedAt ? new Date((run as any).finishedAt).toISOString() : undefined,
-        processed: Number((run as any).processed || 0),
-        created: Number((run as any).created || 0),
-        updated: Number((run as any).updated || 0),
-        noop: Number((run as any).noop || 0),
-        chaptersAdded: Number((run as any).chaptersAdded || 0),
-        imagesUploaded: Number((run as any).imagesUploaded || 0),
-        items: Array.isArray((run as any).items)
-          ? (run as any).items.map((it: any) => ({
+      queue: {
+        id: String((queue as any)._id),
+        status: String((queue as any).status),
+        listUrl: String((queue as any).listUrl || ""),
+        startedAt: (queue as any).startedAt ? new Date((queue as any).startedAt).toISOString() : undefined,
+        finishedAt: (queue as any).finishedAt ? new Date((queue as any).finishedAt).toISOString() : undefined,
+        maxManga: Number((queue as any).maxManga || 0),
+        processed: Number((queue as any).processed || 0),
+        created: Number((queue as any).created || 0),
+        updated: Number((queue as any).updated || 0),
+        noop: Number((queue as any).noop || 0),
+        chaptersAdded: Number((queue as any).chaptersAdded || 0),
+        imagesUploaded: Number((queue as any).imagesUploaded || 0),
+        items: Array.isArray((queue as any).items)
+          ? (queue as any).items.map((it: any) => ({
               index: Number(it.index || 0),
               url: String(it.url || ""),
               status: String(it.status || ""),
@@ -136,38 +147,41 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return Response.json(body, { status: 200 });
   }
 
-  const runs = await ViHentaiAutoUpdateRunModel.find({})
+  const queues = await ViHentaiAutoUpdateQueueModel.find({})
     .sort({ createdAt: -1 })
     .limit(20)
     .lean();
 
-  const latest = runs[0] as any;
+  const latest = queues[0] as any;
 
   const body: LoaderResult = {
     ok: true,
-    runs: runs.map((r: any): RunSummary => ({
-      id: String(r._id),
-      status: String(r.status),
-      listUrl: String(r.listUrl || ""),
-      startedAt: r.startedAt ? new Date(r.startedAt).toISOString() : "",
-      finishedAt: r.finishedAt ? new Date(r.finishedAt).toISOString() : undefined,
-      processed: Number(r.processed || 0),
-      created: Number(r.created || 0),
-      updated: Number(r.updated || 0),
-      noop: Number(r.noop || 0),
-      chaptersAdded: Number(r.chaptersAdded || 0),
-      imagesUploaded: Number(r.imagesUploaded || 0),
-      errorCount: Array.isArray(r.errors) ? r.errors.length : 0,
-      errorsSample: Array.isArray(r.errors) ? r.errors.slice(0, 5) : [],
-      itemsCount: Array.isArray(r.items) ? r.items.length : 0,
+    enabled,
+    queues: queues.map((q: any): QueueSummary => ({
+      id: String(q._id),
+      status: String(q.status),
+      listUrl: String(q.listUrl || ""),
+      startedAt: q.startedAt ? new Date(q.startedAt).toISOString() : undefined,
+      finishedAt: q.finishedAt ? new Date(q.finishedAt).toISOString() : undefined,
+      maxManga: Number(q.maxManga || 0),
+      processed: Number(q.processed || 0),
+      created: Number(q.created || 0),
+      updated: Number(q.updated || 0),
+      noop: Number(q.noop || 0),
+      chaptersAdded: Number(q.chaptersAdded || 0),
+      imagesUploaded: Number(q.imagesUploaded || 0),
+      errorCount: Array.isArray(q.errors) ? q.errors.length : 0,
+      errorsSample: Array.isArray(q.errors) ? q.errors.slice(0, 5) : [],
+      itemsCount: Array.isArray(q.items) ? q.items.length : 0,
     })),
-    latestRun: latest
+    latestQueue: latest
       ? ({
           id: String(latest._id),
           status: String(latest.status),
           listUrl: String(latest.listUrl || ""),
-          startedAt: latest.startedAt ? new Date(latest.startedAt).toISOString() : "",
+          startedAt: latest.startedAt ? new Date(latest.startedAt).toISOString() : undefined,
           finishedAt: latest.finishedAt ? new Date(latest.finishedAt).toISOString() : undefined,
+          maxManga: Number(latest.maxManga || 0),
           processed: Number(latest.processed || 0),
           created: Number(latest.created || 0),
           updated: Number(latest.updated || 0),
@@ -175,7 +189,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           chaptersAdded: Number(latest.chaptersAdded || 0),
           imagesUploaded: Number(latest.imagesUploaded || 0),
           items: Array.isArray(latest.items)
-            ? latest.items.map((it: any): RunItem => ({
+            ? latest.items.map((it: any): QueueItem => ({
                 index: Number(it.index || 0),
                 url: String(it.url || ""),
                 status: String(it.status || ""),
@@ -188,7 +202,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 message: it.message ? String(it.message) : undefined,
               }))
             : [],
-        } satisfies RunDetail)
+        } satisfies QueueDetail)
       : undefined,
   };
 
@@ -201,29 +215,56 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
 
-  if (intent !== "runNow") {
-    const body: ActionResult = { ok: false, error: "intent không hợp lệ" };
-    return Response.json(body, { status: 400 });
-  }
-
-  // Always allow creating new manga on auto-update.
-  const allowCreateNewManga = true;
-  const ownerId = String(formData.get("ownerId") || "").trim();
-  const autoApproveNewManga = formData.get("autoApproveNewManga") === "on";
-
-  const result = await runViHentaiAutoUpdateOnce({
-    allowCreateNewManga,
-    ownerId: ownerId || DEFAULT_OWNER_ID,
-    approveNewManga: autoApproveNewManga,
-  });
-
-  if (!result.ok) {
-    const body: ActionResult = { ok: false, error: result.message || "Chạy thất bại" };
+  if (intent === "toggleEnabled") {
+    const desired = String(formData.get("enabled") || "").trim();
+    const nextEnabled = desired === "1" || desired === "true";
+    const saved = await setViHentaiAutoUpdateEnabled(nextEnabled);
+    const body: ActionResult = { ok: true, enabled: saved };
     return Response.json(body, { status: 200 });
   }
 
-  const body: ActionResult = { ok: true, runId: result.runId };
-  return Response.json(body, { status: 200 });
+  if (intent === "extractQueue") {
+    if (!(await getViHentaiAutoUpdateEnabled())) {
+      const body: ActionResult = { ok: false, error: "Auto-update đang tắt" };
+      return Response.json(body, { status: 200 });
+    }
+    const ownerId = String(formData.get("ownerId") || "").trim();
+    const autoApproveNewManga = formData.get("autoApproveNewManga") === "on";
+
+    const result = await createViHentaiAutoUpdateQueue({
+      listUrl: DEFAULT_LIST_URL,
+      maxManga: DEFAULT_MAX_MANGA,
+      ownerId: ownerId || DEFAULT_OWNER_ID,
+      approveNewManga: autoApproveNewManga,
+    });
+
+    if (!result.ok) {
+      const body: ActionResult = { ok: false, error: result.message || "Trích xuất thất bại" };
+      return Response.json(body, { status: 200 });
+    }
+
+    const body: ActionResult = { ok: true, queueId: result.queueId };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "startQueue") {
+    if (!(await getViHentaiAutoUpdateEnabled())) {
+      const body: ActionResult = { ok: false, error: "Auto-update đang tắt" };
+      return Response.json(body, { status: 200 });
+    }
+    const queueId = String(formData.get("queueId") || "").trim();
+    if (!queueId) {
+      const body: ActionResult = { ok: false, error: "Thiếu queueId" };
+      return Response.json(body, { status: 200 });
+    }
+
+    await startViHentaiAutoUpdateQueue(queueId);
+    const body: ActionResult = { ok: true, queueId };
+    return Response.json(body, { status: 200 });
+  }
+
+  const body: ActionResult = { ok: false, error: "intent không hợp lệ" };
+  return Response.json(body, { status: 400 });
 };
 
 export default function AdminMangaAutoUpdate() {
@@ -231,7 +272,9 @@ export default function AdminMangaAutoUpdate() {
   const fetcher = useFetcher<ActionResult>();
   const pollFetcher = useFetcher<PollResult>();
 
-  const [activeRun, setActiveRun] = useState<RunDetail | undefined>(data.ok ? data.latestRun : undefined);
+  const [enabled, setEnabled] = useState(() => (data.ok ? Boolean((data as any).enabled) : true));
+
+  const [activeQueue, setActiveQueue] = useState<QueueDetail | undefined>(data.ok ? data.latestQueue : undefined);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -239,21 +282,23 @@ export default function AdminMangaAutoUpdate() {
 
   const [cronNow, setCronNow] = useState(() => new Date());
   const nextCronAt = useMemo(() => getNextHourTick(cronNow), [cronNow]);
-  const remainingMs = useMemo(() => nextCronAt.getTime() - cronNow.getTime(), [nextCronAt, cronNow]);
+  const remainingMs = useMemo(() => (enabled ? nextCronAt.getTime() - cronNow.getTime() : 0), [enabled, nextCronAt, cronNow]);
 
   useEffect(() => {
+    if (!enabled) return;
     const t = setInterval(() => setCronNow(new Date()), 1_000);
     return () => clearInterval(t);
-  }, []);
+  }, [enabled]);
 
   const anyItemRunning = useMemo(() => {
-    const items = activeRun?.items || [];
+    const items = activeQueue?.items || [];
     return items.some((it: any) => it.status === "running");
-  }, [activeRun]);
+  }, [activeQueue]);
 
-  const pollRun = (runId?: string) => {
-    if (!runId) return;
-    pollFetcher.load(`/admin/manga/auto-update?intent=poll&runId=${encodeURIComponent(runId)}`);
+  const pollQueue = (queueId?: string) => {
+    if (!queueId) return;
+    if (!enabled) return;
+    pollFetcher.load(`/admin/manga/auto-update?intent=pollQueue&queueId=${encodeURIComponent(queueId)}`);
   };
 
   // Start polling after manual trigger.
@@ -261,13 +306,33 @@ export default function AdminMangaAutoUpdate() {
     if (fetcher.state !== "idle") return;
     if (!fetcher.data) return;
     if (!fetcher.data.ok) return;
-    if (!fetcher.data.runId) return;
 
-    const runId = fetcher.data.runId;
-    pollRun(runId);
+    if (typeof fetcher.data.enabled === "boolean") {
+      setEnabled(fetcher.data.enabled);
+      if (!fetcher.data.enabled) {
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+      }
+      return;
+    }
+
+    const queueId = fetcher.data.queueId;
+    if (!queueId) return;
+
+    pollQueue(queueId);
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    pollTimerRef.current = setInterval(() => pollRun(runId), 5_000);
+    pollTimerRef.current = setInterval(() => pollQueue(queueId), 5_000);
   }, [fetcher.state, fetcher.data]);
+
+  useEffect(() => {
+    if (enabled) return;
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, [enabled]);
 
   // Apply polled run details to the UI.
   useEffect(() => {
@@ -275,10 +340,10 @@ export default function AdminMangaAutoUpdate() {
     if (!pollFetcher.data) return;
     if (!pollFetcher.data.ok) return;
 
-    setActiveRun(pollFetcher.data.run as any);
+    setActiveQueue(pollFetcher.data.queue as any);
 
-    const finished = Boolean((pollFetcher.data.run as any)?.finishedAt);
-    const stillRunning = (pollFetcher.data.run as any)?.status === "running" || (pollFetcher.data.run as any)?.items?.some((it: any) => it.status === "running");
+    const finished = Boolean((pollFetcher.data.queue as any)?.finishedAt);
+    const stillRunning = (pollFetcher.data.queue as any)?.status === "running" || (pollFetcher.data.queue as any)?.items?.some((it: any) => it.status === "running");
     if (finished || !stillRunning) {
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current);
@@ -316,15 +381,23 @@ export default function AdminMangaAutoUpdate() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-txt-primary">Auto cập nhật (vi-hentai)</h1>
-          <p className="text-sm text-txt-secondary">Cron mỗi 1 giờ (primary instance) + có thể chạy thủ công.</p>
+          <p className="text-sm text-txt-secondary">Tách 2 bước: trích xuất 30 URL → chạy queue tải chương/ảnh.</p>
           <div className="mt-1 text-xs text-txt-secondary">
-            Lần kiểm tra list tiếp theo: <span className="text-txt-primary">{nextCronAt.toLocaleString()}</span> — còn lại{" "}
-            <span className="font-semibold text-txt-primary">{formatMs(remainingMs)}</span> (list: {DEFAULT_LIST_URL})
+            Auto-update: <span className={enabled ? "text-emerald-300" : "text-red-300"}>{enabled ? "ON" : "OFF"}</span>.{" "}
+            {enabled ? (
+              <>
+                Cron mỗi 1 giờ sẽ tự trích xuất <span className="text-txt-primary">{DEFAULT_MAX_MANGA}</span> URL và auto chạy (primary). Lần tiếp theo:{" "}
+                <span className="text-txt-primary">{nextCronAt.toLocaleString()}</span> — còn lại{" "}
+                <span className="font-semibold text-txt-primary">{formatMs(remainingMs)}</span> (list: {DEFAULT_LIST_URL})
+              </>
+            ) : (
+              <>Đang tắt — dừng hoàn toàn cho tới khi bật lại.</>
+            )}
           </div>
         </div>
 
         <fetcher.Form method="post" className="flex flex-wrap items-center gap-3">
-          <input type="hidden" name="intent" value="runNow" />
+          <input type="hidden" name="enabled" value={enabled ? "0" : "1"} />
           <div className="text-sm text-txt-secondary">Cho phép tạo truyện mới: <span className="font-semibold text-txt-primary">Luôn bật</span></div>
 
           <label className="flex items-center gap-2 text-sm text-txt-secondary">
@@ -344,44 +417,72 @@ export default function AdminMangaAutoUpdate() {
 
           <button
             type="submit"
-            disabled={running}
+            name="intent"
+            value="extractQueue"
+            disabled={running || !enabled}
             className="rounded bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {running ? "Đang chạy..." : "Chạy ngay"}
+            {running ? "Đang trích xuất..." : `Trích xuất ${DEFAULT_MAX_MANGA} URL`}
           </button>
+
+          <button
+            type="submit"
+            name="intent"
+            value="startQueue"
+            disabled={running || !enabled || !activeQueue?.id || activeQueue.status === "running"}
+            className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
+            {running ? "Đang gửi lệnh..." : "Bắt đầu chạy queue"}
+          </button>
+
+          <button
+            type="submit"
+            name="intent"
+            value="toggleEnabled"
+            disabled={running}
+            className={`rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-60 ${enabled ? "bg-red-600" : "bg-sky-600"}`}
+          >
+            {enabled ? "Tắt" : "Bật"}
+          </button>
+
+          <input type="hidden" name="queueId" value={activeQueue?.id || ""} />
         </fetcher.Form>
       </div>
 
       <div className="mt-4 rounded border border-border bg-card p-3 text-sm text-txt-secondary">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
           <div>
-            <span className="font-semibold text-txt-primary">Run</span>: {activeRun?.id || "-"}
+            <span className="font-semibold text-txt-primary">Queue</span>: {activeQueue?.id || "-"}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">List</span>: {activeRun?.listUrl || "-"}
+            <span className="font-semibold text-txt-primary">List</span>: {activeQueue?.listUrl || "-"}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">Status</span>: {activeRun?.status || "-"}
+            <span className="font-semibold text-txt-primary">Status</span>: {activeQueue?.status || "-"}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">Processed</span>: {activeRun?.processed ?? 0}
+            <span className="font-semibold text-txt-primary">Max</span>: {activeQueue?.maxManga ?? DEFAULT_MAX_MANGA}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">Created</span>: {activeRun?.created ?? 0}
+            <span className="font-semibold text-txt-primary">Processed</span>: {activeQueue?.processed ?? 0}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">Updated</span>: {activeRun?.updated ?? 0}
+            <span className="font-semibold text-txt-primary">Created</span>: {activeQueue?.created ?? 0}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">Noop</span>: {activeRun?.noop ?? 0}
+            <span className="font-semibold text-txt-primary">Updated</span>: {activeQueue?.updated ?? 0}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">Chapters</span>: {activeRun?.chaptersAdded ?? 0}
+            <span className="font-semibold text-txt-primary">Noop</span>: {activeQueue?.noop ?? 0}
           </div>
           <div>
-            <span className="font-semibold text-txt-primary">Images</span>: {activeRun?.imagesUploaded ?? 0}
+            <span className="font-semibold text-txt-primary">Chapters</span>: {activeQueue?.chaptersAdded ?? 0}
+          </div>
+          <div>
+            <span className="font-semibold text-txt-primary">Images</span>: {activeQueue?.imagesUploaded ?? 0}
           </div>
           {anyItemRunning ? <div className="text-yellow-200">Đang chạy (poll 5s)...</div> : null}
+          {!enabled ? <div className="text-red-200">Auto-update đang tắt: worker không xử lý queue.</div> : null}
         </div>
       </div>
 
@@ -397,7 +498,7 @@ export default function AdminMangaAutoUpdate() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {(activeRun?.items || []).map((it: any) => {
+            {(activeQueue?.items || []).map((it: any) => {
               const openHref = it.mangaSlug ? `/truyen-hentai/${it.mangaSlug}` : undefined;
               const openEditHref = it.mangaId ? `/truyen-hentai/edit/${it.mangaId}` : undefined;
               return (
@@ -429,10 +530,10 @@ export default function AdminMangaAutoUpdate() {
                 </tr>
               );
             })}
-            {!activeRun?.items?.length ? (
+            {!activeQueue?.items?.length ? (
               <tr>
                 <td className="p-3 text-sm text-txt-secondary" colSpan={5}>
-                  Chưa có dữ liệu. Bấm “Chạy ngay” để tạo run mới.
+                  Chưa có queue. Bấm “Trích xuất 30 URL” để tạo danh sách chờ.
                 </td>
               </tr>
             ) : null}
@@ -447,7 +548,7 @@ export default function AdminMangaAutoUpdate() {
       ) : null}
 
       <div className="mt-6">
-        <h2 className="text-lg font-semibold text-txt-primary">Lịch sử chạy gần đây</h2>
+        <h2 className="text-lg font-semibold text-txt-primary">Lịch sử queue gần đây</h2>
         {data.ok ? (
           <div className="mt-3 overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
@@ -456,6 +557,7 @@ export default function AdminMangaAutoUpdate() {
                   <th className="p-2">Status</th>
                   <th className="p-2">Started</th>
                   <th className="p-2">Finished</th>
+                  <th className="p-2">Max</th>
                   <th className="p-2">Processed</th>
                   <th className="p-2">Created</th>
                   <th className="p-2">Updated</th>
@@ -467,19 +569,20 @@ export default function AdminMangaAutoUpdate() {
                 </tr>
               </thead>
               <tbody>
-                {data.runs.map((r) => (
-                  <tr key={r.id} className="border-t border-border">
-                    <td className="p-2">{r.status}</td>
-                    <td className="p-2">{r.startedAt}</td>
-                    <td className="p-2">{r.finishedAt || "-"}</td>
-                    <td className="p-2">{r.processed}</td>
-                    <td className="p-2">{r.created}</td>
-                    <td className="p-2">{r.updated}</td>
-                    <td className="p-2">{r.noop}</td>
-                    <td className="p-2">{r.chaptersAdded}</td>
-                    <td className="p-2">{r.imagesUploaded}</td>
-                    <td className="p-2">{r.errorCount}</td>
-                    <td className="p-2">{r.itemsCount}</td>
+                {data.queues.map((q) => (
+                  <tr key={q.id} className="border-t border-border">
+                    <td className="p-2">{q.status}</td>
+                    <td className="p-2">{q.startedAt || "-"}</td>
+                    <td className="p-2">{q.finishedAt || "-"}</td>
+                    <td className="p-2">{q.maxManga}</td>
+                    <td className="p-2">{q.processed}</td>
+                    <td className="p-2">{q.created}</td>
+                    <td className="p-2">{q.updated}</td>
+                    <td className="p-2">{q.noop}</td>
+                    <td className="p-2">{q.chaptersAdded}</td>
+                    <td className="p-2">{q.imagesUploaded}</td>
+                    <td className="p-2">{q.errorCount}</td>
+                    <td className="p-2">{q.itemsCount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -489,11 +592,11 @@ export default function AdminMangaAutoUpdate() {
           <div className="mt-3 text-sm text-red-200">{data.error}</div>
         )}
 
-        {data.ok && data.runs[0]?.errorsSample?.length ? (
+        {data.ok && data.queues[0]?.errorsSample?.length ? (
           <div className="mt-4 rounded border border-border bg-card p-3">
             <div className="text-sm font-medium text-txt-primary">Lỗi gần nhất (sample)</div>
             <ul className="mt-2 space-y-2 text-xs text-txt-secondary">
-              {data.runs[0].errorsSample.map((e, idx) => (
+              {data.queues[0].errorsSample.map((e, idx) => (
                 <li key={idx}>
                   <div className="truncate">{e.url}</div>
                   <div className="truncate">{e.message}</div>

@@ -3,11 +3,17 @@ import { load } from "cheerio";
 
 import { autoUpdateViHentaiManga } from "@/services/importers/vi-hentai-importer";
 import { SystemLockModel } from "~/database/models/system-lock.model";
-import { ViHentaiAutoUpdateRunModel } from "~/database/models/vi-hentai-auto-update-run.model";
+import { ViHentaiAutoUpdateQueueModel } from "~/database/models/vi-hentai-auto-update-queue.model";
 import { MANGA_CONTENT_TYPE } from "~/constants/manga";
+import { getFeatureFlag, setFeatureFlag } from "~/.server/services/system-feature-flag.server";
 
 const TZ = "Asia/Ho_Chi_Minh";
 const LOCK_KEY = "vi-hentai-auto-update";
+
+// We keep extraction and processing separated:
+// - Extraction builds a queue of URLs (30 items) without downloading.
+// - Processing consumes that queue later (background worker).
+const DEFAULT_MAX_MANGA = 30;
 
 // Pacing to reduce upstream rate-limits / 429.
 const MANGA_DELAY_MS = 7_000;
@@ -16,6 +22,62 @@ const WAIT_AUTO_DOWNLOAD_IDLE_TIMEOUT_MS = 25 * 60 * 1000;
 
 const DEFAULT_LIST_URL = "https://vi-hentai.pro/danh-sach?page=1";
 const DEFAULT_OWNER_ID = "68f0f839b69df690049aba65";
+
+const FEATURE_FLAG_KEY = "viHentaiAutoUpdateEnabled";
+const DEFAULT_ENABLED = true;
+
+export const getViHentaiAutoUpdateEnabled = async (): Promise<boolean> => {
+  return getFeatureFlag(FEATURE_FLAG_KEY, DEFAULT_ENABLED);
+};
+
+const pauseAllRunningQueues = async (): Promise<void> => {
+  const runningQueues = await ViHentaiAutoUpdateQueueModel.find({ status: "running" })
+    .select({ _id: 1, listUrl: 1, items: 1 })
+    .lean();
+
+  for (const q of runningQueues as any[]) {
+    const items = Array.isArray(q.items) ? q.items : [];
+    const patchedItems = items.map((it: any) => {
+      if (it?.status === "running") {
+        return { ...it, status: "queued" };
+      }
+      return it;
+    });
+
+    await ViHentaiAutoUpdateQueueModel.updateOne(
+      { _id: q._id },
+      {
+        $set: {
+          status: "paused",
+          items: patchedItems,
+        },
+        $push: {
+          errors: {
+            url: String((q as any).listUrl || ""),
+            message: "Hệ thống đã tắt auto-update (paused)",
+          },
+        },
+      },
+    );
+  }
+};
+
+const resumeAllPausedQueues = async (): Promise<void> => {
+  await ViHentaiAutoUpdateQueueModel.updateMany(
+    { status: "paused" },
+    { $set: { status: "running" } },
+  );
+};
+
+export const setViHentaiAutoUpdateEnabled = async (enabled: boolean): Promise<boolean> => {
+  const value = await setFeatureFlag(FEATURE_FLAG_KEY, enabled);
+  if (!value) {
+    await pauseAllRunningQueues();
+  } else {
+    await resumeAllPausedQueues();
+  }
+  return value;
+};
 
 const getOwnerId = () => {
   const parts = [
@@ -63,6 +125,16 @@ const tryAcquireLock = async (ttlMs: number): Promise<boolean> => {
     return true;
   } catch {
     return false;
+  }
+};
+
+const releaseLock = async (): Promise<void> => {
+  const now = new Date();
+  const lockedBy = getOwnerId();
+  try {
+    await SystemLockModel.updateOne({ key: LOCK_KEY, lockedBy }, { $set: { lockedUntil: now } });
+  } catch {
+    // best-effort
   }
 };
 
@@ -126,11 +198,10 @@ const extractMangaLinksFromListingHtml = (html: string, listingUrl: URL): string
   return links;
 };
 
-export type RunViHentaiAutoUpdateOptions = {
+export type CreateViHentaiAutoUpdateQueueOptions = {
   listUrl?: string;
   maxManga?: number;
   maxNewChaptersPerManga?: number;
-  allowCreateNewManga?: boolean;
   /** Optional override for env `VIHENTAI_AUTO_UPDATE_OWNER_ID` (used when allowCreateNewManga=true). */
   ownerId?: string;
   /** Whether newly created manga should be auto-approved (default: true if env not set). */
@@ -143,8 +214,12 @@ const isValidMongoObjectId = (value?: string) => {
 };
 
 export const runViHentaiAutoUpdateOnce = async (
-  options: RunViHentaiAutoUpdateOptions = {},
+  options: CreateViHentaiAutoUpdateQueueOptions = {},
 ): Promise<{ ok: boolean; runId?: string; message?: string }> => {
+  if (!(await getViHentaiAutoUpdateEnabled())) {
+    return { ok: false, message: "Auto-update đang tắt" };
+  }
+  // Back-compat: old API name kept, but now it creates a queue and starts it.
   const listUrlRaw = (options.listUrl || process.env.VIHENTAI_AUTO_UPDATE_LIST_URL || DEFAULT_LIST_URL).trim();
 
   let listUrl: URL;
@@ -168,67 +243,22 @@ export const runViHentaiAutoUpdateOnce = async (
   const maxManga =
     typeof options.maxManga === "number" && options.maxManga > 0
       ? options.maxManga
-      : Number.parseInt(String(process.env.VIHENTAI_AUTO_UPDATE_MAX_MANGA || "60"), 10) || 60;
+      : Number.parseInt(String(process.env.VIHENTAI_AUTO_UPDATE_MAX_MANGA || String(DEFAULT_MAX_MANGA)), 10) ||
+        DEFAULT_MAX_MANGA;
 
   const maxNewChaptersPerManga =
     typeof options.maxNewChaptersPerManga === "number" && options.maxNewChaptersPerManga > 0
       ? options.maxNewChaptersPerManga
       : Number.parseInt(String(process.env.VIHENTAI_AUTO_UPDATE_MAX_NEW_CHAPTERS || "20"), 10) || 20;
 
-  // Auto-update always allows creating new manga by default.
-  // This prevents silently skipping new URLs and keeps behavior predictable.
-  const allowCreateNewManga = true;
-
   const lockedBy = getOwnerId();
 
-  // Avoid concurrency with auto-download batch.
-  // If a job is already running, wait it out (best-effort) before hitting upstream.
-  const idle = await waitForAutoDownloadIdle(WAIT_AUTO_DOWNLOAD_IDLE_TIMEOUT_MS);
-  if (!idle) {
-    return { ok: false, message: "Đang có batch tải truyện tự động chạy quá lâu; auto-update tạm hoãn" };
-  }
-
-  const run = await ViHentaiAutoUpdateRunModel.create({
-    status: "running",
-    listUrl: listUrl.toString(),
-    startedAt: new Date(),
-    lockedBy,
-    processed: 0,
-    created: 0,
-    updated: 0,
-    noop: 0,
-    chaptersAdded: 0,
-    imagesUploaded: 0,
-    items: [],
-    errors: [],
-  });
-
   const ownerId = (options.ownerId || process.env.VIHENTAI_AUTO_UPDATE_OWNER_ID || DEFAULT_OWNER_ID).trim();
-  if (allowCreateNewManga && ownerId && !isValidMongoObjectId(ownerId)) {
-    await ViHentaiAutoUpdateRunModel.updateOne(
-      { _id: run._id },
-      {
-        $set: {
-          status: "failed",
-          finishedAt: new Date(),
-          errors: [{ url: listUrl.toString(), message: "ownerId không hợp lệ (cần Mongo ObjectId 24 ký tự hex)" }],
-        },
-      },
-    );
-    return { ok: false, runId: String(run._id), message: "ownerId không hợp lệ" };
+  if (ownerId && !isValidMongoObjectId(ownerId)) {
+    return { ok: false, message: "ownerId không hợp lệ" };
   }
-  if (allowCreateNewManga && !ownerId) {
-    await ViHentaiAutoUpdateRunModel.updateOne(
-      { _id: run._id },
-      {
-        $set: {
-          status: "failed",
-          finishedAt: new Date(),
-          errors: [{ url: listUrl.toString(), message: "Thiếu ownerId để tạo truyện mới" }],
-        },
-      },
-    );
-    return { ok: false, runId: String(run._id), message: "Thiếu ownerId để tạo truyện mới" };
+  if (!ownerId) {
+    return { ok: false, message: "Thiếu ownerId để tạo truyện mới" };
   }
   const translationTeam = (process.env.VIHENTAI_AUTO_UPDATE_TRANSLATION_TEAM || "").trim() || undefined;
   const envApproveRaw = process.env.VIHENTAI_AUTO_UPDATE_APPROVE;
@@ -238,190 +268,300 @@ export const runViHentaiAutoUpdateOnce = async (
       : undefined;
   const approveNewManga =
     typeof options.approveNewManga === "boolean" ? options.approveNewManga : (envApprove ?? true);
-  const approve = allowCreateNewManga ? approveNewManga : false;
+  const approve = approveNewManga;
   const contentType =
     String(process.env.VIHENTAI_AUTO_UPDATE_CONTENT_TYPE || "MANGA").toUpperCase() === "COSPLAY"
       ? MANGA_CONTENT_TYPE.COSPLAY
       : MANGA_CONTENT_TYPE.MANGA;
 
+  // Phase 1: extract + create queue (30 urls)
+  const createdQueue = await createViHentaiAutoUpdateQueue({
+    listUrl: listUrl.toString(),
+    maxManga,
+    maxNewChaptersPerManga,
+    ownerId,
+    approveNewManga,
+  });
+  if (!createdQueue.ok) return { ok: false, message: createdQueue.message };
+
+  // Phase 2: mark running (actual downloading happens in background worker)
+  await ViHentaiAutoUpdateQueueModel.updateOne(
+    { _id: createdQueue.queueId },
+    { $set: { status: "running", startedAt: new Date(), lockedBy } },
+  );
+
+  return { ok: true, runId: createdQueue.queueId };
+};
+
+export const createViHentaiAutoUpdateQueue = async (
+  options: CreateViHentaiAutoUpdateQueueOptions = {},
+): Promise<{ ok: boolean; queueId?: string; message?: string }> => {
+  if (!(await getViHentaiAutoUpdateEnabled())) {
+    return { ok: false, message: "Auto-update đang tắt" };
+  }
+  const listUrlRaw = (options.listUrl || process.env.VIHENTAI_AUTO_UPDATE_LIST_URL || DEFAULT_LIST_URL).trim();
+
+  let listUrl: URL;
   try {
-    const res = await fetch(listUrl.toString(), {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-        "Accept-Language": "vi,en;q=0.9",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    });
+    listUrl = new URL(listUrlRaw);
+  } catch {
+    return { ok: false, message: "listUrl không hợp lệ" };
+  }
 
-    if (!res.ok) {
-      await ViHentaiAutoUpdateRunModel.updateOne(
-        { _id: run._id },
-        {
-          $set: {
-            status: "failed",
-            finishedAt: new Date(),
-            errors: [{ url: listUrl.toString(), message: `Không thể tải list (${res.status} ${res.statusText})` }],
-          },
-        },
-      );
-      return { ok: false, runId: String(run._id), message: "Không thể tải list page" };
-    }
+  normalizeViHentaiHostToPro(listUrl);
+  if (!/^https?:$/.test(listUrl.protocol)) {
+    return { ok: false, message: "listUrl không hợp lệ (chỉ hỗ trợ http/https)" };
+  }
+  if (!isAllowedHost(listUrl.hostname)) {
+    return { ok: false, message: "listUrl không thuộc vi-hentai.pro" };
+  }
 
-    const html = await res.text();
-    const links = extractMangaLinksFromListingHtml(html, listUrl);
+  const maxManga =
+    typeof options.maxManga === "number" && options.maxManga > 0 ? options.maxManga : DEFAULT_MAX_MANGA;
+  const maxNewChaptersPerManga =
+    typeof options.maxNewChaptersPerManga === "number" && options.maxNewChaptersPerManga > 0
+      ? options.maxNewChaptersPerManga
+      : 20;
 
-    if (links.length < maxManga) {
-      await ViHentaiAutoUpdateRunModel.updateOne(
-        { _id: run._id },
-        {
-          $push: {
-            errors: {
+  const ownerId = (options.ownerId || process.env.VIHENTAI_AUTO_UPDATE_OWNER_ID || DEFAULT_OWNER_ID).trim();
+  if (ownerId && !isValidMongoObjectId(ownerId)) {
+    return { ok: false, message: "ownerId không hợp lệ" };
+  }
+  if (!ownerId) {
+    return { ok: false, message: "Thiếu ownerId để tạo truyện mới" };
+  }
+
+  const envApproveRaw = process.env.VIHENTAI_AUTO_UPDATE_APPROVE;
+  const envApprove =
+    envApproveRaw != null && String(envApproveRaw).trim() !== ""
+      ? String(envApproveRaw).trim() === "1"
+      : undefined;
+  const approveNewManga =
+    typeof options.approveNewManga === "boolean" ? options.approveNewManga : (envApprove ?? true);
+
+  const res = await fetch(listUrl.toString(), {
+    method: "GET",
+    redirect: "follow",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept-Language": "vi,en;q=0.9",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+  });
+
+  if (!res.ok) {
+    return { ok: false, message: `Không thể tải list (${res.status} ${res.statusText})` };
+  }
+
+  const html = await res.text();
+  const links = extractMangaLinksFromListingHtml(html, listUrl);
+  const selected = links.slice(0, Math.max(0, maxManga));
+
+  const lockedBy = getOwnerId();
+  const queue = await ViHentaiAutoUpdateQueueModel.create({
+    status: "queued",
+    listUrl: listUrl.toString(),
+    maxManga,
+    maxNewChaptersPerManga,
+    ownerId,
+    approveNewManga,
+    lockedBy,
+    processed: 0,
+    created: 0,
+    updated: 0,
+    noop: 0,
+    chaptersAdded: 0,
+    imagesUploaded: 0,
+    items: selected.map((url, idx) => ({
+      index: idx + 1,
+      url,
+      status: "queued",
+    })),
+    errors:
+      links.length < maxManga
+        ? [
+            {
               url: listUrl.toString(),
               message: `Chỉ lấy được ${links.length} URL từ list (cần ${maxManga}). Có thể upstream thay đổi HTML hoặc thiếu dữ liệu.`,
             },
+          ]
+        : [],
+  });
+
+  return { ok: true, queueId: String((queue as any)._id) };
+};
+
+export const startViHentaiAutoUpdateQueue = async (queueId: string): Promise<boolean> => {
+  if (!queueId) return false;
+  if (!(await getViHentaiAutoUpdateEnabled())) return false;
+  const res = await ViHentaiAutoUpdateQueueModel.updateOne(
+    { _id: queueId, status: { $in: ["queued", "failed"] } },
+    { $set: { status: "running", startedAt: new Date() } },
+  );
+  return Boolean((res as any).modifiedCount || (res as any).nModified);
+};
+
+const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> => {
+  if (!(await getViHentaiAutoUpdateEnabled())) return;
+  const queue = await ViHentaiAutoUpdateQueueModel.findById(queueId).lean();
+  if (!queue) return;
+  if ((queue as any).status !== "running") return;
+
+  // Avoid concurrency with auto-download batch.
+  const idle = await waitForAutoDownloadIdle(WAIT_AUTO_DOWNLOAD_IDLE_TIMEOUT_MS);
+  if (!idle) {
+    await ViHentaiAutoUpdateQueueModel.updateOne(
+      { _id: queueId },
+      {
+        $set: { status: "failed", finishedAt: new Date() },
+        $push: {
+          errors: {
+            url: String((queue as any).listUrl || ""),
+            message: "Đang có batch tải truyện tự động chạy quá lâu; queue tạm hoãn",
           },
         },
-      );
-    }
-
-    const selected = links.slice(0, Math.max(1, maxManga));
-
-    const errors: Array<{ url: string; message: string }> = [];
-
-    for (let i = 0; i < selected.length; i += 1) {
-      const mangaUrl = selected[i];
-      const index = i + 1;
-
-      await ViHentaiAutoUpdateRunModel.updateOne(
-        { _id: run._id },
-        {
-          $push: {
-            items: {
-              index,
-              url: mangaUrl,
-              status: "running",
-              startedAt: new Date(),
-            },
-          },
-        },
-      );
-
-      try {
-        const u = new URL(mangaUrl);
-        if (!isAllowedHost(u.hostname)) {
-          throw new Error("Manga URL không thuộc vi-hentai.pro");
-        }
-      } catch {
-        // ignore URL parse errors; will be caught by update
-      }
-
-      try {
-        const result = await autoUpdateViHentaiManga({
-          request: new Request("http://internal/vi-hentai-auto-update"),
-          url: mangaUrl,
-          // For existing manga, ownerId is not required.
-          ownerId: allowCreateNewManga ? ownerId : undefined,
-          translationTeam,
-          approve,
-          contentType,
-          asSystem: true,
-          downloadPoster: true,
-          downloadChapters: true,
-          maxNewChapters: maxNewChaptersPerManga,
-          maxChaptersForNewManga: 200,
-          // pacing (as requested)
-          imageDelayMs: 1_000,
-          chapterDelayMs: 3_000,
-        } as any);
-
-        const inc: any = {
-          processed: 1,
-          chaptersAdded: result.chaptersAdded || 0,
-          imagesUploaded: result.imagesUploaded || 0,
-        };
-        if (result.mode === "created") inc.created = 1;
-        else if (result.mode === "updated") {
-          if ((result.chaptersAdded || 0) > 0) inc.updated = 1;
-          else inc.noop = 1;
-        } else if (result.mode === "noop") inc.noop = 1;
-
-        const itemStatus =
-          result.mode === "created" ? "succeeded" :
-          result.mode === "noop" ? "noop" :
-          (result.mode === "updated" && (result.chaptersAdded || 0) === 0) ? "noop" :
-          "succeeded";
-
-        await ViHentaiAutoUpdateRunModel.updateOne(
-          { _id: run._id },
-          {
-            $inc: inc,
-            $set: {
-              "items.$[it].status": itemStatus,
-              "items.$[it].mode": result.mode,
-              "items.$[it].parsedTitle": result.parsedTitle,
-              "items.$[it].mangaId": result.mangaId,
-              "items.$[it].mangaSlug": result.mangaSlug,
-              "items.$[it].chaptersAdded": result.chaptersAdded || 0,
-              "items.$[it].imagesUploaded": result.imagesUploaded || 0,
-              "items.$[it].message": result.message,
-              "items.$[it].finishedAt": new Date(),
-            },
-          },
-          { arrayFilters: [{ "it.index": index }] } as any,
-        );
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        errors.push({ url: mangaUrl, message });
-
-          await ViHentaiAutoUpdateRunModel.updateOne(
-            { _id: run._id },
-            {
-              $inc: { processed: 1 },
-              $set: {
-                "items.$[it].status": "failed",
-                "items.$[it].mode": "failed",
-                "items.$[it].message": message,
-                "items.$[it].finishedAt": new Date(),
-              },
-            },
-            { arrayFilters: [{ "it.index": index }] } as any,
-          );
-
-          // Keep errors bounded
-          if (errors.length <= 50) {
-            await ViHentaiAutoUpdateRunModel.updateOne(
-              { _id: run._id },
-              { $push: { errors: { url: mangaUrl, message } } },
-            );
-          }
-      }
-
-      // Delay between manga to reduce too-many-requests.
-      if (i < selected.length - 1 && MANGA_DELAY_MS > 0) {
-        await sleep(MANGA_DELAY_MS);
-      }
-    }
-
-    // Run-level status: mark as succeeded when the batch completes.
-    // Item-level failures are tracked in `items` + `errors`.
-    const finalStatus = "succeeded";
-    await ViHentaiAutoUpdateRunModel.updateOne(
-      { _id: run._id },
-      { $set: { status: finalStatus, finishedAt: new Date() } },
+      },
     );
-
-    return { ok: true, runId: String(run._id) };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    await ViHentaiAutoUpdateRunModel.updateOne(
-      { _id: run._id },
-      { $set: { status: "failed", finishedAt: new Date() }, $push: { errors: { url: listUrl.toString(), message } } },
-    );
-    return { ok: false, runId: String(run._id), message };
+    return;
   }
+
+  const ownerId = String((queue as any).ownerId || "").trim();
+  if (!ownerId) {
+    await ViHentaiAutoUpdateQueueModel.updateOne(
+      { _id: queueId },
+      {
+        $set: { status: "failed", finishedAt: new Date() },
+        $push: { errors: { url: String((queue as any).listUrl || ""), message: "Thiếu ownerId" } },
+      },
+    );
+    return;
+  }
+
+  const translationTeam = (process.env.VIHENTAI_AUTO_UPDATE_TRANSLATION_TEAM || "").trim() || undefined;
+  const approveNewManga = Boolean((queue as any).approveNewManga ?? true);
+  const contentType =
+    String(process.env.VIHENTAI_AUTO_UPDATE_CONTENT_TYPE || "MANGA").toUpperCase() === "COSPLAY"
+      ? MANGA_CONTENT_TYPE.COSPLAY
+      : MANGA_CONTENT_TYPE.MANGA;
+  const maxNewChaptersPerManga = Number((queue as any).maxNewChaptersPerManga || 20);
+
+  const items: any[] = Array.isArray((queue as any).items) ? (queue as any).items : [];
+
+  for (let i = 0; i < items.length; i += 1) {
+    if (!(await getViHentaiAutoUpdateEnabled())) {
+      await ViHentaiAutoUpdateQueueModel.updateOne(
+        { _id: queueId, status: "running" },
+        {
+          $set: { status: "paused" },
+          $push: {
+            errors: {
+              url: String((queue as any).listUrl || ""),
+              message: "Auto-update đã bị tắt trong lúc đang chạy (paused)",
+            },
+          },
+        },
+      );
+      return;
+    }
+
+    const it = items[i];
+    const index = Number(it.index || i + 1);
+    const url = String(it.url || "").trim();
+
+    // Skip finished items (supports resume after restart)
+    if (it.status === "succeeded" || it.status === "noop") continue;
+
+    await ViHentaiAutoUpdateQueueModel.updateOne(
+      { _id: queueId },
+      {
+        $set: {
+          "items.$[x].status": "running",
+          "items.$[x].startedAt": new Date(),
+        },
+      },
+      { arrayFilters: [{ "x.index": index }] } as any,
+    );
+
+    try {
+      const result = await autoUpdateViHentaiManga({
+        request: new Request("http://internal/vi-hentai-auto-update-queue"),
+        url,
+        ownerId,
+        translationTeam,
+        approve: approveNewManga,
+        contentType,
+        asSystem: true,
+        downloadPoster: true,
+        downloadChapters: true,
+        maxNewChapters: maxNewChaptersPerManga,
+        maxChaptersForNewManga: 200,
+        imageDelayMs: 1_000,
+        chapterDelayMs: 3_000,
+      } as any);
+
+      const inc: any = {
+        processed: 1,
+        chaptersAdded: result.chaptersAdded || 0,
+        imagesUploaded: result.imagesUploaded || 0,
+      };
+      if (result.mode === "created") inc.created = 1;
+      else if (result.mode === "updated") {
+        if ((result.chaptersAdded || 0) > 0) inc.updated = 1;
+        else inc.noop = 1;
+      } else if (result.mode === "noop") inc.noop = 1;
+
+      const itemStatus =
+        result.mode === "created" ? "succeeded" :
+        result.mode === "noop" ? "noop" :
+        (result.mode === "updated" && (result.chaptersAdded || 0) === 0) ? "noop" :
+        "succeeded";
+
+      await ViHentaiAutoUpdateQueueModel.updateOne(
+        { _id: queueId },
+        {
+          $inc: inc,
+          $set: {
+            "items.$[x].status": itemStatus,
+            "items.$[x].mode": result.mode,
+            "items.$[x].parsedTitle": result.parsedTitle,
+            "items.$[x].mangaId": result.mangaId,
+            "items.$[x].mangaSlug": result.mangaSlug,
+            "items.$[x].chaptersAdded": result.chaptersAdded || 0,
+            "items.$[x].imagesUploaded": result.imagesUploaded || 0,
+            "items.$[x].message": result.message,
+            "items.$[x].finishedAt": new Date(),
+          },
+        },
+        { arrayFilters: [{ "x.index": index }] } as any,
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      await ViHentaiAutoUpdateQueueModel.updateOne(
+        { _id: queueId },
+        {
+          $inc: { processed: 1 },
+          $set: {
+            "items.$[x].status": "failed",
+            "items.$[x].mode": "failed",
+            "items.$[x].message": message,
+            "items.$[x].finishedAt": new Date(),
+          },
+          $push: { errors: { url, message } },
+        },
+        { arrayFilters: [{ "x.index": index }] } as any,
+      );
+    }
+
+    if (i < items.length - 1 && MANGA_DELAY_MS > 0) {
+      await sleep(MANGA_DELAY_MS);
+    }
+  }
+
+  await ViHentaiAutoUpdateQueueModel.updateOne(
+    { _id: queueId },
+    { $set: { status: "succeeded", finishedAt: new Date() } },
+  );
 };
 
 let started = false;
@@ -436,21 +576,59 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
 
   let running = false;
 
+  // 1) Hourly: extract 30 URLs into a new queue (status=queued).
   cron.schedule(
     "0 * * * *",
     async () => {
       if (running) return;
       running = true;
       try {
-        const acquired = await tryAcquireLock(29 * 60 * 1000);
+        if (!(await getViHentaiAutoUpdateEnabled())) return;
+        const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;
 
-        const r = await runViHentaiAutoUpdateOnce();
-        if (r.ok) console.info(`[cron] vi-hentai auto-update done: runId=${r.runId}`);
-        else console.warn(`[cron] vi-hentai auto-update skipped/failed: ${r.message || "unknown"}`);
+        const r = await createViHentaiAutoUpdateQueue({
+          listUrl: DEFAULT_LIST_URL,
+          maxManga: DEFAULT_MAX_MANGA,
+        });
+        if (r.ok && r.queueId) {
+          await startViHentaiAutoUpdateQueue(r.queueId);
+          console.info(`[cron] vi-hentai queue extracted: queueId=${r.queueId}`);
+        } else {
+          console.warn(`[cron] vi-hentai queue extract failed: ${r.message || "unknown"}`);
+        }
       } catch (e) {
-        console.error("[cron] vi-hentai auto-update failed", e);
+        console.error("[cron] vi-hentai queue extract failed", e);
       } finally {
+        await releaseLock();
+        running = false;
+      }
+    },
+    { timezone: TZ },
+  );
+
+  // 2) Every minute: if there is a running queue, process it.
+  cron.schedule(
+    "*/1 * * * *",
+    async () => {
+      if (running) return;
+      running = true;
+      try {
+        if (!(await getViHentaiAutoUpdateEnabled())) return;
+        const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
+        if (!acquired) return;
+
+        const q = await ViHentaiAutoUpdateQueueModel.findOne({ status: "running" })
+          .sort({ startedAt: 1, createdAt: 1 })
+          .select({ _id: 1 })
+          .lean();
+        if (!q) return;
+
+        await processViHentaiAutoUpdateQueue(String((q as any)._id));
+      } catch (e) {
+        console.error("[cron] vi-hentai queue worker failed", e);
+      } finally {
+        await releaseLock();
         running = false;
       }
     },
