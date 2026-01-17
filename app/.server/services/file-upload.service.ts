@@ -51,6 +51,7 @@ interface UploadBufferOptions {
   prefixPath?: string;
   contentType?: string;
   metadata?: Record<string, string>;
+  cacheControl?: string;
   maxSizeInBytes?: number;
   allowedFormats?: AllowedFileFormat[];
   generateUniqueFileName?: boolean;
@@ -144,6 +145,7 @@ export async function uploadBufferWithValidation({
   prefixPath,
   contentType,
   metadata,
+  cacheControl,
   maxSizeInBytes,
   allowedFormats,
   generateUniqueFileName = true,
@@ -171,12 +173,19 @@ export async function uploadBufferWithValidation({
   const targetPrefix = sanitizePrefixPath(prefixPath);
   const resolvedContentType = contentType || getMimeTypeFromExtension(sanitizedFilename);
 
+  const resolvedCacheControl =
+    (cacheControl ?? "").trim() ||
+    (generateUniqueFileName
+      ? "public, max-age=31536000, immutable"
+      : "public, max-age=300");
+
   try {
     const result = await uploadToPublicBucket(buffer, sanitizedFilename, {
       prefixPath: targetPrefix,
       contentType: resolvedContentType,
       metadata,
       generateUniqueFileName,
+      cacheControl: resolvedCacheControl,
     });
 
     return {
