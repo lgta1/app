@@ -1,8 +1,19 @@
 import { ViHentaiAutoDownloadJobModel, type ViHentaiAutoDownloadJobProgress } from "~/database/models/vi-hentai-auto-download-job.model";
 import { autoDownloadViHentaiManga } from "@/services/importers/vi-hentai-importer";
 import { MANGA_CONTENT_TYPE } from "~/constants/manga";
+import { SystemLockModel } from "~/database/models/system-lock.model";
+
+const AUTO_UPDATE_LOCK_KEY = "vi-hentai-auto-update";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function isAutoUpdateActive(): Promise<boolean> {
+  const now = new Date();
+  const lock = await SystemLockModel.findOne({ key: AUTO_UPDATE_LOCK_KEY, lockedUntil: { $gt: now } })
+    .select({ _id: 1 })
+    .lean();
+  return Boolean(lock);
+}
 
 let started = false;
 let busy = false;
@@ -39,6 +50,10 @@ export const initViHentaiAutoDownloadQueueWorker = (): void => {
 };
 
 async function processOneJob(): Promise<void> {
+  // If auto-update is running, don't start auto-download jobs.
+  // This reduces concurrent upstream requests (429 / too-many-requests).
+  if (await isAutoUpdateActive()) return;
+
   // Safety: if there is already a running job, don't start another.
   const running = await ViHentaiAutoDownloadJobModel.findOne({ status: "running" })
     .select({ _id: 1 })

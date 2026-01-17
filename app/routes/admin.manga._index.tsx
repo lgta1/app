@@ -280,6 +280,11 @@ export default function AdminManga() {
             Auto-import vi-hentai
           </button>
         </Link>
+        <Link to="/admin/manga/auto-update">
+          <button className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-bd-default bg-bgc-layer2 px-4 py-3 text-sm font-semibold text-txt-primary shadow hover:bg-bgc-layer2/80">
+            Auto cập nhật (vi-hentai)
+          </button>
+        </Link>
         <Link to="/admin/manga/auto-download">
           <button className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-bd-default bg-bgc-layer2 px-4 py-3 text-sm font-semibold text-txt-primary shadow hover:bg-bgc-layer2/80">
             Tự động tải truyện

@@ -9,6 +9,7 @@ import { uploadBufferWithValidation, encodeForMetadata } from "@/services/file-u
 import { MANGA_CONTENT_TYPE, MANGA_STATUS, MANGA_USER_STATUS, type MangaContentType } from "~/constants/manga";
 import { generateUniqueMangaSlug } from "~/database/helpers/manga-slug.helper";
 import { MangaModel } from "~/database/models/manga.model";
+import { ChapterModel } from "~/database/models/chapter.model";
 import { AuthorModel } from "~/database/models/author.model";
 import { DoujinshiModel } from "~/database/models/doujinshi.model";
 import { CharacterModel } from "~/database/models/character.model";
@@ -1746,8 +1747,9 @@ export async function importViHentaiManga(options: ViHentaiImportOptions): Promi
   const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
   const unknown = mapped.unknown;
   if (!matched.length) {
-    throw new Error(
-      `Không map được thể loại hợp lệ. Nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}`,
+    console.warn(
+      "[importViHentaiManga] No mapped genres; continuing with empty genres.",
+      { url: options.url, rawGenres: parsed.rawGenres, unknownGenres: unknown },
     );
   }
 
@@ -1843,9 +1845,9 @@ export async function autoDownloadViHentaiManga(
   const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
   const unknown = mapped.unknown;
   if (!matched.length) {
-    throw new Error(
-      `Không map được thể loại hợp lệ. Nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}`,
-    );
+    const warning = `Cảnh báo: không map được thể loại hợp lệ (nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}). Sẽ tạo truyện với 0 thể loại.`;
+    console.warn("[autoDownloadViHentaiManga]", warning);
+    await emitProgress({ stage: "manga", message: warning });
   }
 
   const basePayload = prepareBaseMangaPayload(parsed, importOptions, matched);
@@ -2126,6 +2128,7 @@ export async function autoDownloadViHentaiManga(
           await createChapterAsAdmin({
             mangaId: String(doc._id),
             title: sanitizeWhitespace(chapterEntry.title) || "",
+            sourceChapterUrl: chapterUrl,
             contentUrls,
             contentBytes: totalBytes,
           } as any);
@@ -2133,6 +2136,7 @@ export async function autoDownloadViHentaiManga(
           await createChapter(request, {
             mangaId: String(doc._id),
             title: sanitizeWhitespace(chapterEntry.title) || "",
+            sourceChapterUrl: chapterUrl,
             contentUrls,
             contentBytes: totalBytes,
           } as any);
@@ -2188,4 +2192,391 @@ export async function autoDownloadViHentaiManga(
   await emitProgress({ stage: "done", message: resultBase.message });
 
   return resultBase;
+}
+
+export type ViHentaiAutoUpdateOptions = Omit<ViHentaiAutoDownloadOptions, "skipIfExists" | "downloadChapters" | "maxChapters"> & {
+  /** Max number of new chapters to append for existing manga in one run. */
+  maxNewChapters?: number;
+  /** If manga doesn't exist, import at most this many chapters (defaults to 200). */
+  maxChaptersForNewManga?: number;
+};
+
+export type ViHentaiAutoUpdateResult = {
+  url: string;
+  mode: "created" | "updated" | "noop" | "dry-run";
+  message: string;
+  parsedTitle?: string;
+  mangaId?: string;
+  mangaSlug?: string;
+  chaptersAdded: number;
+  imagesUploaded: number;
+  chapterErrors: Array<{ chapterUrl: string; message: string }>;
+};
+
+/**
+ * Auto update flow:
+ * - If manga doesn't exist (match by title): create + optionally download chapters.
+ * - If exists: fetch chapter list and append missing chapters (prefers URL diff).
+ */
+export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions): Promise<ViHentaiAutoUpdateResult> {
+  const {
+    request,
+    asSystem = true,
+    dryRun = false,
+    downloadPoster = true,
+    maxChaptersForNewManga = 200,
+    maxNewChapters = 20,
+    downloadChapters = true,
+    continueOnChapterError = true,
+    maxImagesPerChapter = 300,
+    imageDelayMs = 300,
+    imageTimeoutMs = 30_000,
+    imageRetries = 2,
+    chapterDelayMs = 5_000,
+    onProgress,
+    ...importOptions
+  } = options as any;
+
+  const emitProgress = async (payload: Parameters<NonNullable<typeof onProgress>>[0]) => {
+    if (!onProgress) return;
+    try {
+      await onProgress(payload);
+    } catch {
+      // Progress must never break the update flow.
+    }
+  };
+
+  if (!importOptions.url) throw new Error("Thiếu URL nguồn");
+
+  await emitProgress({ stage: "manga", message: "Đang tải trang truyện..." });
+  const parsed = await fetchViHentaiPage(importOptions.url);
+  const title = parsed.title;
+
+  const existing = await MangaModel.findOne({ title })
+    .select({ _id: 1, slug: 1, chapters: 1 })
+    .lean();
+
+  // If missing -> create via existing auto-download path (ensures same metadata + poster handling)
+  if (!existing) {
+    if (!importOptions.ownerId) {
+      throw new Error(
+        "Không thể tạo truyện mới vì thiếu ownerId. Vui lòng cấu hình ownerId cho scheduler hoặc chạy qua admin UI.",
+      );
+    }
+    if (dryRun) {
+      return {
+        url: importOptions.url,
+        mode: "dry-run",
+        message: "Dry-run: truyện chưa tồn tại, sẽ tạo mới + tải chương",
+        parsedTitle: title,
+        chaptersAdded: 0,
+        imagesUploaded: 0,
+        chapterErrors: [],
+      };
+    }
+
+    const created = await autoDownloadViHentaiManga({
+      ...(options as any),
+      skipIfExists: false,
+      downloadPoster,
+      downloadChapters: Boolean(downloadChapters),
+      asSystem,
+      maxChapters: typeof maxChaptersForNewManga === "number" && maxChaptersForNewManga > 0 ? maxChaptersForNewManga : 200,
+    });
+
+    return {
+      url: importOptions.url,
+      mode: "created",
+      message: created.message,
+      parsedTitle: title,
+      mangaId: created.createdId,
+      mangaSlug: created.createdSlug,
+      chaptersAdded: created.chaptersImported || 0,
+      imagesUploaded: created.imagesUploaded || 0,
+      chapterErrors: Array.isArray(created.chapterErrors) ? created.chapterErrors : [],
+    };
+  }
+
+  // Existing: append missing chapters
+  if (dryRun) {
+    return {
+      url: importOptions.url,
+      mode: "dry-run",
+      message: "Dry-run: truyện đã tồn tại, sẽ sync chương thiếu",
+      parsedTitle: title,
+      mangaId: String(existing._id),
+      mangaSlug: String(existing.slug || existing._id),
+      chaptersAdded: 0,
+      imagesUploaded: 0,
+      chapterErrors: [],
+    };
+  }
+
+  await emitProgress({ stage: "chapters", message: "Đang lấy danh sách chương..." });
+  const chapterList = await fetchViHentaiChapterList(importOptions.url);
+  const sourceEntries = chapterList.entries;
+  if (!sourceEntries.length) {
+    return {
+      url: importOptions.url,
+      mode: "noop",
+      message: "Danh sách chương rỗng",
+      parsedTitle: title,
+      mangaId: String(existing._id),
+      mangaSlug: String(existing.slug || existing._id),
+      chaptersAdded: 0,
+      imagesUploaded: 0,
+      chapterErrors: [],
+    };
+  }
+
+  const mangaId = String(existing._id);
+
+  // IMPORTANT: Do NOT rely on MangaModel.chapters here.
+  // In practice it can be stale or represent a different count than the actual chapter documents.
+  // For auto-update we must compare real chapter totals to decide how many chapters to append.
+  const localCount = await ChapterModel.countDocuments({ mangaId });
+
+  // Rule: determine how many chapters to fetch by comparing totals (sourceCount - localCount).
+  // This prevents backfilling old chapters (1,2,3,...) when only the newest chapter is missing.
+  const sourceCount = sourceEntries.length;
+  const diffByCount = Math.max(0, sourceCount - localCount);
+
+  let missingOrdered: ViHentaiChapterEntry[] = [];
+  if (diffByCount > 0) {
+    const toImport =
+      typeof maxNewChapters === "number" && maxNewChapters > 0 ? Math.min(diffByCount, maxNewChapters) : diffByCount;
+
+    // sourceEntries can be newest-first on vi-hentai (e.g. 20,19,...,1).
+    // We want the NEWEST missing chapters, but import them oldest->newest within that subset.
+    let newestSlice: ViHentaiChapterEntry[];
+    if (toImport >= sourceEntries.length) {
+      newestSlice = sourceEntries.slice();
+    } else if (chapterList.sourceOrder === "asc") {
+      // oldest -> newest: newest are at the end
+      newestSlice = sourceEntries.slice(-toImport);
+    } else {
+      // newest -> oldest: newest are at the start
+      newestSlice = sourceEntries.slice(0, toImport);
+    }
+
+    missingOrdered = chapterList.sourceOrder === "asc" ? newestSlice : newestSlice.slice().reverse();
+  }
+
+  if (!missingOrdered.length) {
+    return {
+      url: importOptions.url,
+      mode: "noop",
+      message: `Không có chương mới (nguồn=${sourceEntries.length}, đích=${localCount})`,
+      parsedTitle: title,
+      mangaId,
+      mangaSlug: String(existing.slug || existing._id),
+      chaptersAdded: 0,
+      imagesUploaded: 0,
+      chapterErrors: [],
+    };
+  }
+
+  await emitProgress({
+    stage: "chapters",
+    message: `Phát hiện ${missingOrdered.length} chương mới. Sẽ tải (oldest → newest).`,
+    chapterCount: missingOrdered.length,
+  });
+
+  // Lazy import to avoid circular dependency at module load.
+  const { createChapter, createChapterAsAdmin } = await import("~/.server/mutations/chapter.mutation");
+
+  const result: ViHentaiAutoUpdateResult = {
+    url: importOptions.url,
+    mode: "updated",
+    message: "Đang tải chương mới...",
+    parsedTitle: title,
+    mangaId,
+    mangaSlug: String(existing.slug || existing._id),
+    chaptersAdded: 0,
+    imagesUploaded: 0,
+    chapterErrors: [],
+  };
+
+  // We use the REAL chapter count to build deterministic storage paths.
+  let nextChapterNumber = localCount + 1;
+
+  for (let idx = 0; idx < missingOrdered.length; idx += 1) {
+    const entry = missingOrdered[idx];
+    const chapterUrl = entry.url;
+    const chapterTitle = sanitizeWhitespace(entry.title) || "";
+    const chapterNumberForPath = nextChapterNumber;
+    const chapterPrefix = `manga-images/${mangaId}/${String(chapterNumberForPath).padStart(4, "0")}`;
+
+    await emitProgress({
+      stage: "chapter",
+      message: `Đang tải chương mới ${idx + 1}/${missingOrdered.length}`,
+      chapterIndex: idx + 1,
+      chapterCount: missingOrdered.length,
+      chapterTitle: chapterTitle || undefined,
+      chapterUrl,
+    });
+
+    try {
+      const html = await fetchHtml(chapterUrl);
+      const imageUrls = parseChapterImagesFromHtml(html, chapterUrl);
+      if (!imageUrls.length) throw new Error("Không tìm thấy ảnh trong trang chương");
+      if (imageUrls.length > maxImagesPerChapter) {
+        throw new Error(`Số ảnh vượt giới hạn: ${imageUrls.length}/${maxImagesPerChapter}`);
+      }
+
+      const uploaded: UploadedRemoteFile[] = [];
+      const skipped: Array<{ url: string; reason: string }> = [];
+      let keptIndex = 0;
+
+      for (let imageIndex = 0; imageIndex < imageUrls.length; imageIndex += 1) {
+        const imgUrl = imageUrls[imageIndex];
+
+        await emitProgress({
+          stage: "image",
+          message: `Ảnh ${imageIndex + 1}/${imageUrls.length}`,
+          chapterIndex: idx + 1,
+          chapterCount: missingOrdered.length,
+          chapterTitle: chapterTitle || undefined,
+          chapterUrl,
+          imageIndex: imageIndex + 1,
+          imageCount: imageUrls.length,
+          imageUrl: imgUrl,
+        });
+
+        if (imageIndex > 0 && imageDelayMs > 0) {
+          await sleep(imageDelayMs);
+        }
+
+        if (shouldSkipByUrl(imgUrl)) {
+          skipped.push({ url: imgUrl, reason: "url_contains_/cover/" });
+          continue;
+        }
+
+        let fetched: { buffer: Buffer; contentType: string | null } | null = null;
+        try {
+          fetched = await fetchRemoteBufferWithRetry(imgUrl, {
+            timeoutMs: imageTimeoutMs,
+            retries: imageRetries,
+            retryDelayMs: 800,
+            headers: {
+              ...HEADERS,
+              Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+              Referer: chapterUrl,
+              Origin: new URL(chapterUrl).origin,
+            },
+          });
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          skipped.push({ url: imgUrl, reason: `fetch_error:${message}` });
+          continue;
+        }
+
+        const decision = await shouldKeepChapterImage({
+          url: imgUrl,
+          buffer: fetched.buffer,
+          contentType: fetched.contentType,
+        });
+        if (!decision.keep) {
+          skipped.push({ url: imgUrl, reason: decision.reason });
+          continue;
+        }
+
+        keptIndex += 1;
+        try {
+          const normalized = await normalizeChapterImageBuffer({
+            url: imgUrl,
+            buffer: fetched.buffer,
+            contentType: fetched.contentType,
+          });
+
+          const uploadedOne = await uploadImageBuffer(imgUrl, normalized.buffer, normalized.contentType, {
+            prefixPath: chapterPrefix,
+            filenameHintBase: `page-${String(keptIndex).padStart(3, "0")}`,
+            maxSizeInBytes: 9 * 1024 * 1024,
+          });
+          uploaded.push(uploadedOne);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          skipped.push({ url: imgUrl, reason: `upload_error:${message}` });
+          continue;
+        }
+      }
+
+      if (!uploaded.length) {
+        const sample = skipped.slice(0, 5).map((s) => `${s.reason}`).join(", ");
+        throw new Error(
+          `Không còn ảnh hợp lệ sau khi lọc (đã loại ${skipped.length}/${imageUrls.length}).` +
+            (sample ? ` Ví dụ lý do: ${sample}` : ""),
+        );
+      }
+
+      const contentUrls = uploaded.map((u) => u.url);
+      const fullPaths = uploaded.map((u) => u.fullPath).filter(Boolean);
+      const totalBytes = uploaded.reduce((sum, u) => sum + (u.sizeBytes || 0), 0);
+
+      try {
+        if (asSystem) {
+          await createChapterAsAdmin({
+            mangaId,
+            title: chapterTitle,
+            sourceChapterUrl: chapterUrl,
+            contentUrls,
+            contentBytes: totalBytes,
+          } as any);
+        } else {
+          await createChapter(request, {
+            mangaId,
+            title: chapterTitle,
+            sourceChapterUrl: chapterUrl,
+            contentUrls,
+            contentBytes: totalBytes,
+          } as any);
+        }
+
+        result.chaptersAdded += 1;
+        result.imagesUploaded += uploaded.length;
+        nextChapterNumber += 1;
+      } catch (e) {
+        try {
+          if (fullPaths.length) await deletePublicFiles(fullPaths);
+        } catch {
+          // ignore
+        }
+        throw e;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      result.chapterErrors.push({ chapterUrl, message });
+      if (!continueOnChapterError) {
+        result.message = `Cập nhật truyện OK nhưng lỗi khi tải chương: ${message}`;
+        return result;
+      }
+    } finally {
+      if (idx < missingOrdered.length - 1 && chapterDelayMs > 0) {
+        await sleep(chapterDelayMs);
+      }
+    }
+  }
+
+  // Best-effort: set Manga.updatedAt based on source "Lần cuối".
+  if (parsed.lastUpdatedAt) {
+    try {
+      await MangaModel.updateOne(
+        { _id: mangaId },
+        { $set: { updatedAt: parsed.lastUpdatedAt } },
+        { timestamps: false } as any,
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  if (result.chapterErrors.length) {
+    result.message = `Cập nhật xong (${result.chaptersAdded}/${missingOrdered.length}) nhưng có lỗi.`;
+  } else {
+    result.message = `Cập nhật xong (${result.chaptersAdded} chương, ${result.imagesUploaded} ảnh).`;
+  }
+
+  await emitProgress({ stage: "done", message: result.message });
+  return result;
 }
