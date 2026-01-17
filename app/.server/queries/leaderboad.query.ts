@@ -8,6 +8,7 @@ import { getLatestChapterTitlesForMangaIds } from "./shared.latest-chapter-title
 import { ensureSlugForDocs } from "~/database/helpers/manga-slug.helper";
 import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 import { toSlug } from "~/utils/slug.utils";
+import { HotCarouselSnapshotModel } from "~/database/models/hot-carousel-snapshot.model";
 
 const HOT_CAROUSEL_LIMITS = {
   MANGA: ENV.LEADERBOARD.MAX_ITEMS,
@@ -20,6 +21,10 @@ const HOT_CAROUSEL_CACHE_TTL_MS = 60 * 1000; // cache snapshot for 60s to avoid 
 type HotCarouselCache = {
   data: MangaType[];
   expiresAt: number;
+};
+
+export type HotCarouselSnapshotInfo = {
+  computedAt: string | null;
 };
 
 export type HotCarouselScoreBreakdown = {
@@ -128,13 +133,100 @@ export const getHotCarouselLeaderboard = async () => {
     return hotCarouselCache.data;
   }
 
-  const fresh = await aggregateHotCarouselSnapshot();
+  const fresh = await getHotCarouselLeaderboardFromSnapshotOrCompute();
   hotCarouselCache = {
     data: fresh,
     expiresAt: now + HOT_CAROUSEL_CACHE_TTL_MS,
   };
 
   return fresh;
+};
+
+const HOT_CAROUSEL_SNAPSHOT_KEY = "default";
+
+export const getHotCarouselSnapshotInfo = async (): Promise<HotCarouselSnapshotInfo> => {
+  const doc = await HotCarouselSnapshotModel.findOne({ key: HOT_CAROUSEL_SNAPSHOT_KEY })
+    .select({ computedAt: 1 })
+    .lean();
+
+  const computedAt = (doc as any)?.computedAt instanceof Date
+    ? (doc as any).computedAt.toISOString()
+    : (doc as any)?.computedAt
+      ? new Date((doc as any).computedAt).toISOString()
+      : null;
+
+  return { computedAt };
+};
+
+export const forceRefreshHotCarouselSnapshot = async (): Promise<HotCarouselSnapshotInfo> => {
+  const { items, computedAt } = await computeHotCarouselSnapshotIds();
+  await HotCarouselSnapshotModel.findOneAndUpdate(
+    { key: HOT_CAROUSEL_SNAPSHOT_KEY },
+    { $set: { items, computedAt } },
+    { upsert: true },
+  );
+
+  hotCarouselCache = null;
+
+  return { computedAt: computedAt.toISOString() };
+};
+
+const getHotCarouselLeaderboardFromSnapshotOrCompute = async (): Promise<MangaType[]> => {
+  const snap = await HotCarouselSnapshotModel.findOne({ key: HOT_CAROUSEL_SNAPSHOT_KEY })
+    .select({ items: 1, computedAt: 1 })
+    .lean();
+
+  const items = Array.isArray((snap as any)?.items) ? ((snap as any).items as unknown[]) : [];
+  const ids = items.map((x) => String(x || "")).filter(Boolean);
+
+  if (ids.length > 0) {
+    return hydrateHotCarouselStoriesFromIds(ids);
+  }
+
+  // No snapshot yet → compute once and save.
+  const { items: computedIds, computedAt } = await computeHotCarouselSnapshotIds();
+  await HotCarouselSnapshotModel.findOneAndUpdate(
+    { key: HOT_CAROUSEL_SNAPSHOT_KEY },
+    { $set: { items: computedIds, computedAt } },
+    { upsert: true },
+  );
+
+  return hydrateHotCarouselStoriesFromIds(computedIds);
+};
+
+const hydrateHotCarouselStoriesFromIds = async (ids: string[]): Promise<MangaType[]> => {
+  const docs = (await MangaModel.find({ _id: { $in: ids } }).lean()) as any as MangaType[];
+  const storyMap = new Map<string, MangaType>(
+    (Array.isArray(docs) ? docs : []).map((story: MangaType) => [
+      String((story as any)?._id ?? (story as any)?.id ?? ""),
+      story,
+    ]),
+  );
+
+  const ordered: MangaType[] = [];
+  for (const id of ids) {
+    const story = storyMap.get(String(id));
+    if (!story) continue;
+    if ((story as any).status !== MANGA_STATUS.APPROVED) continue;
+    ordered.push(story);
+  }
+
+  await ensureSlugForDocs(ordered as any[]);
+  await attachLatestChapterTitles(ordered);
+  for (const story of ordered as MangaType[]) {
+    if (!(story as any).id) (story as any).id = String((story as any)?._id ?? "");
+    normalizeMangaAssets(story as any);
+  }
+
+  return ordered;
+};
+
+const computeHotCarouselSnapshotIds = async (): Promise<{ items: string[]; computedAt: Date }> => {
+  const stories = await aggregateHotCarouselSnapshot();
+  const items = (Array.isArray(stories) ? stories : [])
+    .map((s: any) => String(s?.id ?? s?._id ?? ""))
+    .filter(Boolean);
+  return { items, computedAt: new Date() };
 };
 
 const aggregateHotCarouselSnapshot = async () => {

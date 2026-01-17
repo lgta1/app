@@ -8,6 +8,7 @@ import { PassThrough } from "node:stream";
 
 import { ENV } from "@/configs/env.config";
 import { initLeaderboardScheduler } from "@/jobs/leaderboard.server";
+import { initHotCarouselSnapshotScheduler } from "@/jobs/hot-carousel-snapshot.server";
 import { initSitemapScheduler } from "@/jobs/sitemap.server";
 import { initViHentaiAutoDownloadQueueWorker } from "@/jobs/vi-hentai-auto-download-queue.server";
 import {
@@ -26,6 +27,7 @@ initMongoDB();
 // Initialize Leaderboard Scheduler (chỉ chạy ở production)
 if (ENV.IS_PRODUCTION) {
   initLeaderboardScheduler();
+  initHotCarouselSnapshotScheduler();
   initSitemapScheduler();
   initViHentaiAutoDownloadQueueWorker();
 }

@@ -3,7 +3,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { BookOpen, Eye, Users } from "lucide-react";
 
 import { getLeaderboard } from "@/queries/leaderboad.query";
-import { getHotCarouselLeaderboardWithScores, type HotCarouselScoreRow } from "@/queries/leaderboad.query";
+import { forceRefreshHotCarouselSnapshot, getHotCarouselLeaderboardWithScores, getHotCarouselSnapshotInfo, type HotCarouselScoreRow } from "@/queries/leaderboad.query";
 import { getStatistic } from "@/queries/statistic.query";
 
 import RatingItem from "~/components/rating-item";
@@ -17,6 +17,7 @@ interface StatisticData {
   weeklyLeaderboard: MangaType[];
   monthlyLeaderboard: MangaType[];
   hotCarousel: HotCarouselScoreRow[];
+  hotCarouselSnapshotComputedAt: string | null;
 }
 
 export const meta: MetaFunction = () => {
@@ -33,6 +34,7 @@ export async function loader(): Promise<Response> {
   const weeklyLeaderboard = await getLeaderboard("weekly");
   const monthlyLeaderboard = await getLeaderboard("monthly");
   const hotCarousel = await getHotCarouselLeaderboardWithScores();
+  const snapshotInfo = await getHotCarouselSnapshotInfo();
 
   return Response.json({
     ...statistic,
@@ -40,7 +42,19 @@ export async function loader(): Promise<Response> {
     weeklyLeaderboard,
     monthlyLeaderboard,
     hotCarousel,
+    hotCarouselSnapshotComputedAt: snapshotInfo.computedAt,
   });
+}
+
+export async function action({ request }: { request: Request }): Promise<Response> {
+  const form = await request.formData();
+  const intent = String(form.get("intent") || "");
+  if (intent === "refreshHotCarousel") {
+    await forceRefreshHotCarouselSnapshot();
+    const url = new URL(request.url);
+    return Response.redirect(url.pathname, 303);
+  }
+  return Response.json({ ok: false }, { status: 400 });
 }
 
 export default function AdminStatistic() {
@@ -181,6 +195,19 @@ export default function AdminStatistic() {
           <div className="text-txt-primary font-sans text-lg font-semibold">
             Danh sách truyện HOT (kèm score + công thức tính)
           </div>
+          <div className="text-txt-secondary font-sans text-xs">
+            Snapshot computedAt: {data.hotCarouselSnapshotComputedAt ?? "(chưa có snapshot)"}
+          </div>
+          <form method="post" className="mt-1">
+            <button
+              type="submit"
+              name="intent"
+              value="refreshHotCarousel"
+              className="bg-btn-primary text-txt-primary rounded-md px-3 py-1 text-xs font-semibold"
+            >
+              Force refresh HOT snapshot
+            </button>
+          </form>
           <div className="text-txt-secondary font-sans text-xs">
             {data.hotCarousel?.[0]?.formula ?? "adjusted = baseScore * (1 - clamp(weeklyPenalty + monthlyPenalty, 0..0.70)) * updateBoostMultiplier * genreMultiplier * disturbingMultiplier"}
           </div>
