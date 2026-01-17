@@ -1818,7 +1818,7 @@ export async function autoDownloadViHentaiManga(
     maxChapters = 500,
     maxImagesPerChapter = 300,
     continueOnChapterError = true,
-    imageDelayMs = 100,
+    imageDelayMs = 50,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
     chapterDelayMs = 2_000,

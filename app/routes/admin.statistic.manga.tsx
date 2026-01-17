@@ -182,10 +182,10 @@ export default function AdminStatistic() {
             Danh sách truyện HOT (kèm score + công thức tính)
           </div>
           <div className="text-txt-secondary font-sans text-xs">
-            {data.hotCarousel?.[0]?.formula ?? "adjusted = baseScore * (1 - (weeklyPenalty + monthlyPenalty)) * recentMultiplier * genreMultiplier"}
+            {data.hotCarousel?.[0]?.formula ?? "adjusted = baseScore * (1 - clamp(weeklyPenalty + monthlyPenalty, 0..0.70)) * updateBoostMultiplier * genreMultiplier * disturbingMultiplier"}
           </div>
           <div className="text-txt-secondary font-sans text-xs">
-            Lưu ý: nếu có genre <span className="font-semibold">manhwa</span> thì trừ <span className="font-semibold">35%</span> (nhân 0.65) và <span className="font-semibold">không áp dụng</span> bonus cập nhật gần đây (12h). Nếu có tag <span className="font-semibold">guro</span>/<span className="font-semibold">scat</span> thì <span className="font-semibold">không áp dụng</span> bonus cập nhật gần đây (12h) và bị trừ <span className="font-semibold">50%</span> điểm (nhân 0.5). Các truyện không thuộc các nhóm trên nếu vừa cập nhật gần đây (12h) thì cộng <span className="font-semibold">25%</span> (nhân 1.25).
+            Lưu ý: baseScore chỉ tính từ <span className="font-semibold">views</span> (không tính comments). Penalty top tuần/tháng áp dụng cộng dồn (weekly + monthly) và chặn tối đa <span className="font-semibold">70%</span>. UpdateBoost dựa theo <span className="font-semibold">updatedAt</span>: 0–7h ×1.30, 7–12h ×1.20, 12–20h ×1.10, &gt;20h ×1.0. Nếu có genre <span className="font-semibold">manhwa</span> thì trừ <span className="font-semibold">45%</span> (nhân 0.55) và <span className="font-semibold">vẫn được</span> UpdateBoost. Nếu có tag <span className="font-semibold">guro</span>/<span className="font-semibold">scat</span> thì <span className="font-semibold">không áp dụng</span> UpdateBoost và bị trừ <span className="font-semibold">50%</span> điểm (nhân 0.5).
           </div>
         </div>
 

@@ -144,6 +144,6 @@ async function processOneJob(): Promise<void> {
     );
   } finally {
     // Cooldown between manga jobs (server pacing)
-    await sleep(10_000);
+    await sleep(7_000);
   }
 }

@@ -282,6 +282,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // ---- Server-side queue (background) ----
   if (intent === "enqueueBatch") {
+    const MAX_QUEUE_ITEMS = 2000;
     const batchId = (formData.get("batchId") || "").toString().trim();
     const itemsRaw = (formData.get("items") || "").toString();
 
@@ -318,6 +319,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
     if (!items.length) {
       const body: EnqueueBatchActionResult = { ok: false, error: "Không có URL hợp lệ để đưa vào queue" };
+      return Response.json(body, { status: 400 });
+    }
+
+    if (items.length > MAX_QUEUE_ITEMS) {
+      const body: EnqueueBatchActionResult = {
+        ok: false,
+        error: `Queue vượt giới hạn ${MAX_QUEUE_ITEMS} link/lần. Hiện có: ${items.length}`,
+      };
       return Response.json(body, { status: 400 });
     }
 
@@ -395,7 +404,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json(body, { status: 400 });
     }
 
-    const MAX_LINKS = 500;
+    const MAX_LINKS = 2000;
 
     const res = await fetch(listingUrl.toString(), {
       method: "GET",
