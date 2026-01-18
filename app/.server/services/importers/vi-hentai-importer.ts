@@ -77,6 +77,56 @@ const sanitizeWhitespace = (value?: string | null) => {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+// Reduce upstream rate-limits (429) from vi-hentai when auto-updating/downloading.
+// This only applies to HTML page fetches (manga/chapter pages), NOT image downloads.
+const VIHENTAI_HTML_MIN_INTERVAL_MS = (() => {
+  const raw = process.env.VIHENTAI_HTML_MIN_INTERVAL_MS;
+  if (raw == null || String(raw).trim() === "") return 1_500;
+  const parsed = Number.parseInt(String(raw), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1_500;
+})();
+
+const getViHentaiThrottleKey = (url: string): string | null => {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (hostname === "vi-hentai.pro" || hostname.endsWith(".vi-hentai.pro")) return "vi-hentai";
+    if (hostname === "vi-hentai.moe" || hostname.endsWith(".vi-hentai.moe")) return "vi-hentai";
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+const viHentaiHtmlTailByKey = new Map<string, Promise<void>>();
+const viHentaiHtmlLastAtByKey = new Map<string, number>();
+
+async function runViHentaiHtmlPaced<T>(key: string, task: () => Promise<T>): Promise<T> {
+  const minIntervalMs = VIHENTAI_HTML_MIN_INTERVAL_MS;
+  if (minIntervalMs <= 0) return task();
+
+  const prev = viHentaiHtmlTailByKey.get(key) ?? Promise.resolve();
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  viHentaiHtmlTailByKey.set(key, prev.then(() => gate));
+
+  await prev;
+  try {
+    const lastAt = viHentaiHtmlLastAtByKey.get(key) ?? 0;
+    const waitMs = Math.max(0, lastAt + minIntervalMs - Date.now());
+    if (waitMs > 0) await sleep(waitMs);
+    viHentaiHtmlLastAtByKey.set(key, Date.now());
+    return await task();
+  } finally {
+    try {
+      release?.();
+    } catch {
+      // ignore
+    }
+  }
+}
+
 const stripBranding = (value?: string | null) => {
   let result = sanitizeWhitespace(value);
   if (!result) return "";
@@ -340,6 +390,13 @@ const fetchHtml = async (url: string) => {
     throw new Error(`Không thể tải trang (${response.status} ${response.statusText})`);
   }
   return response.text();
+};
+
+// Auto-update only: pace vi-hentai HTML requests to avoid 429.
+const fetchViHentaiHtmlForAutoUpdate = async (url: string) => {
+  const key = getViHentaiThrottleKey(url);
+  if (!key) return fetchHtml(url);
+  return runViHentaiHtmlPaced(key, () => fetchHtml(url));
 };
 
 const contentTypeToExtension = (contentType?: string | null) => {
@@ -2229,7 +2286,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     downloadChapters = true,
     continueOnChapterError = true,
     maxImagesPerChapter = 300,
-    imageDelayMs = 300,
+    imageDelayMs = 100,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
     chapterDelayMs = 5_000,
@@ -2249,7 +2306,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
   if (!importOptions.url) throw new Error("Thiếu URL nguồn");
 
   await emitProgress({ stage: "manga", message: "Đang tải trang truyện..." });
-  const parsed = await fetchViHentaiPage(importOptions.url);
+  const parsed = parsePage(await fetchViHentaiHtmlForAutoUpdate(importOptions.url), importOptions.url);
   const title = parsed.title;
 
   const existing = await MangaModel.findOne({ title })
@@ -2313,7 +2370,8 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
   }
 
   await emitProgress({ stage: "chapters", message: "Đang lấy danh sách chương..." });
-  const chapterList = await fetchViHentaiChapterList(importOptions.url);
+  const chapterListHtml = await fetchViHentaiHtmlForAutoUpdate(importOptions.url);
+  const chapterList = parseChapterList(load(chapterListHtml), importOptions.url);
   const sourceEntries = chapterList.entries;
   if (!sourceEntries.length) {
     return {
@@ -2417,7 +2475,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     });
 
     try {
-      const html = await fetchHtml(chapterUrl);
+      const html = await fetchViHentaiHtmlForAutoUpdate(chapterUrl);
       const imageUrls = parseChapterImagesFromHtml(html, chapterUrl);
       if (!imageUrls.length) throw new Error("Không tìm thấy ảnh trong trang chương");
       if (imageUrls.length > maxImagesPerChapter) {

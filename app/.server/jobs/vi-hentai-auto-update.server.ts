@@ -408,6 +408,25 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
   if (!queue) return;
   if ((queue as any).status !== "running") return;
 
+  const STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED = 5;
+  let consecutiveNoopOrFailed = 0;
+  const listUrl = String((queue as any).listUrl || "");
+
+  const stopEarly = async (reason: string): Promise<void> => {
+    await ViHentaiAutoUpdateQueueModel.updateOne(
+      { _id: queueId, status: "running" },
+      {
+        $set: { status: "succeeded", finishedAt: new Date() },
+        $push: {
+          errors: {
+            url: listUrl,
+            message: reason,
+          },
+        },
+      },
+    );
+  };
+
   // Avoid concurrency with auto-download batch.
   const idle = await waitForAutoDownloadIdle(WAIT_AUTO_DOWNLOAD_IDLE_TIMEOUT_MS);
   if (!idle) {
@@ -470,7 +489,20 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
     const url = String(it.url || "").trim();
 
     // Skip finished items (supports resume after restart)
-    if (it.status === "succeeded" || it.status === "noop") continue;
+    if (it.status === "succeeded") {
+      consecutiveNoopOrFailed = 0;
+      continue;
+    }
+    if (it.status === "noop") {
+      consecutiveNoopOrFailed += 1;
+      if (consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED) {
+        await stopEarly(
+          `Dừng sớm: ${STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED} truyện liên tiếp ở trạng thái noop/failed (mới nhất: #${index} ${url})`,
+        );
+        return;
+      }
+      continue;
+    }
 
     await ViHentaiAutoUpdateQueueModel.updateOne(
       { _id: queueId },
@@ -496,7 +528,7 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
         downloadChapters: true,
         maxNewChapters: maxNewChaptersPerManga,
         maxChaptersForNewManga: 200,
-        imageDelayMs: 1_000,
+        imageDelayMs: 100,
         chapterDelayMs: 3_000,
       } as any);
 
@@ -535,6 +567,16 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
         },
         { arrayFilters: [{ "x.index": index }] } as any,
       );
+
+      if (itemStatus === "noop") consecutiveNoopOrFailed += 1;
+      else consecutiveNoopOrFailed = 0;
+
+      if (consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED) {
+        await stopEarly(
+          `Dừng sớm: ${STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED} truyện liên tiếp ở trạng thái noop/failed (mới nhất: #${index} ${url})`,
+        );
+        return;
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await ViHentaiAutoUpdateQueueModel.updateOne(
@@ -551,6 +593,14 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
         },
         { arrayFilters: [{ "x.index": index }] } as any,
       );
+
+      consecutiveNoopOrFailed += 1;
+      if (consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED) {
+        await stopEarly(
+          `Dừng sớm: ${STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED} truyện liên tiếp ở trạng thái noop/failed (mới nhất: #${index} ${url})`,
+        );
+        return;
+      }
     }
 
     if (i < items.length - 1 && MANGA_DELAY_MS > 0) {
@@ -576,9 +626,9 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
 
   let running = false;
 
-  // 1) Hourly: extract 30 URLs into a new queue (status=queued).
+  // 1) Every 30 minutes: extract 30 URLs into a new queue (status=queued).
   cron.schedule(
-    "0 * * * *",
+    "*/30 * * * *",
     async () => {
       if (running) return;
       running = true;

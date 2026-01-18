@@ -68,68 +68,51 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     if (intent === "like") {
-      // Kiểm tra đã like chưa
-      const existingLike = await UserLikeMangaModel.findOne({
-        userId: user.id,
-        mangaId: mangaId,
-      });
-
-      if (existingLike) {
-        return Response.json({ error: "Bạn đã thích truyện này rồi" }, { status: 400 });
-      }
-
-      // Tạo like record
-      await UserLikeMangaModel.create({
-        userId: user.id,
-        mangaId: mangaId,
-      });
-
-      // Tăng likeNumber trong manga
-      await MangaModel.findByIdAndUpdate(
-        mangaId,
-        { $inc: { likeNumber: 1 } },
-        { timestamps: false },
+      // Make this operation idempotent + race-safe (unique index on {userId,mangaId}).
+      // If multiple requests hit at once, only the first should increment likeNumber.
+      const upsertRes = await UserLikeMangaModel.updateOne(
+        { userId: user.id, mangaId },
+        { $setOnInsert: { userId: user.id, mangaId } },
+        { upsert: true },
       );
+      const inserted = Boolean((upsertRes as any)?.upsertedId || (upsertRes as any)?.upsertedCount);
 
-      // Record like interaction (non-blocking)
-      recordLike(mangaId, user.id).catch((error) => {
-        console.error("Lỗi khi ghi like interaction:", error);
-      });
+      if (inserted) {
+        await MangaModel.findByIdAndUpdate(
+          mangaId,
+          { $inc: { likeNumber: 1 } },
+          { timestamps: false },
+        );
+
+        // Record like interaction (non-blocking)
+        recordLike(mangaId, user.id).catch((error) => {
+          console.error("Lỗi khi ghi like interaction:", error);
+        });
+      }
 
       return Response.json({
         success: true,
-        message: "Thích truyện thành công",
+        message: inserted ? "Thích truyện thành công" : "Truyện đã được thích trước đó",
         isLiked: true,
       });
     }
 
     if (intent === "unlike") {
-      // Kiểm tra đã like chưa
-      const existingLike = await UserLikeMangaModel.findOne({
-        userId: user.id,
-        mangaId: mangaId,
-      });
+      // Idempotent unlike: only decrement if we actually removed a record.
+      const delRes = await UserLikeMangaModel.deleteOne({ userId: user.id, mangaId });
+      const deleted = Number((delRes as any)?.deletedCount || (delRes as any)?.n || 0) > 0;
 
-      if (!existingLike) {
-        return Response.json({ error: "Bạn chưa thích truyện này" }, { status: 400 });
+      if (deleted) {
+        await MangaModel.findByIdAndUpdate(
+          mangaId,
+          { $inc: { likeNumber: -1 } },
+          { timestamps: false },
+        );
       }
-
-      // Xóa like record
-      await UserLikeMangaModel.deleteOne({
-        userId: user.id,
-        mangaId: mangaId,
-      });
-
-      // Giảm likeNumber trong manga
-      await MangaModel.findByIdAndUpdate(
-        mangaId,
-        { $inc: { likeNumber: -1 } },
-        { timestamps: false },
-      );
 
       return Response.json({
         success: true,
-        message: "Bỏ thích truyện thành công",
+        message: deleted ? "Bỏ thích truyện thành công" : "Truyện chưa được thích trước đó",
         isLiked: false,
       });
     }

@@ -32,6 +32,8 @@ export type HotCarouselScoreBreakdown = {
   baseScoreViewsWeighted: number;
   baseScoreViewsContribution: number;
   baseScoreCommentsContribution: number;
+  chapters: number;
+  lowChapterBoostMultiplier: number;
   hoursSinceUpdatedAt: number | null;
   updateBoostMultiplier: number;
   weeklyRank: number | null;
@@ -106,9 +108,11 @@ export const getLeaderboard = async (period: LeaderboardPeriod) => {
   // Weekly/Monthly dùng lightweight counters trực tiếp trên MangaModel
   if (period === "weekly" || period === "monthly") {
     const sortKey = period === "weekly" ? "weeklyViews" : "monthlyViews";
+    const excludeManhwa = period === "weekly";
     const docs = await MangaModel.find({
       status: 1 /* APPROVED */,
       contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, null] },
+      ...(excludeManhwa ? { genres: { $nin: ["manhwa"] } } : {}),
     })
       .sort({ [sortKey]: -1, updatedAt: -1 })
       .limit(ENV.LEADERBOARD.MAX_ITEMS)
@@ -242,6 +246,7 @@ const aggregateHotCarouselSnapshot = async () => {
     MangaModel.find({
       status: 1 /* APPROVED */,
       contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, null] },
+      genres: { $nin: ["manhwa"] },
     })
       .sort({ weeklyViews: -1, updatedAt: -1 })
       .limit(5)
@@ -285,12 +290,12 @@ const aggregateHotCarouselSnapshot = async () => {
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     const baseScore = typeof doc?.score === "number" ? doc.score : 0;
 
-    // Base score breakdown (rolling 48h buckets)
+    // Base score breakdown (rolling 36h buckets)
     const views0_2h = Math.max(0, Number(doc?.views_0_2h) || 0);
     const views2_8h = Math.max(0, Number(doc?.views_2_8h) || 0);
     const views8_24h = Math.max(0, Number(doc?.views_8_24h) || 0);
-    const views24_48h = Math.max(0, Number(doc?.views_24_48h) || 0);
-    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h + views24_48h * 0.6;
+    const views24_36h = Math.max(0, Number(doc?.views_24_36h) || 0);
+    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h + views24_36h;
     const baseScoreViewsContribution = baseScoreViewsWeighted * (ENV.LEADERBOARD?.daily?.VIEW_WEIGHT ?? 1);
     const baseScoreCommentsContribution = 0;
 
@@ -305,14 +310,14 @@ const aggregateHotCarouselSnapshot = async () => {
     const penalty = Math.min(weeklyPenalty + monthlyPenalty, 0.7);
     const penaltyMultiplier = 1 - penalty;
 
-    // Genre penalty: if manga has genre "manhwa", reduce score by 45%.
+    // Genre penalty: if manga has genre "manhwa", reduce score by 60%.
     // Apply to manga only (not COSPLAY).
     const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
     const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
     const hasManhwaGenre =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       genres.some((g) => typeof g === "string" && g.trim().toLowerCase() === "manhwa");
-    const genreMultiplier = hasManhwaGenre ? 0.55 : 1;
+    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
 
     // Disturbing tags (guro/scat): -50% score and no recent bonus.
     const genreSlugs = genres
@@ -322,6 +327,18 @@ const aggregateHotCarouselSnapshot = async () => {
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       (genreSlugs.includes("guro") || genreSlugs.includes("scat"));
     const disturbingMultiplier = hasDisturbingTags ? 0.5 : 1;
+
+    // Boost new/short series:
+    // - 1 chapter: +30%
+    // - 2..5 chapters: +10%
+    // Apply to manga only (not COSPLAY).
+    const chapters = Math.max(0, Number((story as any)?.chapters) || 0);
+    const lowChapterBoostMultiplier =
+      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) && chapters <= 1
+        ? 1.3
+        : (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) && chapters <= 5
+          ? 1.1
+          : 1;
 
     // Update boost applies to manga only (contentType MANGA/null) and uses updatedAt as proxy for latest chapter time.
     // Do NOT apply update boost for disturbing tags.
@@ -345,13 +362,21 @@ const aggregateHotCarouselSnapshot = async () => {
       else updateBoostMultiplier = 1;
     }
 
-    const adjustedScore = baseScore * penaltyMultiplier * updateBoostMultiplier * genreMultiplier * disturbingMultiplier;
+    const adjustedScore =
+      baseScore *
+      penaltyMultiplier *
+      updateBoostMultiplier *
+      genreMultiplier *
+      disturbingMultiplier *
+      lowChapterBoostMultiplier;
 
     return {
       baseScore,
       baseScoreViewsWeighted,
       baseScoreViewsContribution,
       baseScoreCommentsContribution,
+      chapters,
+      lowChapterBoostMultiplier,
       hoursSinceUpdatedAt,
       updateBoostMultiplier,
       weeklyRank,
@@ -500,12 +525,12 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     const baseScore = typeof doc?.score === "number" ? doc.score : 0;
 
-    // Base score breakdown (rolling 48h buckets)
+    // Base score breakdown (rolling 36h buckets)
     const views0_2h = Math.max(0, Number(doc?.views_0_2h) || 0);
     const views2_8h = Math.max(0, Number(doc?.views_2_8h) || 0);
     const views8_24h = Math.max(0, Number(doc?.views_8_24h) || 0);
-    const views24_48h = Math.max(0, Number(doc?.views_24_48h) || 0);
-    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h + views24_48h * 0.6;
+    const views24_36h = Math.max(0, Number(doc?.views_24_36h) || 0);
+    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h + views24_36h;
     const baseScoreViewsContribution = baseScoreViewsWeighted * (ENV.LEADERBOARD?.daily?.VIEW_WEIGHT ?? 1);
     const baseScoreCommentsContribution = 0;
 
@@ -516,14 +541,14 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     const penalty = Math.min(weeklyPenalty + monthlyPenalty, 0.7);
     const penaltyMultiplier = 1 - penalty;
 
-    // Genre penalty: if manga has genre "manhwa", reduce score by 45%.
+    // Genre penalty: if manga has genre "manhwa", reduce score by 60%.
     // Apply to manga only (not COSPLAY).
     const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
     const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
     const hasManhwaGenre =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       genres.some((g) => typeof g === "string" && g.trim().toLowerCase() === "manhwa");
-    const genreMultiplier = hasManhwaGenre ? 0.55 : 1;
+    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
 
     const genreSlugs = genres
       .filter((g) => typeof g === "string")
@@ -532,6 +557,18 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       (genreSlugs.includes("guro") || genreSlugs.includes("scat"));
     const disturbingMultiplier = hasDisturbingTags ? 0.5 : 1;
+
+    // Boost new/short series:
+    // - 1 chapter: +30%
+    // - 2..5 chapters: +10%
+    // Apply to manga only (not COSPLAY).
+    const chapters = Math.max(0, Number((story as any)?.chapters) || 0);
+    const lowChapterBoostMultiplier =
+      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) && chapters <= 1
+        ? 1.3
+        : (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) && chapters <= 5
+          ? 1.1
+          : 1;
 
     const storyUpdatedAt = (story as any)?.updatedAt instanceof Date
       ? (story as any).updatedAt
@@ -553,13 +590,21 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
       else updateBoostMultiplier = 1;
     }
 
-    const adjustedScore = baseScore * penaltyMultiplier * updateBoostMultiplier * genreMultiplier * disturbingMultiplier;
+    const adjustedScore =
+      baseScore *
+      penaltyMultiplier *
+      updateBoostMultiplier *
+      genreMultiplier *
+      disturbingMultiplier *
+      lowChapterBoostMultiplier;
 
     return {
       baseScore,
       baseScoreViewsWeighted,
       baseScoreViewsContribution,
       baseScoreCommentsContribution,
+      chapters,
+      lowChapterBoostMultiplier,
       hoursSinceUpdatedAt,
       updateBoostMultiplier,
       weeklyRank,
@@ -639,7 +684,8 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     normalizeMangaAssets(story as any);
   }
 
-  const formula = "adjusted = baseScore * (1 - clamp(weeklyPenalty + monthlyPenalty, 0..0.70)) * updateBoostMultiplier * genreMultiplier * disturbingMultiplier";
+  const formula =
+    "adjusted = baseScore * (1 - clamp(weeklyPenalty + monthlyPenalty, 0..0.70)) * updateBoostMultiplier * genreMultiplier * disturbingMultiplier * lowChapterBoostMultiplier";
 
   const rows: HotCarouselScoreRow[] = [];
   for (let i = 0; i < combined.length; i++) {
@@ -650,9 +696,9 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
       : null;
 
     const steps: string[] = [];
-    steps.push("BASE SCORE (rolling 48h buckets)");
-    steps.push(`views_0_2h=${Math.max(0, Number((doc as any)?.views_0_2h) || 0)}, views_2_8h=${Math.max(0, Number((doc as any)?.views_2_8h) || 0)}, views_8_24h=${Math.max(0, Number((doc as any)?.views_8_24h) || 0)}, views_24_48h=${Math.max(0, Number((doc as any)?.views_24_48h) || 0)}`);
-    steps.push(`viewsWeighted = v0_2h*1.5 + v2_8h*1.3 + v8_24h*1.0 + v24_48h*0.6 = ${breakdown.baseScoreViewsWeighted}`);
+    steps.push("BASE SCORE (rolling 36h buckets)");
+    steps.push(`views_0_2h=${Math.max(0, Number((doc as any)?.views_0_2h) || 0)}, views_2_8h=${Math.max(0, Number((doc as any)?.views_2_8h) || 0)}, views_8_24h=${Math.max(0, Number((doc as any)?.views_8_24h) || 0)}, views_24_36h=${Math.max(0, Number((doc as any)?.views_24_36h) || 0)}`);
+    steps.push(`viewsWeighted = v0_2h*1.5 + v2_8h*1.3 + v8_24h*1.0 + v24_36h*1.0 = ${breakdown.baseScoreViewsWeighted}`);
     steps.push(`viewsScore = viewsWeighted * VIEW_WEIGHT(${ENV.LEADERBOARD?.daily?.VIEW_WEIGHT ?? 1}) = ${breakdown.baseScoreViewsContribution}`);
     steps.push("commentScore is ignored in HOT carousel scoring");
     steps.push(`baseScore = viewsScore = ${breakdown.baseScore}`);
@@ -661,9 +707,10 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     steps.push(`monthlyRank=${breakdown.monthlyRank ?? "-"}, monthlyPenalty=${breakdown.monthlyPenalty}`);
     steps.push(`penaltyTotal = ${breakdown.penalty} => penaltyMultiplier = ${breakdown.penaltyMultiplier}`);
     steps.push(`updatedAt: ${breakdown.hoursSinceUpdatedAt != null ? `${breakdown.hoursSinceUpdatedAt.toFixed(2)}h ago` : "n/a"} => updateBoostMultiplier = ${breakdown.updateBoostMultiplier}`);
-    steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-45%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
+    steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-60%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
     steps.push(`tags guro/scat: ${breakdown.hasDisturbingTags ? "-50%" : "no"} => disturbingMultiplier = ${breakdown.disturbingMultiplier}`);
-    steps.push(`adjustedScore = ${breakdown.baseScore} * ${breakdown.penaltyMultiplier} * ${breakdown.updateBoostMultiplier} * ${breakdown.genreMultiplier} * ${breakdown.disturbingMultiplier} = ${breakdown.adjustedScore}`);
+    steps.push(`chapters=${breakdown.chapters} (1 => +30%, 2-5 => +10%) => lowChapterBoostMultiplier = ${breakdown.lowChapterBoostMultiplier}`);
+    steps.push(`adjustedScore = ${breakdown.baseScore} * ${breakdown.penaltyMultiplier} * ${breakdown.updateBoostMultiplier} * ${breakdown.genreMultiplier} * ${breakdown.disturbingMultiplier} * ${breakdown.lowChapterBoostMultiplier} = ${breakdown.adjustedScore}`);
 
     rows.push({
       rank: i + 1,
@@ -682,17 +729,17 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
 };
 
 const buildHotCarouselPipeline = (limit: number) => {
-  // Custom HOT carousel pipeline (request-time) using rolling 48h window.
+  // Custom HOT carousel pipeline (request-time) using rolling 36h window.
   const now = new Date();
   const t2 = new Date(now.getTime() - 2 * 3600 * 1000);
   const t8 = new Date(now.getTime() - 8 * 3600 * 1000);
   const t24 = new Date(now.getTime() - 24 * 3600 * 1000);
-  const t48 = new Date(now.getTime() - 48 * 3600 * 1000);
+  const t36 = new Date(now.getTime() - 36 * 3600 * 1000);
 
   return [
     {
       $match: {
-        created_at: { $gte: t48 },
+        created_at: { $gte: t36 },
         type: "view",
       },
     },
@@ -738,13 +785,13 @@ const buildHotCarouselPipeline = (limit: number) => {
             ],
           },
         },
-        views_24_48h: {
+        views_24_36h: {
           $sum: {
             $cond: [
               {
                 $and: [
                   { $eq: ["$type", "view"] },
-                  { $gte: ["$created_at", t48] },
+                  { $gte: ["$created_at", t36] },
                   { $lt: ["$created_at", t24] },
                 ],
               },
@@ -763,7 +810,7 @@ const buildHotCarouselPipeline = (limit: number) => {
             { $multiply: [{ $ifNull: ["$views_0_2h", 0] }, 1.5] },
             { $multiply: [{ $ifNull: ["$views_2_8h", 0] }, 1.3] },
             { $multiply: [{ $ifNull: ["$views_8_24h", 0] }, 1.0] },
-            { $multiply: [{ $ifNull: ["$views_24_48h", 0] }, 0.6] },
+            { $multiply: [{ $ifNull: ["$views_24_36h", 0] }, 1.0] },
           ],
         },
       },
@@ -789,7 +836,7 @@ const buildHotCarouselPipeline = (limit: number) => {
         views_0_2h: -1,
         views_2_8h: -1,
         views_8_24h: -1,
-        views_24_48h: -1,
+        views_24_36h: -1,
       },
     },
     { $limit: limit },
@@ -803,13 +850,13 @@ const buildHotCarouselPipeline = (limit: number) => {
         views_0_2h: 1,
         views_2_8h: 1,
         views_8_24h: 1,
-        views_24_48h: 1,
+        views_24_36h: 1,
         views_in_period: {
           $add: [
             { $ifNull: ["$views_0_2h", 0] },
             { $ifNull: ["$views_2_8h", 0] },
             { $ifNull: ["$views_8_24h", 0] },
-            { $ifNull: ["$views_24_48h", 0] },
+            { $ifNull: ["$views_24_36h", 0] },
           ],
         },
         likes_in_period: { $literal: 0 },
