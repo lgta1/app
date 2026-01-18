@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { load } from "cheerio";
+import os from "node:os";
 
 import { autoUpdateViHentaiManga } from "@/services/importers/vi-hentai-importer";
 import { SystemLockModel } from "~/database/models/system-lock.model";
@@ -65,7 +66,7 @@ const pauseAllRunningQueues = async (): Promise<void> => {
 const resumeAllPausedQueues = async (): Promise<void> => {
   await ViHentaiAutoUpdateQueueModel.updateMany(
     { status: "paused" },
-    { $set: { status: "running" } },
+    { $set: { status: "queued" } },
   );
 };
 
@@ -80,10 +81,14 @@ export const setViHentaiAutoUpdateEnabled = async (enabled: boolean): Promise<bo
 };
 
 const getOwnerId = () => {
+  // IMPORTANT: keep this stable across process restarts.
+  // If we include pid, a crash/restart can leave a lock that the restarted process
+  // can no longer release, which blocks both auto-update and auto-download.
   const parts = [
-    process.env.PM2_HOME ? "pm2" : undefined,
+    process.env.PM2_HOME ? "pm2" : "node",
     process.env.NODE_APP_INSTANCE != null ? `inst:${process.env.NODE_APP_INSTANCE}` : undefined,
-    `pid:${process.pid}`,
+    process.env.PORT ? `port:${process.env.PORT}` : undefined,
+    `host:${os.hostname()}`,
   ].filter(Boolean);
   return parts.join("|");
 };
@@ -112,7 +117,7 @@ const tryAcquireLock = async (ttlMs: number): Promise<boolean> => {
   const updated = await SystemLockModel.findOneAndUpdate(
     {
       key: LOCK_KEY,
-      $or: [{ lockedUntil: { $lte: now } }, { lockedUntil: { $exists: false } }],
+      $or: [{ lockedUntil: { $lte: now } }, { lockedUntil: { $exists: false } }, { lockedBy }],
     },
     { $set: { lockedUntil, lockedBy } },
     { new: true },
@@ -395,6 +400,11 @@ export const createViHentaiAutoUpdateQueue = async (
 export const startViHentaiAutoUpdateQueue = async (queueId: string): Promise<boolean> => {
   if (!queueId) return false;
   if (!(await getViHentaiAutoUpdateEnabled())) return false;
+
+  // Ensure we only have a single active running queue at a time.
+  const otherRunning = await ViHentaiAutoUpdateQueueModel.exists({ status: "running", _id: { $ne: queueId } });
+  if (otherRunning) return false;
+
   const res = await ViHentaiAutoUpdateQueueModel.updateOne(
     { _id: queueId, status: { $in: ["queued", "failed"] } },
     { $set: { status: "running", startedAt: new Date() } },
@@ -408,15 +418,32 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
   if (!queue) return;
   if ((queue as any).status !== "running") return;
 
+  const ensureQueueStillRunning = async (): Promise<boolean> => {
+    const fresh = await ViHentaiAutoUpdateQueueModel.findById(queueId)
+      .select({ status: 1 })
+      .lean();
+    return Boolean(fresh && (fresh as any).status === "running");
+  };
+
   const STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED = 5;
   let consecutiveNoopOrFailed = 0;
   const listUrl = String((queue as any).listUrl || "");
 
   const stopEarly = async (reason: string): Promise<void> => {
+    const now = new Date();
+    // Mark the queue as completed, and also finalize any remaining queued/running items
+    // so the UI doesn't show items stuck in "queued".
     await ViHentaiAutoUpdateQueueModel.updateOne(
       { _id: queueId, status: "running" },
       {
-        $set: { status: "succeeded", finishedAt: new Date() },
+        $set: {
+          status: "succeeded",
+          finishedAt: now,
+          "items.$[x].status": "noop",
+          "items.$[x].mode": "stopped",
+          "items.$[x].message": reason,
+          "items.$[x].finishedAt": now,
+        },
         $push: {
           errors: {
             url: listUrl,
@@ -424,6 +451,7 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
           },
         },
       },
+      { arrayFilters: [{ "x.status": { $in: ["queued", "running"] } }] } as any,
     );
   };
 
@@ -468,6 +496,9 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
   const items: any[] = Array.isArray((queue as any).items) ? (queue as any).items : [];
 
   for (let i = 0; i < items.length; i += 1) {
+    // Allow admin to pause/delete an in-progress queue.
+    if (!(await ensureQueueStillRunning())) return;
+
     if (!(await getViHentaiAutoUpdateEnabled())) {
       await ViHentaiAutoUpdateQueueModel.updateOne(
         { _id: queueId, status: "running" },
@@ -624,6 +655,9 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
   const isPrimary = process.env.LEADERBOARD_SCHEDULER === "1" || process.env.PORT === "3001";
   if (!isPrimary) return;
 
+  // Best-effort: clear any leftover lock owned by this instance from a previous crash.
+  void releaseLock();
+
   let running = false;
 
   // 1) Every 30 minutes: extract 30 URLs into a new queue (status=queued).
@@ -642,8 +676,14 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
           maxManga: DEFAULT_MAX_MANGA,
         });
         if (r.ok && r.queueId) {
-          await startViHentaiAutoUpdateQueue(r.queueId);
-          console.info(`[cron] vi-hentai queue extracted: queueId=${r.queueId}`);
+          // Only start automatically if no other queue is currently running.
+          const hasRunning = await ViHentaiAutoUpdateQueueModel.exists({ status: "running" });
+          if (!hasRunning) {
+            await startViHentaiAutoUpdateQueue(r.queueId);
+            console.info(`[cron] vi-hentai queue extracted+started: queueId=${r.queueId}`);
+          } else {
+            console.info(`[cron] vi-hentai queue extracted (kept queued): queueId=${r.queueId}`);
+          }
         } else {
           console.warn(`[cron] vi-hentai queue extract failed: ${r.message || "unknown"}`);
         }
@@ -668,13 +708,24 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;
 
-        const q = await ViHentaiAutoUpdateQueueModel.findOne({ status: "running" })
+        // Prefer an existing running queue; otherwise promote the oldest queued queue.
+        const qRunning = await ViHentaiAutoUpdateQueueModel.findOne({ status: "running" })
           .sort({ startedAt: 1, createdAt: 1 })
           .select({ _id: 1 })
           .lean();
-        if (!q) return;
+        if (qRunning) {
+          await processViHentaiAutoUpdateQueue(String((qRunning as any)._id));
+          return;
+        }
 
-        await processViHentaiAutoUpdateQueue(String((q as any)._id));
+        const qQueued = await ViHentaiAutoUpdateQueueModel.findOneAndUpdate(
+          { status: "queued" },
+          { $set: { status: "running", startedAt: new Date() } },
+          { sort: { createdAt: 1 }, new: true },
+        ).select({ _id: 1 }).lean();
+        if (!qQueued) return;
+
+        await processViHentaiAutoUpdateQueue(String((qQueued as any)._id));
       } catch (e) {
         console.error("[cron] vi-hentai queue worker failed", e);
       } finally {

@@ -74,6 +74,10 @@ type ActionResult =
   | { ok: true; queueId?: string; enabled?: boolean }
   | { ok: false; error: string };
 
+type ControlActionResult =
+  | { ok: true; action: "pauseQueue" | "deleteQueue" | "pauseAllRunning" | "deleteAllQueued"; queueId?: string; count?: number }
+  | { ok: false; error: string };
+
 type PollResult =
   | { ok: true; queue: QueueDetail }
   | { ok: false; error: string };
@@ -258,8 +262,114 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return Response.json(body, { status: 200 });
     }
 
-    await startViHentaiAutoUpdateQueue(queueId);
+    const started = await startViHentaiAutoUpdateQueue(queueId);
+    if (!started) {
+      const body: ActionResult = { ok: false, error: "Không thể start queue (có thể đang có queue khác running)" };
+      return Response.json(body, { status: 200 });
+    }
+
     const body: ActionResult = { ok: true, queueId };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "pauseQueue") {
+    const queueId = String(formData.get("queueId") || "").trim();
+    if (!queueId) {
+      const body: ControlActionResult = { ok: false, error: "Thiếu queueId" };
+      return Response.json(body, { status: 200 });
+    }
+
+    const now = new Date();
+    const q = await ViHentaiAutoUpdateQueueModel.findById(queueId)
+      .select({ _id: 1, status: 1, listUrl: 1, items: 1 })
+      .lean();
+    if (!q) {
+      const body: ControlActionResult = { ok: false, error: "Không tìm thấy queue" };
+      return Response.json(body, { status: 200 });
+    }
+
+    const items = Array.isArray((q as any).items) ? (q as any).items : [];
+    const patchedItems = items.map((it: any) => {
+      if (it?.status === "running") return { ...it, status: "queued" };
+      return it;
+    });
+
+    await ViHentaiAutoUpdateQueueModel.updateOne(
+      { _id: (q as any)._id },
+      {
+        $set: {
+          status: "paused",
+          finishedAt: now,
+          items: patchedItems,
+        },
+        $unset: { lockedBy: "" },
+        $push: {
+          errors: {
+            url: String((q as any).listUrl || ""),
+            message: "Admin đã hủy queue (paused)",
+          },
+        },
+      },
+    );
+
+    const body: ControlActionResult = { ok: true, action: "pauseQueue", queueId };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "deleteQueue") {
+    const queueId = String(formData.get("queueId") || "").trim();
+    if (!queueId) {
+      const body: ControlActionResult = { ok: false, error: "Thiếu queueId" };
+      return Response.json(body, { status: 200 });
+    }
+
+    // Best-effort: pause first so a running worker can notice and stop between items.
+    try {
+      await ViHentaiAutoUpdateQueueModel.updateOne(
+        { _id: queueId },
+        { $set: { status: "paused", finishedAt: new Date() }, $unset: { lockedBy: "" } },
+      );
+    } catch {
+      // ignore
+    }
+
+    const res = await ViHentaiAutoUpdateQueueModel.deleteOne({ _id: queueId });
+    const deleted = Number((res as any).deletedCount || 0);
+    const body: ControlActionResult = { ok: true, action: "deleteQueue", queueId, count: deleted };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "pauseAllRunning") {
+    const now = new Date();
+    const runningQueues = await ViHentaiAutoUpdateQueueModel.find({ status: "running" })
+      .select({ _id: 1, listUrl: 1, items: 1 })
+      .lean();
+
+    for (const q of runningQueues as any[]) {
+      const items = Array.isArray(q.items) ? q.items : [];
+      const patchedItems = items.map((it: any) => {
+        if (it?.status === "running") return { ...it, status: "queued" };
+        return it;
+      });
+
+      await ViHentaiAutoUpdateQueueModel.updateOne(
+        { _id: q._id },
+        {
+          $set: { status: "paused", finishedAt: now, items: patchedItems },
+          $unset: { lockedBy: "" },
+          $push: { errors: { url: String(q.listUrl || ""), message: "Admin đã hủy queue (paused)" } },
+        },
+      );
+    }
+
+    const body: ControlActionResult = { ok: true, action: "pauseAllRunning", count: runningQueues.length };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "deleteAllQueued") {
+    const res = await ViHentaiAutoUpdateQueueModel.deleteMany({ status: "queued" });
+    const deleted = Number((res as any).deletedCount || 0);
+    const body: ControlActionResult = { ok: true, action: "deleteAllQueued", count: deleted };
     return Response.json(body, { status: 200 });
   }
 
@@ -271,6 +381,7 @@ export default function AdminMangaAutoUpdate() {
   const data = useLoaderData() as LoaderResult;
   const fetcher = useFetcher<ActionResult>();
   const pollFetcher = useFetcher<PollResult>();
+  const controlFetcher = useFetcher<ControlActionResult>();
 
   const [enabled, setEnabled] = useState(() => (data.ok ? Boolean((data as any).enabled) : true));
 
@@ -297,8 +408,47 @@ export default function AdminMangaAutoUpdate() {
 
   const pollQueue = (queueId?: string) => {
     if (!queueId) return;
-    if (!enabled) return;
     pollFetcher.load(`/admin/manga/auto-update?intent=pollQueue&queueId=${encodeURIComponent(queueId)}`);
+  };
+
+  const startPollingQueue = (queueId: string) => {
+    pollQueue(queueId);
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    pollTimerRef.current = setInterval(() => pollQueue(queueId), 5_000);
+  };
+
+  const pauseQueueOnServer = (queueId: string) => {
+    const ok = confirm("Hủy queue này? (sẽ dừng chạy giữa các truyện, giữ lại lịch sử)");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "pauseQueue");
+    fd.set("queueId", queueId);
+    controlFetcher.submit(fd, { method: "post" });
+  };
+
+  const deleteQueueOnServer = (queueId: string) => {
+    const ok = confirm("Xóa queue này khỏi server? (Nếu đang chạy: sẽ dừng ở checkpoint và xóa lịch sử)");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "deleteQueue");
+    fd.set("queueId", queueId);
+    controlFetcher.submit(fd, { method: "post" });
+  };
+
+  const pauseAllRunningOnServer = () => {
+    const ok = confirm("Hủy TẤT CẢ queue đang running?");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "pauseAllRunning");
+    controlFetcher.submit(fd, { method: "post" });
+  };
+
+  const deleteAllQueuedOnServer = () => {
+    const ok = confirm("Xóa TẤT CẢ queue đang queued?");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "deleteAllQueued");
+    controlFetcher.submit(fd, { method: "post" });
   };
 
   // Start polling after manual trigger.
@@ -484,6 +634,32 @@ export default function AdminMangaAutoUpdate() {
           {anyItemRunning ? <div className="text-yellow-200">Đang chạy (poll 5s)...</div> : null}
           {!enabled ? <div className="text-red-200">Auto-update đang tắt: worker không xử lý queue.</div> : null}
         </div>
+
+        {activeQueue?.id ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => startPollingQueue(activeQueue.id)}
+              className="rounded border border-border bg-transparent px-3 py-1.5 text-xs font-medium text-txt-primary hover:bg-white/5"
+            >
+              Refresh/Poll
+            </button>
+            <button
+              type="button"
+              onClick={() => pauseQueueOnServer(activeQueue.id)}
+              className="rounded bg-yellow-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-yellow-600"
+            >
+              Hủy queue
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteQueueOnServer(activeQueue.id)}
+              className="rounded bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
+            >
+              Xóa queue
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4 overflow-hidden rounded border border-border">
@@ -547,8 +723,32 @@ export default function AdminMangaAutoUpdate() {
         </div>
       ) : null}
 
+      {controlFetcher.data && !controlFetcher.data.ok ? (
+        <div className="mt-3 rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          {controlFetcher.data.error}
+        </div>
+      ) : null}
+
       <div className="mt-6">
-        <h2 className="text-lg font-semibold text-txt-primary">Lịch sử queue gần đây</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-txt-primary">Lịch sử queue gần đây</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={pauseAllRunningOnServer}
+              className="rounded bg-yellow-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-yellow-600"
+            >
+              Hủy tất cả running
+            </button>
+            <button
+              type="button"
+              onClick={deleteAllQueuedOnServer}
+              className="rounded bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
+            >
+              Xóa tất cả queued
+            </button>
+          </div>
+        </div>
         {data.ok ? (
           <div className="mt-3 overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
@@ -566,6 +766,7 @@ export default function AdminMangaAutoUpdate() {
                   <th className="p-2">Images</th>
                   <th className="p-2">Errors</th>
                   <th className="p-2">Items</th>
+                  <th className="p-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -583,6 +784,31 @@ export default function AdminMangaAutoUpdate() {
                     <td className="p-2">{q.imagesUploaded}</td>
                     <td className="p-2">{q.errorCount}</td>
                     <td className="p-2">{q.itemsCount}</td>
+                    <td className="p-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startPollingQueue(q.id)}
+                          className="rounded border border-border bg-transparent px-2 py-1 text-xs text-txt-primary hover:bg-white/5"
+                        >
+                          Mở
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => pauseQueueOnServer(q.id)}
+                          className="rounded bg-yellow-700 px-2 py-1 text-xs text-white hover:bg-yellow-600"
+                        >
+                          Hủy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteQueueOnServer(q.id)}
+                          className="rounded bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-600"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
