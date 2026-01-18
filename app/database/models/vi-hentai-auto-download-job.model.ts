@@ -1,6 +1,6 @@
 import { model, Schema } from "mongoose";
 
-export type ViHentaiAutoDownloadJobStatus = "queued" | "running" | "paused" | "succeeded" | "failed";
+export type ViHentaiAutoDownloadJobStatus = "queued" | "running" | "succeeded" | "failed";
 
 export type ViHentaiAutoDownloadJobProgress = {
   stage?: "manga" | "poster" | "chapters" | "chapter" | "image" | "done";

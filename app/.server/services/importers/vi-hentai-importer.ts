@@ -77,32 +77,6 @@ const sanitizeWhitespace = (value?: string | null) => {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-class ViHentaiForcedPauseError extends Error {
-  code = "VI_HENTAI_FORCED_PAUSE" as const;
-
-  constructor(message = "Đã tạm dừng (force)") {
-    super(message);
-    this.name = "ViHentaiForcedPauseError";
-  }
-}
-
-async function sleepAbortable(ms: number, options: { signal?: AbortSignal; checkAbort?: () => Promise<void> | void }) {
-  if (!ms || ms <= 0) return;
-
-  const { signal, checkAbort } = options;
-  const endAt = Date.now() + ms;
-  const stepMs = 250;
-
-  while (Date.now() < endAt) {
-    if (signal?.aborted) throw new ViHentaiForcedPauseError();
-    if (checkAbort) await checkAbort();
-
-    const remaining = endAt - Date.now();
-    if (remaining <= 0) break;
-    await sleep(Math.min(stepMs, remaining));
-  }
-}
-
 // Reduce upstream rate-limits (429) from vi-hentai when auto-updating/downloading.
 // This only applies to HTML page fetches (manga/chapter pages), NOT image downloads.
 const VIHENTAI_HTML_MIN_INTERVAL_MS = (() => {
@@ -359,10 +333,6 @@ export type ViHentaiAutoDownloadOptions = ViHentaiImportOptions & {
   imageTimeoutMs?: number;
   imageRetries?: number;
   chapterDelayMs?: number;
-  /** Force-stop support (used by the background queue worker). */
-  abortSignal?: AbortSignal;
-  /** Return a string reason to abort ASAP (e.g. when admin force-pauses the running job). */
-  shouldAbort?: () => Promise<string | undefined> | string | undefined;
   onProgress?: (progress: {
     stage: "manga" | "poster" | "chapters" | "chapter" | "image" | "done";
     message?: string;
@@ -717,19 +687,13 @@ const safeFilenameFromUrl = (rawUrl: string, fallbackBase: string, contentType?:
 
 async function fetchRemoteBuffer(
   url: string,
-  options: { timeoutMs?: number; headers?: Record<string, string>; signal?: AbortSignal } = {},
+  options: { timeoutMs?: number; headers?: Record<string, string> } = {},
 ): Promise<{ buffer: Buffer; contentType: string | null }> {
   const timeoutMs = options.timeoutMs ?? 30_000;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
 
-  const onAbort = () => ac.abort();
   try {
-    if (options.signal) {
-      if (options.signal.aborted) ac.abort();
-      else options.signal.addEventListener("abort", onAbort, { once: true });
-    }
-
     const response = await fetch(url, {
       headers: options.headers ?? HEADERS,
       redirect: "follow",
@@ -741,21 +705,8 @@ async function fetchRemoteBuffer(
     const contentType = response.headers.get("content-type");
     const arrayBuffer = await response.arrayBuffer();
     return { buffer: Buffer.from(arrayBuffer), contentType };
-  } catch (e) {
-    // Distinguish forced pause vs our own timeout abort.
-    if (options.signal?.aborted) {
-      throw new ViHentaiForcedPauseError();
-    }
-    throw e;
   } finally {
     clearTimeout(timer);
-    if (options.signal) {
-      try {
-        options.signal.removeEventListener("abort", onAbort);
-      } catch {
-        // ignore
-      }
-    }
   }
 }
 
@@ -766,7 +717,6 @@ async function fetchRemoteBufferWithRetry(
     headers?: Record<string, string>;
     retries?: number;
     retryDelayMs?: number;
-    signal?: AbortSignal;
   } = {},
 ): Promise<{ buffer: Buffer; contentType: string | null }> {
   const retries = Number.isFinite(options.retries) ? Math.max(0, options.retries ?? 0) : 0;
@@ -774,14 +724,12 @@ async function fetchRemoteBufferWithRetry(
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      if (options.signal?.aborted) throw new ViHentaiForcedPauseError();
       if (attempt > 0 && (options.retryDelayMs ?? 0) > 0) {
-        await sleepAbortable(options.retryDelayMs ?? 0, { signal: options.signal });
+        await sleep(options.retryDelayMs ?? 0);
       }
       return await fetchRemoteBuffer(url, {
         timeoutMs: options.timeoutMs,
         headers: options.headers,
-        signal: options.signal,
       });
     } catch (e) {
       lastError = e;
@@ -1933,29 +1881,9 @@ export async function autoDownloadViHentaiManga(
     imageTimeoutMs = 30_000,
     imageRetries = 2,
     chapterDelayMs = 2_000,
-    abortSignal,
-    shouldAbort,
     onProgress,
     ...importOptions
   } = options;
-
-  let lastAbortCheckAt = 0;
-  let cachedAbortReason: string | undefined;
-  const checkAbort = async () => {
-    if (abortSignal?.aborted) throw new ViHentaiForcedPauseError();
-    if (!shouldAbort) return;
-
-    const now = Date.now();
-    if (cachedAbortReason) throw new ViHentaiForcedPauseError(cachedAbortReason);
-    if (now - lastAbortCheckAt < 400) return;
-    lastAbortCheckAt = now;
-
-    const reason = await shouldAbort();
-    if (reason) {
-      cachedAbortReason = reason;
-      throw new ViHentaiForcedPauseError(reason);
-    }
-  };
 
   const emitProgress = async (payload: Parameters<NonNullable<typeof onProgress>>[0]) => {
     if (!onProgress) return;
@@ -1967,10 +1895,8 @@ export async function autoDownloadViHentaiManga(
   };
 
   // Step 1: create Manga (same as import)
-  await checkAbort();
   await emitProgress({ stage: "manga", message: "Đang tải trang truyện..." });
   const parsed = await fetchViHentaiPage(importOptions.url);
-  await checkAbort();
   await emitProgress({ stage: "manga", message: `Đã parse truyện: ${parsed.title || ""}`.trim() });
   const mapped = await mapGenres(parsed.rawGenres);
   const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
@@ -2011,14 +1937,12 @@ export async function autoDownloadViHentaiManga(
 
   // Optional: download poster to our storage and store CDN URL
   if (downloadPoster) {
-    await checkAbort();
     await emitProgress({ stage: "poster", message: "Đang tải poster..." });
     try {
       const fetchedPoster = await fetchRemoteBufferWithRetry(parsed.poster, {
         timeoutMs: imageTimeoutMs,
         retries: imageRetries,
         retryDelayMs: 800,
-        signal: abortSignal,
         headers: {
           ...HEADERS,
           Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -2091,7 +2015,6 @@ export async function autoDownloadViHentaiManga(
   }
 
   // Step 2: fetch chapter list and import from oldest -> newest
-  await checkAbort();
   await emitProgress({ stage: "chapters", message: "Đang lấy danh sách chương..." });
   const chapterList = await fetchViHentaiChapterList(importOptions.url);
   const chapters = chapterList.entries;
@@ -2125,7 +2048,6 @@ export async function autoDownloadViHentaiManga(
   const { createChapter, createChapterAsAdmin } = await import("~/.server/mutations/chapter.mutation");
 
   for (let chapterIndex = 0; chapterIndex < ordered.length; chapterIndex += 1) {
-    await checkAbort();
     const chapterEntry = ordered[chapterIndex];
     const chapterUrl = chapterEntry.url;
     const chapterPrefix = `manga-images/${String(doc._id)}/${String(chapterIndex + 1).padStart(4, "0")}`;
@@ -2140,7 +2062,6 @@ export async function autoDownloadViHentaiManga(
     });
 
     try {
-      await checkAbort();
       const html = await fetchHtml(chapterUrl);
       const imageUrls = parseChapterImagesFromHtml(html, chapterUrl);
       if (!imageUrls.length) {
@@ -2155,7 +2076,6 @@ export async function autoDownloadViHentaiManga(
       let keptIndex = 0;
 
       for (let imageIndex = 0; imageIndex < imageUrls.length; imageIndex += 1) {
-        await checkAbort();
         const imgUrl = imageUrls[imageIndex];
 
         await emitProgress({
@@ -2171,7 +2091,7 @@ export async function autoDownloadViHentaiManga(
         });
 
         if (imageIndex > 0 && imageDelayMs > 0) {
-          await sleepAbortable(imageDelayMs, { signal: abortSignal, checkAbort });
+          await sleep(imageDelayMs);
         }
 
         // 1) Skip obvious non-content images early
@@ -2187,7 +2107,6 @@ export async function autoDownloadViHentaiManga(
             timeoutMs: imageTimeoutMs,
             retries: imageRetries,
             retryDelayMs: 800,
-            signal: abortSignal,
             headers: {
               ...HEADERS,
               Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -2301,7 +2220,7 @@ export async function autoDownloadViHentaiManga(
       // continue
     } finally {
       if (chapterIndex < ordered.length - 1 && chapterDelayMs > 0) {
-        await sleepAbortable(chapterDelayMs, { signal: abortSignal, checkAbort });
+        await sleep(chapterDelayMs);
       }
     }
   }
