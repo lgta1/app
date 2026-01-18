@@ -579,7 +579,7 @@ export default function EditStory() {
                   <div className="text-txt-secondary text-xs">Gõ <b>a,b,c…</b> để lọc theo chữ đầu; gõ <b> nhiều từ khóa cùng lúc</b> để tìm nhanh hơn.</div>
 
                   <label className="relative w-full max-w-[360px]">
-                    <input value={genreQuery} onChange={(e) => setGenreQuery(e.target.value)} placeholder="Có thể nhập nhiều từ khóa cùng lúc để tìm, vd: manhwa color series ..." className="w-full rounded-md border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+                    <input value={genreQuery} onChange={(e) => setGenreQuery(e.target.value)} placeholder="Có thể nhập nhiều từ khóa cùng lúc để tìm, vd: manhwa color series ..." className="w-full rounded-md border border-bd-default bg-bgc-layer2 px-3 py-2 text-base md:text-sm outline-none focus:ring-2 focus:ring-primary/40" />
                   </label>
 
                   <div className="max-h-[360px] overflow-y-auto rounded-lg border border-white/10 p-3 pr-1 [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]">

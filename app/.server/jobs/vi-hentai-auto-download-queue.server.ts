@@ -18,6 +18,18 @@ async function isAutoUpdateActive(): Promise<boolean> {
 let started = false;
 let busy = false;
 
+let inFlight: { jobId: string; abortController: AbortController } | null = null;
+
+export function forceAbortInFlightViHentaiAutoDownloadJob(): boolean {
+  if (!inFlight) return false;
+  try {
+    inFlight.abortController.abort();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const initViHentaiAutoDownloadQueueWorker = (): void => {
   if (started) return;
   started = true;
@@ -76,6 +88,9 @@ async function processOneJob(): Promise<void> {
 
   if (!job) return;
 
+  const abortController = new AbortController();
+  inFlight = { jobId: String(job._id), abortController };
+
   // Throttle DB writes from per-image progress.
   let lastPersistAt = 0;
   const persistProgress = async (progress: ViHentaiAutoDownloadJobProgress) => {
@@ -114,6 +129,18 @@ async function processOneJob(): Promise<void> {
       asSystem: true,
       maxChapters: typeof job.maxChapters === "number" && job.maxChapters > 0 ? job.maxChapters : 200,
       // importer already has pacing/retry defaults
+      abortSignal: abortController.signal,
+      shouldAbort: async () => {
+        const fresh = await ViHentaiAutoDownloadJobModel.findById(job._id)
+          .select({ status: 1, paused: 1 })
+          .lean();
+
+        // If job doc is missing or no longer running, stop ASAP.
+        if (!fresh) return "Job không còn tồn tại";
+        if ((fresh as any).paused) return "Đã tạm dừng (force)";
+        if ((fresh as any).status !== "running") return "Đã tạm dừng (force)";
+        return undefined;
+      },
       onProgress: async (p) => {
         try {
           await persistProgress(p);
@@ -144,20 +171,40 @@ async function processOneJob(): Promise<void> {
       },
     );
   } catch (error) {
+    const code = (error as any)?.code;
+    const isForcedPause = code === "VI_HENTAI_FORCED_PAUSE";
     const message = error instanceof Error ? error.message : String(error);
-    await ViHentaiAutoDownloadJobModel.updateOne(
-      { _id: job._id },
-      {
-        $set: {
-          status: "failed",
-          finishedAt: new Date(),
-          lastHeartbeatAt: new Date(),
-          errorMessage: message,
-          progress: { stage: "done", message: "Lỗi", updatedAt: new Date() },
+
+    if (isForcedPause) {
+      await ViHentaiAutoDownloadJobModel.updateOne(
+        { _id: job._id },
+        {
+          $set: {
+            status: "paused",
+            paused: true,
+            finishedAt: new Date(),
+            lastHeartbeatAt: new Date(),
+            errorMessage: message || "Đã tạm dừng (force)",
+            progress: { stage: "done", message: "Đã tạm dừng (force)", updatedAt: new Date() },
+          },
         },
-      },
-    );
+      );
+    } else {
+      await ViHentaiAutoDownloadJobModel.updateOne(
+        { _id: job._id },
+        {
+          $set: {
+            status: "failed",
+            finishedAt: new Date(),
+            lastHeartbeatAt: new Date(),
+            errorMessage: message,
+            progress: { stage: "done", message: "Lỗi", updatedAt: new Date() },
+          },
+        },
+      );
+    }
   } finally {
+    inFlight = null;
     // Cooldown between manga jobs (server pacing)
     await sleep(7_000);
   }

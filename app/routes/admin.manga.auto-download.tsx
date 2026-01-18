@@ -55,7 +55,7 @@ type PauseBatchActionResult =
   | { ok: false; error: string };
 
 type BatchControlActionResult =
-  | { ok: true; batchId: string; action: "stop" | "delete" }
+  | { ok: true; batchId: string; action: "stop" | "forcePause" | "delete" }
   | { ok: false; error: string };
 
 type PollBatchLoaderResult =
@@ -101,7 +101,7 @@ type InitialLoaderResult =
         status: "queued" | "running" | "stopped" | "succeeded" | "failed";
         createdAt: string;
         lastActivityAt: string;
-        counts: { total: number; queued: number; running: number; succeeded: number; failed: number; pausedQueued: number };
+        counts: { total: number; queued: number; running: number; paused: number; succeeded: number; failed: number; pausedQueued: number };
       }>;
       jobs: Array<{
         jobId: string;
@@ -198,6 +198,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
               total: { $sum: 1 },
               queued: { $sum: { $cond: [{ $eq: ["$status", "queued"] }, 1, 0] } },
               running: { $sum: { $cond: [{ $eq: ["$status", "running"] }, 1, 0] } },
+              paused: { $sum: { $cond: [{ $eq: ["$status", "paused"] }, 1, 0] } },
               succeeded: { $sum: { $cond: [{ $eq: ["$status", "succeeded"] }, 1, 0] } },
               failed: { $sum: { $cond: [{ $eq: ["$status", "failed"] }, 1, 0] } },
               pausedQueued: {
@@ -230,6 +231,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const batches = (batchSummariesRaw as any[]).map((b) => {
         const queued = Number(b.queued || 0);
         const running = Number(b.running || 0);
+        const paused = Number(b.paused || 0);
         const failed = Number(b.failed || 0);
         const succeeded = Number(b.succeeded || 0);
         const pausedQueued = Number(b.pausedQueued || 0);
@@ -238,7 +240,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
         const status: "queued" | "running" | "stopped" | "succeeded" | "failed" =
           running > 0
             ? "running"
-            : queued > 0 && pausedQueued >= queued
+            : paused > 0 && queued === 0
+              ? "stopped"
+              : queued > 0 && pausedQueued >= queued
               ? "stopped"
               : queued > 0
                 ? "queued"
@@ -257,6 +261,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             total: Number(b.total || 0),
             queued,
             running,
+            paused,
             succeeded,
             failed,
             pausedQueued,
@@ -484,6 +489,53 @@ export async function action({ request }: ActionFunctionArgs) {
     );
 
     const body: BatchControlActionResult = { ok: true, batchId, action: "stop" };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "forcePauseBatch") {
+    const batchId = (formData.get("batchId") || "").toString().trim();
+    if (!batchId) {
+      const body: BatchControlActionResult = { ok: false, error: "Thiếu batchId" };
+      return Response.json(body, { status: 400 });
+    }
+
+    const now = new Date();
+
+    // 1) Pause all queued jobs in the batch
+    await ViHentaiAutoDownloadJobModel.updateMany(
+      { batchId, status: "queued" },
+      { $set: { paused: true } },
+    );
+
+    // 2) Force-stop the running job (if any)
+    const running = await ViHentaiAutoDownloadJobModel.findOne({ batchId, status: "running" })
+      .select({ _id: 1 })
+      .lean();
+    if (running) {
+      await ViHentaiAutoDownloadJobModel.updateOne(
+        { _id: (running as any)._id, status: "running" },
+        {
+          $set: {
+            status: "paused",
+            paused: true,
+            finishedAt: now,
+            lastHeartbeatAt: now,
+            errorMessage: "Đã tạm dừng (force)",
+            progress: { stage: "done", message: "Đã tạm dừng (force)", updatedAt: now },
+          },
+        },
+      );
+    }
+
+    // 3) Best-effort: abort in-flight fetches in this process
+    try {
+      const { forceAbortInFlightViHentaiAutoDownloadJob } = await import("~/.server/jobs/vi-hentai-auto-download-queue.server");
+      forceAbortInFlightViHentaiAutoDownloadJob();
+    } catch {
+      // ignore
+    }
+
+    const body: BatchControlActionResult = { ok: true, batchId, action: "forcePause" };
     return Response.json(body, { status: 200 });
   }
 
@@ -829,6 +881,18 @@ export default function AdminMangaAutoDownload() {
         };
       }
 
+      if (job.status === "paused") {
+        return {
+          id: makeId(),
+          url: job.url,
+          jobId: job.jobId,
+          status: "done",
+          message: job.errorMessage || job.progress?.message || "Đã tạm dừng (force)",
+          startedAt: job.startedAt,
+          finishedAt: job.finishedAt,
+        };
+      }
+
       if (job.status === "succeeded") {
         return {
           id: makeId(),
@@ -1004,6 +1068,15 @@ export default function AdminMangaAutoDownload() {
     if (!ok) return;
     const fd = new FormData();
     fd.set("intent", "stopBatch");
+    fd.set("batchId", batchId);
+    batchControlFetcher.submit(fd, { method: "post" });
+  };
+
+  const forcePauseBatchOnServer = (batchId: string) => {
+    const ok = confirm("CƯỠNG ÉP TẠM DỪNG batch này? (Job đang chạy sẽ bị dừng ngay, ngừng tải ảnh)");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "forcePauseBatch");
     fd.set("batchId", batchId);
     batchControlFetcher.submit(fd, { method: "post" });
   };
@@ -1215,6 +1288,15 @@ export default function AdminMangaAutoDownload() {
           };
         }
 
+        if (job.status === "paused") {
+          return {
+            ...r,
+            status: "done",
+            message: job.errorMessage || job.progress?.message || "Đã tạm dừng (force)",
+            finishedAt: job.finishedAt || new Date().toISOString(),
+          };
+        }
+
         if (job.status === "succeeded") {
           return {
             ...r,
@@ -1395,7 +1477,7 @@ export default function AdminMangaAutoDownload() {
                             <td className="px-3 py-2 text-right text-txt-secondary">
                               <div>{b.counts.total} jobs</div>
                               <div className="text-[11px]">
-                                Q:{b.counts.queued} R:{b.counts.running} OK:{b.counts.succeeded} F:{b.counts.failed}
+                                Q:{b.counts.queued} R:{b.counts.running} P:{b.counts.paused} OK:{b.counts.succeeded} F:{b.counts.failed}
                               </div>
                             </td>
                             <td className="px-3 py-2 text-right">
@@ -1438,6 +1520,16 @@ export default function AdminMangaAutoDownload() {
                                   className="rounded-lg border border-bd-default px-3 py-1 text-[11px] font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
                                 >
                                   Dừng
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => forcePauseBatchOnServer(b.batchId)}
+                                  disabled={isBusy}
+                                  className="rounded-lg border border-yellow-500/30 px-3 py-1 text-[11px] font-semibold text-yellow-100 hover:bg-yellow-500/10 disabled:opacity-50"
+                                  title="Cưỡng ép tạm dừng ngay cả khi đang running"
+                                >
+                                  Force pause
                                 </button>
 
                                 <button
