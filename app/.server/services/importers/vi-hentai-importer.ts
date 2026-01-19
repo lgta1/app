@@ -77,6 +77,29 @@ const sanitizeWhitespace = (value?: string | null) => {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const sleepWithAbort = (ms: number, signal?: AbortSignal) => {
+  if (!signal) return sleep(ms);
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new Error("Đã hủy"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(new Error("Đã hủy"));
+    };
+    const t = setTimeout(() => {
+      try {
+        signal.removeEventListener("abort", onAbort);
+      } catch {
+        // ignore
+      }
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+};
+
 // Reduce upstream rate-limits (429) from vi-hentai when auto-updating/downloading.
 // This only applies to HTML page fetches (manga/chapter pages), NOT image downloads.
 const VIHENTAI_HTML_MIN_INTERVAL_MS = (() => {
@@ -336,6 +359,10 @@ export type ViHentaiAutoDownloadOptions = ViHentaiImportOptions & {
   onProgress?: (progress: {
     stage: "manga" | "poster" | "chapters" | "chapter" | "image" | "done";
     message?: string;
+
+    mangaId?: string;
+    mangaSlug?: string;
+
     chapterIndex?: number;
     chapterCount?: number;
     chapterTitle?: string;
@@ -344,6 +371,9 @@ export type ViHentaiAutoDownloadOptions = ViHentaiImportOptions & {
     imageCount?: number;
     imageUrl?: string;
   }) => void | Promise<void>;
+
+  /** Abort the download immediately (used by hard delete). */
+  abortSignal?: AbortSignal;
 };
 
 export type ViHentaiImportResult = {
@@ -384,8 +414,8 @@ export type ViHentaiAutoDownloadResult = ViHentaiImportResult & {
   chapterErrors: Array<{ chapterUrl: string; message: string }>;
 };
 
-const fetchHtml = async (url: string) => {
-  const response = await fetch(url, { headers: HEADERS });
+const fetchHtml = async (url: string, options: { signal?: AbortSignal } = {}) => {
+  const response = await fetch(url, { headers: HEADERS, signal: options.signal });
   if (!response.ok) {
     throw new Error(`Không thể tải trang (${response.status} ${response.statusText})`);
   }
@@ -687,11 +717,16 @@ const safeFilenameFromUrl = (rawUrl: string, fallbackBase: string, contentType?:
 
 async function fetchRemoteBuffer(
   url: string,
-  options: { timeoutMs?: number; headers?: Record<string, string> } = {},
+  options: { timeoutMs?: number; headers?: Record<string, string>; signal?: AbortSignal } = {},
 ): Promise<{ buffer: Buffer; contentType: string | null }> {
   const timeoutMs = options.timeoutMs ?? 30_000;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
+  const onAbort = () => ac.abort();
+  if (options.signal) {
+    if (options.signal.aborted) ac.abort();
+    else options.signal.addEventListener("abort", onAbort, { once: true });
+  }
 
   try {
     const response = await fetch(url, {
@@ -707,6 +742,13 @@ async function fetchRemoteBuffer(
     return { buffer: Buffer.from(arrayBuffer), contentType };
   } finally {
     clearTimeout(timer);
+    if (options.signal) {
+      try {
+        options.signal.removeEventListener("abort", onAbort);
+      } catch {
+        // ignore
+      }
+    }
   }
 }
 
@@ -717,6 +759,7 @@ async function fetchRemoteBufferWithRetry(
     headers?: Record<string, string>;
     retries?: number;
     retryDelayMs?: number;
+    signal?: AbortSignal;
   } = {},
 ): Promise<{ buffer: Buffer; contentType: string | null }> {
   const retries = Number.isFinite(options.retries) ? Math.max(0, options.retries ?? 0) : 0;
@@ -725,11 +768,12 @@ async function fetchRemoteBufferWithRetry(
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
       if (attempt > 0 && (options.retryDelayMs ?? 0) > 0) {
-        await sleep(options.retryDelayMs ?? 0);
+        await sleepWithAbort(options.retryDelayMs ?? 0, options.signal);
       }
       return await fetchRemoteBuffer(url, {
         timeoutMs: options.timeoutMs,
         headers: options.headers,
+        signal: options.signal,
       });
     } catch (e) {
       lastError = e;
@@ -1002,6 +1046,7 @@ type ViHentaiChapterListResult = {
   entries: ViHentaiChapterEntry[];
   expectedCount?: number;
   sourceOrder: "asc" | "desc" | "unknown";
+  warnings?: string[];
 };
 
 const extractChapterNumber = (value?: string) => {
@@ -1158,17 +1203,23 @@ const parseChapterList = ($: CheerioAPI, baseUrl: string): ViHentaiChapterListRe
     throw new Error("Danh sách chương rỗng (không lấy được link chương từ mục 'Danh sách chương')");
   }
 
+  const warnings: string[] = [];
   if (expectedCount && entries.length !== expectedCount) {
-    throw new Error(`Số chương không khớp: header=${expectedCount}, parsed=${entries.length}. Không tiếp tục để tránh sai dữ liệu.`);
+    const warning = `Cảnh báo: Số chương không khớp: header=${expectedCount}, parsed=${entries.length}. Tiếp tục tải theo parsed=${entries.length}.`;
+    warnings.push(warning);
+    console.warn("[fetchViHentaiChapterList]", warning);
   }
 
   const sourceOrder = detectChapterListOrder(entries);
 
-  return { entries, expectedCount, sourceOrder };
+  return { entries, expectedCount, sourceOrder, warnings: warnings.length ? warnings : undefined };
 };
 
-export async function fetchViHentaiChapterList(url: string): Promise<ViHentaiChapterListResult> {
-  const html = await fetchHtml(url);
+export async function fetchViHentaiChapterList(
+  url: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<ViHentaiChapterListResult> {
+  const html = await fetchHtml(url, { signal: options.signal });
   const $ = load(html);
   return parseChapterList($, url);
 }
@@ -1772,8 +1823,8 @@ const prepareBaseMangaPayload = (
   };
 };
 
-export const fetchViHentaiPage = async (url: string) => {
-  const html = await fetchHtml(url);
+export const fetchViHentaiPage = async (url: string, options: { signal?: AbortSignal } = {}) => {
+  const html = await fetchHtml(url, { signal: options.signal });
   return parsePage(html, url);
 };
 
@@ -1882,8 +1933,15 @@ export async function autoDownloadViHentaiManga(
     imageRetries = 2,
     chapterDelayMs = 2_000,
     onProgress,
+    abortSignal,
     ...importOptions
   } = options;
+
+  const throwIfAborted = () => {
+    if (abortSignal?.aborted) {
+      throw new Error("Đã hủy (hard delete)");
+    }
+  };
 
   const emitProgress = async (payload: Parameters<NonNullable<typeof onProgress>>[0]) => {
     if (!onProgress) return;
@@ -1895,8 +1953,10 @@ export async function autoDownloadViHentaiManga(
   };
 
   // Step 1: create Manga (same as import)
+  throwIfAborted();
   await emitProgress({ stage: "manga", message: "Đang tải trang truyện..." });
-  const parsed = await fetchViHentaiPage(importOptions.url);
+  const parsed = await fetchViHentaiPage(importOptions.url, { signal: abortSignal });
+  throwIfAborted();
   await emitProgress({ stage: "manga", message: `Đã parse truyện: ${parsed.title || ""}`.trim() });
   const mapped = await mapGenres(parsed.rawGenres);
   const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
@@ -1937,12 +1997,14 @@ export async function autoDownloadViHentaiManga(
 
   // Optional: download poster to our storage and store CDN URL
   if (downloadPoster) {
+    throwIfAborted();
     await emitProgress({ stage: "poster", message: "Đang tải poster..." });
     try {
       const fetchedPoster = await fetchRemoteBufferWithRetry(parsed.poster, {
         timeoutMs: imageTimeoutMs,
         retries: imageRetries,
         retryDelayMs: 800,
+        signal: abortSignal,
         headers: {
           ...HEADERS,
           Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -1954,6 +2016,8 @@ export async function autoDownloadViHentaiManga(
       const normalizedPoster = await normalizePosterBuffer(fetchedPoster.buffer, {
         contentType: fetchedPoster.contentType,
       });
+
+      throwIfAborted();
 
       const uploaded = await uploadImageBuffer(parsed.poster, normalizedPoster.buffer, normalizedPoster.contentType, {
         prefixPath: "manga-posters",
@@ -1990,7 +2054,16 @@ export async function autoDownloadViHentaiManga(
   payload = await ensureDoujinshiDocuments(payload);
   payload = await ensureCharacterDocuments(payload);
 
+  throwIfAborted();
+
   const doc = await MangaModel.create(payload);
+
+  await emitProgress({
+    stage: "manga",
+    message: "Đã tạo truyện",
+    mangaId: String(doc._id),
+    mangaSlug: String((doc as any).slug || ""),
+  });
 
   const resultBase: ViHentaiAutoDownloadResult = {
     url: importOptions.url,
@@ -2015,8 +2088,16 @@ export async function autoDownloadViHentaiManga(
   }
 
   // Step 2: fetch chapter list and import from oldest -> newest
+  throwIfAborted();
   await emitProgress({ stage: "chapters", message: "Đang lấy danh sách chương..." });
-  const chapterList = await fetchViHentaiChapterList(importOptions.url);
+  const chapterList = await fetchViHentaiChapterList(importOptions.url, { signal: abortSignal });
+  throwIfAborted();
+  if (chapterList.warnings?.length) {
+    for (const warning of chapterList.warnings) {
+      throwIfAborted();
+      await emitProgress({ stage: "chapters", message: warning });
+    }
+  }
   const chapters = chapterList.entries;
   if (!chapters.length) {
     throw new Error("Danh sách chương rỗng");
@@ -2048,6 +2129,7 @@ export async function autoDownloadViHentaiManga(
   const { createChapter, createChapterAsAdmin } = await import("~/.server/mutations/chapter.mutation");
 
   for (let chapterIndex = 0; chapterIndex < ordered.length; chapterIndex += 1) {
+    throwIfAborted();
     const chapterEntry = ordered[chapterIndex];
     const chapterUrl = chapterEntry.url;
     const chapterPrefix = `manga-images/${String(doc._id)}/${String(chapterIndex + 1).padStart(4, "0")}`;
@@ -2062,7 +2144,8 @@ export async function autoDownloadViHentaiManga(
     });
 
     try {
-      const html = await fetchHtml(chapterUrl);
+      throwIfAborted();
+      const html = await fetchHtml(chapterUrl, { signal: abortSignal });
       const imageUrls = parseChapterImagesFromHtml(html, chapterUrl);
       if (!imageUrls.length) {
         throw new Error("Không tìm thấy ảnh trong trang chương");
@@ -2076,6 +2159,7 @@ export async function autoDownloadViHentaiManga(
       let keptIndex = 0;
 
       for (let imageIndex = 0; imageIndex < imageUrls.length; imageIndex += 1) {
+        throwIfAborted();
         const imgUrl = imageUrls[imageIndex];
 
         await emitProgress({
@@ -2091,7 +2175,7 @@ export async function autoDownloadViHentaiManga(
         });
 
         if (imageIndex > 0 && imageDelayMs > 0) {
-          await sleep(imageDelayMs);
+          await sleepWithAbort(imageDelayMs, abortSignal);
         }
 
         // 1) Skip obvious non-content images early
@@ -2107,6 +2191,7 @@ export async function autoDownloadViHentaiManga(
             timeoutMs: imageTimeoutMs,
             retries: imageRetries,
             retryDelayMs: 800,
+            signal: abortSignal,
             headers: {
               ...HEADERS,
               Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -2132,12 +2217,14 @@ export async function autoDownloadViHentaiManga(
 
         keptIndex += 1;
         try {
+          throwIfAborted();
           const normalized = await normalizeChapterImageBuffer({
             url: imgUrl,
             buffer: fetched.buffer,
             contentType: fetched.contentType,
           });
 
+          throwIfAborted();
           const uploadedOne = await uploadImageBuffer(imgUrl, normalized.buffer, normalized.contentType, {
             prefixPath: chapterPrefix,
             filenameHintBase: `page-${String(keptIndex).padStart(3, "0")}`,
@@ -2181,6 +2268,7 @@ export async function autoDownloadViHentaiManga(
       const totalBytes = uploaded.reduce((sum, u) => sum + (u.sizeBytes || 0), 0);
 
       try {
+        throwIfAborted();
         if (asSystem) {
           await createChapterAsAdmin({
             mangaId: String(doc._id),
@@ -2220,7 +2308,7 @@ export async function autoDownloadViHentaiManga(
       // continue
     } finally {
       if (chapterIndex < ordered.length - 1 && chapterDelayMs > 0) {
-        await sleep(chapterDelayMs);
+        await sleepWithAbort(chapterDelayMs, abortSignal);
       }
     }
   }

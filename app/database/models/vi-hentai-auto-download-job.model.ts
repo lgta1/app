@@ -6,6 +6,9 @@ export type ViHentaiAutoDownloadJobProgress = {
   stage?: "manga" | "poster" | "chapters" | "chapter" | "image" | "done";
   message?: string;
 
+  mangaId?: string;
+  mangaSlug?: string;
+
   chapterIndex?: number; // 1-based
   chapterCount?: number;
   chapterTitle?: string;
@@ -47,6 +50,12 @@ export type ViHentaiAutoDownloadJobType = {
   status: ViHentaiAutoDownloadJobStatus;
   paused?: boolean;
 
+  cancelRequestedAt?: Date;
+  hardDeleteRequestedAt?: Date;
+
+  createdMangaId?: string;
+  createdMangaSlug?: string;
+
   startedAt?: Date;
   finishedAt?: Date;
   lastHeartbeatAt?: Date;
@@ -79,6 +88,12 @@ const ViHentaiAutoDownloadJobSchema = new Schema<ViHentaiAutoDownloadJobType>(
     status: { type: String, required: true, index: true },
     paused: { type: Boolean, default: false, index: true },
 
+    cancelRequestedAt: { type: Date },
+    hardDeleteRequestedAt: { type: Date },
+
+    createdMangaId: { type: String },
+    createdMangaSlug: { type: String },
+
     startedAt: { type: Date },
     finishedAt: { type: Date },
     lastHeartbeatAt: { type: Date },
@@ -87,6 +102,10 @@ const ViHentaiAutoDownloadJobSchema = new Schema<ViHentaiAutoDownloadJobType>(
       type: {
         stage: { type: String },
         message: { type: String },
+
+        mangaId: { type: String },
+        mangaSlug: { type: String },
+
         chapterIndex: { type: Number },
         chapterCount: { type: Number },
         chapterTitle: { type: String },

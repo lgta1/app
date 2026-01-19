@@ -11,6 +11,30 @@ const STALE_HEARTBEAT_MS = 15 * 60 * 1000;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const abortControllersByJobId = new Map<string, AbortController>();
+
+export const requestAbortViHentaiAutoDownloadJob = (jobId: string): boolean => {
+  const ac = abortControllersByJobId.get(String(jobId));
+  if (!ac) return false;
+  try {
+    ac.abort();
+  } catch {
+    // ignore
+  }
+  return true;
+};
+
+export const requestAbortViHentaiAutoDownloadBatch = async (batchId: string): Promise<number> => {
+  const running = await ViHentaiAutoDownloadJobModel.find({ batchId, status: "running" })
+    .select({ _id: 1 })
+    .lean();
+  let n = 0;
+  for (const j of running) {
+    if (requestAbortViHentaiAutoDownloadJob(String((j as any)._id))) n += 1;
+  }
+  return n;
+};
+
 async function isAutoUpdateActive(): Promise<boolean> {
   const now = new Date();
   const lock = await SystemLockModel.findOne({ key: AUTO_UPDATE_LOCK_KEY, lockedUntil: { $gt: now } })
@@ -89,7 +113,12 @@ async function processOneJob(): Promise<void> {
   }
 
   const job = await ViHentaiAutoDownloadJobModel.findOneAndUpdate(
-    { status: "queued", paused: { $ne: true } },
+    {
+      status: "queued",
+      paused: { $ne: true },
+      cancelRequestedAt: { $exists: false },
+      hardDeleteRequestedAt: { $exists: false },
+    },
     {
       $set: {
         status: "running",
@@ -108,19 +137,39 @@ async function processOneJob(): Promise<void> {
   let lastPersistAt = 0;
   const persistProgress = async (progress: ViHentaiAutoDownloadJobProgress) => {
     const now = Date.now();
-    if (now - lastPersistAt < 1200) return;
+    const hasMangaInfo = Boolean((progress as any).mangaId || (progress as any).mangaSlug);
+    if (!hasMangaInfo && now - lastPersistAt < 1200) return;
     lastPersistAt = now;
 
-    await ViHentaiAutoDownloadJobModel.updateOne(
-      { _id: job._id },
-      {
-        $set: {
-          progress: { ...progress, updatedAt: new Date() },
-          lastHeartbeatAt: new Date(),
-        },
-      },
-    );
+    const set: any = {
+      progress: { ...progress, updatedAt: new Date() },
+      lastHeartbeatAt: new Date(),
+    };
+    if ((progress as any).mangaId) set.createdMangaId = String((progress as any).mangaId);
+    if ((progress as any).mangaSlug) set.createdMangaSlug = String((progress as any).mangaSlug);
+
+    await ViHentaiAutoDownloadJobModel.updateOne({ _id: job._id }, { $set: set });
   };
+
+  const jobId = String((job as any)._id);
+  const abortController = new AbortController();
+  abortControllersByJobId.set(jobId, abortController);
+
+  // Poll DB for cancel/hard-delete signals to abort even if the request hit another instance.
+  const cancelPoll = setInterval(() => {
+    void (async () => {
+      try {
+        const doc = await ViHentaiAutoDownloadJobModel.findById(jobId)
+          .select({ cancelRequestedAt: 1, hardDeleteRequestedAt: 1 })
+          .lean();
+        if ((doc as any)?.cancelRequestedAt || (doc as any)?.hardDeleteRequestedAt) {
+          abortController.abort();
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, 500);
 
   try {
     const contentType = job.contentType === "COSPLAY" ? MANGA_CONTENT_TYPE.COSPLAY : MANGA_CONTENT_TYPE.MANGA;
@@ -142,6 +191,7 @@ async function processOneJob(): Promise<void> {
       asSystem: true,
       maxChapters: typeof job.maxChapters === "number" && job.maxChapters > 0 ? job.maxChapters : 200,
       // importer already has pacing/retry defaults
+      abortSignal: abortController.signal,
       onProgress: async (p: ViHentaiAutoDownloadJobProgress) => {
         try {
           await persistProgress(p);
@@ -186,6 +236,12 @@ async function processOneJob(): Promise<void> {
       },
     );
   } finally {
+    try {
+      clearInterval(cancelPoll);
+    } catch {
+      // ignore
+    }
+    abortControllersByJobId.delete(jobId);
     // Cooldown between manga jobs (server pacing)
     await sleep(7_000);
   }

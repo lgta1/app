@@ -55,7 +55,7 @@ type PauseBatchActionResult =
   | { ok: false; error: string };
 
 type BatchControlActionResult =
-  | { ok: true; batchId: string; action: "stop" | "delete" }
+  | { ok: true; batchId: string; action: "stop" | "delete" | "hard-delete" }
   | { ok: false; error: string };
 
 type PollBatchLoaderResult =
@@ -504,6 +504,142 @@ export async function action({ request }: ActionFunctionArgs) {
 
     await ViHentaiAutoDownloadJobModel.deleteMany({ batchId });
     const body: BatchControlActionResult = { ok: true, batchId, action: "delete" };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "hardDeleteBatch") {
+    const batchId = (formData.get("batchId") || "").toString().trim();
+    if (!batchId) {
+      const body: BatchControlActionResult = { ok: false, error: "Thiếu batchId" };
+      return Response.json(body, { status: 400 });
+    }
+
+    const now = new Date();
+
+    // 1) Request cancel for ALL jobs in batch (queued + running).
+    await ViHentaiAutoDownloadJobModel.updateMany(
+      { batchId },
+      { $set: { paused: true, cancelRequestedAt: now, hardDeleteRequestedAt: now } },
+    );
+
+    // 2) Best-effort in-process abort (if this request hits the same instance running the worker).
+    try {
+      const { requestAbortViHentaiAutoDownloadBatch } = await import("~/.server/jobs/vi-hentai-auto-download-queue.server");
+      await requestAbortViHentaiAutoDownloadBatch(batchId);
+    } catch {
+      // ignore
+    }
+
+    // 3) Wait a bit for running job to abort (to avoid racing cleanup).
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    const timeoutMs = 20_000;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const running = await ViHentaiAutoDownloadJobModel.findOne({ batchId, status: "running" })
+        .select({ _id: 1 })
+        .lean();
+      if (!running) break;
+      await sleep(250);
+    }
+
+    const stillRunning = await ViHentaiAutoDownloadJobModel.findOne({ batchId, status: "running" })
+      .select({ _id: 1 })
+      .lean();
+    if (stillRunning) {
+      const body: BatchControlActionResult = {
+        ok: false,
+        error: "Không thể dừng job đang chạy kịp thời (timeout). Vui lòng bấm Hard delete lại sau vài giây.",
+      };
+      return Response.json(body, { status: 409 });
+    }
+
+    // 4) Collect created manga IDs from jobs (even partial runs).
+    const jobs = await ViHentaiAutoDownloadJobModel.find({ batchId })
+      .select({ createdMangaId: 1, progress: 1, result: 1 })
+      .lean();
+    const mangaIds = new Set<string>();
+    for (const j of jobs) {
+      const createdMangaId = String((j as any).createdMangaId || "");
+      const progressMangaId = String((j as any).progress?.mangaId || "");
+      const resultMangaId = String((j as any).result?.createdId || "");
+      if (createdMangaId) mangaIds.add(createdMangaId);
+      if (progressMangaId) mangaIds.add(progressMangaId);
+      if (resultMangaId) mangaIds.add(resultMangaId);
+    }
+
+    // 5) Cleanup storage + DB docs.
+    if (mangaIds.size) {
+      const { MangaModel } = await import("~/database/models/manga.model");
+      const { deleteManga } = await import("~/.server/mutations/manga.mutation");
+      const { listFiles, deleteFiles, getEnvironmentPrefix } = await import("~/utils/minio.utils");
+      const { MINIO_CONFIG } = await import("@/configs/minio.config");
+
+      const envPrefix = getEnvironmentPrefix();
+      const bucketMarker = `/${String((MINIO_CONFIG as any).DEFAULT_BUCKET || "")}/`;
+      const cdnBase = ((process.env.CDN_BASE ?? "").trim() || "https://cdn.hoangsatruongsalacuavietnam.site").replace(/\/+$/, "");
+
+      const toFullPathIfInternal = (urlRaw?: string | null) => {
+        const u = (urlRaw || "").toString().trim();
+        if (!u) return null;
+        if (!(u.startsWith(cdnBase + "/") || u.includes(bucketMarker))) return null;
+        try {
+          const url = new URL(u);
+          if (bucketMarker && url.pathname.includes(bucketMarker)) {
+            const rest = url.pathname.split(bucketMarker)[1];
+            return rest ? rest.replace(/^\/+/, "") : null;
+          }
+          return url.pathname.replace(/^\/+/, "");
+        } catch {
+          return null;
+        }
+      };
+
+      const deletePrefix = async (prefixPath: string) => {
+        const normalized = prefixPath.replace(/^\/+|\/+$/g, "");
+        const actualPrefix = envPrefix ? `${envPrefix}/${normalized}` : normalized;
+        const files = await listFiles({ prefixPath: actualPrefix, recursive: true, isPublic: true } as any);
+        const fullPaths = files.map((f: any) => String(f.fullPath || "")).filter(Boolean);
+        const CHUNK = 500;
+        for (let i = 0; i < fullPaths.length; i += CHUNK) {
+          await deleteFiles(fullPaths.slice(i, i + CHUNK));
+        }
+      };
+
+      await Promise.allSettled(
+        Array.from(mangaIds).map(async (mangaId) => {
+          try {
+            // 5.1) delete all chapter images under prefix
+            await deletePrefix(`manga-images/${mangaId}`);
+
+            // 5.2) delete poster/shareImage if they are internal URLs
+            const manga = await MangaModel.findById(mangaId)
+              .select({ poster: 1, shareImage: 1 })
+              .lean();
+
+            const posterFullPath = toFullPathIfInternal((manga as any)?.poster);
+            const shareFullPath = toFullPathIfInternal((manga as any)?.shareImage);
+            const toDelete = [posterFullPath, shareFullPath].filter(Boolean) as string[];
+            if (toDelete.length) {
+              try {
+                await deleteFiles(toDelete);
+              } catch {
+                // ignore
+              }
+            }
+
+            // 5.3) delete DB cascade
+            await deleteManga(request, mangaId);
+          } catch {
+            // Best-effort cleanup; keep going
+          }
+        }),
+      );
+    }
+
+    // 6) Finally, delete the whole batch jobs.
+    await ViHentaiAutoDownloadJobModel.deleteMany({ batchId });
+
+    const body: BatchControlActionResult = { ok: true, batchId, action: "hard-delete" };
     return Response.json(body, { status: 200 });
   }
 
@@ -1017,6 +1153,17 @@ export default function AdminMangaAutoDownload() {
     batchControlFetcher.submit(fd, { method: "post" });
   };
 
+  const hardDeleteBatchOnServer = (batchId: string) => {
+    const ok = confirm(
+      "HARD DELETE batch này?\n- Dừng ngay job đang chạy\n- Xóa truyện/chương/ảnh đã tạo dở\n- Xóa toàn bộ job trong batch\n\nThao tác này không thể hoàn tác.",
+    );
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "hardDeleteBatch");
+    fd.set("batchId", batchId);
+    batchControlFetcher.submit(fd, { method: "post" });
+  };
+
   const submitExtractListing = (url: string) => {
     const fd = new FormData();
     fd.set("intent", "extractListing");
@@ -1135,6 +1282,14 @@ export default function AdminMangaAutoDownload() {
     if (!batchControlFetcher.data.ok) {
       alert(batchControlFetcher.data.error);
       return;
+    }
+
+    const action = batchControlFetcher.data.action;
+    const batchId = batchControlFetcher.data.batchId;
+    if ((action === "delete" || action === "hard-delete") && activeBatchIdRef.current === batchId) {
+      activeBatchIdRef.current = null;
+      setActiveBatchId(null);
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     }
     revalidator.revalidate();
   }, [batchControlFetcher.state, batchControlFetcher.data]);
@@ -1448,6 +1603,16 @@ export default function AdminMangaAutoDownload() {
                                   title={!canDelete ? "Không thể xóa khi đang có job running" : "Xóa batch"}
                                 >
                                   Xóa
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => hardDeleteBatchOnServer(b.batchId)}
+                                  disabled={isBusy}
+                                  className="rounded-lg border border-red-500 px-3 py-1 text-[11px] font-semibold text-red-100 hover:bg-red-500/20 disabled:opacity-50"
+                                  title="Hard delete: dừng ngay + xóa sạch dữ liệu đã tạo"
+                                >
+                                  Hard delete
                                 </button>
                               </div>
                             </td>
