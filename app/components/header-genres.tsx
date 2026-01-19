@@ -169,7 +169,7 @@ export function HeaderGenres({ genres }: HeaderGenresProps) {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Có thể nhập nhiều từ khóa cùng lúc… (vd: manhwa color series)"
-                className="w-full rounded-md border border-bd-default bg-bgc-layer2 pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-md border border-bd-default bg-bgc-layer2 pl-8 pr-3 py-2 text-base outline-none focus:ring-2 focus:ring-primary/40 md:text-sm"
               />
             </label>
 

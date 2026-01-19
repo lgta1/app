@@ -15,7 +15,9 @@
     "backfill:manga-slugs": "tsx scripts/backfill-manga-slugs.ts",
     "backfill:chapter-slugs": "tsx scripts/backfill-chapter-slugs.ts",
     "import:vi-hentai": "tsx scripts/import-vi-hentai.ts",
-    "migrate:cdn-host": "tsx scripts/migrate-cdn-host.ts --dry-run"
+    "migrate:cdn-host": "tsx scripts/migrate-cdn-host.ts --dry-run",
+    "ops:inspect-vi-hentai-jobs": "tsx scripts/ops/inspect-vi-hentai-jobs.ts",
+    "ops:clear-system-lock": "tsx scripts/ops/clear-system-lock.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.888.0",

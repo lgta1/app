@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { Eye } from "lucide-react";
 
 import { LoadingSpinner } from "~/components/loading-spinner";
-import { Pagination } from "~/components/pagination";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
@@ -14,14 +13,11 @@ interface ProfileMangaRecentReadProps {
 export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) {
   const queryParams = userId ? { userId } : undefined;
 
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 300;
   const {
     data: recentReadMangas,
-    currentPage,
-    totalPages,
     isLoading,
     error,
-    goToPage,
   } = usePagination<MangaType>({
     apiUrl: "/api/manga/recent-read",
     limit: PAGE_SIZE,
@@ -98,13 +94,6 @@ export function ProfileMangaRecentRead({ userId }: ProfileMangaRecentReadProps) 
               </Link>
             ))}
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex w-full justify-center">
-              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={goToPage} />
-            </div>
-          )}
         </>
       )}
     </div>

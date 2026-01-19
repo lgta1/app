@@ -295,7 +295,7 @@ const aggregateHotCarouselSnapshot = async () => {
     const views2_8h = Math.max(0, Number(doc?.views_2_8h) || 0);
     const views8_24h = Math.max(0, Number(doc?.views_8_24h) || 0);
     const views24_36h = Math.max(0, Number(doc?.views_24_36h) || 0);
-    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h + views24_36h;
+    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h * 1.0 + views24_36h * 0.5;
     const baseScoreViewsContribution = baseScoreViewsWeighted * (ENV.LEADERBOARD?.daily?.VIEW_WEIGHT ?? 1);
     const baseScoreCommentsContribution = 0;
 
@@ -356,9 +356,10 @@ const aggregateHotCarouselSnapshot = async () => {
 
     let updateBoostMultiplier = 1;
     if (hoursSinceUpdatedAt != null && !hasDisturbingTags) {
-      if (hoursSinceUpdatedAt < 7) updateBoostMultiplier = 1.3;
-      else if (hoursSinceUpdatedAt < 12) updateBoostMultiplier = 1.2;
-      else if (hoursSinceUpdatedAt < 20) updateBoostMultiplier = 1.1;
+      if (hoursSinceUpdatedAt < 2) updateBoostMultiplier = 1.5;
+      else if (hoursSinceUpdatedAt < 6) updateBoostMultiplier = 1.4;
+      else if (hoursSinceUpdatedAt < 12) updateBoostMultiplier = 1.3;
+      else if (hoursSinceUpdatedAt < 24) updateBoostMultiplier = 1.2;
       else updateBoostMultiplier = 1;
     }
 
@@ -530,7 +531,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     const views2_8h = Math.max(0, Number(doc?.views_2_8h) || 0);
     const views8_24h = Math.max(0, Number(doc?.views_8_24h) || 0);
     const views24_36h = Math.max(0, Number(doc?.views_24_36h) || 0);
-    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h + views24_36h;
+    const baseScoreViewsWeighted = views0_2h * 1.5 + views2_8h * 1.3 + views8_24h * 1.0 + views24_36h * 0.5;
     const baseScoreViewsContribution = baseScoreViewsWeighted * (ENV.LEADERBOARD?.daily?.VIEW_WEIGHT ?? 1);
     const baseScoreCommentsContribution = 0;
 
@@ -584,9 +585,10 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
 
     let updateBoostMultiplier = 1;
     if (hoursSinceUpdatedAt != null && !hasDisturbingTags) {
-      if (hoursSinceUpdatedAt < 7) updateBoostMultiplier = 1.3;
-      else if (hoursSinceUpdatedAt < 12) updateBoostMultiplier = 1.2;
-      else if (hoursSinceUpdatedAt < 20) updateBoostMultiplier = 1.1;
+      if (hoursSinceUpdatedAt < 2) updateBoostMultiplier = 1.5;
+      else if (hoursSinceUpdatedAt < 6) updateBoostMultiplier = 1.4;
+      else if (hoursSinceUpdatedAt < 12) updateBoostMultiplier = 1.3;
+      else if (hoursSinceUpdatedAt < 24) updateBoostMultiplier = 1.2;
       else updateBoostMultiplier = 1;
     }
 

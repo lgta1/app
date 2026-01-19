@@ -160,40 +160,53 @@ export const likePost = async (postId: string, userId: string) => {
     throw new BusinessError("ID không hợp lệ");
   }
 
-  const post = await PostModel.findById(postId);
+  const post = await PostModel.findById(postId).select("likeNumber");
   if (!post) {
     throw new BusinessError("Không tìm thấy bài viết");
   }
 
-  // Kiểm tra user đã like hay chưa
-  const existingLike = await UserLikePostModel.findOne({
-    postId,
-    userId,
-  });
+  // Race-safe toggle:
+  // - Like: upsert the relation and only increment counter if inserted
+  // - Unlike: delete the relation and only decrement counter if deleted
+  const existing = await UserLikePostModel.findOne({ postId, userId }).select("_id").lean();
 
-  if (existingLike) {
-    // User đã like, thực hiện unlike
-    await UserLikePostModel.deleteOne({ postId, userId });
-    await PostModel.findByIdAndUpdate(postId, { $inc: { likeNumber: -1 } });
+  if (existing) {
+    const delRes = await UserLikePostModel.deleteOne({ postId, userId });
+    const deleted = (delRes as any)?.deletedCount === 1;
+
+    const updatedPost = await PostModel.findOneAndUpdate(
+      { _id: postId },
+      deleted ? { $inc: { likeNumber: -1 } } : {},
+      { new: true, projection: { likeNumber: 1 } },
+    ).lean();
 
     return {
       success: true,
-      message: "Đã bỏ thích bài viết",
+      message: deleted ? "Đã bỏ thích bài viết" : "Bài viết chưa được thích trước đó",
       isLiked: false,
-      likeNumber: Math.max(0, (post.likeNumber || 0) - 1),
-    };
-  } else {
-    // User chưa like, thực hiện like
-    await UserLikePostModel.create({ postId, userId });
-    await PostModel.findByIdAndUpdate(postId, { $inc: { likeNumber: 1 } });
-
-    return {
-      success: true,
-      message: "Đã thích bài viết",
-      isLiked: true,
-      likeNumber: (post.likeNumber || 0) + 1,
+      likeNumber: Math.max(0, Number((updatedPost as any)?.likeNumber ?? post.likeNumber ?? 0)),
     };
   }
+
+  const upsertRes = await UserLikePostModel.updateOne(
+    { postId, userId },
+    { $setOnInsert: { postId, userId } },
+    { upsert: true },
+  );
+  const inserted = Boolean((upsertRes as any)?.upsertedCount) || Boolean((upsertRes as any)?.upsertedId);
+
+  const updatedPost = await PostModel.findOneAndUpdate(
+    { _id: postId },
+    inserted ? { $inc: { likeNumber: 1 } } : {},
+    { new: true, projection: { likeNumber: 1 } },
+  ).lean();
+
+  return {
+    success: true,
+    message: inserted ? "Đã thích bài viết" : "Bài viết đã được thích trước đó",
+    isLiked: true,
+    likeNumber: Math.max(0, Number((updatedPost as any)?.likeNumber ?? post.likeNumber ?? 0)),
+  };
 };
 
 export const checkUserLikedPost = async (postId: string, userId: string) => {

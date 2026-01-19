@@ -5,6 +5,10 @@ import { SystemLockModel } from "~/database/models/system-lock.model";
 
 const AUTO_UPDATE_LOCK_KEY = "vi-hentai-auto-update";
 
+// If a running job stops updating heartbeat (process crash / hung IO), it can block the whole queue forever.
+// Auto-fail it after a grace period so the worker can continue.
+const STALE_HEARTBEAT_MS = 15 * 60 * 1000;
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 async function isAutoUpdateActive(): Promise<boolean> {
@@ -55,10 +59,34 @@ async function processOneJob(): Promise<void> {
   if (await isAutoUpdateActive()) return;
 
   // Safety: if there is already a running job, don't start another.
+  // Self-heal: if that running job has a stale heartbeat, mark it failed to unblock the queue.
+  const now = new Date();
   const running = await ViHentaiAutoDownloadJobModel.findOne({ status: "running" })
-    .select({ _id: 1 })
+    .select({ _id: 1, url: 1, startedAt: 1, lastHeartbeatAt: 1 })
     .lean();
-  if (running) return;
+  if (running) {
+    const hb = (running as any).lastHeartbeatAt ? new Date((running as any).lastHeartbeatAt) : null;
+    const hbAgeMs = hb ? now.getTime() - hb.getTime() : Number.POSITIVE_INFINITY;
+    if (hbAgeMs > STALE_HEARTBEAT_MS) {
+      const url = String((running as any).url || "");
+      console.warn(
+        `[vi-hentai-queue] stale running job detected; auto-failing to unblock queue: jobId=${String((running as any)._id)} url=${url} heartbeatAgeMs=${Math.round(hbAgeMs)}`,
+      );
+      await ViHentaiAutoDownloadJobModel.updateOne(
+        { _id: (running as any)._id, status: "running" },
+        {
+          $set: {
+            status: "failed",
+            finishedAt: now,
+            lastHeartbeatAt: now,
+            errorMessage: `Stale heartbeat: job stuck without progress for ${Math.round(hbAgeMs / 1000)}s; auto-failed to unblock queue`,
+            progress: { stage: "done", message: "Lỗi (stale heartbeat)", updatedAt: now },
+          },
+        },
+      );
+    }
+    return;
+  }
 
   const job = await ViHentaiAutoDownloadJobModel.findOneAndUpdate(
     { status: "queued", paused: { $ne: true } },
@@ -114,7 +142,7 @@ async function processOneJob(): Promise<void> {
       asSystem: true,
       maxChapters: typeof job.maxChapters === "number" && job.maxChapters > 0 ? job.maxChapters : 200,
       // importer already has pacing/retry defaults
-      onProgress: async (p) => {
+      onProgress: async (p: ViHentaiAutoDownloadJobProgress) => {
         try {
           await persistProgress(p);
         } catch {

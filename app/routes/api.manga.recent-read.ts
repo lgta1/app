@@ -3,13 +3,20 @@ import type { LoaderFunctionArgs } from "react-router";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
+import { Types } from "mongoose";
+import { MangaModel } from "~/database/models/manga.model";
+import { ensureSlugForDocs } from "~/database/helpers/manga-slug.helper";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
+import { MANGA_STATUS } from "~/constants/manga";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "10");
+    const limitRaw = parseInt(url.searchParams.get("limit") || "300");
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(300, limitRaw)) : 300;
     const userIdParam = url.searchParams.get("userId");
+
+    const sessionUser = await getUserInfoFromSession(request);
 
     let targetUserId: string;
 
@@ -18,69 +25,131 @@ export async function loader({ request }: LoaderFunctionArgs) {
       targetUserId = userIdParam;
     } else {
       // Nếu không có userId, lấy từ session (flow hiện tại)
-      const user = await getUserInfoFromSession(request);
-      if (!user) {
+      if (!sessionUser) {
         return Response.json(
           { error: "Vui lòng đăng nhập để xem lịch sử đọc" },
           { status: 401 },
         );
       }
-      targetUserId = user.id;
+      targetUserId = sessionUser.id;
     }
 
-    // Lấy danh sách chapter đã đọc và populate manga
-    const skip = (page - 1) * limit;
+    const shouldTrim = !!sessionUser && String(sessionUser.id) === String(targetUserId);
 
-    const recentReadChapters = await UserReadChapterModel.find({ userId: targetUserId })
-      .populate({
-        path: "chapterId",
-        model: "Chapter",
-        select: "mangaId",
-        populate: {
-          path: "mangaId",
-          model: "Manga",
-          select:
-            "title poster slug chapters viewNumber likeNumber followNumber ratingScore ratingTotalVotes ratingChaptersWithVotes",
-        },
-      })
-      .sort({ createdAt: -1 })
-      .limit(100); // Lấy nhiều hơn để group by manga
+    // Owner-only: keep at most 300 unique mangas in reading history by removing older mangas.
+    // We do this in bounded batches to avoid long request times.
+    if (shouldTrim) {
+      const MAX_UNIQUE = 300;
+      const DROP_BATCH = 200;
+      const MAX_PASSES = 10;
 
-    // Group by manga và lấy manga unique
-    const mangaMap = new Map();
-    recentReadChapters.forEach((readChapter) => {
-      const chapter = readChapter.chapterId as any;
-      if (chapter && chapter.mangaId && typeof chapter.mangaId === "object") {
-        const manga = chapter.mangaId;
-        const mangaId = manga._id.toString();
+      for (let pass = 0; pass < MAX_PASSES; pass++) {
+        const mangasToDrop = await UserReadChapterModel.aggregate<{ mangaId: Types.ObjectId }>([
+          { $match: { userId: targetUserId } },
+          {
+            $lookup: {
+              from: "chapters",
+              localField: "chapterId",
+              foreignField: "_id",
+              as: "chapter",
+            },
+          },
+          { $unwind: "$chapter" },
+          { $group: { _id: "$chapter.mangaId", lastReadAt: { $max: "$createdAt" } } },
+          { $sort: { lastReadAt: -1 } },
+          { $skip: MAX_UNIQUE },
+          { $limit: DROP_BATCH },
+          { $project: { mangaId: "$_id", _id: 0 } },
+        ]);
 
-        // Chỉ lấy manga đầu tiên (đọc gần nhất)
-        if (!mangaMap.has(mangaId)) {
-          mangaMap.set(mangaId, {
-            ...manga.toObject(),
-            id: mangaId,
-            slug: manga.slug,
-            lastReadAt: readChapter.createdAt,
-          });
-        }
+        const dropIds = (mangasToDrop || [])
+          .map((x: any) => x?.mangaId)
+          .filter((x: any) => x && Types.ObjectId.isValid(String(x))) as Types.ObjectId[];
+
+        if (dropIds.length === 0) break;
+
+        const readDocIds = await UserReadChapterModel.aggregate<{ _id: Types.ObjectId }>([
+          { $match: { userId: targetUserId } },
+          {
+            $lookup: {
+              from: "chapters",
+              localField: "chapterId",
+              foreignField: "_id",
+              as: "chapter",
+            },
+          },
+          { $unwind: "$chapter" },
+          { $match: { "chapter.mangaId": { $in: dropIds } } },
+          { $project: { _id: 1 } },
+        ]);
+
+        const idsToDelete = (readDocIds || [])
+          .map((x: any) => x?._id)
+          .filter((x: any) => x && Types.ObjectId.isValid(String(x))) as Types.ObjectId[];
+        if (idsToDelete.length === 0) break;
+
+        await UserReadChapterModel.deleteMany({ _id: { $in: idsToDelete } });
       }
-    });
+    }
 
-    // Convert map to array và apply pagination
-    const allMangaList = Array.from(mangaMap.values()).sort(
-      (a, b) => new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime(),
+    // Fetch up to 300 unique mangas (most recently read first)
+    const agg = await UserReadChapterModel.aggregate<{ _id: Types.ObjectId; lastReadAt: Date }>([
+      { $match: { userId: targetUserId } },
+      {
+        $lookup: {
+          from: "chapters",
+          localField: "chapterId",
+          foreignField: "_id",
+          as: "chapter",
+        },
+      },
+      { $unwind: "$chapter" },
+      { $group: { _id: "$chapter.mangaId", lastReadAt: { $max: "$createdAt" } } },
+      { $sort: { lastReadAt: -1 } },
+      { $limit: limit },
+    ]);
+
+    const mangaIds = (agg || []).map((x) => x._id).filter(Boolean);
+    if (mangaIds.length === 0) {
+      return Response.json({
+        success: true,
+        data: [],
+        currentPage: 1,
+        totalPages: 1,
+        totalRecentRead: 0,
+      });
+    }
+
+    const docs = await MangaModel.find({ _id: { $in: mangaIds }, status: MANGA_STATUS.APPROVED })
+      .select("title poster slug chapters viewNumber likeNumber followNumber ratingScore ratingTotalVotes ratingChaptersWithVotes status")
+      .lean();
+
+    await ensureSlugForDocs(docs as any[]);
+
+    const storyMap = new Map<string, any>(
+      (docs || []).map((m: any) => {
+        const id = String(m?._id ?? m?.id ?? "");
+        if (typeof m?.poster === "string") m.poster = rewriteLegacyCdnUrl(m.poster);
+        return [id, { ...m, id }];
+      }),
     );
 
-    const totalRecentRead = allMangaList.length;
-    const totalPages = Math.ceil(totalRecentRead / limit);
-    const mangaList = allMangaList.slice(skip, skip + limit);
+    const lastReadMap = new Map<string, Date>((agg || []).map((x: any) => [String(x._id), x.lastReadAt]));
+
+    const data = mangaIds
+      .map((id) => storyMap.get(String(id)))
+      .filter(Boolean)
+      .map((m: any) => ({
+        ...m,
+        lastReadAt: lastReadMap.get(String(m.id)) ?? null,
+      }));
 
     return Response.json({
       success: true,
-      data: mangaList,
-      currentPage: page,
-      totalPages,
-      totalRecentRead,
+      data,
+      currentPage: 1,
+      totalPages: 1,
+      totalRecentRead: data.length,
     });
   } catch (error) {
     console.error("Error in manga recent read loader:", error);

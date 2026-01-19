@@ -102,7 +102,7 @@ export default function PostDetail() {
   // Calculate current like count based on fetcher result
   const currentLikeNumber = fetcher.data?.likeNumber ?? post.likeNumber;
   const isLiked = fetcher.data?.isLiked ?? post.isLiked;
-  const isLiking = fetcher.state === "submitting";
+  const isLiking = fetcher.state !== "idle";
 
   return (
     <div className="flex">

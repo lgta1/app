@@ -1,7 +1,7 @@
-import { Toaster } from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { Trophy } from "lucide-react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { Link, redirect } from "react-router";
+import { Link, redirect, useFetcher } from "react-router";
 
 // Lưu ý: tất cả import server-only (alias @) sẽ được dynamic import trong loader để tránh lôi vào client bundle
 
@@ -20,6 +20,8 @@ import React from "react"; // đảm bảo JSX types
 import LazyRender from "~/components/lazy-render";
 import ProfileUploaderCard from "~/components/profile-uploader-card";
 import { toSlug } from "~/utils/slug.utils";
+import { useFileOperations } from "~/hooks/use-file-operations";
+import { normalizePosterImage } from "~/utils/image-compression.utils";
 
 import type { MangaType } from "~/database/models/manga.model";
 // server helpers sẽ được import trong loader bằng dynamic import
@@ -175,6 +177,58 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 }
 
+export async function action({ request, params }: Route.ActionArgs) {
+  try {
+    const formData = await request.formData();
+    const actionType = String(formData.get("actionType") ?? "");
+    if (actionType !== "adminUpdatePoster") {
+      return Response.json({ success: false, error: "Hành động không hợp lệ" }, { status: 400 });
+    }
+
+    const [{ requireLogin }, { resolveMangaHandle }, { MangaModel }] = await Promise.all([
+      import("~/.server/services/auth.server"),
+      import("~/database/helpers/manga-slug.helper"),
+      import("~/database/models/manga.model"),
+    ]);
+
+    const user = await requireLogin(request);
+    if (!isAdmin((user as any)?.role ?? "")) {
+      return Response.json({ success: false, error: "Chỉ admin mới có quyền đổi ảnh bìa" }, { status: 403 });
+    }
+
+    const handle = String(params.slug ?? "").trim();
+    if (!handle) {
+      return Response.json({ success: false, error: "Thiếu thông tin truyện" }, { status: 400 });
+    }
+
+    const target = await resolveMangaHandle(handle);
+    if (!target) {
+      return Response.json({ success: false, error: "Không tìm thấy truyện" }, { status: 404 });
+    }
+
+    const mangaId = String((target as any).id ?? (target as any)._id ?? "");
+    if (!mangaId) {
+      return Response.json({ success: false, error: "Không tìm thấy mangaId" }, { status: 404 });
+    }
+
+    const posterUrl = formData.get("posterUrl");
+    if (typeof posterUrl !== "string" || !posterUrl.trim()) {
+      return Response.json({ success: false, error: "Vui lòng tải lên ảnh bìa hợp lệ" }, { status: 400 });
+    }
+
+    await MangaModel.findByIdAndUpdate(
+      mangaId,
+      { $set: { poster: posterUrl.trim() } },
+      { timestamps: false },
+    );
+
+    return Response.json({ success: true, poster: posterUrl.trim(), message: "Đã cập nhật ảnh bìa" });
+  } catch (error) {
+    console.error("[manga detail] adminUpdatePoster error", error);
+    return Response.json({ success: false, error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.manga) {
     return [
@@ -262,6 +316,66 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     genreDisplayMap,
   } = loaderData;
   const manageHandle = manga.slug || manga.id;
+
+  const { uploadMultipleFiles } = useFileOperations();
+  const posterUpdateFetcher = useFetcher<typeof action>();
+  const posterUpdateInFlightRef = React.useRef(false);
+  const pendingPosterUrlRef = React.useRef<string | null>(null);
+  const [posterUrl, setPosterUrl] = React.useState<string>(manga.poster || "");
+  const [isPosterUpdating, setIsPosterUpdating] = React.useState(false);
+
+  const displayManga = React.useMemo(() => ({ ...manga, poster: posterUrl }), [manga, posterUrl]);
+
+  const handlePosterDrop = async (file: File) => {
+    if (!userIsAdmin || isPosterUpdating) return;
+    setIsPosterUpdating(true);
+    try {
+      const normalized = await normalizePosterImage(file);
+      const [upload] = await uploadMultipleFiles([{ file: normalized.file, options: { prefixPath: "story-images" } }]);
+      const remoteUrl = (upload as any)?.url || (upload as any)?.location || (upload as any)?.path || (upload as any)?.key;
+      if (!remoteUrl) {
+        throw new Error("Không thể tải ảnh lên");
+      }
+
+      const formData = new FormData();
+      formData.append("actionType", "adminUpdatePoster");
+      formData.append("posterUrl", String(remoteUrl));
+      pendingPosterUrlRef.current = String(remoteUrl);
+      posterUpdateInFlightRef.current = true;
+      posterUpdateFetcher.submit(formData, {
+        method: "POST",
+        action: `/truyen-hentai/${manageHandle}`,
+        encType: "multipart/form-data",
+      });
+    } catch (error) {
+      console.error("[manga detail] update poster", error);
+      toast.error(error instanceof Error ? error.message : "Cập nhật ảnh bìa thất bại");
+      pendingPosterUrlRef.current = null;
+      posterUpdateInFlightRef.current = false;
+      setIsPosterUpdating(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (!posterUpdateInFlightRef.current) return;
+    if (posterUpdateFetcher.state !== "idle") return;
+
+    const data = posterUpdateFetcher.data as
+      | { success?: boolean; error?: string; message?: string; poster?: string }
+      | undefined;
+
+    if (data?.success) {
+      const nextPoster = data.poster || pendingPosterUrlRef.current;
+      if (nextPoster) setPosterUrl(nextPoster);
+      toast.success(data.message || "Đã cập nhật ảnh bìa");
+    } else {
+      toast.error(data?.error || "Cập nhật ảnh bìa thất bại");
+    }
+
+    pendingPosterUrlRef.current = null;
+    posterUpdateInFlightRef.current = false;
+    setIsPosterUpdating(false);
+  }, [posterUpdateFetcher.state, posterUpdateFetcher.data]);
 
   const disturbingTagSlugs = React.useMemo(() => {
     const raw = Array.isArray((manga as any)?.genres) ? (manga as any).genres : [];
@@ -382,7 +496,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             </div>
           ) : null}
 
-          <MangaDetail manga={manga} chapters={chapters} genreDisplayMap={genreDisplayMap} isLoggedIn={isLoggedIn} />
+          <MangaDetail
+            manga={displayManga as any}
+            chapters={chapters}
+            genreDisplayMap={genreDisplayMap}
+            isLoggedIn={isLoggedIn}
+            posterDropEnabled={userIsAdmin}
+            onPosterDrop={handlePosterDrop}
+            posterDropUploading={isPosterUpdating}
+            posterDropHint="Ảnh mới được lưu ngay khi thả"
+          />
           <ShareButtons title={manga.title} />
 
           {uploader ? (

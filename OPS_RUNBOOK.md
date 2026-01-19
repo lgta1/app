@@ -16,6 +16,31 @@ pm2 restart ww --update-env && pm2 save
 # xem listener
 ss -ltnp | grep ':3000'
 
+## Vi-hentai auto-update bị “enqueued mãi” (kẹt lock)
+### Triệu chứng
+- Job auto-update/auto-download không chạy, queue cứ ở trạng thái `queued/enqueued` lâu.
+- Nguyên nhân hay gặp: lock hệ thống `SystemLock` bị kẹt (crash/restart giữa chừng).
+
+### Kiểm tra nhanh
+Chạy dưới user `devuser` (khuyến nghị):
+
+```bash
+npm run ops:inspect-vi-hentai-jobs
+```
+
+### Clear lock nhanh (best-effort)
+Nếu xác định không có queue/job thật sự đang chạy, có thể clear lock để cron lấy lại:
+
+```bash
+npm run ops:clear-system-lock -- vi-hentai-auto-update
+```
+
+Dry-run (chỉ xem trước, không ghi DB):
+
+```bash
+npm run ops:clear-system-lock -- vi-hentai-auto-update --dry-run
+```
+
 ## ENV chuẩn (.env.production)
 - MONGO_URL / MONGODB_URI / MONGO_URI / MONGODB_URL / DATABASE_URL
   đều trỏ: `...mongodb.net/ww?...`

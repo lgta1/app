@@ -2,11 +2,42 @@ import { initMongoDB } from "~/database/connection";
 import { SystemLockModel } from "~/database/models/system-lock.model";
 import { ViHentaiAutoDownloadJobModel } from "~/database/models/vi-hentai-auto-download-job.model";
 import { ViHentaiAutoUpdateQueueModel } from "~/database/models/vi-hentai-auto-update-queue.model";
+import mongoose from "mongoose";
 
 const LOCK_KEY = "vi-hentai-auto-update";
 
+const waitForMongoConnected = async (timeoutMs: number) => {
+  if (mongoose.connection.readyState === 1) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => {
+      cleanup();
+      reject(new Error(`MongoDB connection timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    const onConnected = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (err: unknown) => {
+      cleanup();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+
+    const cleanup = () => {
+      clearTimeout(t);
+      mongoose.connection.off("connected", onConnected);
+      mongoose.connection.off("error", onError);
+    };
+
+    mongoose.connection.on("connected", onConnected);
+    mongoose.connection.on("error", onError);
+  });
+};
+
 async function main() {
   initMongoDB();
+  await waitForMongoConnected(15_000);
 
   const now = new Date();
   const lock = await SystemLockModel.findOne({ key: LOCK_KEY }).lean();
@@ -55,7 +86,7 @@ async function main() {
     ),
   );
 
-  process.exit(0);
+  await mongoose.disconnect();
 }
 
 main().catch((e) => {
