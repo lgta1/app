@@ -18,6 +18,119 @@ const HOT_CAROUSEL_TOTAL = HOT_CAROUSEL_LIMITS.MANGA + HOT_CAROUSEL_LIMITS.COSPL
 const HOT_CAROUSEL_PIPELINE_LIMIT = Math.max(HOT_CAROUSEL_TOTAL + 40, 120);
 const HOT_CAROUSEL_CACHE_TTL_MS = 60 * 1000; // cache snapshot for 60s to avoid re-aggregating per request
 
+// HOT carousel: time-on-leaderboard decay + re-entry cooldown
+const HOT_CAROUSEL_REENTRY_COOLDOWN_MS = 6 * 3600 * 1000;
+const HOT_CAROUSEL_PRESENCE_PRUNE_MS = 30 * 24 * 3600 * 1000;
+
+type HotCarouselPresenceEntry = {
+  streakStartedAt: Date;
+  lastSeenAt: Date;
+  lastLeftAt?: Date;
+};
+
+type HotCarouselPresenceMap = Record<string, HotCarouselPresenceEntry>;
+
+const toDateSafe = (v: unknown): Date | null => {
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  if (typeof v === "string" || typeof v === "number") {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+};
+
+const normalizeHotCarouselPresence = (raw: unknown): HotCarouselPresenceMap => {
+  const obj: any =
+    raw && typeof raw === "object"
+      ? raw instanceof Map
+        ? Object.fromEntries((raw as Map<any, any>).entries())
+        : raw
+      : {};
+
+  const out: HotCarouselPresenceMap = {};
+  for (const [id, entry] of Object.entries(obj as Record<string, any>)) {
+    if (!id) continue;
+    const started = toDateSafe((entry as any)?.streakStartedAt);
+    const seen = toDateSafe((entry as any)?.lastSeenAt);
+    const left = toDateSafe((entry as any)?.lastLeftAt);
+    if (!started || !seen) continue;
+    out[String(id)] = {
+      streakStartedAt: started,
+      lastSeenAt: seen,
+      ...(left ? { lastLeftAt: left } : null),
+    };
+  }
+  return out;
+};
+
+const getHotStreakMultiplierForHours = (hoursOnHot: number): number => {
+  if (!Number.isFinite(hoursOnHot)) return 1;
+  if (hoursOnHot >= 72) return 0.4; // -60%
+  if (hoursOnHot >= 60) return 0.5; // -50%
+  if (hoursOnHot >= 48) return 0.6; // -40%
+  if (hoursOnHot >= 36) return 0.7; // -30%
+  return 1;
+};
+
+const isInHotReentryCooldown = (
+  storyId: string,
+  presence: HotCarouselPresenceMap,
+  activeHotSet: Set<string>,
+  nowMs: number,
+): boolean => {
+  if (!storyId) return false;
+  // If it's already on the leaderboard (active set), cooldown does not apply.
+  if (activeHotSet.has(storyId)) return false;
+  const leftAt = presence[storyId]?.lastLeftAt;
+  if (!leftAt) return false;
+  const dt = nowMs - leftAt.getTime();
+  return dt >= 0 && dt < HOT_CAROUSEL_REENTRY_COOLDOWN_MS;
+};
+
+const updateHotCarouselPresence = (
+  prevPresence: HotCarouselPresenceMap,
+  prevItems: Set<string>,
+  nextItems: Set<string>,
+  computedAt: Date,
+): HotCarouselPresenceMap => {
+  const now = computedAt.getTime();
+  const next: HotCarouselPresenceMap = { ...prevPresence };
+
+  // Mark currently present items.
+  for (const id of nextItems) {
+    const prev = prevPresence[id];
+    const continuing = prevItems.has(id);
+    const streakStartedAt = continuing ? (prev?.streakStartedAt ?? computedAt) : computedAt;
+    next[id] = {
+      streakStartedAt,
+      lastSeenAt: computedAt,
+    };
+  }
+
+  // Mark items that just left.
+  for (const id of prevItems) {
+    if (nextItems.has(id)) continue;
+    const prev = prevPresence[id];
+    if (!prev) {
+      next[id] = { streakStartedAt: computedAt, lastSeenAt: computedAt, lastLeftAt: computedAt };
+    } else {
+      next[id] = { ...prev, lastLeftAt: computedAt };
+    }
+  }
+
+  // Prune old entries to avoid unbounded growth.
+  for (const [id, entry] of Object.entries(next)) {
+    const lastSeen = entry?.lastSeenAt instanceof Date ? entry.lastSeenAt.getTime() : 0;
+    const lastLeft = entry?.lastLeftAt instanceof Date ? entry.lastLeftAt.getTime() : 0;
+    const newest = Math.max(lastSeen, lastLeft);
+    if (newest > 0 && now - newest > HOT_CAROUSEL_PRESENCE_PRUNE_MS) {
+      delete next[id];
+    }
+  }
+
+  return next;
+};
+
 type HotCarouselCache = {
   data: MangaType[];
   expiresAt: number;
@@ -32,6 +145,8 @@ export type HotCarouselScoreBreakdown = {
   baseScoreViewsWeighted: number;
   baseScoreViewsContribution: number;
   baseScoreCommentsContribution: number;
+  hotStreakHours: number;
+  hotStreakMultiplier: number;
   chapters: number;
   lowChapterBoostMultiplier: number;
   hoursSinceUpdatedAt: number | null;
@@ -163,10 +278,10 @@ export const getHotCarouselSnapshotInfo = async (): Promise<HotCarouselSnapshotI
 };
 
 export const forceRefreshHotCarouselSnapshot = async (): Promise<HotCarouselSnapshotInfo> => {
-  const { items, computedAt } = await computeHotCarouselSnapshotIds();
+  const { items, computedAt, presence } = await computeHotCarouselSnapshot();
   await HotCarouselSnapshotModel.findOneAndUpdate(
     { key: HOT_CAROUSEL_SNAPSHOT_KEY },
-    { $set: { items, computedAt } },
+    { $set: { items, computedAt, presence } },
     { upsert: true },
   );
 
@@ -188,10 +303,10 @@ const getHotCarouselLeaderboardFromSnapshotOrCompute = async (): Promise<MangaTy
   }
 
   // No snapshot yet → compute once and save.
-  const { items: computedIds, computedAt } = await computeHotCarouselSnapshotIds();
+  const { items: computedIds, computedAt, presence } = await computeHotCarouselSnapshot();
   await HotCarouselSnapshotModel.findOneAndUpdate(
     { key: HOT_CAROUSEL_SNAPSHOT_KEY },
-    { $set: { items: computedIds, computedAt } },
+    { $set: { items: computedIds, computedAt, presence } },
     { upsert: true },
   );
 
@@ -225,22 +340,50 @@ const hydrateHotCarouselStoriesFromIds = async (ids: string[]): Promise<MangaTyp
   return ordered;
 };
 
-const computeHotCarouselSnapshotIds = async (): Promise<{ items: string[]; computedAt: Date }> => {
-  const stories = await aggregateHotCarouselSnapshot();
+const computeHotCarouselSnapshot = async (): Promise<{ items: string[]; computedAt: Date; presence: HotCarouselPresenceMap }> => {
+  const computedAt = new Date();
+
+  const prev = await HotCarouselSnapshotModel.findOne({ key: HOT_CAROUSEL_SNAPSHOT_KEY })
+    .select({ items: 1, presence: 1, computedAt: 1 })
+    .lean();
+
+  const prevItemsArr = Array.isArray((prev as any)?.items) ? ((prev as any).items as unknown[]) : [];
+  const prevItems = new Set(prevItemsArr.map((x) => String(x || "")).filter(Boolean));
+  const prevPresence = normalizeHotCarouselPresence((prev as any)?.presence);
+
+  // Backward-compat: older snapshots won't have presence → seed minimal entries so streak starts counting.
+  const prevComputedAt = toDateSafe((prev as any)?.computedAt) ?? computedAt;
+  for (const id of prevItems) {
+    if (prevPresence[id]) continue;
+    prevPresence[id] = { streakStartedAt: prevComputedAt, lastSeenAt: prevComputedAt };
+  }
+
+  const stories = await aggregateHotCarouselSnapshot({ computedAt, prevItems, presence: prevPresence });
   const items = (Array.isArray(stories) ? stories : [])
     .map((s: any) => String(s?.id ?? s?._id ?? ""))
     .filter(Boolean);
-  return { items, computedAt: new Date() };
+
+  const nextItems = new Set(items);
+  const presence = updateHotCarouselPresence(prevPresence, prevItems, nextItems, computedAt);
+
+  return { items, computedAt, presence };
 };
 
-const aggregateHotCarouselSnapshot = async () => {
+const aggregateHotCarouselSnapshot = async (opts?: {
+  computedAt: Date;
+  prevItems: Set<string>;
+  presence: HotCarouselPresenceMap;
+}) => {
   const leaderboardDocs = await InteractionModel.aggregate(buildHotCarouselPipeline(HOT_CAROUSEL_PIPELINE_LIMIT) as any);
   if (!leaderboardDocs?.length) return [];
 
   // Diversity & freshness adjustments for HOT carousel ordering.
   // - Penalize items already dominating weekly/monthly leaderboards.
   // - Boost items that have a very recent chapter (approx via Manga.updatedAt).
-  const now = Date.now();
+  const computedAt = opts?.computedAt ?? new Date();
+  const now = computedAt.getTime();
+  const activeHotSet = opts?.prevItems ?? new Set<string>();
+  const presence = opts?.presence ?? ({} as HotCarouselPresenceMap);
   const TOP_RANK_PENALTY = [0.35, 0.25, 0.2, 0.15, 0.1] as const;
   const [weeklyTopDocs, monthlyTopDocs] = await Promise.all([
     MangaModel.find({
@@ -289,6 +432,12 @@ const aggregateHotCarouselSnapshot = async () => {
   const getHotCarouselScoreBreakdown = (doc: any, story?: MangaType | null): HotCarouselScoreBreakdown => {
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     const baseScore = typeof doc?.score === "number" ? doc.score : 0;
+
+    // HOT streak penalty: apply only if the story is already on the HOT leaderboard (continuous streak).
+    // New entrants start at 0h → no penalty until they have stayed long enough.
+    const streakStartedAt = activeHotSet.has(sid) ? presence[sid]?.streakStartedAt : null;
+    const hotStreakHours = streakStartedAt ? (now - streakStartedAt.getTime()) / (3600 * 1000) : 0;
+    const hotStreakMultiplier = streakStartedAt ? getHotStreakMultiplierForHours(hotStreakHours) : 1;
 
     // Base score breakdown (rolling 36h buckets)
     const views0_2h = Math.max(0, Number(doc?.views_0_2h) || 0);
@@ -365,6 +514,7 @@ const aggregateHotCarouselSnapshot = async () => {
 
     const adjustedScore =
       baseScore *
+      hotStreakMultiplier *
       penaltyMultiplier *
       updateBoostMultiplier *
       genreMultiplier *
@@ -376,6 +526,8 @@ const aggregateHotCarouselSnapshot = async () => {
       baseScoreViewsWeighted,
       baseScoreViewsContribution,
       baseScoreCommentsContribution,
+      hotStreakHours,
+      hotStreakMultiplier,
       chapters,
       lowChapterBoostMultiplier,
       hoursSinceUpdatedAt,
@@ -421,6 +573,10 @@ const aggregateHotCarouselSnapshot = async () => {
   for (const doc of rankedDocs as any[]) {
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     if (!sid || seen.has(sid)) continue;
+
+    // Cooldown: if a story just left the HOT snapshot, keep it out for at least 6 hours.
+    if (isInHotReentryCooldown(sid, presence, activeHotSet, now)) continue;
+
     const story = storyMap.get(sid);
     if (!story) continue;
     if (story.status !== MANGA_STATUS.APPROVED) continue;
@@ -476,6 +632,17 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
   const leaderboardDocs = await InteractionModel.aggregate(buildHotCarouselPipeline(HOT_CAROUSEL_PIPELINE_LIMIT) as any);
   if (!leaderboardDocs?.length) return [];
 
+  const snap = await HotCarouselSnapshotModel.findOne({ key: HOT_CAROUSEL_SNAPSHOT_KEY })
+    .select({ items: 1, presence: 1 })
+    .lean();
+
+  const activeHotSet = new Set(
+    (Array.isArray((snap as any)?.items) ? ((snap as any).items as unknown[]) : [])
+      .map((x) => String(x || ""))
+      .filter(Boolean),
+  );
+  const presence = normalizeHotCarouselPresence((snap as any)?.presence);
+
   const now = Date.now();
   const TOP_RANK_PENALTY = [0.35, 0.25, 0.2, 0.15, 0.1] as const;
 
@@ -525,6 +692,10 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
   const getHotCarouselScoreBreakdown = (doc: any, story?: MangaType | null): HotCarouselScoreBreakdown => {
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     const baseScore = typeof doc?.score === "number" ? doc.score : 0;
+
+    const streakStartedAt = activeHotSet.has(sid) ? presence[sid]?.streakStartedAt : null;
+    const hotStreakHours = streakStartedAt ? (now - streakStartedAt.getTime()) / (3600 * 1000) : 0;
+    const hotStreakMultiplier = streakStartedAt ? getHotStreakMultiplierForHours(hotStreakHours) : 1;
 
     // Base score breakdown (rolling 36h buckets)
     const views0_2h = Math.max(0, Number(doc?.views_0_2h) || 0);
@@ -594,6 +765,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
 
     const adjustedScore =
       baseScore *
+      hotStreakMultiplier *
       penaltyMultiplier *
       updateBoostMultiplier *
       genreMultiplier *
@@ -605,6 +777,8 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
       baseScoreViewsWeighted,
       baseScoreViewsContribution,
       baseScoreCommentsContribution,
+      hotStreakHours,
+      hotStreakMultiplier,
       chapters,
       lowChapterBoostMultiplier,
       hoursSinceUpdatedAt,
@@ -648,6 +822,9 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
   for (const doc of rankedDocs as any[]) {
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     if (!sid || seen.has(sid)) continue;
+
+    if (isInHotReentryCooldown(sid, presence, activeHotSet, now)) continue;
+
     const story = storyMap.get(sid);
     if (!story) continue;
     if ((story as any).status !== MANGA_STATUS.APPROVED) continue;
@@ -687,7 +864,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
   }
 
   const formula =
-    "adjusted = baseScore * (1 - clamp(weeklyPenalty + monthlyPenalty, 0..0.70)) * updateBoostMultiplier * genreMultiplier * disturbingMultiplier * lowChapterBoostMultiplier";
+    "adjusted = baseScore * hotStreakMultiplier * (1 - clamp(weeklyPenalty + monthlyPenalty, 0..0.70)) * updateBoostMultiplier * genreMultiplier * disturbingMultiplier * lowChapterBoostMultiplier";
 
   const rows: HotCarouselScoreRow[] = [];
   for (let i = 0; i < combined.length; i++) {
@@ -705,6 +882,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     steps.push("commentScore is ignored in HOT carousel scoring");
     steps.push(`baseScore = viewsScore = ${breakdown.baseScore}`);
     steps.push("\nADJUSTMENTS");
+    steps.push(`hotStreak: ${breakdown.hotStreakHours.toFixed(2)}h => hotStreakMultiplier = ${breakdown.hotStreakMultiplier}`);
     steps.push(`weeklyRank=${breakdown.weeklyRank ?? "-"}, weeklyPenalty=${breakdown.weeklyPenalty}`);
     steps.push(`monthlyRank=${breakdown.monthlyRank ?? "-"}, monthlyPenalty=${breakdown.monthlyPenalty}`);
     steps.push(`penaltyTotal = ${breakdown.penalty} => penaltyMultiplier = ${breakdown.penaltyMultiplier}`);
@@ -712,7 +890,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-60%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
     steps.push(`tags guro/scat: ${breakdown.hasDisturbingTags ? "-50%" : "no"} => disturbingMultiplier = ${breakdown.disturbingMultiplier}`);
     steps.push(`chapters=${breakdown.chapters} (1 => +30%, 2-5 => +10%) => lowChapterBoostMultiplier = ${breakdown.lowChapterBoostMultiplier}`);
-    steps.push(`adjustedScore = ${breakdown.baseScore} * ${breakdown.penaltyMultiplier} * ${breakdown.updateBoostMultiplier} * ${breakdown.genreMultiplier} * ${breakdown.disturbingMultiplier} * ${breakdown.lowChapterBoostMultiplier} = ${breakdown.adjustedScore}`);
+    steps.push(`adjustedScore = ${breakdown.baseScore} * ${breakdown.hotStreakMultiplier} * ${breakdown.penaltyMultiplier} * ${breakdown.updateBoostMultiplier} * ${breakdown.genreMultiplier} * ${breakdown.disturbingMultiplier} * ${breakdown.lowChapterBoostMultiplier} = ${breakdown.adjustedScore}`);
 
     rows.push({
       rank: i + 1,

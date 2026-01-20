@@ -29,7 +29,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const statusParam = url.searchParams.get("status") || ""; // "completed,ongoing" etc
   const limit = 40;
 
-  const cacheKey = `loader:danh-sach:page=${page}:sort=${sortParam}:status=${statusParam}`;
+  const cacheKey = `loader:danh-sach:page=${page}:sort=${sortParam}:status=${statusParam}:chapters>=1`;
   return sharedTtlCache.getOrSet(cacheKey, 30_000, async () => {
 
   const statuses = new Set(statusParam.split(",").map((s) => s.trim()).filter(Boolean));
@@ -37,6 +37,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const query: Record<string, any> = {
     status: MANGA_STATUS.APPROVED,
     contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, null] },
+    // Align with Latest Updates rule: only show stories that have at least 1 chapter.
+    chapters: { $gte: 1 },
   };
   if (statuses.has("completed") && !statuses.has("ongoing")) {
     query.userStatus = MANGA_USER_STATUS.COMPLETED;
