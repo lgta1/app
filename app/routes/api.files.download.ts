@@ -3,6 +3,8 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import type { Route } from "./+types/api.files.download";
 
 import { downloadFile, getPublicFileInfo, getPublicFileUrl } from "~/utils/minio.utils";
+import { getCdnBase } from "~/.server/utils/cdn-url";
+import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 
 export async function loader({ request }: Route.LoaderArgs) {
   try {
@@ -64,7 +66,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       const downloadUrl = getPublicFileUrl(fullPath);
       const fileInfo = await getPublicFileInfo(fullPath);
 
-      return Response.json({
+      const payload = {
         success: true,
         data: {
           downloadUrl, // Direct public URL
@@ -81,7 +83,13 @@ export async function loader({ request }: Route.LoaderArgs) {
           },
         },
         message: "Tạo URL tải xuống thành công",
-      });
+      };
+
+      try {
+        rewriteCdnHostsDeepInPlace(payload as any, getCdnBase(request as any));
+      } catch {}
+
+      return Response.json(payload);
     }
   } catch (error) {
     console.error("Download error:", error);

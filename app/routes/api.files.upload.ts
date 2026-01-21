@@ -10,6 +10,8 @@ import {
   uploadBufferWithValidation,
 } from "~/.server/services/file-upload.service";
 import { applyWatermark } from "~/.server/utils/watermark.utils";
+import { getCdnBase } from "~/.server/utils/cdn-url";
+import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 
 function getErrorMessage(error: unknown): { message: string; statusCode: number } {
   if (isBusinessError(error)) {
@@ -215,7 +217,7 @@ export async function action({ request }: Route.ActionArgs) {
       metadata,
     });
 
-    return Response.json({
+    const payload = {
       success: true,
       data: {
         objectName: result.objectName,
@@ -230,7 +232,13 @@ export async function action({ request }: Route.ActionArgs) {
         isPublic: true,
       },
       message: "Tải file lên thành công",
-    });
+    };
+
+    try {
+      rewriteCdnHostsDeepInPlace(payload as any, getCdnBase(request as any));
+    } catch {}
+
+    return Response.json(payload);
   } catch (error) {
     console.error("Upload error:", error);
 

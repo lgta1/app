@@ -4,7 +4,7 @@ body {
   /* Mobile-first: enable glow (center alpha ~0.3) */
   background-color: #0B0C1D; /* theme(colors.bgc.layer1) */
   background-image:
-    url("https://cdn.hoangsatruongsalacuavietnam.site/avatar-uploads/bg/body-bg%20(2).webp"),
+    var(--cdn-bg-body),
     radial-gradient(
       ellipse at top center,
       rgba(25, 23, 88, 0.3) 0%,
@@ -45,7 +45,7 @@ body {
   body {
     background-color: #0B0C1D; /* base */
       background-image:
-        url("https://cdn.hoangsatruongsalacuavietnam.site/avatar-uploads/bg/body-bg%20(2).webp"),
+        var(--cdn-bg-body),
         radial-gradient(
           ellipse at top center,
           rgba(25, 23, 88, 0.3) 0%,

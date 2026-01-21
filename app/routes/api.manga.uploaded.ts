@@ -4,6 +4,8 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { MangaModel } from "~/database/models/manga.model";
 import { isAdmin } from "~/helpers/user.helper";
+import { getCdnBase } from "~/.server/utils/cdn-url";
+import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -55,6 +57,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       id: manga._id.toString(),
       slug: manga.slug,
     }));
+
+    try {
+      rewriteCdnHostsDeepInPlace(mangaList as any, getCdnBase(request as any));
+    } catch {}
 
     return Response.json({
       success: true,

@@ -17,6 +17,12 @@ const getForwardedHost = (request: Request): string | undefined => {
 };
 
 export const getCanonicalHostname = (request?: Request): string | undefined => {
+  // Prefer the incoming host so backup domains remain self-contained.
+  if (request) {
+    const host = getForwardedHost(request);
+    if (host) return stripWww(host);
+  }
+
   const origin = (process.env.CANONICAL_ORIGIN || process.env.VITE_CANONICAL_ORIGIN || "").trim();
   if (origin) {
     try {
@@ -26,10 +32,7 @@ export const getCanonicalHostname = (request?: Request): string | undefined => {
     }
   }
 
-  if (!request) return undefined;
-  const host = getForwardedHost(request);
-  if (!host) return undefined;
-  return stripWww(host);
+  return undefined;
 };
 
 export const getLegacySiteHosts = (): string[] => {
@@ -38,7 +41,14 @@ export const getLegacySiteHosts = (): string[] => {
   const fromEnv = splitCsv(process.env.LEGACY_SITE_HOSTS);
   return fromEnv.length
     ? fromEnv
-    : ["vinahentai.xyz", "www.vinahentai.xyz", "vinahentai.com", "www.vinahentai.com"];
+    : [
+        "vinahentai.top",
+        "www.vinahentai.top",
+        "vinahentai.xyz",
+        "www.vinahentai.xyz",
+        "vinahentai.com",
+        "www.vinahentai.com",
+      ];
 };
 
 const getLegacySiteHostRegex = (legacyHosts: string[]): RegExp | undefined => {

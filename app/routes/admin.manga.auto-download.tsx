@@ -10,6 +10,7 @@ import {
   type ViHentaiAutoDownloadResult,
 } from "@/services/importers/vi-hentai-importer";
 import { MANGA_CONTENT_TYPE, MANGA_USER_STATUS } from "~/constants/manga";
+import { getCdnBase } from "~/.server/utils/cdn-url";
 
 import { Trash2 } from "lucide-react";
 
@@ -546,11 +547,19 @@ export async function action({ request }: ActionFunctionArgs) {
       .select({ _id: 1 })
       .lean();
     if (stillRunning) {
-      const body: BatchControlActionResult = {
-        ok: false,
-        error: "Không thể dừng job đang chạy kịp thời (timeout). Vui lòng bấm Hard delete lại sau vài giây.",
-      };
-      return Response.json(body, { status: 409 });
+      // Force-stop: mark any remaining running jobs as failed so we can proceed with cleanup.
+      await ViHentaiAutoDownloadJobModel.updateMany(
+        { batchId, status: "running" },
+        {
+          $set: {
+            status: "failed",
+            finishedAt: new Date(),
+            lastHeartbeatAt: new Date(),
+            errorMessage: "Hard delete: forced stop",
+            progress: { stage: "done", message: "Hard delete: forced stop", updatedAt: new Date() },
+          },
+        },
+      );
     }
 
     // 4) Collect created manga IDs from jobs (even partial runs).
@@ -576,7 +585,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
       const envPrefix = getEnvironmentPrefix();
       const bucketMarker = `/${String((MINIO_CONFIG as any).DEFAULT_BUCKET || "")}/`;
-      const cdnBase = ((process.env.CDN_BASE ?? "").trim() || "https://cdn.hoangsatruongsalacuavietnam.site").replace(/\/+$/, "");
+      const cdnBase = getCdnBase(request as any).replace(/\/+$/, "");
 
       const toFullPathIfInternal = (urlRaw?: string | null) => {
         const u = (urlRaw || "").toString().trim();

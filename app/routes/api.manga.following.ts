@@ -3,6 +3,8 @@ import type { LoaderFunctionArgs } from "react-router";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
+import { getCdnBase } from "~/.server/utils/cdn-url";
+import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -59,6 +61,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
           slug: manga.slug,
         };
       });
+
+    try {
+      rewriteCdnHostsDeepInPlace(mangaList as any, getCdnBase(request as any));
+    } catch {}
 
     return Response.json({
       success: true,

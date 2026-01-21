@@ -1,4 +1,11 @@
-const DEFAULT_CANONICAL_ORIGIN = "https://vinahentai.top";
+const DEFAULT_CANONICAL_ORIGIN = "https://vinahentai.fun";
+
+const stripWww = (hostname: string): string => hostname.replace(/^www\./i, "");
+
+const isParallelApexHost = (hostname: string | undefined): boolean => {
+  const host = stripWww(String(hostname ?? "").trim().toLowerCase());
+  return host === "vinahentai.fun" || host === "vinahentai.one";
+};
 
 const TRACKING_QUERY_KEYS = new Set([
   "fbclid",
@@ -34,6 +41,7 @@ function getKnownSiteCanonicalOriginForHost(hostname: string | undefined): strin
   if (!host) return undefined;
 
   // Map legacy hosts to the current canonical origin.
+  if (host === "vinahentai.top" || host === "www.vinahentai.top") return DEFAULT_CANONICAL_ORIGIN;
   if (host === "vinahentai.xyz" || host === "www.vinahentai.xyz") return DEFAULT_CANONICAL_ORIGIN;
   if (host === "vinahentai.com" || host === "www.vinahentai.com") return DEFAULT_CANONICAL_ORIGIN;
 
@@ -93,11 +101,36 @@ export function getCanonicalUrl(request: Request): string {
   const envOrigin = normalizeOrigin(process.env.CANONICAL_ORIGIN);
   const knownCanonical = getKnownSiteCanonicalOriginForHost(effective.hostname);
 
-  const canonicalOrigin = envOrigin ?? knownCanonical ?? effective.origin;
+  // If we are serving multiple apex domains in parallel, do NOT force canonical origin
+  // to the primary domain via env. That would make the backup domain emit primary-domain
+  // canonicals and can cause the UI to generate absolute links to the primary domain.
+  const useEnvOrigin = Boolean(envOrigin) && !isParallelApexHost(effective.hostname);
+  const canonicalOrigin = (useEnvOrigin ? envOrigin : undefined) ?? knownCanonical ?? effective.origin;
   const canonicalPath = normalizePathname(effective.pathname);
   const canonicalSearch = stripTrackingParams(effective.search);
 
   return new URL(`${canonicalPath}${canonicalSearch}`, canonicalOrigin).toString();
+}
+
+/**
+ * Returns a same-host redirect target that only normalizes path/query (and forwarded proto/host),
+ * without forcing a different canonical origin. This keeps backup domains usable while still
+ * collapsing tracking params / trailing slashes.
+ */
+export function getRedirectUrl(request: Request): string {
+  const effective = getEffectiveRequestUrl(request);
+  const knownCanonical = getKnownSiteCanonicalOriginForHost(effective.hostname);
+
+  // Redirect legacy apex domains to the primary canonical origin.
+  // This keeps historical domains consolidated and avoids serving duplicate sites.
+  // NOTE: vinahentai.one is intentionally NOT mapped here.
+  const forcedOrigin = knownCanonical ?? undefined;
+
+  const nextHost = stripWww(effective.host);
+  const nextOrigin = forcedOrigin ?? `${effective.protocol}//${nextHost}`;
+  const normalizedPath = normalizePathname(effective.pathname);
+  const normalizedSearch = stripTrackingParams(effective.search);
+  return new URL(`${normalizedPath}${normalizedSearch}`, nextOrigin).toString();
 }
 
 export function getCanonicalOrigin(_request?: Request): string {
@@ -105,7 +138,24 @@ export function getCanonicalOrigin(_request?: Request): string {
   // If missing, derive from the request (including forwarded headers) so a domain switch
   // doesn't silently keep returning an old hardcoded fallback.
   const envOrigin = normalizeOrigin(process.env.CANONICAL_ORIGIN);
-  if (envOrigin) return envOrigin;
+  if (envOrigin) {
+    // Respect env for single-host deployments, but avoid forcing the primary origin
+    // when serving parallel apex domains.
+    try {
+      if (_request) {
+        const effective = getEffectiveRequestUrl(_request);
+        if (!isParallelApexHost(effective.hostname)) return envOrigin;
+
+        const envHost = stripWww(new URL(envOrigin).hostname);
+        const reqHost = stripWww(effective.hostname);
+        if (envHost.toLowerCase() === reqHost.toLowerCase()) return envOrigin;
+      } else {
+        return envOrigin;
+      }
+    } catch {
+      return envOrigin;
+    }
+  }
 
   try {
     if (_request) {

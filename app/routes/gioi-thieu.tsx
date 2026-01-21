@@ -80,7 +80,7 @@ export default function GioiThieuPage() {
         <div className="mb-10 flex flex-col gap-6 lg:mb-12 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-4 lg:w-3/5">
             <p className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500/10 to-rose-500/10 px-3 py-1 text-sm font-semibold uppercase tracking-wide text-fuchsia-300">
-              Vinahentai.top
+              Vinahentai.fun
             </p>
             <div className="rounded-2xl border border-white/5 bg-bgc-layer2/60 p-4 text-sm leading-relaxed text-txt-secondary">
               <strong className="text-txt-primary">Cảnh báo 18+:</strong> Đây là trang web 18+, nghiêm cấm người dưới 18 tuổi truy cập.

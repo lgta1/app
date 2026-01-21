@@ -57,7 +57,11 @@ rolling_pm2() {
     local name="${names[$i]}"
     echo "[rolling] $action $name (${i}/${#names[@]})"
     # --update-env ensures refreshed env values from ecosystem/config
-    pm2_exec "$action" "$name" --update-env
+    if [[ "$action" == "start" ]]; then
+      pm2_exec start ecosystem.config.cjs --only "$name" --update-env
+    else
+      pm2_exec "$action" "$name" --update-env
+    fi
     if (( i < ${#names[@]} - 1 )); then
       sleep "$delay_s"
     fi
@@ -84,6 +88,11 @@ case "$1" in
     # Sequential restart ww-1..ww-N with delay (seconds, default=5)
     rolling_pm2 restart "${2:-5}"
     ;;
+  rolling-start)
+    # Sequential start ww-1..ww-N with delay (seconds, default=5)
+    pm2_exec delete $(app_names) >/dev/null 2>&1 || true
+    rolling_pm2 start "${2:-5}"
+    ;;
   rolling-reload)
     # Sequential reload ww-1..ww-N with delay (seconds, default=5)
     rolling_pm2 reload "${2:-5}"
@@ -106,7 +115,7 @@ case "$1" in
     pm2_exec start ecosystem.config.cjs
     ;;
   *)
-    echo "Usage: $0 {start|stop|restart|reload|rolling-restart [delay_s]|rolling-reload [delay_s]|status|logs|monitor|scale <number>}"
+    echo "Usage: $0 {start|stop|restart|reload|rolling-start [delay_s]|rolling-restart [delay_s]|rolling-reload [delay_s]|status|logs|monitor|scale <number>}"
     exit 1
     ;;
 esac

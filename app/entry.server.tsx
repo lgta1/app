@@ -9,7 +9,6 @@ import { PassThrough } from "node:stream";
 import { ENV } from "@/configs/env.config";
 import { initLeaderboardScheduler } from "@/jobs/leaderboard.server";
 import { initHotCarouselSnapshotScheduler } from "@/jobs/hot-carousel-snapshot.server";
-import { initSitemapScheduler } from "@/jobs/sitemap.server";
 import { initViHentaiAutoDownloadQueueWorker } from "@/jobs/vi-hentai-auto-download-queue.server";
 import { initViHentaiAutoUpdateScheduler } from "@/jobs/vi-hentai-auto-update.server";
 import {
@@ -17,6 +16,14 @@ import {
   rewriteLegacySiteHostsDeepInPlace,
   rewriteLegacySiteHostsInStream,
 } from "@/utils/site-host-rewrite";
+
+import { getRedirectUrl } from "~/.server/utils/canonical-url";
+
+import { getCdnBase } from "~/.server/utils/cdn-url";
+import {
+  rewriteCdnHostsDeepInPlace,
+  rewriteCdnHostsInStream,
+} from "~/.server/utils/cdn-host-rewrite";
 
 import { initMongoDB } from "~/database/connection";
 
@@ -29,7 +36,6 @@ initMongoDB();
 if (ENV.IS_PRODUCTION) {
   initLeaderboardScheduler();
   initHotCarouselSnapshotScheduler();
-  initSitemapScheduler();
   initViHentaiAutoDownloadQueueWorker();
   initViHentaiAutoUpdateScheduler();
 }
@@ -47,9 +53,52 @@ export default function handleRequest(
     let shellRendered = false;
     const userAgent = request.headers.get("user-agent");
 
+    const getRequestHostname = (): string => {
+      const forwardedHost = (request.headers.get("x-forwarded-host") ?? "").trim();
+      const hostHeader = (request.headers.get("host") ?? "").trim();
+      const rawHost = (forwardedHost || hostHeader).split(",")[0]?.trim() ?? "";
+      return rawHost.replace(/:\d+$/, "").replace(/^www\./i, "").toLowerCase();
+    };
+
+    // Legacy domains must ALWAYS redirect to the primary domain for every path.
+    // (Do this here so it also applies to /robots.txt, /sitemap.xml, etc.)
+    try {
+      const hostname = getRequestHostname();
+      const isLegacy = hostname === "vinahentai.top" || hostname === "vinahentai.xyz" || hostname === "vinahentai.com";
+      if (isLegacy) {
+        const target = getRedirectUrl(request as any);
+        const headers = new Headers(responseHeaders);
+        headers.set("Location", target);
+        // Cache the redirect at the edge; it rarely changes.
+        headers.set("Cache-Control", "public, max-age=300, s-maxage=86400");
+        resolve(new Response(null, { status: 301, headers }));
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Backup domain should not be indexed.
+    try {
+      const hostname = getRequestHostname();
+      if (hostname === "vinahentai.one") {
+        responseHeaders.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      }
+    } catch {
+      // ignore
+    }
+
     const canonicalHostname = (() => {
       try {
         return getCanonicalHostname(request);
+      } catch {
+        return undefined;
+      }
+    })();
+
+    const cdnBase = (() => {
+      try {
+        return getCdnBase(request as any);
       } catch {
         return undefined;
       }
@@ -79,6 +128,38 @@ export default function handleRequest(
             try {
               (originalStream as unknown as { getReader: () => ReadableStreamDefaultReader<Uint8Array> }).getReader =
                 () => rewrittenStream.getReader();
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+    } catch {
+      // Never block rendering on rewrite logic.
+    }
+
+    // Rewrite CDN URLs (both legacy and current) to match the incoming site host.
+    // This ensures the backup domain can fully render even when the primary domain/CDN is blocked.
+    try {
+      if (cdnBase) {
+        rewriteCdnHostsDeepInPlace(routerContext.staticHandlerContext?.loaderData, cdnBase);
+        rewriteCdnHostsDeepInPlace(routerContext.staticHandlerContext?.actionData, cdnBase);
+        rewriteCdnHostsDeepInPlace(routerContext.staticHandlerContext?.errors, cdnBase);
+
+        const currentStream = routerContext.serverHandoffStream;
+        const nextStream = rewriteCdnHostsInStream(currentStream, cdnBase);
+
+        if (nextStream && nextStream !== currentStream) {
+          try {
+            routerContext.serverHandoffStream = nextStream;
+          } catch {
+            // Some runtimes may define this property as non-writable.
+          }
+
+          if (currentStream) {
+            try {
+              (currentStream as unknown as { getReader: () => ReadableStreamDefaultReader<Uint8Array> }).getReader =
+                () => nextStream.getReader();
             } catch {
               // ignore
             }

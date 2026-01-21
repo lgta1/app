@@ -1,4 +1,4 @@
-const DEFAULT_CDN_BASE = "https://cdn.hoangsatruongsalacuavietnam.site";
+import { DEFAULT_CDN_BASE } from "~/constants/cdn";
 
 const splitCsv = (value: string | undefined): string[] =>
   (value ?? "")
@@ -8,7 +8,31 @@ const splitCsv = (value: string | undefined): string[] =>
 
 const stripWww = (hostname: string): string => hostname.replace(/^www\./i, "");
 
-export const getCdnBase = (): string => {
+const getForwardedHost = (request: Request): string | undefined => {
+  const forwarded = (request.headers.get("x-forwarded-host") ?? "").trim();
+  const hostHeader = (request.headers.get("host") ?? "").trim();
+  const host = (forwarded || hostHeader).split(",")[0]?.trim();
+  if (!host) return undefined;
+  return host.replace(/:\d+$/, "");
+};
+
+const getCdnBaseForSiteHost = (hostname: string | undefined): string | undefined => {
+  const host = stripWww((hostname ?? "").trim().toLowerCase());
+  if (!host) return undefined;
+  // Serve parallel domains with matching CDN subdomain.
+  if (host === "vinahentai.fun" || host === "vinahentai.one") return `https://cdn.${host}`;
+  return undefined;
+};
+
+export const getCdnBase = (request?: Request): string => {
+  // Prefer deriving from the incoming host so backup domains don't accidentally
+  // keep pointing at the primary CDN hostname.
+  if (request) {
+    const host = getForwardedHost(request);
+    const derived = getCdnBaseForSiteHost(host);
+    if (derived) return derived;
+  }
+
   const fromEnv = (process.env.CDN_BASE ?? "").trim();
   if (fromEnv) return fromEnv;
 
@@ -22,7 +46,12 @@ export const getLegacyCdnHosts = (): string[] => {
   // LEGACY_CDN_HOSTS=cdn.vinahentai.com,cdn.vinahentai.xyz
   return splitCsv(process.env.LEGACY_CDN_HOSTS).length
     ? splitCsv(process.env.LEGACY_CDN_HOSTS)
-    : ["cdn.vinahentai.com", "cdn.vinahentai.xyz"];
+    : [
+        "cdn.vinahentai.top",
+        "cdn.vinahentai.xyz",
+        "cdn.vinahentai.com",
+        "cdn.hoangsatruongsalacuavietnam.site",
+      ];
 };
 
 const getLegacyCdnBases = (): string[] => {

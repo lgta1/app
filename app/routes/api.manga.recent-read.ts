@@ -7,6 +7,8 @@ import { Types } from "mongoose";
 import { MangaModel } from "~/database/models/manga.model";
 import { ensureSlugForDocs } from "~/database/helpers/manga-slug.helper";
 import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
+import { getCdnBase } from "~/.server/utils/cdn-url";
+import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 import { MANGA_STATUS } from "~/constants/manga";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -143,6 +145,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ...m,
         lastReadAt: lastReadMap.get(String(m.id)) ?? null,
       }));
+
+    // Ensure returned URLs use the CDN hostname matching the current domain.
+    try {
+      rewriteCdnHostsDeepInPlace(data as any, getCdnBase(request as any));
+    } catch {}
 
     return Response.json({
       success: true,

@@ -1,5 +1,5 @@
 // app/root.tsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import {
   Links,
   Meta,
@@ -61,7 +61,7 @@ export function meta({ data }: Route.MetaArgs) {
   const baseTitle = "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO";
   const description =
     "Vinahentai - Trang đọc truyện hentai, manhwa 18+ vietsub, hentaiVN,... KHÔNG QUẢNG CÁO, cập nhật nhanh, đa dạng thể loại. Trải nghiệm ngay!";
-  const canonicalUrl = (data as any)?.canonicalUrl || (data as any)?.origin || "https://vinahentai.top";
+  const canonicalUrl = (data as any)?.canonicalUrl || (data as any)?.origin;
   const image = DEFAULT_SHARE_IMAGE;
   return [
     { title: baseTitle },
@@ -70,21 +70,27 @@ export function meta({ data }: Route.MetaArgs) {
     { property: "og:site_name", content: "Vinahentai" },
     { property: "og:title", content: baseTitle },
     { property: "og:description", content: description },
-    { property: "og:url", content: canonicalUrl },
+    ...(canonicalUrl ? [{ property: "og:url", content: canonicalUrl }] : []),
     { property: "og:image", content: image },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: baseTitle },
     { name: "twitter:description", content: description },
     { name: "twitter:image", content: image },
-    { name: "twitter:url", content: canonicalUrl },
+    ...(canonicalUrl ? [{ name: "twitter:url", content: canonicalUrl }] : []),
   ];
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { canonicalUrl } = useLoaderData<RootLoaderData>();
+  const { canonicalUrl, cdnBase } = useLoaderData<RootLoaderData>();
+  const htmlStyle = cdnBase
+    ? ({
+        "--cdn-base": cdnBase,
+        "--cdn-bg-body": `url(${cdnBase}/avatar-uploads/bg/bg%20body%20chuan.webp)`,
+      } as CSSProperties)
+    : undefined;
 
   return (
-    <html lang="vi">
+    <html lang="vi" style={htmlStyle}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -214,7 +220,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export async function loader({ request }: Route.LoaderArgs) {
   const { sharedTtlCache } = await import("~/.server/utils/ttl-cache");
   const { isbot } = await import("isbot");
-  const { getCanonicalUrl, getCanonicalOrigin, getEffectiveRequestUrl } = await import("~/.server/utils/canonical-url");
+  const { getCanonicalUrl, getRedirectUrl, getCanonicalOrigin, getEffectiveRequestUrl } = await import("~/.server/utils/canonical-url");
+  const { getCdnBase } = await import("~/.server/utils/cdn-url");
 
   // Consolidate hostname (e.g. www -> non-www), protocol (http -> https), trailing slashes
   // and common tracking params at the app layer.
@@ -228,11 +235,19 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   })();
 
-  if (canonicalUrl && (request.method === "GET" || request.method === "HEAD")) {
+  const redirectUrl = (() => {
+    try {
+      return getRedirectUrl(request as any);
+    } catch {
+      return undefined;
+    }
+  })();
+
+  if (redirectUrl && (request.method === "GET" || request.method === "HEAD")) {
     try {
       const effectiveUrl = getEffectiveRequestUrl(request as any);
-      if (effectiveUrl.toString() !== canonicalUrl) {
-        return redirect(encodeURI(canonicalUrl), { status: 301 });
+      if (effectiveUrl.toString() !== redirectUrl) {
+        return redirect(encodeURI(redirectUrl), { status: 301 });
       }
     } catch {}
   }
@@ -252,11 +267,27 @@ export async function loader({ request }: Route.LoaderArgs) {
       return getCanonicalOrigin(request as any);
     }
   })();
+  const cdnBase = getCdnBase(request as any).replace(/\/+$/, "");
 
   const responseHeaders = new Headers();
   // Prevent CDN/Cloudflare from caching HTML/data responses and serving stale asset-hash refs
   responseHeaders.set("Cache-Control", "private, no-store, max-age=0");
   responseHeaders.set("Vary", "Cookie");
+
+  // Backup domain should not be indexed.
+  try {
+    const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "")
+      .split(",")[0]
+      ?.trim()
+      ?.replace(/:\d+$/, "")
+      ?.replace(/^www\./i, "")
+      ?.toLowerCase();
+    if (host === "vinahentai.one") {
+      responseHeaders.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    }
+  } catch {
+    // ignore
+  }
 
   if (user) {
     // Enrich session user with blacklist tags (used by MangaCard), and apply defaults once if never configured.
@@ -292,11 +323,14 @@ export async function loader({ request }: Route.LoaderArgs) {
       unreadCount = await countUnreadNotifications(user.id);
     } catch {}
     return json(
-      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified, origin, canonicalUrl },
+      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified, origin, canonicalUrl, cdnBase },
       { headers: responseHeaders },
     );
   }
-  return json({ isAdmin: false, genres, isBot, ageVerified, origin, canonicalUrl }, { headers: responseHeaders });
+  return json(
+    { isAdmin: false, genres, isBot, ageVerified, origin, canonicalUrl, cdnBase },
+    { headers: responseHeaders },
+  );
 }
 
 type RootLoaderData = {
@@ -308,6 +342,7 @@ type RootLoaderData = {
   ageVerified?: boolean;
   origin?: string;
   canonicalUrl?: string;
+  cdnBase?: string;
 };
 
 export default function App() {

@@ -39,6 +39,26 @@ const stripDiacritics = (value: string): string => {
   return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
 };
 
+const normalizePrefix = (value: string): string => value.trim().toLowerCase();
+
+const resolveCacheControlByPrefix = (prefixPath: string, generateUniqueFileName: boolean): string => {
+  const prefix = normalizePrefix(prefixPath);
+
+  // Manga cover images
+  if (prefix.startsWith("story-images") || prefix.startsWith("manga-posters")) {
+    return "public, max-age=86400, immutable"; // 1 day
+  }
+
+  // Chapter/page images
+  if (prefix.startsWith("manga-images")) {
+    return "public, max-age=172800, immutable"; // 2 days
+  }
+
+  return generateUniqueFileName
+    ? "public, max-age=31536000, immutable"
+    : "public, max-age=300";
+};
+
 const coerceSafeString = (value: unknown, fallback = "unknown"): string => {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
@@ -173,11 +193,8 @@ export async function uploadBufferWithValidation({
   const targetPrefix = sanitizePrefixPath(prefixPath);
   const resolvedContentType = contentType || getMimeTypeFromExtension(sanitizedFilename);
 
-  const resolvedCacheControl =
-    (cacheControl ?? "").trim() ||
-    (generateUniqueFileName
-      ? "public, max-age=31536000, immutable"
-      : "public, max-age=300");
+  const resolvedCacheControl = (cacheControl ?? "").trim() ||
+    resolveCacheControlByPrefix(targetPrefix, generateUniqueFileName);
 
   try {
     const result = await uploadToPublicBucket(buffer, sanitizedFilename, {

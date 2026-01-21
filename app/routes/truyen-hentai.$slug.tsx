@@ -237,7 +237,7 @@ export function meta({ data }: Route.MetaArgs) {
     ];
   }
 
-  const origin = data.origin || "https://vinahentai.top";
+  const origin = data.origin || "https://vinahentai.fun";
   const canonicalPath = data.manga.slug
     ? `/truyen-hentai/${data.manga.slug}`
     : `/truyen-hentai/${data.manga.id}`;

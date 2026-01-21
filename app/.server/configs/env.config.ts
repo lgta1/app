@@ -39,18 +39,10 @@ export const ENV = {
     const explicit = (process.env.COOKIE_DOMAIN || "").trim();
     if (explicit) return explicit;
 
-    if (process.env.NODE_ENV !== "production") return undefined;
-
-    const origin = (process.env.CANONICAL_ORIGIN || process.env.VITE_CANONICAL_ORIGIN || "").trim();
-    if (!origin) return undefined;
-
-    try {
-      const hostname = new URL(origin).hostname;
-      if (!hostname || hostname === "localhost") return undefined;
-      return `.${hostname}`;
-    } catch {
-      return undefined;
-    }
+    // Host-only cookies are required when serving multiple apex domains
+    // (e.g. vinahentai.fun + vinahentai.one). Browsers will reject a cookie
+    // Domain that doesn't match the current request host.
+    return undefined;
   })(),
   NODE_ENV: process.env.NODE_ENV || "development",
   IS_PRODUCTION: process.env.NODE_ENV === "production",

@@ -227,7 +227,7 @@ export const generateMangaShareImage = async ({
   mangaId,
   title,
   posterUrl,
-  subtitle = "vinahentai.top",
+  subtitle = "vinahentai.fun",
 }: {
   mangaId: string;
   title: string;

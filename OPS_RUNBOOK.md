@@ -52,12 +52,12 @@ npm run ops:clear-system-lock -- vi-hentai-auto-update --dry-run
 
 ## Hợp nhất www & non-www (ưu tiên cao)
 ### Hiện tượng
-- Nếu cả `vinahentai.xyz` và `www.vinahentai.xyz` đều serve nội dung, analytics có thể ghi nhận **self-referral** (2 hostname coi như 2 site).
+- Nếu cả `vinahentai.fun` và `www.vinahentai.fun` đều serve nội dung, analytics có thể ghi nhận **self-referral** (2 hostname coi như 2 site).
 - Cookie session dạng **host-only** (không set `Domain=`) có thể làm user bị “logout” khi nhảy qua hostname khác.
 
 ### Mục tiêu
-- Chọn canonical: **non-www** `https://vinahentai.xyz`
-- Ép redirect **301 triệt để**: `https://www.vinahentai.xyz/*` → `https://vinahentai.xyz/*`
+- Chọn canonical: **non-www** `https://vinahentai.fun`
+- Ép redirect **301 triệt để**: `https://www.vinahentai.fun/*` → `https://vinahentai.fun/*`
 
 ### Cách 1: Nginx 301 (khuyến nghị)
 Tách riêng server block cho `www` để redirect về non-www. Ví dụ (giữ nguyên ACME path):
@@ -66,30 +66,30 @@ Tách riêng server block cho `www` để redirect về non-www. Ví dụ (giữ
 # 1) HTTP -> HTTPS + hợp nhất www
 server {
   listen 80;
-  server_name www.vinahentai.xyz;
+  server_name www.vinahentai.fun;
   location ~ /.well-known/acme-challenge { allow all; root /var/www/html; }
-  return 301 https://vinahentai.xyz$request_uri;
+  return 301 https://vinahentai.fun$request_uri;
 }
 
 server {
   listen 80;
-  server_name vinahentai.xyz;
+  server_name vinahentai.fun;
   location ~ /.well-known/acme-challenge { allow all; root /var/www/html; }
-  return 301 https://vinahentai.xyz$request_uri;
+  return 301 https://vinahentai.fun$request_uri;
 }
 
 # 2) HTTPS hợp nhất www
 server {
   listen 443 ssl;
-  server_name www.vinahentai.xyz;
+  server_name www.vinahentai.fun;
   location ~ /.well-known/acme-challenge { allow all; root /var/www/html; }
-  return 301 https://vinahentai.xyz$request_uri;
+  return 301 https://vinahentai.fun$request_uri;
 }
 
 # 3) HTTPS canonical (proxy về app)
 server {
   listen 443 ssl;
-  server_name vinahentai.xyz;
+  server_name vinahentai.fun;
   location ~ /.well-known/acme-challenge { allow all; root /var/www/html; }
   location / {
     proxy_pass http://ww_backend;
@@ -101,7 +101,7 @@ server {
 ```
 
 ### Cách 2: Cloudflare Redirect Rule (nếu dùng CF trước Nginx)
-- Rule: If hostname equals `www.vinahentai.xyz` → 301 to `https://vinahentai.xyz${uri}`
+- Rule: If hostname equals `www.vinahentai.fun` → 301 to `https://vinahentai.fun${uri}`
 
 ### Ghi chú về “logout”
 - Có thể xảy ra **một lần** khi user đang ở `www` mà cookie được set ở `vinahentai.com` (hoặc ngược lại).
@@ -109,25 +109,27 @@ server {
 
 ### Kiểm tra sau khi áp dụng
 ```bash
-curl -I https://www.vinahentai.xyz/ | head
-curl -I https://www.vinahentai.xyz/danh-sach | head
+curl -I https://www.vinahentai.fun/ | head
+curl -I https://www.vinahentai.fun/danh-sach | head
 ```
-- Kỳ vọng: status `301` và `Location: https://vinahentai.xyz/...`
+- Kỳ vọng: status `301` và `Location: https://vinahentai.fun/...`
 
 ## Checklist đổi domain + CDN (để làm nhanh lần sau)
 ### 1) Cloudflare (ưu tiên cao)
 - Redirect Rules:
-  - `www.vinahentai.xyz/*` → `https://vinahentai.xyz${uri}` (301)
-  - (nếu migrate domain) `vinahentai.com/*` → `https://vinahentai.xyz${uri}` (301) và `www.vinahentai.com/*` tương tự
+  - `www.vinahentai.fun/*` → `https://vinahentai.fun${uri}` (301)
+  - (migrate domain) `vinahentai.top/*` → `https://vinahentai.fun${uri}` (301) và `www.vinahentai.top/*` tương tự
+  - (migrate domain) `vinahentai.xyz/*` → `https://vinahentai.fun${uri}` (301) và `www.vinahentai.xyz/*` tương tự
+  - (migrate domain) `vinahentai.com/*` → `https://vinahentai.fun${uri}` (301) và `www.vinahentai.com/*` tương tự
 - DNS:
   - `@` và `www` ở zone mới phải **proxied** (orange cloud) nếu muốn rules áp dụng ở edge
 
 ### 2) App env (PM2)
-- `CANONICAL_ORIGIN=https://vinahentai.xyz`
-- `VITE_CANONICAL_ORIGIN=https://vinahentai.xyz`
-- `COOKIE_DOMAIN=.vinahentai.xyz` (để cookie ổn định nếu user/bot chạm www)
-- `CDN_BASE=https://cdn.hoangsatruongsalacuavietnam.site`
-- `VITE_CDN_BASE=https://cdn.hoangsatruongsalacuavietnam.site`
+- `CANONICAL_ORIGIN=https://vinahentai.fun`
+- `VITE_CANONICAL_ORIGIN=https://vinahentai.fun`
+- `COOKIE_DOMAIN=.vinahentai.fun` (để cookie ổn định nếu user/bot chạm www)
+- `CDN_BASE=https://cdn.vinahentai.fun`
+- `VITE_CDN_BASE=https://cdn.vinahentai.fun`
 
 ### 3) Xử lý dữ liệu legacy CDN trong DB
 - Chạy migration rewrite URL (mặc định dry-run):
@@ -137,12 +139,14 @@ curl -I https://www.vinahentai.xyz/danh-sach | head
 
 ### 4) Verify (bắt buộc)
 - Redirect:
-  - `curl -I https://www.vinahentai.xyz/` phải ra 301
+  - `curl -I https://www.vinahentai.fun/` phải ra 301
+  - `curl -I https://vinahentai.top/` phải ra 301
+  - `curl -I https://vinahentai.xyz/` phải ra 301
   - `curl -I https://vinahentai.com/` phải ra 301 (nếu còn giữ domain cũ)
 - HTML không còn leak host cũ:
-  - `curl -sS https://vinahentai.xyz/ | grep -Eo 'cdn\.vinahentai\.com|www\.vinahentai\.xyz' | head`
+  - `curl -sS https://vinahentai.fun/ | grep -Eo 'cdn\.vinahentai\.(top|xyz|com)|cdn\.hoangsatruongsalacuavietnam\.site|www\.vinahentai\.(top|xyz|com)' | head`
 - Cookie/session:
-  - Kiểm tra `Set-Cookie` có `Domain=.vinahentai.xyz` (prod)
+  - Kiểm tra `Set-Cookie` có `Domain=.vinahentai.fun` (prod)
 
 ## Cloudflare cache (thực tế sau thay đổi)
 ### HTML (cache theo từng trang)

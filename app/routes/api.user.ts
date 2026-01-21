@@ -6,6 +6,8 @@ import { UserModel } from "~/database/models/user.model";
 import { WaifuModel } from "~/database/models/waifu.model";
 import { getDefaultBlacklistTagSlugs } from "~/constants/blacklist-tags";
 import { UserWaifuInventoryModel } from "~/database/models/user-waifu-inventory";
+import { getCdnBase } from "~/.server/utils/cdn-url";
+import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -31,6 +33,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     } catch {
       // ignore
     }
+
+    try {
+      rewriteCdnHostsDeepInPlace(userFull as any, getCdnBase(request as any));
+    } catch {}
 
     return Response.json({ success: true, data: userFull });
   } catch (error) {

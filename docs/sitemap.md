@@ -1,4 +1,4 @@
-# Sitemap (SEO) – Vinahentai.top
+# Sitemap (SEO) – Vinahentai.fun
 
 ## Mục tiêu
 - Có **1 sitemap index** duy nhất để submit lên Google Search Console.
@@ -7,36 +7,25 @@
 - Không đưa URL admin/nội bộ/legacy redirect/noindex.
 
 ## Cấu trúc sitemap triển khai
-- `sitemap_index.xml` (index)
-  - `sitemap-static.xml` (home + hub pages)
-  - `sitemap-rankings.xml` (leaderboard pages – daily/weekly/monthly là tab trong 1 URL canonical)
-  - `sitemap-genres.xml` (khoảng ~200 genre)
-  - `sitemap-comics.xml` (~3k manga detail)
-  - `sitemap-chapters-1.xml`, `sitemap-chapters-2.xml`, ... (~30k chapter read URLs, split 10k/file)
-  - `sitemap-users.xml` (subset profile user – mặc định top 1000 để tránh thin/spam)
-  - `sitemap-entities.xml` (authors/translators/characters/doujinshi – page 1 canonical, không query)
+- `sitemap_index_fun.xml` (index)
+  - `sitemap-static_fun.xml` (home + hub pages)
+  - `sitemap-rankings_fun.xml` (leaderboard pages – daily/weekly/monthly là tab trong 1 URL canonical)
+  - `sitemap-genres_fun.xml` (khoảng ~200 genre)
+  - `sitemap-comics_fun.xml` (~3k manga detail)
+  - `sitemap-chapters-1_fun.xml`, `sitemap-chapters-2_fun.xml`, ... (~30k chapter read URLs, split 10k/file)
+  - `sitemap-users_fun.xml` (subset profile user – mặc định top 1000 để tránh thin/spam)
+  - `sitemap-entities_fun.xml` (authors/translators/characters/doujinshi – page 1 canonical, không query)
 
-## Generate sitemap
-### Chạy thủ công
-- `npm run sitemap:generate`
-
-Mặc định script sẽ ghi vào thư mục `build/client` (static root của `react-router-serve`).
-Nếu chưa có `build/client`, nó sẽ fallback ghi vào `public`.
-
-### Tuỳ chọn env
-- `SITEMAP_OUTPUT_DIR`: thư mục output (ví dụ: `build/client`)
-- `SITEMAP_CHAPTERS_PER_FILE`: mặc định `10000`
-- `SITEMAP_MAX_USER_PROFILES`: mặc định `1000`
-
-## Tự động cập nhật (cron trong app)
-- Job `initSitemapScheduler()` chạy **mỗi giờ** (phút 15) ở 1 instance primary:
-  - Primary được xác định bởi `SITEMAP_SCHEDULER=1` hoặc `LEADERBOARD_SCHEDULER=1` hoặc `PORT=3001`.
+## Cập nhật sitemap (thủ công)
+- Sitemap hiện được **duy trì thủ công** bằng cách chỉnh sửa trực tiếp các file XML trong `build/client` (hoặc `public` nếu cần).
+- Khi có cập nhật lớn (truyện mới/chapters mới/genre mới), hãy cập nhật các file sitemap tương ứng và thay `lastmod`.
+- Không có cron/job hoặc script tự động trong hệ thống.
 
 ## Robots
-- `public/robots.txt` trỏ tới `https://vinahentai.top/sitemap_index.xml`
+- `public/robots.txt` trỏ tới `https://vinahentai.fun/sitemap_index_fun.xml`
 
 ## Gợi ý submit lên GSC
-- Chỉ submit **1 URL**: `https://vinahentai.top/sitemap_index.xml`
+- Chỉ submit **1 URL**: `https://vinahentai.fun/sitemap_index_fun.xml`
 - Khi có thay đổi lớn (migrate domain/CDN, đổi cấu trúc URL): regenerate ngay và kiểm tra lỗi trong GSC.
 
 ## Lỗi thường gặp

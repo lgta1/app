@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { ENV } from "@/configs/env.config";
 import { MINIO_CONFIG } from "@/configs/minio.config";
+import { DEFAULT_CDN_BASE } from "~/constants/cdn";
 
 import { BusinessError } from "~/helpers/errors.helper";
 import type {
@@ -269,9 +270,7 @@ export const getMinioClient = (): Minio.Client => {
 export const getPublicFileUrl = (fullPath: string): string => {
   const bucket = MINIO_CONFIG.DEFAULT_BUCKET;
 
-  const cdnBase =
-    (process.env.CDN_BASE ?? "").trim() ||
-    "https://cdn.hoangsatruongsalacuavietnam.site";
+  const cdnBase = ((process.env.CDN_BASE ?? "").trim() || DEFAULT_CDN_BASE).replace(/\/+$/, "");
 
   // Nếu sử dụng Cloudflare R2, dùng R2 public URL format
   if (isUsingCloudflareR2()) {
