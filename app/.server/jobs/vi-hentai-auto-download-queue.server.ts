@@ -215,6 +215,7 @@ async function processOneJob(): Promise<void> {
             createdSlug: result.createdSlug,
             chaptersImported: result.chaptersImported,
             imagesUploaded: result.imagesUploaded,
+            bytesSaved: result.bytesSaved,
             chapterErrors: Array.isArray(result.chapterErrors) ? result.chapterErrors.length : 0,
           },
         },

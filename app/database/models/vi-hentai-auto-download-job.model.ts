@@ -27,6 +27,7 @@ export type ViHentaiAutoDownloadJobResultSummary = {
   createdSlug?: string;
   chaptersImported?: number;
   imagesUploaded?: number;
+  bytesSaved?: number;
   chapterErrors?: number;
 };
 
@@ -125,6 +126,7 @@ const ViHentaiAutoDownloadJobSchema = new Schema<ViHentaiAutoDownloadJobType>(
         createdSlug: { type: String },
         chaptersImported: { type: Number },
         imagesUploaded: { type: Number },
+        bytesSaved: { type: Number },
         chapterErrors: { type: Number },
       },
       default: undefined,

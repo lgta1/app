@@ -85,6 +85,7 @@ type PollBatchLoaderResult =
           createdSlug?: string;
           chaptersImported?: number;
           imagesUploaded?: number;
+          bytesSaved?: number;
           chapterErrors?: number;
         };
         errorMessage?: string;
@@ -126,6 +127,7 @@ type InitialLoaderResult =
           createdSlug?: string;
           chaptersImported?: number;
           imagesUploaded?: number;
+          bytesSaved?: number;
           chapterErrors?: number;
         };
         errorMessage?: string;
@@ -295,6 +297,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
                 createdSlug: (j as any).result?.createdSlug,
                 chaptersImported: (j as any).result?.chaptersImported,
                 imagesUploaded: (j as any).result?.imagesUploaded,
+                bytesSaved: (j as any).result?.bytesSaved,
                 chapterErrors: (j as any).result?.chapterErrors,
               }
             : undefined,
@@ -359,6 +362,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             createdSlug: (j as any).result?.createdSlug,
             chaptersImported: (j as any).result?.chaptersImported,
             imagesUploaded: (j as any).result?.imagesUploaded,
+            bytesSaved: (j as any).result?.bytesSaved,
             chapterErrors: (j as any).result?.chapterErrors,
           }
         : undefined,
@@ -920,6 +924,19 @@ export default function AdminMangaAutoDownload() {
 
   const [listingUrlInput, setListingUrlInput] = useState<string>("");
 
+  const formatBytes = (bytes: number) => {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"]; 
+    let idx = 0;
+    let value = bytes;
+    while (value >= 1024 && idx < units.length - 1) {
+      value /= 1024;
+      idx += 1;
+    }
+    const fixed = value >= 10 || idx === 0 ? value.toFixed(0) : value.toFixed(1);
+    return `${fixed} ${units[idx]}`;
+  };
+
   const [isRunning, setIsRunning] = useState(false);
   const activeBatchIdRef = useRef<string | null>(null);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
@@ -975,6 +992,8 @@ export default function AdminMangaAutoDownload() {
       }
 
       if (job.status === "succeeded") {
+        const savedBytes = Number(job.result?.bytesSaved || 0);
+        const savedText = savedBytes > 0 ? `Tiết kiệm được ${formatBytes(savedBytes)}` : "";
         return {
           id: makeId(),
           url: job.url,
@@ -982,7 +1001,7 @@ export default function AdminMangaAutoDownload() {
           status: "done",
           message:
             job.result?.message ||
-            `Xong · ${job.result?.chaptersImported ?? 0} chương · ${job.result?.imagesUploaded ?? 0} ảnh`,
+            `Xong · ${job.result?.chaptersImported ?? 0} chương · ${job.result?.imagesUploaded ?? 0} ảnh${savedText ? ` · ${savedText}` : ""}`,
           startedAt: job.startedAt,
           finishedAt: job.finishedAt,
           lastResult: job.result?.createdId
@@ -1380,12 +1399,14 @@ export default function AdminMangaAutoDownload() {
         }
 
         if (job.status === "succeeded") {
+          const savedBytes = Number(job.result?.bytesSaved || 0);
+          const savedText = savedBytes > 0 ? `Tiết kiệm được ${formatBytes(savedBytes)}` : "";
           return {
             ...r,
             status: "done",
             message:
               job.result?.message ||
-              `Xong · ${job.result?.chaptersImported ?? 0} chương · ${job.result?.imagesUploaded ?? 0} ảnh`,
+              `Xong · ${job.result?.chaptersImported ?? 0} chương · ${job.result?.imagesUploaded ?? 0} ảnh${savedText ? ` · ${savedText}` : ""}`,
             finishedAt: new Date().toISOString(),
             lastResult:
               job.result?.createdId

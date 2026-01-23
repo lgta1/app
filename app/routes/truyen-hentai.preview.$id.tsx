@@ -844,17 +844,19 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           </Link>
           {isAdminUser && (
             <>
-              <button
-                className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-green-500 px-4 py-3 text-green-400 shadow-[0px_4px_8.9px_0px_rgba(34,197,94,0.25)] transition-colors hover:bg-green-500/10"
-                onClick={() => {
-                  const formData = new FormData();
-                  formData.append("actionType", "approve");
-                  submit(formData, { method: "POST" });
-                }}
-              >
-                <CheckCircle className="h-5 w-5" />
-                <span className="text-sm font-semibold">Duyệt</span>
-              </button>
+              {status !== MANGA_STATUS.APPROVED && (
+                <button
+                  className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-green-500 px-4 py-3 text-green-400 shadow-[0px_4px_8.9px_0px_rgba(34,197,94,0.25)] transition-colors hover:bg-green-500/10"
+                  onClick={() => {
+                    const formData = new FormData();
+                    formData.append("actionType", "approve");
+                    submit(formData, { method: "POST" });
+                  }}
+                >
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="text-sm font-semibold">Duyệt</span>
+                </button>
+              )}
               <button
                 className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500 px-4 py-3 text-red-400 shadow-[0px_4px_8.9px_0px_rgba(239,68,68,0.25)] transition-colors hover:bg-red-500/10"
                 onClick={() => {

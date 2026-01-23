@@ -411,6 +411,7 @@ export type ViHentaiImportResult = {
 export type ViHentaiAutoDownloadResult = ViHentaiImportResult & {
   chaptersImported: number;
   imagesUploaded: number;
+  bytesSaved?: number;
   chapterErrors: Array<{ chapterUrl: string; message: string }>;
 };
 
@@ -641,17 +642,17 @@ async function normalizeChapterImageBuffer(input: {
     }
 
     const size = workingBuffer.length;
-    if (size <= 2 * MB) {
+    if (size <= 1.2 * MB) {
       return { buffer: workingBuffer, contentType: formatToContentType(workingFormat) || input.contentType };
     }
 
-    // 2MB–2.85MB: try -10% quality first; if not good enough, scale 75%.
+    // 1.2MB–2.85MB: try -10% quality first; if not good enough, scale 70%.
     if (size <= 2.85 * MB) {
       const trial = await reencodeKeepResolutionMinus10(workingBuffer, workingFormat);
-      if (trial && trial.buffer.length < workingBuffer.length && trial.buffer.length < 2 * MB) {
+      if (trial && trial.buffer.length < workingBuffer.length && trial.buffer.length < 1.2 * MB) {
         return trial;
       }
-      return await scaleByRatioKeepFormat(workingBuffer, workingFormat, 0.75);
+      return await scaleByRatioKeepFormat(workingBuffer, workingFormat, 0.7);
     }
 
     // Remaining tiers
@@ -2077,6 +2078,7 @@ export async function autoDownloadViHentaiManga(
     createdSlug: doc.slug,
     chaptersImported: 0,
     imagesUploaded: 0,
+    bytesSaved: 0,
     chapterErrors: [],
   };
 
@@ -2223,6 +2225,11 @@ export async function autoDownloadViHentaiManga(
             buffer: fetched.buffer,
             contentType: fetched.contentType,
           });
+
+          const savedBytes = Math.max(0, fetched.buffer.length - normalized.buffer.length);
+          if (savedBytes > 0) {
+            resultBase.bytesSaved = (resultBase.bytesSaved || 0) + savedBytes;
+          }
 
           throwIfAborted();
           const uploadedOne = await uploadImageBuffer(imgUrl, normalized.buffer, normalized.contentType, {

@@ -126,6 +126,25 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
+  if (action === "update-status" && typeof mangaId === "string") {
+    const statusRaw = formData.get("status");
+    const statusNumber = Number.parseInt(String(statusRaw ?? ""), 10);
+    const allowed = new Set([MANGA_STATUS.PENDING, MANGA_STATUS.APPROVED, MANGA_STATUS.REJECTED]);
+    if (!allowed.has(statusNumber)) {
+      return { success: false, message: "Trạng thái không hợp lệ" };
+    }
+    try {
+      const { updateManga } = await import("@/mutations/manga.mutation");
+      await updateManga(request, mangaId, { status: statusNumber } as any);
+      return { success: true, message: "Cập nhật trạng thái thành công" };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Có lỗi xảy ra khi cập nhật trạng thái",
+      };
+    }
+  }
+
   return { success: false, message: "Hành động không hợp lệ" };
 }
 
@@ -245,6 +264,14 @@ export default function AdminManga() {
     }
     params.delete("page");
     submit(params, { method: "get" });
+  };
+
+  const handleStatusUpdate = (mangaId: string, status: number) => {
+    const fd = new FormData();
+    fd.append("action", "update-status");
+    fd.append("mangaId", mangaId);
+    fd.append("status", String(status));
+    submit(fd, { method: "post" });
   };
 
   const [editingOwnerRow, setEditingOwnerRow] = useState<string | null>(null);
@@ -385,11 +412,15 @@ export default function AdminManga() {
                     <div className="text-txt-primary font-sans text-sm font-semibold">
                       #{globalIndex}
                     </div>
-                    <div
-                      className={`font-sans text-sm font-semibold ${getStatusColor(manga.status)}`}
+                    <select
+                      className={`bg-transparent font-sans text-sm font-semibold ${getStatusColor(manga.status)}`}
+                      value={manga.status}
+                      onChange={(e) => handleStatusUpdate(manga.id, Number.parseInt(e.target.value, 10))}
                     >
-                      {getStatusText(manga.status)}
-                    </div>
+                      <option value={MANGA_STATUS.APPROVED}>Đã duyệt</option>
+                      <option value={MANGA_STATUS.PENDING}>Chờ duyệt</option>
+                      <option value={MANGA_STATUS.REJECTED}>Từ chối</option>
+                    </select>
                   </div>
                   <div className="flex items-center gap-2">
                     <Link to={`/truyen-hentai/preview/${previewHandle}`} className="flex items-center gap-2">
@@ -496,11 +527,15 @@ export default function AdminManga() {
                   </div>
                 </div>
                 <div className="hidden min-w-28 items-center justify-start gap-2.5 p-3 lg:flex">
-                  <div
-                    className={`font-sans text-sm leading-tight font-semibold ${getStatusColor(manga.status)}`}
+                  <select
+                    className={`bg-transparent font-sans text-sm leading-tight font-semibold ${getStatusColor(manga.status)}`}
+                    value={manga.status}
+                    onChange={(e) => handleStatusUpdate(manga.id, Number.parseInt(e.target.value, 10))}
                   >
-                    {getStatusText(manga.status)}
-                  </div>
+                    <option value={MANGA_STATUS.APPROVED}>Đã duyệt</option>
+                    <option value={MANGA_STATUS.PENDING}>Chờ duyệt</option>
+                    <option value={MANGA_STATUS.REJECTED}>Từ chối</option>
+                  </select>
                 </div>
                 <div className="hidden min-w-20 items-center justify-start gap-2.5 p-3 lg:flex">
                   <ActionButtons
