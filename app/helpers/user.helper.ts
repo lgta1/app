@@ -18,6 +18,10 @@ export const canBulkDownloadChapters = (
 };
 
 export const getTitleImgPath = (user: UserType) => {
+  if (user.level === 4) {
+    return `/images/title/0/cap4forall.webp`;
+  }
+
   if (user.level > 9) {
     return `/images/title/${user.faction}/9.webp`;
   }

@@ -13,7 +13,7 @@ type WatermarkResult = {
 const SUPPORTED_FORMATS = new Set(["jpeg", "jpg", "png", "webp"]);
 const LIMIT_PIXELS = 20000 * 20000; // guardrail against huge images
 
-const watermarkPath = path.join(process.cwd(), "public", "images", "logo-watermark.webp");
+const watermarkPath = path.join(process.cwd(), "public", "images", "watermark.webp");
 let cachedWatermark: Buffer | null = null;
 let cachedWatermarkMeta: sharp.Metadata | null = null;
 
@@ -93,21 +93,15 @@ export async function applyWatermark(
   ] as const;
   const message = opts?.variant === 2 ? messages[1] : messages[0];
 
-  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
   // Layout tuning
   const charFactor = 0.55; // rough width/height ratio for sans fonts
-  const minFont = 12;
-  const minLogoH = 24;
-  const maxLogoH = 110;
 
-  // IMPORTANT: size watermark based on the (already-optimized) uploaded image,
-  // not the watermark asset's native pixels. This keeps consistent proportions
-  // across same aspect ratio but different resolutions.
-  // ~5.5% of image height, clamped.
-  let logoH = clamp(Math.round(height * 0.055), minLogoH, maxLogoH);
-  let stripHeight = Math.max(1, Math.ceil(logoH));
-  let fontSize = clamp(Math.floor(stripHeight * 0.6), minFont, Math.max(minFont, stripHeight - 4));
+  // IMPORTANT: size watermark based on the original image width (Wc).
+  // Spec: strip height = 3.5% of Wc, and text/logo height equals strip height.
+  const baseStripHeight = Math.max(1, Math.round(width * 0.035));
+  let stripHeight = baseStripHeight;
+  let logoH = baseStripHeight;
+  let fontSize = Math.max(1, Math.floor(logoH * 0.8));
   let gap = 0;
   let logoW = Math.max(1, Math.floor(logoH * logoAspect));
   let textW = Math.ceil(message.length * fontSize * charFactor);
@@ -117,9 +111,9 @@ export async function applyWatermark(
   const maxIters = 6;
   for (let i = 0; i < maxIters && groupW > maxGroupWidth; i++) {
     const scale = maxGroupWidth / groupW;
-    logoH = Math.max(minLogoH, Math.floor(logoH * scale));
-    stripHeight = Math.max(1, Math.ceil(logoH));
-    fontSize = clamp(Math.floor(stripHeight * 0.6), minFont, Math.max(minFont, stripHeight - 4));
+    stripHeight = Math.max(1, Math.floor(stripHeight * scale));
+    logoH = stripHeight;
+    fontSize = Math.max(1, Math.floor(logoH * 0.8));
     gap = 0;
     logoW = Math.max(1, Math.floor(logoH * logoAspect));
     textW = Math.ceil(message.length * fontSize * charFactor);

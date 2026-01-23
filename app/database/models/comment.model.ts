@@ -1,5 +1,7 @@
 import { model, Schema } from "mongoose";
 
+import type { ReactionCounts } from "~/constants/reactions";
+
 export type CommentType = {
   id: string;
   content: string;
@@ -8,6 +10,8 @@ export type CommentType = {
   userId: string;
   parentId?: string;
   likeNumber: number;
+  reactionCounts?: ReactionCounts;
+  totalReactions?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -20,6 +24,16 @@ const CommentSchema = new Schema<CommentType>(
     userId: { type: String, ref: "User", required: true },
     parentId: { type: String, ref: "Comment", required: false },
     likeNumber: { type: Number, default: 0 },
+    reactionCounts: {
+      like: { type: Number, default: 0 },
+      love: { type: Number, default: 0 },
+      care: { type: Number, default: 0 },
+      haha: { type: Number, default: 0 },
+      wow: { type: Number, default: 0 },
+      sad: { type: Number, default: 0 },
+      angry: { type: Number, default: 0 },
+    },
+    totalReactions: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

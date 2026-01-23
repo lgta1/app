@@ -7,8 +7,19 @@ const getHost = (request: Request): string => {
   return raw.replace(/:\d+$/, "").replace(/^www\./i, "").toLowerCase();
 };
 
+const getOrigin = (request: Request): string => {
+  const url = new URL(request.url);
+  const forwardedProto = (request.headers.get("x-forwarded-proto") ?? "")
+    .split(",")[0]
+    ?.trim();
+  const proto = forwardedProto || url.protocol.replace(/:$/, "");
+  const host = getHost(request);
+  return host ? `${proto}://${host}` : url.origin;
+};
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const host = getHost(request);
+  const origin = getOrigin(request);
 
   // Backup domain: explicitly block all crawlers.
   if (host === "vinahentai.one") {
@@ -59,7 +70,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   // Primary domain: allow crawling (SEO rules handled elsewhere).
-  return new Response("User-agent: *\nAllow: /\n\n# Posts are disabled and should be removed from index.\n# Do NOT block via robots.txt, so crawlers can fetch and observe 410/404.\n", {
+  const robots = [
+    "User-agent: *",
+    "Allow: /",
+    "",
+    `Sitemap: ${origin}/sitemap4.xml`,
+    "",
+    "# Posts are disabled and should be removed from index.",
+    "# Do NOT block via robots.txt, so crawlers can fetch and observe 410/404.",
+    "",
+  ].join("\n");
+
+  return new Response(robots, {
     status: 200,
     headers: {
       "Content-Type": "text/plain; charset=utf-8",

@@ -12,7 +12,7 @@ export async function loader({}: Route.LoaderArgs) {
   const { resolveMangaHandle } = await import("~/database/helpers/manga-slug.helper");
   const manga = await resolveMangaHandle(randomId);
   const targetHandle = manga?.slug ?? randomId;
-  return redirect(`/truyen-hentai/${targetHandle}`);
+  return redirect(encodeURI(`/truyen-hentai/${targetHandle}`));
 }
 
 export default function RandomRedirect() {

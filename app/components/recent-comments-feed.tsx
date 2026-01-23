@@ -2,16 +2,21 @@ import { useMemo } from "react";
 import type React from "react";
 import { Link } from "react-router-dom";
 import { User as UserIcon, MessageSquare } from "lucide-react";
+import { CommentReactionSummary } from "~/components/comment-reaction";
 import { usePagination } from "~/hooks/use-pagination";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { buildMangaUrl, getMangaHandle } from "~/utils/manga-url.utils";
 // import { formatDistanceToNow } from "~/utils/date.utils"; // replaced by compact formatAgo()
+
+import type { ReactionCounts } from "~/constants/reactions";
 
 interface FeedItem {
   id: string;
   content: string;
   parentId?: string;
   createdAt: string | Date;
+  reactionCounts?: Partial<ReactionCounts>;
+  totalReactions?: number;
   user?: { id: string; name: string; avatar?: string } | null;
   manga?: { id: string; slug?: string | null; title: string; poster?: string } | null;
 }
@@ -25,7 +30,7 @@ interface RecentCommentsFeedProps {
 }
 
 export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages, limit = 5, showPagination = true }: RecentCommentsFeedProps) {
-  const pageSize = 5;
+  const pageSize = 10;
   const { data, isLoading, error, currentPage, totalPages, goToPage } =
     usePagination<FeedItem>({
       apiUrl: "/api/comments/recent",
@@ -119,6 +124,13 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
                         ))}
                       </span>
                     )}
+
+                    <CommentReactionSummary
+                      compact
+                      className="mt-2"
+                      reactionCounts={(c as any).reactionCounts}
+                      totalReactions={(c as any).totalReactions}
+                    />
                   </div>
                 </div>
 

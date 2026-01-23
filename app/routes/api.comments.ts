@@ -1,5 +1,6 @@
-import { createComment, deleteComment, likeComment } from "@/mutations/comment.mutation";
+import { createComment, deleteComment, likeComment, reactComment } from "@/mutations/comment.mutation";
 import { getComments, getReplies, getPageContainingComment } from "@/queries/comment.query";
+import { getUserReactionsForComments } from "@/queries/comment-reaction.query";
 import { recordComment } from "@/services/interaction.svc";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
@@ -10,6 +11,7 @@ import { sharedTtlCache } from "~/.server/utils/ttl-cache";
 
 export async function loader({ request }: Route.LoaderArgs) {
   try {
+    const user = await getUserInfoFromSession(request);
     const url = new URL(request.url);
     const mangaId = url.searchParams.get("mangaId");
     const postId = url.searchParams.get("postId");
@@ -24,6 +26,17 @@ export async function loader({ request }: Route.LoaderArgs) {
         10_000,
         () => getReplies(parentId),
       );
+
+      if (user?.id) {
+        const ids = (replies || []).map((c: any) => String(c?.id ?? c?._id ?? "")).filter(Boolean);
+        const map = await getUserReactionsForComments(user.id, ids);
+        const withMine = (replies || []).map((c: any) => ({
+          ...c,
+          userReaction: map[String(c?.id ?? c?._id ?? "")] ?? null,
+        }));
+        return Response.json({ data: withMine, success: true });
+      }
+
       return Response.json({ data: replies, success: true });
     }
 
@@ -75,8 +88,26 @@ export async function loader({ request }: Route.LoaderArgs) {
           limit,
         );
 
+    const comments = commentsData.data || [];
+    if (user?.id) {
+      const ids = comments.map((c: any) => String(c?.id ?? c?._id ?? "")).filter(Boolean);
+      const map = await getUserReactionsForComments(user.id, ids);
+      const withMine = comments.map((c: any) => ({
+        ...c,
+        userReaction: map[String(c?.id ?? c?._id ?? "")] ?? null,
+      }));
+
+      return Response.json({
+        data: withMine,
+        totalPages: commentsData.totalPages,
+        currentPage: commentsData.currentPage,
+        totalCount: commentsData.totalCount,
+        success: true,
+      });
+    }
+
     return Response.json({
-      data: commentsData.data,
+      data: comments,
       totalPages: commentsData.totalPages,
       currentPage: commentsData.currentPage,
       totalCount: commentsData.totalCount,
@@ -186,6 +217,18 @@ export async function action({ request }: Route.ActionArgs) {
 
       const result = await likeComment(commentId, user.id);
 
+      return Response.json(result);
+    }
+
+    if (intent === "react-comment") {
+      const commentId = formData.get("commentId") as string;
+      const reaction = formData.get("reaction");
+
+      if (!commentId) {
+        return Response.json({ error: "commentId là bắt buộc" }, { status: 400 });
+      }
+
+      const result = await reactComment(commentId, user.id, reaction);
       return Response.json(result);
     }
 

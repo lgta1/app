@@ -1,12 +1,16 @@
 import { redirect } from "react-router";
 import type { LoaderFunctionArgs } from "react-router-dom";
 
-export async function loader(_args: LoaderFunctionArgs) {
+const getHost = (request: Request): string => {
+  const forwarded = (request.headers.get("x-forwarded-host") ?? "").trim();
+  const hostHeader = (request.headers.get("host") ?? "").trim();
+  const raw = (forwarded || hostHeader).split(",")[0]?.trim() ?? "";
+  return raw.replace(/:\d+$/, "").replace(/^www\./i, "").toLowerCase();
+};
+
+export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    const request = (_args as any)?.request as Request | undefined;
-    const forwarded = (request?.headers.get("x-forwarded-host") ?? "").trim();
-    const hostHeader = (request?.headers.get("host") ?? "").trim();
-    const host = (forwarded || hostHeader).split(",")[0]?.trim()?.replace(/:\d+$/, "").replace(/^www\./i, "").toLowerCase();
+    const host = getHost(request);
     if (host === "vinahentai.one") {
       return new Response("Not Found", {
         status: 404,
@@ -20,7 +24,7 @@ export async function loader(_args: LoaderFunctionArgs) {
     // ignore
   }
 
-  const res = redirect("/sitemap4.xml", { status: 301 });
+  const res = redirect("/sitemapforfun3.xml", { status: 301 });
   res.headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
   return res;
 }

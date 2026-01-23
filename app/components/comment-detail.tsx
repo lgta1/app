@@ -8,7 +8,6 @@ import {
   MessageSquare,
   Send,
   Image as ImageIcon,
-  ThumbsUp,
   Trash2,
   X,
 } from "lucide-react";
@@ -17,10 +16,12 @@ import ReportDialog from "./dialog-report";
 import { isDichGia } from "~/helpers/user.helper";
 import GifMemeDialog from "./dialog-gif-meme";
 import { Pagination } from "./pagination";
+import { CommentReaction, CommentReactionSummary } from "./comment-reaction";
 
 import WaifuMeta from "~/components/common/WaifuMeta";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { REPORT_TYPE } from "~/constants/report";
+import type { ReactionType } from "~/constants/reactions";
 import type { CommentType } from "~/database/models/comment.model";
 import type { UserType } from "~/database/models/user.model";
 import { getTitleImgPath } from "~/helpers/user.helper";
@@ -38,6 +39,7 @@ interface CommentTypeWithUser extends Omit<CommentType, "userId"> {
   parentId?: string;
   replies?: CommentTypeWithUser[];
   replyCount?: number;
+  userReaction?: ReactionType | null;
 }
 
 interface PaginationState {
@@ -50,7 +52,7 @@ interface PaginationState {
 interface LoadingStates {
   creating: boolean;
   deleting: string | null;
-  liking: string | null;
+  reacting: string | null;
   reporting: boolean;
   loadingReplies: string | null;
 }
@@ -398,7 +400,7 @@ export default function CommentDetail({
   const [loadingStates, setLoadingStates] = useState<LoadingStates>({
     creating: false,
     deleting: null,
-    liking: null,
+    reacting: null,
     reporting: false,
     loadingReplies: null,
   });
@@ -465,9 +467,11 @@ export default function CommentDetail({
     if (!user) return;
     if (!isTouch) return;
     e.stopPropagation();
+    const src = getTitleImgPath(user);
+    if (!src) return;
     setMobileZoomPreview({
       kind: "badge",
-      src: getTitleImgPath(user),
+      src,
       alt: "User badge",
       baseHeight,
     });
@@ -616,16 +620,17 @@ export default function CommentDetail({
     [isAdmin],
   );
 
-  /* -------- Like -------- */
-  const handleLikeComment = useCallback(
-    async (commentId: string) => {
+  /* -------- Reactions -------- */
+  const handleReactComment = useCallback(
+    async (commentId: string, reaction: ReactionType) => {
       if (!isLoggedIn) return;
-      setLoadingStates((prev) => ({ ...prev, liking: commentId }));
+      setLoadingStates((prev) => ({ ...prev, reacting: commentId }));
 
       try {
         const formData = new FormData();
         formData.append("commentId", commentId);
-        formData.append("intent", "like-comment");
+        formData.append("reaction", reaction);
+        formData.append("intent", "react-comment");
 
         const response = await fetch("/api/comments", { method: "POST", body: formData });
         const data = await response.json();
@@ -633,49 +638,29 @@ export default function CommentDetail({
         if (data.success) {
           setComments((prev) =>
             prev.map((c) => {
-              if (c.id === commentId) return { ...c, likeNumber: data.newLikeCount };
+              const patch = (x: any) => ({
+                ...x,
+                reactionCounts: data.reactionCounts,
+                totalReactions: data.totalReactions,
+                userReaction: data.userReaction ?? null,
+                likeNumber: Number(data?.reactionCounts?.like) || x.likeNumber || 0,
+              });
+
+              if (c.id === commentId) return patch(c);
               if (c.replies) {
-                const replies = c.replies.map((r) =>
-                  r.id === commentId ? { ...r, likeNumber: data.newLikeCount } : r,
-                );
+                const replies = c.replies.map((r) => (r.id === commentId ? patch(r) : r));
                 return { ...c, replies };
               }
               return c;
             }),
           );
-          // Tắt toast thành công (giữ lỗi)
-          // toast.success(data.message);
         } else {
-          setComments((prev) =>
-            prev.map((c) => {
-              if (c.id === commentId) return { ...c, likeNumber: Math.max(0, (c.likeNumber || 0) - 1) };
-              if (c.replies) {
-                const replies = c.replies.map((r) =>
-                  r.id === commentId ? { ...r, likeNumber: Math.max(0, (r.likeNumber || 0) - 1) } : r,
-                );
-                return { ...c, replies };
-              }
-              return c;
-            }),
-          );
-          toast.error(data.error || "Không thể thích bình luận");
+          toast.error(data.error || "Không thể thả cảm xúc");
         }
       } catch {
-        setComments((prev) =>
-          prev.map((c) => {
-            if (c.id === commentId) return { ...c, likeNumber: Math.max(0, (c.likeNumber || 0) - 1) };
-            if (c.replies) {
-              const replies = c.replies.map((r) =>
-                r.id === commentId ? { ...r, likeNumber: Math.max(0, (r.likeNumber || 0) - 1) } : r,
-              );
-              return { ...c, replies };
-            }
-            return c;
-          }),
-        );
-        toast.error("Có lỗi xảy ra khi thích bình luận");
+        toast.error("Có lỗi xảy ra khi thả cảm xúc");
       } finally {
-        setLoadingStates((prev) => ({ ...prev, liking: null }));
+        setLoadingStates((prev) => ({ ...prev, reacting: null }));
       }
     },
     [isLoggedIn],
@@ -904,23 +889,30 @@ export default function CommentDetail({
                   ))}
                 </div>
               )}
+
+              <CommentReactionSummary
+                compact
+                className="mt-2"
+                reactionCounts={(reply as any).reactionCounts}
+                totalReactions={(reply as any).totalReactions}
+              />
             </div>
           </div>
         </div>
 
         {/* Actions (reply: nhỏ hơn 3/4) */}
         <div className="flex flex-wrap items-center justify-start gap-4">
-          <button
-            onClick={() => handleLikeComment(reply.id)}
-            disabled={!isLoggedIn || loadingStates.liking === reply.id}
-            className="flex cursor-pointer items-center justify-start gap-1 text-txt-secondary transition-colors hover:text-txt-primary disabled:cursor-not-allowed disabled:opacity-50"
-            title={isLoggedIn ? "Thích bình luận" : "Đăng nhập để thích"}
-          >
-            <ThumbsUp className="h-3 w-3" />
-            <div className="font-sans text-[0.65rem] leading-[0.95rem] font-medium">
-              {reply.likeNumber || 0}
-            </div>
-          </button>
+          <CommentReaction
+            compact
+            isLoggedIn={isLoggedIn}
+            commentId={reply.id}
+            userReaction={(reply as any).userReaction}
+            reactionCounts={(reply as any).reactionCounts}
+            totalReactions={(reply as any).totalReactions}
+            loading={loadingStates.reacting === reply.id}
+            disabled={loadingStates.reacting === reply.id}
+            onReact={handleReactComment}
+          />
           <button
             onClick={() => handleReply(reply)}
             disabled={!isLoggedIn}
@@ -1148,23 +1140,30 @@ export default function CommentDetail({
                                 ))}
                               </div>
                             )}
+
+                            <CommentReactionSummary
+                              compact
+                              className="mt-2"
+                              reactionCounts={(comment as any).reactionCounts}
+                              totalReactions={(comment as any).totalReactions}
+                            />
                           </div>
                         </div>
                       </div>
 
                       {/* Actions (comment chính: thu nhỏ 3/5) */}
                       <div className="flex flex-wrap items-center justify-start gap-4">
-                        <button
-                          onClick={() => handleLikeComment(comment.id)}
-                          disabled={!isLoggedIn || loadingStates.liking === comment.id}
-                          className="flex cursor-pointer items-center justify-start gap-1 text-txt-secondary transition-colors hover:text-txt-primary disabled:cursor-not-allowed disabled:opacity-50"
-                          title={isLoggedIn ? "Thích bình luận" : "Đăng nhập để thích"}
-                        >
-                          <ThumbsUp className="h-3 w-3" />
-                          <div className="font-sans text-[0.65rem] leading-[0.95rem] font-medium">
-                            {comment.likeNumber || 0}
-                          </div>
-                        </button>
+                        <CommentReaction
+                          compact
+                          isLoggedIn={isLoggedIn}
+                          commentId={comment.id}
+                          userReaction={(comment as any).userReaction}
+                          reactionCounts={(comment as any).reactionCounts}
+                          totalReactions={(comment as any).totalReactions}
+                          loading={loadingStates.reacting === comment.id}
+                          disabled={loadingStates.reacting === comment.id}
+                          onReact={handleReactComment}
+                        />
                         <button
                           onClick={() => handleReply(comment)}
                           disabled={!isLoggedIn}

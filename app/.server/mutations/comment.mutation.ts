@@ -5,12 +5,15 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import { createNotification } from "@/mutations/notification.mutation";
 
 import { CommentModel } from "~/database/models/comment.model";
-import { UserLikeCommentModel } from "~/database/models/user-like-comment.model";
+import { UserReactionCommentModel } from "~/database/models/user-reaction-comment.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
 import { MangaModel } from "~/database/models/manga.model";
 import { PostModel } from "~/database/models/post.model";
 import { UserModel } from "~/database/models/user.model";
+
+import type { ReactionType } from "~/constants/reactions";
+import { normalizeReactionType } from "~/constants/reactions";
 
 export const createComment = async (data: {
   content: string;
@@ -220,46 +223,97 @@ export const deleteComment = async (commentId: string, request: Request) => {
 };
 
 export const likeComment = async (commentId: string, userId: string) => {
+  // Backward-compat wrapper: old "like" behavior becomes a reaction.
+  const result = await reactComment(commentId, userId, "like");
+
+  return {
+    success: true,
+    message: result.userReaction === "like" ? "Thích bình luận thành công" : "Bỏ thích bình luận thành công",
+    commentId,
+    newLikeCount: (result.reactionCounts as any)?.like ?? 0,
+    isLiked: result.userReaction === "like",
+  };
+};
+
+export const reactComment = async (commentId: string, userId: string, reactionRaw: unknown) => {
+  const reaction = normalizeReactionType(reactionRaw);
+  if (!reaction) {
+    throw new BusinessError("Reaction không hợp lệ");
+  }
+
   if (!isValidObjectId(commentId) || !isValidObjectId(userId)) {
     throw new BusinessError("ID không hợp lệ");
   }
 
-  const comment = await CommentModel.findById(commentId);
+  const comment = await CommentModel.findById(commentId).select("_id").lean();
   if (!comment) {
     throw new BusinessError("Không tìm thấy bình luận");
   }
 
-  const userLikeComment = await UserLikeCommentModel.findOne({ commentId, userId });
+  const existing = await UserReactionCommentModel.findOne({ commentId, userId }).lean();
 
-  if (userLikeComment) {
-    // Unlike comment
-    await UserLikeCommentModel.findByIdAndDelete(userLikeComment._id);
-    await CommentModel.findByIdAndUpdate(commentId, { $inc: { likeNumber: -1 } });
+  // Business rule: click same reaction -> toggle off
+  if (existing && (existing as any).reaction === reaction) {
+    await UserReactionCommentModel.deleteOne({ _id: (existing as any)._id });
 
-    const newLikeCount = Math.max(0, (comment.likeNumber || 0) - 1);
+    const inc: Record<string, number> = {
+      [`reactionCounts.${reaction}`]: -1,
+      totalReactions: -1,
+    };
+    if (reaction === "like") inc.likeNumber = -1;
+
+    const updated = await CommentModel.findByIdAndUpdate(commentId, { $inc: inc }, { new: true }).lean();
 
     return {
       success: true,
-      message: "Bỏ thích bình luận thành công",
+      message: "Đã hủy cảm xúc",
       commentId,
-      newLikeCount,
-      isLiked: false,
+      userReaction: null as ReactionType | null,
+      reactionCounts: (updated as any)?.reactionCounts,
+      totalReactions: (updated as any)?.totalReactions,
     };
   }
 
-  // Like comment
-  const newUserLikeComment = new UserLikeCommentModel({ commentId, userId });
-  await newUserLikeComment.save();
+  if (existing) {
+    const oldReaction = (existing as any).reaction as ReactionType;
+    await UserReactionCommentModel.updateOne({ _id: (existing as any)._id }, { $set: { reaction } });
 
-  await CommentModel.findByIdAndUpdate(commentId, { $inc: { likeNumber: 1 } });
+    const inc: Record<string, number> = {
+      [`reactionCounts.${oldReaction}`]: -1,
+      [`reactionCounts.${reaction}`]: 1,
+    };
 
-  const newLikeCount = (comment.likeNumber || 0) + 1;
+    if (oldReaction === "like") inc.likeNumber = (inc.likeNumber || 0) - 1;
+    if (reaction === "like") inc.likeNumber = (inc.likeNumber || 0) + 1;
+
+    const updated = await CommentModel.findByIdAndUpdate(commentId, { $inc: inc }, { new: true }).lean();
+
+    return {
+      success: true,
+      message: "Đã cập nhật cảm xúc",
+      commentId,
+      userReaction: reaction,
+      reactionCounts: (updated as any)?.reactionCounts,
+      totalReactions: (updated as any)?.totalReactions,
+    };
+  }
+
+  await UserReactionCommentModel.create({ commentId, userId, reaction });
+
+  const inc: Record<string, number> = {
+    [`reactionCounts.${reaction}`]: 1,
+    totalReactions: 1,
+  };
+  if (reaction === "like") inc.likeNumber = 1;
+
+  const updated = await CommentModel.findByIdAndUpdate(commentId, { $inc: inc }, { new: true }).lean();
 
   return {
     success: true,
-    message: "Thích bình luận thành công",
+    message: "Đã thả cảm xúc",
     commentId,
-    newLikeCount,
-    isLiked: true,
+    userReaction: reaction,
+    reactionCounts: (updated as any)?.reactionCounts,
+    totalReactions: (updated as any)?.totalReactions,
   };
 };

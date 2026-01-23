@@ -1,5 +1,6 @@
 import { CommentModel } from "~/database/models/comment.model";
 import { ensureMangaSlug } from "~/database/helpers/manga-slug.helper";
+import { normalizeReactionCounts, sumReactionCounts } from "~/constants/reactions";
 import { rewriteLegacyCdnUrl, rewriteLegacyCdnUrlsInText } from "~/.server/utils/cdn-url";
 
 const normalizeCommentDoc = (comment: any) => {
@@ -26,6 +27,14 @@ const normalizeCommentDoc = (comment: any) => {
 
   const normalizedPost = postId && typeof postId === "object" ? { ...postId } : postId;
 
+  const likeNumber = Number((comment as any)?.likeNumber) || 0;
+  const reactionCounts = normalizeReactionCounts((comment as any)?.reactionCounts, likeNumber);
+  const totalReactionsRaw = (comment as any)?.totalReactions;
+  const totalReactions =
+    typeof totalReactionsRaw === "number" && Number.isFinite(totalReactionsRaw)
+      ? totalReactionsRaw
+      : sumReactionCounts(reactionCounts);
+
   return {
     ...(comment as any),
     id: String((comment as any)?._id ?? (comment as any)?.id ?? ""),
@@ -36,6 +45,8 @@ const normalizeCommentDoc = (comment: any) => {
     userId: normalizedUser,
     mangaId: normalizedManga,
     postId: normalizedPost,
+    reactionCounts,
+    totalReactions,
   } as any;
 };
 
@@ -226,6 +237,14 @@ export const getRecentMangaComments = async (
     const userId = (c as any)?.userId;
     const mangaId = (c as any)?.mangaId;
 
+    const likeNumber = Number((c as any)?.likeNumber) || 0;
+    const reactionCounts = normalizeReactionCounts((c as any)?.reactionCounts, likeNumber);
+    const totalReactionsRaw = (c as any)?.totalReactions;
+    const totalReactions =
+      typeof totalReactionsRaw === "number" && Number.isFinite(totalReactionsRaw)
+        ? totalReactionsRaw
+        : sumReactionCounts(reactionCounts);
+
     const normalizedContent =
       typeof (c as any)?.content === "string" ? rewriteLegacyCdnUrlsInText((c as any).content) : (c as any)?.content;
 
@@ -251,6 +270,8 @@ export const getRecentMangaComments = async (
       content: normalizedContent,
       userId: normalizedUserId,
       mangaId: normalizedMangaId,
+      reactionCounts,
+      totalReactions,
       user:
         userId && typeof userId === "object"
           ? {

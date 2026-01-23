@@ -796,7 +796,16 @@ useEffect(() => {
         {/* Discord CTA */}
         <div className="bg-bgc-layer2 flex flex-col items-center gap-2 rounded-xl p-3 sm:flex-row sm:justify-between relative z-20">
           <div className="text-txt-primary font-sans text-base font-medium">
-            Nhận thông tin mới, chém gió, thảo luận, liên hệ dịch giả, báo lỗi :
+            Truy cập{" "}
+            <a
+              href="https://vinahentai.one"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[17px] font-semibold text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.85)] hover:text-green-300"
+            >
+              Vinahentai.one
+            </a>
+            {" "}khi bị chặn hoặc tải ứng dụng 1.1.1.1 để truy cập
           </div>
           <a
             href="https://discord.gg/equKSnEDUB"

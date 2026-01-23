@@ -81,7 +81,9 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { canonicalUrl, cdnBase } = useLoaderData<RootLoaderData>();
+  const data = useLoaderData<RootLoaderData | undefined>();
+  const canonicalUrl = data?.canonicalUrl;
+  const cdnBase = data?.cdnBase;
   const htmlStyle = cdnBase
     ? ({
         "--cdn-base": cdnBase,
@@ -346,7 +348,13 @@ type RootLoaderData = {
 };
 
 export default function App() {
-  const { isAdmin, user, genres, unreadCount, isBot, ageVerified } = useLoaderData<RootLoaderData>();
+  const data = useLoaderData<RootLoaderData | undefined>();
+  const isAdmin = data?.isAdmin ?? false;
+  const user = data?.user;
+  const genres = data?.genres ?? [];
+  const unreadCount = data?.unreadCount;
+  const isBot = data?.isBot;
+  const ageVerified = data?.ageVerified;
   const navigate = useNavigate();
   const location = useLocation();
 

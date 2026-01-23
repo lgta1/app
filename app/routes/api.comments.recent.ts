@@ -6,8 +6,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
-    // Quy chuẩn mới: tối đa 10 bình luận gần nhất, chia 2 trang, mỗi trang 5.
-    const limit = 5;
+    // Quy chuẩn: chia 2 trang; mỗi trang 10 bình luận.
+    const limit = 10;
 
     // Chỉ cho phép 2 trang
     const clampedPage = Math.max(1, Math.min(page, 2));
