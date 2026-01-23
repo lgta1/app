@@ -4,7 +4,7 @@ import { BookOpen, Eye, Users } from "lucide-react";
 
 import { getLeaderboard } from "@/queries/leaderboad.query";
 import { forceRefreshHotCarouselSnapshot, getHotCarouselLeaderboardWithScores, getHotCarouselSnapshotInfo, type HotCarouselScoreRow } from "@/queries/leaderboad.query";
-import { getStatistic } from "@/queries/statistic.query";
+import { getDailyRegistrationAndMangaStats, getStatistic, type DailySeriesPoint } from "@/queries/statistic.query";
 
 import RatingItem from "~/components/rating-item";
 import type { MangaType } from "~/database/models/manga.model";
@@ -13,6 +13,9 @@ interface StatisticData {
   totalMembers: number;
   totalManga: number;
   totalViews: number;
+  dailyRegistrations: DailySeriesPoint[];
+  dailyMangasCreated: DailySeriesPoint[];
+  dailyStatsTimezone: string;
   dailyLeaderboard: MangaType[];
   weeklyLeaderboard: MangaType[];
   monthlyLeaderboard: MangaType[];
@@ -30,6 +33,7 @@ export const meta: MetaFunction = () => {
 export async function loader(): Promise<Response> {
   // Lấy dữ liệu thống kê và leaderboard từ database
   const statistic = await getStatistic();
+  const dailyStats = await getDailyRegistrationAndMangaStats(15);
   const dailyLeaderboard = await getLeaderboard("daily");
   const weeklyLeaderboard = await getLeaderboard("weekly");
   const monthlyLeaderboard = await getLeaderboard("monthly");
@@ -38,6 +42,9 @@ export async function loader(): Promise<Response> {
 
   return Response.json({
     ...statistic,
+    dailyRegistrations: dailyStats.registrations,
+    dailyMangasCreated: dailyStats.mangasCreated,
+    dailyStatsTimezone: dailyStats.timezone,
     dailyLeaderboard,
     weeklyLeaderboard,
     monthlyLeaderboard,
@@ -59,6 +66,8 @@ export async function action({ request }: { request: Request }): Promise<Respons
 
 export default function AdminStatistic() {
   const data = useLoaderData<StatisticData>();
+  const registrationSeries = data.dailyRegistrations || [];
+  const mangaSeries = data.dailyMangasCreated || [];
 
   const tabs = [
     { key: "manga" as const, label: "Top Truyện tranh" },
@@ -74,6 +83,87 @@ export default function AdminStatistic() {
   if (!data) {
     return <div>Loading...</div>;
   }
+
+  const renderSummary = (series: DailySeriesPoint[]) => {
+    const total = series.reduce((sum, point) => sum + (point.count || 0), 0);
+    const avg = series.length > 0 ? Math.round(total / series.length) : 0;
+    const maxPoint = series.reduce<DailySeriesPoint | null>(
+      (acc, point) => (!acc || point.count > acc.count ? point : acc),
+      null,
+    );
+    return {
+      total,
+      avg,
+      maxPoint,
+    };
+  };
+
+  const renderBarChart = (
+    title: string,
+    subtitle: string,
+    series: DailySeriesPoint[],
+    barClassName: string,
+  ) => {
+    const maxValue = Math.max(0, ...series.map((point) => point.count));
+    const summary = renderSummary(series);
+
+    return (
+      <div className="border-bd-default bg-bgc-layer1 flex w-full flex-col rounded-xl border p-4 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-txt-primary text-base font-semibold">{title}</div>
+            <div className="text-txt-secondary text-xs">{subtitle}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="text-txt-secondary">
+              Tổng 15 ngày: <span className="text-txt-primary font-semibold">{summary.total}</span>
+            </div>
+            <div className="text-txt-secondary">
+              TB/ngày: <span className="text-txt-primary font-semibold">{summary.avg}</span>
+            </div>
+            <div className="text-txt-secondary">
+              Cao nhất: {summary.maxPoint ? (
+                <span className="text-txt-primary font-semibold">
+                  {summary.maxPoint.count} ({summary.maxPoint.label})
+                </span>
+              ) : (
+                <span className="text-txt-primary font-semibold">0</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex h-52 items-end gap-2">
+          {series.map((point) => {
+            const safeValue = point.count || 0;
+            const percent = maxValue > 0 ? Math.round((safeValue / maxValue) * 100) : 0;
+            const heightPercent = safeValue === 0 ? 2 : Math.max(8, percent);
+            return (
+              <div key={point.dateKey} className="flex min-w-0 flex-1 flex-col items-center">
+                <div className="text-txt-secondary mb-1 text-[10px] font-medium">
+                  {safeValue}
+                </div>
+                <div
+                  className={`w-full rounded-md ${barClassName}`}
+                  style={{ height: `${heightPercent}%` }}
+                  title={`${point.label}: +${safeValue} (Tổng cuối ngày: ${point.total})`}
+                />
+                <div className="text-txt-secondary mt-1 text-[10px]">
+                  {point.label}
+                </div>
+                <div className="text-txt-secondary mt-1 text-[10px]">
+                  {point.total}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-txt-secondary mt-2 text-[11px]">
+          Hàng số dưới cùng = tổng cộng dồn đến cuối ngày.
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-[968px] flex-col items-center justify-center gap-6 p-4 md:p-6 lg:p-8">
@@ -120,6 +210,22 @@ export default function AdminStatistic() {
             <Eye className="text-txt-secondary h-10 w-10" />
           </div>
         </div>
+      </div>
+
+      {/* Daily Growth Charts */}
+      <div className="flex w-full flex-col gap-4">
+        {renderBarChart(
+          "Đăng ký mới (15 ngày gần nhất)",
+          `Tính theo ngày — múi giờ ${data.dailyStatsTimezone}`,
+          registrationSeries,
+          "bg-gradient-to-t from-[#4FD1C5] via-[#38B2AC] to-[#0BC5EA]",
+        )}
+        {renderBarChart(
+          "Truyện đã đăng (15 ngày gần nhất)",
+          `Tính theo ngày — múi giờ ${data.dailyStatsTimezone}`,
+          mangaSeries,
+          "bg-gradient-to-t from-[#C466FF] via-[#A855F7] to-[#7C3AED]",
+        )}
       </div>
 
       {/* Tab Selection and Title */}

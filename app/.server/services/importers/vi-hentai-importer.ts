@@ -1799,6 +1799,10 @@ const prepareBaseMangaPayload = (
     characterNames,
   );
   const author = authorList.length ? authorList.join(", ") : undefined;
+  const scaledViewNumber =
+    typeof parsed.viewNumber === "number" && Number.isFinite(parsed.viewNumber)
+      ? Math.max(0, Math.round(parsed.viewNumber / 10))
+      : undefined;
 
   return {
     title: parsed.title,
@@ -1816,6 +1820,7 @@ const prepareBaseMangaPayload = (
     doujinshiSlugs,
     characterNames,
     characterSlugs,
+    viewNumber: scaledViewNumber,
     ownerId: options.ownerId,
     status: options.approve ? MANGA_STATUS.APPROVED : MANGA_STATUS.PENDING,
     userStatus,
