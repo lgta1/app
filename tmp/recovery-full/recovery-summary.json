@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-01-24T22:09:32.115Z",
+  "bucket": "vnht-images",
+  "endPoint": "f6de453e5fe8af5525fa232b5a6f498a.r2.cloudflarestorage.com",
+  "cdnBase": "https://cdn.vinahentai.fun",
+  "prefixes": [
+    "manga-images",
+    "story-images",
+    "test/manga-images",
+    "test/story-images"
+  ],
+  "totalObjects": 200000,
+  "mangaCount": 4356
+}

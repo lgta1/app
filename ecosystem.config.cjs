@@ -31,8 +31,10 @@ for (let i = 0; i < instances; i++) {
       NODE_ENV: "production",
       TZ: "Asia/Ho_Chi_Minh",
       PORT: basePort + i,                     // 3001 / 3002
-      LEADERBOARD_SCHEDULER: isPrimary ? "1" : "0",
-      HOT_CAROUSEL_SCHEDULER: isPrimary ? "1" : "0",
+      // Temporarily disable schedulers to prevent crash-loops when DB is down.
+      // Re-enable after MongoDB connectivity is restored.
+      LEADERBOARD_SCHEDULER: "0",
+      HOT_CAROUSEL_SCHEDULER: "0",
       INTERNAL_JOB_TOKEN: "Lequoctruong98!",
 
       CANONICAL_ORIGIN: "https://vinahentai.fun",

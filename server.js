@@ -1,4 +1,5 @@
 import { createRequestListener } from "@react-router/node";
+import dotenv from "dotenv";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -7,8 +8,14 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const NODE_ENV = process.env.NODE_ENV ?? "production";
+dotenv.config({
+  path: path.join(__dirname, NODE_ENV === "production" ? ".env.production" : ".env"),
+  override: true,
+});
+
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
-const MODE = process.env.NODE_ENV ?? "production";
+const MODE = NODE_ENV;
 
 const clientDir = path.join(__dirname, "build", "client");
 

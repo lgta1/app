@@ -1,0 +1,16 @@
+[dotenv@17.2.3] injecting env (4) from .env.production -- tip: ⚙️  enable debug logging with { debug: true }
+Recovery scan done: {
+  generatedAt: '2026-01-24T22:09:32.115Z',
+  bucket: 'vnht-images',
+  endPoint: 'f6de453e5fe8af5525fa232b5a6f498a.r2.cloudflarestorage.com',
+  cdnBase: 'https://cdn.vinahentai.fun',
+  prefixes: [
+    'manga-images',
+    'story-images',
+    'test/manga-images',
+    'test/story-images'
+  ],
+  totalObjects: 200000,
+  mangaCount: 4356
+}
+NDJSON: tmp/recovery-full/recovery-chapters.ndjson

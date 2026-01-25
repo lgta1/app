@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import mongoose from "mongoose";
 import { calculateLeaderboard } from "@/services/leaderboard.svc";
 import { MangaModel } from "~/database/models/manga.model";
 
@@ -18,6 +19,7 @@ export const initLeaderboardScheduler = (): void => {
   }
 
   const TZ = "Asia/Ho_Chi_Minh";
+  const isMongoReady = () => mongoose.connection.readyState === 1;
 
   // ─────────────────────────────────────────────────────────────
   // DAILY: chạy MỖI 30 PHÚT cả ngày (rolling 6h được xử lý trong service)
@@ -27,6 +29,10 @@ export const initLeaderboardScheduler = (): void => {
     "*/30 * * * *",
     async () => {
       if (runningDaily) return; // chống chồng job
+      if (!isMongoReady()) {
+        console.warn("[cron] Leaderboard daily skipped: MongoDB not connected");
+        return;
+      }
       runningDaily = true;
       try {
         await calculateLeaderboard("daily");
@@ -50,6 +56,10 @@ export const initLeaderboardScheduler = (): void => {
     "5 0 * * *",
     async () => {
       try {
+        if (!isMongoReady()) {
+          console.warn("[cron] Daily views reset skipped: MongoDB not connected");
+          return;
+        }
         const r = await MangaModel.updateMany({}, { $set: { dailyViews: 0 } }, { timestamps: false });
         const matched =
           typeof r === "object" && r !== null && "matchedCount" in r
@@ -70,6 +80,10 @@ export const initLeaderboardScheduler = (): void => {
     "0 0 * * 1",
     async () => {
       try {
+        if (!isMongoReady()) {
+          console.warn("[cron] Weekly views reset skipped: MongoDB not connected");
+          return;
+        }
         const r = await MangaModel.updateMany({}, { $set: { weeklyViews: 0 } }, { timestamps: false });
         const matched =
           typeof r === "object" && r !== null && "matchedCount" in r
@@ -90,6 +104,10 @@ export const initLeaderboardScheduler = (): void => {
     "0 0 1 * *",
     async () => {
       try {
+        if (!isMongoReady()) {
+          console.warn("[cron] Monthly views reset skipped: MongoDB not connected");
+          return;
+        }
         const r = await MangaModel.updateMany({}, { $set: { monthlyViews: 0 } }, { timestamps: false });
         const matched =
           typeof r === "object" && r !== null && "matchedCount" in r

@@ -228,7 +228,7 @@ const loadScriptGenres = (): GenreEntry[] => {
     // NOTE: This module is executed in an ESM build in many environments (Remix/Vite).
     // Using `createRequire` keeps compatibility with CommonJS exports.
     const requireFromHere = createRequire(import.meta.url);
-    const raw = requireFromHere("../../../../scripts/genres.array.cjs");
+    const raw = requireFromHere(`${process.cwd()}/scripts/genres.array.cjs`);
     if (Array.isArray(raw)) {
       return raw
         .map((item) => {

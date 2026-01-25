@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import mongoose from "mongoose";
 
 import { forceRefreshHotCarouselSnapshot } from "@/queries/leaderboad.query";
 import { SystemLockModel } from "~/database/models/system-lock.model";
@@ -49,11 +50,16 @@ export const initHotCarouselSnapshotScheduler = (): void => {
   if (!isPrimaryInstance) return;
 
   let running = false;
+  const isMongoReady = () => mongoose.connection.readyState === 1;
 
   cron.schedule(
     "*/15 * * * *",
     async () => {
       if (running) return;
+      if (!isMongoReady()) {
+        console.warn("[cron] Hot carousel snapshot skipped: MongoDB not connected");
+        return;
+      }
       running = true;
       try {
         const acquired = await tryAcquireLock(14 * 60 * 1000);

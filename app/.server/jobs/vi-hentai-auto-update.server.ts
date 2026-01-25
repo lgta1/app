@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import mongoose from "mongoose";
 import { load } from "cheerio";
 import os from "node:os";
 
@@ -659,6 +660,7 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
   void releaseLock();
 
   let running = false;
+  const isMongoReady = () => mongoose.connection.readyState === 1;
 
   // 1) Every 30 minutes: extract 30 URLs into a new queue (status=queued).
   cron.schedule(
@@ -667,6 +669,10 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
       if (running) return;
       running = true;
       try {
+        if (!isMongoReady()) {
+          console.warn("[cron] vi-hentai queue extract skipped: MongoDB not connected");
+          return;
+        }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;
@@ -704,6 +710,10 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
       if (running) return;
       running = true;
       try {
+        if (!isMongoReady()) {
+          console.warn("[cron] vi-hentai queue worker skipped: MongoDB not connected");
+          return;
+        }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;

@@ -1,4 +1,5 @@
 import { ViHentaiAutoDownloadJobModel, type ViHentaiAutoDownloadJobProgress } from "~/database/models/vi-hentai-auto-download-job.model";
+import mongoose from "mongoose";
 import { autoDownloadViHentaiManga } from "@/services/importers/vi-hentai-importer";
 import { MANGA_CONTENT_TYPE } from "~/constants/manga";
 import { SystemLockModel } from "~/database/models/system-lock.model";
@@ -12,6 +13,7 @@ const STALE_HEARTBEAT_MS = 15 * 60 * 1000;
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const abortControllersByJobId = new Map<string, AbortController>();
+const isMongoReady = () => mongoose.connection.readyState === 1;
 
 export const requestAbortViHentaiAutoDownloadJob = (jobId: string): boolean => {
   const ac = abortControllersByJobId.get(String(jobId));
@@ -62,6 +64,10 @@ export const initViHentaiAutoDownloadQueueWorker = (): void => {
     if (busy) return;
     busy = true;
     try {
+      if (!isMongoReady()) {
+        console.warn("[vi-hentai-queue] worker skipped: MongoDB not connected");
+        return;
+      }
       await processOneJob();
     } finally {
       busy = false;
