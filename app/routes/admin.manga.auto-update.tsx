@@ -1,6 +1,7 @@
 import { Link, useFetcher, useLoaderData } from "react-router-dom";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import os from "node:os";
 
 import { requireAdminLogin } from "@/services/auth.server";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/jobs/vi-hentai-auto-update.server";
 
 import { ViHentaiAutoUpdateQueueModel } from "~/database/models/vi-hentai-auto-update-queue.model";
+import { SystemLockModel } from "~/database/models/system-lock.model";
 
 export const meta: MetaFunction = () => {
   return [
@@ -75,7 +77,7 @@ type ActionResult =
   | { ok: false; error: string };
 
 type ControlActionResult =
-  | { ok: true; action: "pauseQueue" | "deleteQueue" | "pauseAllRunning" | "deleteAllQueued"; queueId?: string; count?: number }
+  | { ok: true; action: "pauseQueue" | "deleteQueue" | "pauseAllRunning" | "deleteAllQueued" | "clearSystemLock"; queueId?: string; count?: number }
   | { ok: false; error: string };
 
 type PollResult =
@@ -214,7 +216,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await requireAdminLogin(request);
+  const admin = await requireAdminLogin(request);
 
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
@@ -373,6 +375,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json(body, { status: 200 });
   }
 
+  if (intent === "clearSystemLock") {
+    const now = new Date();
+    const lockedBy = `admin-ui|user:${String((admin as any).id || (admin as any)._id || "unknown")}|host:${os.hostname()}`;
+    await SystemLockModel.findOneAndUpdate(
+      { key: "vi-hentai-auto-update" },
+      { $set: { lockedUntil: now, lockedBy } },
+      { upsert: true, new: true },
+    );
+    const body: ControlActionResult = { ok: true, action: "clearSystemLock" };
+    return Response.json(body, { status: 200 });
+  }
+
   const body: ActionResult = { ok: false, error: "intent không hợp lệ" };
   return Response.json(body, { status: 400 });
 };
@@ -448,6 +462,14 @@ export default function AdminMangaAutoUpdate() {
     if (!ok) return;
     const fd = new FormData();
     fd.set("intent", "deleteAllQueued");
+    controlFetcher.submit(fd, { method: "post" });
+  };
+
+  const clearSystemLockOnServer = () => {
+    const ok = confirm("Clear lock hệ thống? (dùng khi queue bị kẹt enqueued)");
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("intent", "clearSystemLock");
     controlFetcher.submit(fd, { method: "post" });
   };
 
@@ -593,6 +615,14 @@ export default function AdminMangaAutoUpdate() {
             className={`rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-60 ${enabled ? "bg-red-600" : "bg-sky-600"}`}
           >
             {enabled ? "Tắt" : "Bật"}
+          </button>
+
+          <button
+            type="button"
+            onClick={clearSystemLockOnServer}
+            className="rounded border border-border bg-transparent px-3 py-2 text-sm font-medium text-txt-primary hover:bg-white/5"
+          >
+            Clear lock (queue kẹt)
           </button>
 
           <input type="hidden" name="queueId" value={activeQueue?.id || ""} />
