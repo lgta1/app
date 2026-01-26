@@ -42,6 +42,7 @@ export type MangaType = {
   ratingUpdatedAt?: Date;
   translationTeam: string;
   ownerId: string;
+  rejectReason?: string;
   keywords?: string;
   contentType: MangaContentType;
   createdAt: Date;
@@ -89,6 +90,7 @@ const MangaSchema = new Schema<MangaType>(
     ratingUpdatedAt: { type: Date },
     translationTeam: { type: String, required: true },
     ownerId: { type: String, required: true },
+    rejectReason: { type: String, default: "" },
     keywords: { type: String },
     contentType: {
       type: String,

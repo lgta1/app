@@ -42,6 +42,10 @@ export function RewardGoldDialog({
 
   const memberLabel = member.name ? `${member.name} (${member.email})` : member.email;
 
+  const appendMessage = (text: string) => {
+    setMessage((prev) => (prev ? `${prev}\n${text}` : text));
+  };
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -92,6 +96,21 @@ export function RewardGoldDialog({
                         placeholder="VD: Bạn đã nhận được 500 dâm ngọc vì đạt top 10 doanh thu tuần."
                         className="text-txt-primary placeholder-txt-secondary h-full flex-1 resize-none bg-transparent text-base leading-normal font-medium focus:outline-none"
                       />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {[
+                        "Cảm ơn bạn đã thông báo lỗi. Bạn là người đầu tiên phát hiện ra lỗi này, xin gửi bạn một ít dâm ngọc.",
+                        "Rất cảm ơn đóng góp của bạn trong việc báo lỗi. Bạn là người đầu tiên phát hiện lỗi này, xin gửi bạn ít dâm ngọc.",
+                      ].map((text) => (
+                        <button
+                          key={text}
+                          type="button"
+                          onClick={() => appendMessage(text)}
+                          className="bg-bgc-layer2 outline-bd-default rounded-full px-3 py-1 text-xs font-semibold text-txt-primary outline outline-offset-[-1px] hover:opacity-80"
+                        >
+                          {text}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>

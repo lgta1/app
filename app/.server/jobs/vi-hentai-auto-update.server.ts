@@ -28,8 +28,15 @@ const DEFAULT_OWNER_ID = "68f0f839b69df690049aba65";
 const FEATURE_FLAG_KEY = "viHentaiAutoUpdateEnabled";
 const DEFAULT_ENABLED = true;
 
+const FEATURE_FLAG_STOP_EARLY_KEY = "viHentaiAutoUpdateStopEarlyEnabled";
+const DEFAULT_STOP_EARLY_ENABLED = true;
+
 export const getViHentaiAutoUpdateEnabled = async (): Promise<boolean> => {
   return getFeatureFlag(FEATURE_FLAG_KEY, DEFAULT_ENABLED);
+};
+
+export const getViHentaiAutoUpdateStopEarlyEnabled = async (): Promise<boolean> => {
+  return getFeatureFlag(FEATURE_FLAG_STOP_EARLY_KEY, DEFAULT_STOP_EARLY_ENABLED);
 };
 
 const pauseAllRunningQueues = async (): Promise<void> => {
@@ -79,6 +86,10 @@ export const setViHentaiAutoUpdateEnabled = async (enabled: boolean): Promise<bo
     await resumeAllPausedQueues();
   }
   return value;
+};
+
+export const setViHentaiAutoUpdateStopEarlyEnabled = async (enabled: boolean): Promise<boolean> => {
+  return setFeatureFlag(FEATURE_FLAG_STOP_EARLY_KEY, enabled);
 };
 
 const getOwnerId = () => {
@@ -527,7 +538,10 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
     }
     if (it.status === "noop") {
       consecutiveNoopOrFailed += 1;
-      if (consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED) {
+      if (
+        consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED &&
+        (await getViHentaiAutoUpdateStopEarlyEnabled())
+      ) {
         await stopEarly(
           `Dừng sớm: ${STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED} truyện liên tiếp ở trạng thái noop/failed (mới nhất: #${index} ${url})`,
         );
@@ -603,7 +617,10 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
       if (itemStatus === "noop") consecutiveNoopOrFailed += 1;
       else consecutiveNoopOrFailed = 0;
 
-      if (consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED) {
+      if (
+        consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED &&
+        (await getViHentaiAutoUpdateStopEarlyEnabled())
+      ) {
         await stopEarly(
           `Dừng sớm: ${STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED} truyện liên tiếp ở trạng thái noop/failed (mới nhất: #${index} ${url})`,
         );
@@ -627,7 +644,10 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
       );
 
       consecutiveNoopOrFailed += 1;
-      if (consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED) {
+      if (
+        consecutiveNoopOrFailed >= STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED &&
+        (await getViHentaiAutoUpdateStopEarlyEnabled())
+      ) {
         await stopEarly(
           `Dừng sớm: ${STOP_AFTER_CONSECUTIVE_NOOP_OR_FAILED} truyện liên tiếp ở trạng thái noop/failed (mới nhất: #${index} ${url})`,
         );

@@ -9,12 +9,33 @@ export const ENV = {
     SECRET: process.env.SESSION_SECRET || "s3crets3crets3cret_must_be_changed",
   },
   MINIO: {
-    ENDPOINT: process.env.MINIO_ENDPOINT || "172.188.218.21",
-    PORT: Number(process.env.MINIO_PORT) || 9000,
-    ACCESS_KEY: process.env.MINIO_ACCESS_KEY || "minioadmin",
-    SECRET_KEY: process.env.MINIO_SECRET_KEY || "minioadmin",
-    USE_SSL: process.env.MINIO_USE_SSL === "true" || false,
-    DEFAULT_BUCKET: process.env.MINIO_DEFAULT_BUCKET || "vnht-images",
+    get ENDPOINT() {
+      return process.env.MINIO_ENDPOINT || "172.188.218.21";
+    },
+    get PORT() {
+      return Number(process.env.MINIO_PORT) || 9000;
+    },
+    get ACCESS_KEY() {
+      return process.env.MINIO_ACCESS_KEY || "minioadmin";
+    },
+    get SECRET_KEY() {
+      return process.env.MINIO_SECRET_KEY || "minioadmin";
+    },
+    get USE_SSL() {
+      return process.env.MINIO_USE_SSL === "true" || false;
+    },
+    get DEFAULT_BUCKET() {
+      return process.env.MINIO_DEFAULT_BUCKET || "vnht-images";
+    },
+    get REGION() {
+      return (
+        process.env.MINIO_REGION ||
+        ((process.env.MINIO_ENDPOINT || "").includes(".r2.cloudflarestorage.com") ? "auto" : "")
+      );
+    },
+    get S3_FORCE_PATH_STYLE() {
+      return process.env.S3_FORCE_PATH_STYLE === "true";
+    },
   },
   LEADERBOARD: {
     daily: {

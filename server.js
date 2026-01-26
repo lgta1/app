@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const NODE_ENV = process.env.NODE_ENV ?? "production";
 dotenv.config({
   path: path.join(__dirname, NODE_ENV === "production" ? ".env.production" : ".env"),
-  override: true,
+  override: false,
 });
 
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);

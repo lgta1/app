@@ -205,6 +205,11 @@ export const updateManga = async (
   }
 
   const payload: Record<string, any> = { ...data };
+  const willReject =
+    typeof payload.status === "number" &&
+    payload.status === MANGA_STATUS.REJECTED &&
+    manga.status !== MANGA_STATUS.REJECTED;
+  const rejectReasonText = typeof payload.rejectReason === "string" ? payload.rejectReason.trim() : "";
   if ("contentType" in payload) {
     if (canEditContentType) {
       payload.contentType =
@@ -241,6 +246,26 @@ export const updateManga = async (
 
   // Không cập nhật updatedAt khi chỉ sửa metadata
   await MangaModel.findByIdAndUpdate(id, { $set: payload }, { timestamps: false });
+
+  if (willReject && userInfo && isAdmin(userInfo.role)) {
+    const title = "Có Truyện Bị Từ Chối";
+    const reasonText = rejectReasonText || "Không có lý do.";
+    const subtitle = `Truyện "${manga.title}" bị từ chối với lý do: ${reasonText}`;
+    try {
+      await createNotification({
+        userId: String(manga.ownerId || ""),
+        title,
+        subtitle,
+        imgUrl: "/images/noti/system.png",
+        type: "manga-rejected",
+        targetType: "manga",
+        targetId: String(manga._id || id),
+        targetSlug: String(manga.slug || ""),
+      });
+    } catch (e) {
+      console.warn("[updateManga] reject notification failed", e);
+    }
+  }
 };
 
 export const submitMangaToReview = async (request: Request, mangaId: string) => {

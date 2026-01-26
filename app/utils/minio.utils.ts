@@ -250,6 +250,21 @@ export const getMinioClient = (): Minio.Client => {
       secretKey: MINIO_CONFIG.SECRET_KEY,
     };
 
+    // Hard-override for Cloudflare R2 to avoid signature mismatch
+    if (MINIO_CONFIG.ENDPOINT.includes(".r2.cloudflarestorage.com")) {
+      config.region = "auto";
+      config.pathStyle = false;
+      config.useSSL = true;
+    }
+
+    if (MINIO_CONFIG.REGION) {
+      config.region = MINIO_CONFIG.REGION;
+    }
+
+    if (typeof MINIO_CONFIG.S3_FORCE_PATH_STYLE === "boolean") {
+      config.pathStyle = MINIO_CONFIG.S3_FORCE_PATH_STYLE;
+    }
+
     // Chỉ set port nếu không phải Cloudflare R2
     if (!MINIO_CONFIG.ENDPOINT.includes(".r2.cloudflarestorage.com")) {
       config.port = MINIO_CONFIG.PORT;

@@ -1775,6 +1775,9 @@ const prepareBaseMangaPayload = (
   parsed: ParsedViHentaiPage,
   options: Omit<ViHentaiImportOptions, "url">,
   matchedGenres: string[],
+  overrides: {
+    includeSourceViews?: boolean;
+  } = {},
 ) => {
   const translatorMeta = buildTranslatorMeta(options.translationTeam, parsed.translationTeam);
   const executorNames = normalizeNameList(parsed.executorNames);
@@ -1803,6 +1806,7 @@ const prepareBaseMangaPayload = (
     typeof parsed.viewNumber === "number" && Number.isFinite(parsed.viewNumber)
       ? Math.max(0, Math.round(parsed.viewNumber / 10))
       : undefined;
+  const includeSourceViews = Boolean(overrides.includeSourceViews);
 
   return {
     title: parsed.title,
@@ -1820,7 +1824,7 @@ const prepareBaseMangaPayload = (
     doujinshiSlugs,
     characterNames,
     characterSlugs,
-    viewNumber: scaledViewNumber,
+    viewNumber: includeSourceViews ? scaledViewNumber : undefined,
     ownerId: options.ownerId,
     status: options.approve ? MANGA_STATUS.APPROVED : MANGA_STATUS.PENDING,
     userStatus,
@@ -1973,7 +1977,9 @@ export async function autoDownloadViHentaiManga(
     await emitProgress({ stage: "manga", message: warning });
   }
 
-  const basePayload = prepareBaseMangaPayload(parsed, importOptions, matched);
+  const basePayload = prepareBaseMangaPayload(parsed, importOptions, matched, {
+    includeSourceViews: true,
+  });
 
   if (importOptions.skipIfExists) {
     const existing = await MangaModel.findOne({ title: parsed.title })

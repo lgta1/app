@@ -33,7 +33,7 @@ for (let i = 0; i < instances; i++) {
       PORT: basePort + i,                     // 3001 / 3002
       // Temporarily disable schedulers to prevent crash-loops when DB is down.
       // Re-enable after MongoDB connectivity is restored.
-      LEADERBOARD_SCHEDULER: "0",
+      LEADERBOARD_SCHEDULER: isPrimary ? "1" : "0",
       HOT_CAROUSEL_SCHEDULER: "0",
       INTERNAL_JOB_TOKEN: "Lequoctruong98!",
 
@@ -56,6 +56,8 @@ for (let i = 0; i < instances; i++) {
       MINIO_ACCESS_KEY: "64b16b6572f535527f4a0cee30d9059f",
       MINIO_SECRET_KEY: "5236b7d902ce7aed759d6ae165d9ab629e234825fa2e30cff3dc80b1583ae1c0",
       MINIO_DEFAULT_BUCKET: "vnht-images",
+      MINIO_REGION: "auto",
+      S3_FORCE_PATH_STYLE: "false",
     },
   });
 }

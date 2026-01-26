@@ -129,13 +129,21 @@ export async function action({ request }: ActionFunctionArgs) {
   if (action === "update-status" && typeof mangaId === "string") {
     const statusRaw = formData.get("status");
     const statusNumber = Number.parseInt(String(statusRaw ?? ""), 10);
+    const rejectReasonRaw = formData.get("rejectReason");
+    const rejectReason = typeof rejectReasonRaw === "string" ? rejectReasonRaw.trim() : "";
     const allowed = new Set([MANGA_STATUS.PENDING, MANGA_STATUS.APPROVED, MANGA_STATUS.REJECTED]);
     if (!allowed.has(statusNumber)) {
       return { success: false, message: "Trạng thái không hợp lệ" };
     }
     try {
       const { updateManga } = await import("@/mutations/manga.mutation");
-      await updateManga(request, mangaId, { status: statusNumber } as any);
+      const payload: Record<string, any> = { status: statusNumber };
+      if (statusNumber === MANGA_STATUS.REJECTED) {
+        payload.rejectReason = rejectReason;
+      } else {
+        payload.rejectReason = "";
+      }
+      await updateManga(request, mangaId, payload as any);
       return { success: true, message: "Cập nhật trạng thái thành công" };
     } catch (error) {
       return {
@@ -215,6 +223,8 @@ export default function AdminManga() {
   const [searchParams] = useSearchParams();
   const submit = useSubmit();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
+  const [rejectTarget, setRejectTarget] = useState<{ mangaId: string; title: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>("");
 
   // Status options for dropdown
   const statusOptions = [
@@ -266,12 +276,33 @@ export default function AdminManga() {
     submit(params, { method: "get" });
   };
 
-  const handleStatusUpdate = (mangaId: string, status: number) => {
+  const handleStatusUpdate = (mangaId: string, status: number, title: string) => {
+    if (status === MANGA_STATUS.REJECTED) {
+      setRejectTarget({ mangaId, title });
+      setRejectReason("");
+      return;
+    }
     const fd = new FormData();
     fd.append("action", "update-status");
     fd.append("mangaId", mangaId);
     fd.append("status", String(status));
     submit(fd, { method: "post" });
+  };
+
+  const appendRejectReason = (text: string) => {
+    setRejectReason((prev) => (prev ? `${prev}\n${text}` : text));
+  };
+
+  const submitReject = () => {
+    if (!rejectTarget) return;
+    const fd = new FormData();
+    fd.append("action", "update-status");
+    fd.append("mangaId", rejectTarget.mangaId);
+    fd.append("status", String(MANGA_STATUS.REJECTED));
+    fd.append("rejectReason", rejectReason);
+    submit(fd, { method: "post" });
+    setRejectTarget(null);
+    setRejectReason("");
   };
 
   const [editingOwnerRow, setEditingOwnerRow] = useState<string | null>(null);
@@ -415,7 +446,7 @@ export default function AdminManga() {
                     <select
                       className={`bg-transparent font-sans text-sm font-semibold ${getStatusColor(manga.status)}`}
                       value={manga.status}
-                      onChange={(e) => handleStatusUpdate(manga.id, Number.parseInt(e.target.value, 10))}
+                      onChange={(e) => handleStatusUpdate(manga.id, Number.parseInt(e.target.value, 10), manga.title)}
                     >
                       <option value={MANGA_STATUS.APPROVED}>Đã duyệt</option>
                       <option value={MANGA_STATUS.PENDING}>Chờ duyệt</option>
@@ -530,7 +561,7 @@ export default function AdminManga() {
                   <select
                     className={`bg-transparent font-sans text-sm leading-tight font-semibold ${getStatusColor(manga.status)}`}
                     value={manga.status}
-                    onChange={(e) => handleStatusUpdate(manga.id, Number.parseInt(e.target.value, 10))}
+                    onChange={(e) => handleStatusUpdate(manga.id, Number.parseInt(e.target.value, 10), manga.title)}
                   >
                     <option value={MANGA_STATUS.APPROVED}>Đã duyệt</option>
                     <option value={MANGA_STATUS.PENDING}>Chờ duyệt</option>
@@ -559,6 +590,54 @@ export default function AdminManga() {
           </div>
         )}
       </div>
+
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-bgc-layer1 border-bd-default w-full max-w-xl rounded-xl border p-5 shadow-lg">
+            <div className="text-txt-primary text-lg font-semibold">Lý do từ chối</div>
+            <div className="text-txt-secondary mt-1 text-sm">
+              Truyện: <span className="text-txt-primary font-semibold">{rejectTarget.title}</span>
+            </div>
+            <textarea
+              className="bg-bgc-layer2 border-bd-default text-txt-primary mt-3 min-h-[120px] w-full rounded-lg border p-3 text-sm"
+              placeholder="Nhập lý do từ chối..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {["Truyện quá ngắn.", "Font chữ dịch chưa chuẩn.", "Cảm ơn bạn đã đăng truyện.", "Thiếu Thể Loại, cần bổ sung thêm."].map((text) => (
+                <button
+                  key={text}
+                  type="button"
+                  onClick={() => appendRejectReason(text)}
+                  className="bg-bgc-layer2 border-bd-default text-txt-primary rounded-full border px-3 py-1 text-xs font-semibold hover:opacity-80"
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectTarget(null);
+                  setRejectReason("");
+                }}
+                className="rounded bg-gray-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-80"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={submitReject}
+                className="rounded bg-[#FF555D] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+              >
+                Xác nhận từ chối
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

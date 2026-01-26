@@ -7,11 +7,14 @@ import { requireAdminLogin } from "@/services/auth.server";
 import {
   createViHentaiAutoUpdateQueue,
   getViHentaiAutoUpdateEnabled,
+  getViHentaiAutoUpdateStopEarlyEnabled,
+  setViHentaiAutoUpdateStopEarlyEnabled,
   setViHentaiAutoUpdateEnabled,
   startViHentaiAutoUpdateQueue,
 } from "@/jobs/vi-hentai-auto-update.server";
 
 import { ViHentaiAutoUpdateQueueModel } from "~/database/models/vi-hentai-auto-update-queue.model";
+import { ViHentaiAutoDownloadJobModel } from "~/database/models/vi-hentai-auto-download-job.model";
 import { SystemLockModel } from "~/database/models/system-lock.model";
 
 export const meta: MetaFunction = () => {
@@ -22,8 +25,42 @@ export const meta: MetaFunction = () => {
 };
 
 type LoaderResult =
-  | ({ ok: true; enabled: boolean; queues: QueueSummary[]; latestQueue?: QueueDetail } & Record<string, unknown>)
+  | ({
+      ok: true;
+      enabled: boolean;
+      stopEarlyEnabled: boolean;
+      queues: QueueSummary[];
+      latestQueue?: QueueDetail;
+      systemStatus: SystemStatus;
+    } & Record<string, unknown>)
   | { ok: false; error: string };
+
+type SystemStatus = {
+  lock: {
+    key: string;
+    lockedUntil?: string;
+    lockedBy?: string;
+    isActive: boolean;
+  } | null;
+  autoUpdate: {
+    runningQueue?: {
+      id: string;
+      listUrl: string;
+      startedAt?: string;
+    };
+    counts: Record<string, number>;
+  };
+  autoDownload: {
+    runningJob?: {
+      id: string;
+      url: string;
+      startedAt?: string;
+      lastHeartbeatAt?: string;
+    };
+    counts: Record<string, number>;
+    pausedQueued: number;
+  };
+};
 
 type QueueSummary = {
   id: string;
@@ -73,11 +110,11 @@ type QueueDetail = {
 };
 
 type ActionResult =
-  | { ok: true; queueId?: string; enabled?: boolean }
+  | { ok: true; queueId?: string; enabled?: boolean; stopEarlyEnabled?: boolean }
   | { ok: false; error: string };
 
 type ControlActionResult =
-  | { ok: true; action: "pauseQueue" | "deleteQueue" | "pauseAllRunning" | "deleteAllQueued" | "clearSystemLock"; queueId?: string; count?: number }
+  | { ok: true; action: "pauseQueue" | "deleteQueue" | "pauseAllRunning" | "deleteAllQueues" | "clearSystemLock"; queueId?: string; count?: number }
   | { ok: false; error: string };
 
 type PollResult =
@@ -108,6 +145,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireAdminLogin(request);
 
   const enabled = await getViHentaiAutoUpdateEnabled();
+  const stopEarlyEnabled = await getViHentaiAutoUpdateStopEarlyEnabled();
 
   const url = new URL(request.url);
   const intent = String(url.searchParams.get("intent") || "");
@@ -158,11 +196,96 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     .limit(20)
     .lean();
 
+  const [lock, updateRunning, downloadRunning, updateCountsRaw, downloadCountsRaw, pausedQueuedRaw] =
+    await Promise.all([
+      SystemLockModel.findOne({ key: "vi-hentai-auto-update" })
+        .select({ key: 1, lockedUntil: 1, lockedBy: 1 })
+        .lean(),
+      ViHentaiAutoUpdateQueueModel.findOne({ status: "running" })
+        .sort({ startedAt: 1, createdAt: 1 })
+        .select({ _id: 1, listUrl: 1, startedAt: 1 })
+        .lean(),
+      ViHentaiAutoDownloadJobModel.findOne({ status: "running" })
+        .sort({ startedAt: 1 })
+        .select({ _id: 1, url: 1, startedAt: 1, lastHeartbeatAt: 1 })
+        .lean(),
+      ViHentaiAutoUpdateQueueModel.aggregate([
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      ViHentaiAutoDownloadJobModel.aggregate([
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      ViHentaiAutoDownloadJobModel.countDocuments({ status: "queued", paused: true }),
+    ]);
+
+  const updateCounts = (updateCountsRaw as Array<{ _id: string; count: number }>).reduce(
+    (acc, item) => {
+      if (item?._id) acc[item._id] = Number(item.count || 0);
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  const downloadCounts = (downloadCountsRaw as Array<{ _id: string; count: number }>).reduce(
+    (acc, item) => {
+      if (item?._id) acc[item._id] = Number(item.count || 0);
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  const now = new Date();
+  const lockedUntil = lock ? (lock as any).lockedUntil : undefined;
+  const lockActive = lockedUntil ? new Date(lockedUntil).getTime() > now.getTime() : false;
+
   const latest = queues[0] as any;
 
   const body: LoaderResult = {
     ok: true,
     enabled,
+    stopEarlyEnabled,
+    systemStatus: {
+      lock: lock
+        ? {
+            key: String((lock as any).key || ""),
+            lockedUntil: (lock as any).lockedUntil
+              ? new Date((lock as any).lockedUntil).toISOString()
+              : undefined,
+            lockedBy: (lock as any).lockedBy ? String((lock as any).lockedBy) : undefined,
+            isActive: lockActive,
+          }
+        : null,
+      autoUpdate: {
+        runningQueue: updateRunning
+          ? {
+              id: String((updateRunning as any)._id),
+              listUrl: String((updateRunning as any).listUrl || ""),
+              startedAt: (updateRunning as any).startedAt
+                ? new Date((updateRunning as any).startedAt).toISOString()
+                : undefined,
+            }
+          : undefined,
+        counts: updateCounts,
+      },
+      autoDownload: {
+        runningJob: downloadRunning
+          ? {
+              id: String((downloadRunning as any)._id),
+              url: String((downloadRunning as any).url || ""),
+              startedAt: (downloadRunning as any).startedAt
+                ? new Date((downloadRunning as any).startedAt).toISOString()
+                : undefined,
+              lastHeartbeatAt: (downloadRunning as any).lastHeartbeatAt
+                ? new Date((downloadRunning as any).lastHeartbeatAt).toISOString()
+                : undefined,
+            }
+          : undefined,
+        counts: downloadCounts,
+        pausedQueued: Number(pausedQueuedRaw || 0),
+      },
+    },
     queues: queues.map((q: any): QueueSummary => ({
       id: String(q._id),
       status: String(q.status),
@@ -226,6 +349,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const nextEnabled = desired === "1" || desired === "true";
     const saved = await setViHentaiAutoUpdateEnabled(nextEnabled);
     const body: ActionResult = { ok: true, enabled: saved };
+    return Response.json(body, { status: 200 });
+  }
+
+  if (intent === "toggleStopEarly") {
+    const desired = String(formData.get("stopEarlyEnabled") || "").trim();
+    const nextEnabled = desired === "1" || desired === "true";
+    const saved = await setViHentaiAutoUpdateStopEarlyEnabled(nextEnabled);
+    const body: ActionResult = { ok: true, stopEarlyEnabled: saved };
     return Response.json(body, { status: 200 });
   }
 
@@ -368,10 +499,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json(body, { status: 200 });
   }
 
-  if (intent === "deleteAllQueued") {
-    const res = await ViHentaiAutoUpdateQueueModel.deleteMany({ status: "queued" });
+  if (intent === "deleteAllQueues") {
+    // Best-effort: pause running queues first so workers can stop.
+    try {
+      await ViHentaiAutoUpdateQueueModel.updateMany(
+        { status: "running" },
+        { $set: { status: "paused", finishedAt: new Date() }, $unset: { lockedBy: "" } },
+      );
+    } catch {
+      // ignore
+    }
+    const res = await ViHentaiAutoUpdateQueueModel.deleteMany({});
     const deleted = Number((res as any).deletedCount || 0);
-    const body: ControlActionResult = { ok: true, action: "deleteAllQueued", count: deleted };
+    const body: ControlActionResult = { ok: true, action: "deleteAllQueues", count: deleted };
     return Response.json(body, { status: 200 });
   }
 
@@ -397,7 +537,10 @@ export default function AdminMangaAutoUpdate() {
   const pollFetcher = useFetcher<PollResult>();
   const controlFetcher = useFetcher<ControlActionResult>();
 
+  const systemStatus = data.ok ? (data as any).systemStatus : undefined;
+
   const [enabled, setEnabled] = useState(() => (data.ok ? Boolean((data as any).enabled) : true));
+  const [stopEarlyEnabled, setStopEarlyEnabled] = useState(() => (data.ok ? Boolean((data as any).stopEarlyEnabled) : true));
 
   const [activeQueue, setActiveQueue] = useState<QueueDetail | undefined>(data.ok ? data.latestQueue : undefined);
 
@@ -419,6 +562,12 @@ export default function AdminMangaAutoUpdate() {
     const items = activeQueue?.items || [];
     return items.some((it: any) => it.status === "running");
   }, [activeQueue]);
+
+  const lockStatusLabel = systemStatus?.lock
+    ? systemStatus.lock.isActive
+      ? "Đang khóa"
+      : "Đã mở"
+    : "Không có";
 
   const pollQueue = (queueId?: string) => {
     if (!queueId) return;
@@ -458,10 +607,10 @@ export default function AdminMangaAutoUpdate() {
   };
 
   const deleteAllQueuedOnServer = () => {
-    const ok = confirm("Xóa TẤT CẢ queue đang queued?");
+    const ok = confirm("Xóa TẤT CẢ queue? (mọi trạng thái, sẽ mất lịch sử)");
     if (!ok) return;
     const fd = new FormData();
-    fd.set("intent", "deleteAllQueued");
+    fd.set("intent", "deleteAllQueues");
     controlFetcher.submit(fd, { method: "post" });
   };
 
@@ -472,6 +621,9 @@ export default function AdminMangaAutoUpdate() {
     fd.set("intent", "clearSystemLock");
     controlFetcher.submit(fd, { method: "post" });
   };
+
+  const updateCounts = systemStatus?.autoUpdate?.counts || {};
+  const downloadCounts = systemStatus?.autoDownload?.counts || {};
 
   // Start polling after manual trigger.
   useEffect(() => {
@@ -487,6 +639,11 @@ export default function AdminMangaAutoUpdate() {
           pollTimerRef.current = null;
         }
       }
+      return;
+    }
+
+    if (typeof fetcher.data.stopEarlyEnabled === "boolean") {
+      setStopEarlyEnabled(fetcher.data.stopEarlyEnabled);
       return;
     }
 
@@ -565,11 +722,16 @@ export default function AdminMangaAutoUpdate() {
             ) : (
               <>Đang tắt — dừng hoàn toàn cho tới khi bật lại.</>
             )}
+            <div className="mt-1">
+              Dừng sớm khi có 5 truyện noop/failed liên tiếp:{" "}
+              <span className={stopEarlyEnabled ? "text-emerald-300" : "text-red-300"}>{stopEarlyEnabled ? "ON" : "OFF"}</span>.
+            </div>
           </div>
         </div>
 
         <fetcher.Form method="post" className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="enabled" value={enabled ? "0" : "1"} />
+          <input type="hidden" name="stopEarlyEnabled" value={stopEarlyEnabled ? "0" : "1"} />
           <div className="text-sm text-txt-secondary">Cho phép tạo truyện mới: <span className="font-semibold text-txt-primary">Luôn bật</span></div>
 
           <label className="flex items-center gap-2 text-sm text-txt-secondary">
@@ -618,6 +780,16 @@ export default function AdminMangaAutoUpdate() {
           </button>
 
           <button
+            type="submit"
+            name="intent"
+            value="toggleStopEarly"
+            disabled={running}
+            className={`rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-60 ${stopEarlyEnabled ? "bg-red-600" : "bg-sky-600"}`}
+          >
+            {stopEarlyEnabled ? "Tắt dừng sớm" : "Bật dừng sớm"}
+          </button>
+
+          <button
             type="button"
             onClick={clearSystemLockOnServer}
             className="rounded border border-border bg-transparent px-3 py-2 text-sm font-medium text-txt-primary hover:bg-white/5"
@@ -627,6 +799,86 @@ export default function AdminMangaAutoUpdate() {
 
           <input type="hidden" name="queueId" value={activeQueue?.id || ""} />
         </fetcher.Form>
+      </div>
+
+      <div className="mt-4 rounded border border-border bg-card p-3 text-sm text-txt-secondary">
+        <div className="mb-2 text-sm font-semibold text-txt-primary">Trạng thái hệ thống (auto-update + auto-download)</div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded border border-border/60 bg-background/40 p-3">
+            <div className="text-xs uppercase tracking-wide text-txt-secondary">System Lock</div>
+            <div className="mt-1 text-sm text-txt-primary">
+              {systemStatus?.lock ? (
+                <div className="space-y-1">
+                  <div>
+                    <span className="font-semibold">Key:</span> {systemStatus.lock.key}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Trạng thái:</span> {lockStatusLabel}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Locked until:</span> {systemStatus.lock.lockedUntil || "-"}
+                  </div>
+                  <div className="truncate">
+                    <span className="font-semibold">Locked by:</span> {systemStatus.lock.lockedBy || "-"}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-txt-secondary">Không có lock</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded border border-border/60 bg-background/40 p-3">
+            <div className="text-xs uppercase tracking-wide text-txt-secondary">Auto-update</div>
+            <div className="mt-1 text-sm text-txt-primary">
+              {systemStatus?.autoUpdate?.runningQueue ? (
+                <div className="space-y-1">
+                  <div>
+                    <span className="font-semibold">Running queue:</span> {systemStatus.autoUpdate.runningQueue.id}
+                  </div>
+                  <div className="truncate">
+                    <span className="font-semibold">List:</span> {systemStatus.autoUpdate.runningQueue.listUrl}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Started:</span> {systemStatus.autoUpdate.runningQueue.startedAt || "-"}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-txt-secondary">Không có queue running</div>
+              )}
+              <div className="mt-2 text-xs text-txt-secondary">
+                Counts: queued {updateCounts.queued || 0} · running {updateCounts.running || 0} · paused {updateCounts.paused || 0} · succeeded {updateCounts.succeeded || 0} · failed {updateCounts.failed || 0}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded border border-border/60 bg-background/40 p-3">
+            <div className="text-xs uppercase tracking-wide text-txt-secondary">Auto-download</div>
+            <div className="mt-1 text-sm text-txt-primary">
+              {systemStatus?.autoDownload?.runningJob ? (
+                <div className="space-y-1">
+                  <div>
+                    <span className="font-semibold">Running job:</span> {systemStatus.autoDownload.runningJob.id}
+                  </div>
+                  <div className="truncate">
+                    <span className="font-semibold">URL:</span> {systemStatus.autoDownload.runningJob.url}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Started:</span> {systemStatus.autoDownload.runningJob.startedAt || "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Heartbeat:</span> {systemStatus.autoDownload.runningJob.lastHeartbeatAt || "-"}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-txt-secondary">Không có job running</div>
+              )}
+              <div className="mt-2 text-xs text-txt-secondary">
+                Counts: queued {downloadCounts.queued || 0} · running {downloadCounts.running || 0} · succeeded {downloadCounts.succeeded || 0} · failed {downloadCounts.failed || 0} · pausedQueued {systemStatus?.autoDownload?.pausedQueued || 0}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 rounded border border-border bg-card p-3 text-sm text-txt-secondary">
@@ -775,7 +1027,7 @@ export default function AdminMangaAutoUpdate() {
               onClick={deleteAllQueuedOnServer}
               className="rounded bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
             >
-              Xóa tất cả queued
+              Xóa tất cả queue
             </button>
           </div>
         </div>

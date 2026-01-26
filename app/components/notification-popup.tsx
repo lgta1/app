@@ -90,6 +90,7 @@ export function NotificationPopup({
                       (notification as any).type === "follow-release-author" ||
                       (notification as any).type === "follow-release-translator";
                     const isGoldReward = (notification as any).type === "gold-reward";
+                    const isMangaRejected = (notification as any).type === "manga-rejected";
                     const isDamNgocReward =
                       isGoldReward ||
                       /dâm\s*ngọc/i.test(`${notification.title || ""} ${notification.subtitle || ""}`) ||
@@ -99,11 +100,13 @@ export function NotificationPopup({
                     const showSummonWaifuButton = isDamNgocReward;
                     const waifuSummonUrl = "/waifu/summon";
 
-                    const titleClassName = isFollowRelease
-                      ? "text-success-success"
-                      : isGoldReward
-                        ? "text-yellow-300"
-                        : "text-txt-focus";
+                    const titleClassName = isMangaRejected
+                      ? "text-red-500"
+                      : isFollowRelease
+                        ? "text-success-success"
+                        : isGoldReward
+                          ? "text-yellow-300"
+                          : "text-txt-focus";
 
                     return (
                       <div
