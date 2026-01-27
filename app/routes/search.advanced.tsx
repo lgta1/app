@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ChevronDown, Search } from "lucide-react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useLoaderData, useSearchParams } from "react-router-dom";
 
@@ -209,7 +210,7 @@ export default function AdvancedSearchPage() {
   }, [genresList]);
 
   return (
-    <div className="container-page mx-auto px-4 py-6">
+    <div className="container-page mx-auto px-4 py-6 pb-48 md:pb-64">
       <h1 className="text-txt-primary mb-3 text-3xl font-semibold">Tìm kiếm nâng cao</h1>
       <div className="h-1.5 w-20 bg-fuchsia-400 mb-6" />
 
@@ -256,56 +257,73 @@ export default function AdvancedSearchPage() {
       </div>
 
       {/* Genres selector (staging) */}
-      <div className="mb-4">
-        <div className="mb-2 text-sm text-txt-secondary">Thể loại (bao gồm)</div>
-        <GenreGridPicker
-          genres={genresAZ}
-          selectedSlugs={draftIncludeGenres}
-          onToggle={toggleIncludeGenre}
-          showLetterNav={false}
-          placeholder="Có thể nhập nhiều từ khóa cùng lúc để tìm"
-          helperText={
-            <>
-              Gõ <b>a,b,c…</b> để lọc theo chữ đầu; gõ <b>nhiều từ khóa</b> để tìm nhanh.
-            </>
-          }
-        />
+      <div className="mb-4 space-y-4">
+        <div className="rounded-2xl border border-white/5 bg-bgc-layer2/70 p-3 shadow-lg backdrop-blur">
+          <div className="mb-2 text-sm font-semibold text-txt-primary">Thể loại (bao gồm)</div>
+          <GenreGridPicker
+            genres={genresAZ}
+            selectedSlugs={draftIncludeGenres}
+            onToggle={toggleIncludeGenre}
+            showLetterNav={false}
+            placeholder="Có thể nhập nhiều từ khóa cùng lúc để tìm"
+            gridClassName="grid grid-cols-3 gap-x-4 gap-y-2 sm:grid-cols-4 lg:grid-cols-5"
+            panelClassName="overflow-y-auto rounded-lg p-2 pr-1 [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]"
+            helperText={
+              <>
+                Gõ <b>a,b,c…</b> để lọc theo chữ đầu; gõ <b>nhiều từ khóa</b> để tìm nhanh.
+              </>
+            }
+          />
+        </div>
 
-        <div className="mt-3">
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-600/15 p-3 shadow-lg backdrop-blur">
           <button
             type="button"
             onClick={() => setShowExclude((v) => !v)}
-            className="rounded-lg border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm font-semibold text-txt-primary hover:bg-white/5"
+            className="flex w-full items-center justify-between rounded-xl border border-rose-500/30 bg-rose-500/20 px-4 py-3 text-sm font-semibold text-rose-100 shadow transition hover:bg-rose-500/30"
+            aria-expanded={showExclude}
+            aria-controls="exclude-genres-panel"
           >
-            Chọn thể loại muốn loại trừ{draftExcludeGenres.size ? ` (${draftExcludeGenres.size})` : ""}
-          </button>
-        </div>
-
-        {showExclude ? (
-          <div className="mt-3">
-            <div className="mb-2 text-sm text-txt-secondary">Thể loại (loại trừ)</div>
-            <GenreGridPicker
-              genres={genresAZ}
-              selectedSlugs={draftExcludeGenres}
-              onToggle={toggleExcludeGenre}
-              showLetterNav={false}
-              placeholder="Có thể nhập nhiều từ khóa cùng lúc để tìm"
-              helperText={
-                <>
-                  Truyện có <b>bất kỳ</b> thể loại trong danh sách này sẽ bị loại khỏi kết quả.
-                </>
-              }
+            <span>
+              Chọn thể loại muốn loại trừ{draftExcludeGenres.size ? ` (${draftExcludeGenres.size})` : ""}
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform duration-200 ${showExclude ? "rotate-180" : "rotate-0"}`}
             />
+          </button>
+
+          <div
+            id="exclude-genres-panel"
+            className={`grid transition-all duration-300 ease-out ${showExclude ? "mt-4 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+          >
+            <div className="overflow-hidden">
+              <div className="mb-2 text-sm font-semibold text-rose-100">Thể loại (loại trừ)</div>
+              <GenreGridPicker
+                genres={genresAZ}
+                selectedSlugs={draftExcludeGenres}
+                onToggle={toggleExcludeGenre}
+                showLetterNav={false}
+                placeholder="Có thể nhập nhiều từ khóa cùng lúc để tìm"
+                gridClassName="grid grid-cols-3 gap-x-4 gap-y-2 sm:grid-cols-4 lg:grid-cols-5"
+                panelClassName="overflow-y-auto rounded-lg p-2 pr-1 [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]"
+                helperText={
+                  <>
+                    Truyện có <b>bất kỳ</b> thể loại trong danh sách này sẽ bị loại khỏi kết quả.
+                  </>
+                }
+              />
+            </div>
           </div>
-        ) : null}
+        </div>
       </div>
 
       {/* Apply button moved below genres */}
       <div className="mb-8">
         <button
           onClick={applyFilters}
-          className="rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-6 py-3 text-sm font-semibold text-black shadow-lg transition-opacity hover:opacity-90"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-6 py-3 text-sm font-semibold text-black shadow-lg transition-opacity hover:opacity-90"
         >
+          <Search className="h-4 w-4" />
           Áp dụng bộ lọc
         </button>
         {!isApplied && (

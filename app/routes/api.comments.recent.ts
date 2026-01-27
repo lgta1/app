@@ -25,8 +25,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       },
       {
         headers: {
-          // Ngăn cache trên mobile/CDN làm treo dữ liệu cũ
-          "Cache-Control": "no-store, max-age=0",
+            // Cache ngắn cho guest để giảm tải, vẫn đảm bảo dữ liệu mới
+            "Cache-Control": "public, max-age=10, s-maxage=60, stale-while-revalidate=60",
         },
       },
     );
@@ -34,7 +34,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     console.error("Error fetching recent comments:", error);
     return Response.json(
       { error: "Có lỗi xảy ra khi tải bình luận gần đây", success: false },
-      { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } },
+        { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
 }

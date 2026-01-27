@@ -1,5 +1,5 @@
 // app/root.tsx
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Links,
   Meta,
@@ -9,7 +9,7 @@ import {
   useLoaderData,
   redirect,
 } from "react-router";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useRevalidator } from "react-router-dom";
 
 import type { Route } from "./+types/root";
 
@@ -210,7 +210,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           }}
         />
       </head>
-      <body>
+      <body className="overflow-x-hidden">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -349,14 +349,21 @@ type RootLoaderData = {
 
 export default function App() {
   const data = useLoaderData<RootLoaderData | undefined>();
-  const isAdmin = data?.isAdmin ?? false;
+  const isAdminFromLoader = data?.isAdmin ?? false;
   const user = data?.user;
+  const [clientUser, setClientUser] = useState<any>(user);
+  const userSyncAttemptedRef = useRef(false);
+  const effectiveUser = clientUser ?? user;
+  const effectiveIsAdmin = effectiveUser ? isAdmin((effectiveUser as any).role) : isAdminFromLoader;
   const genres = data?.genres ?? [];
   const unreadCount = data?.unreadCount;
   const isBot = data?.isBot;
   const ageVerified = data?.ageVerified;
   const navigate = useNavigate();
   const location = useLocation();
+  const revalidator = useRevalidator();
+  const lastHomeRevalidateAtRef = useRef<number>(0);
+  const lastPathnameRef = useRef<string | null>(null);
 
   const lastPathRef = useRef<string | null>(null);
   const lastNavFromPathRef = useRef<string | null>(null);
@@ -502,13 +509,13 @@ export default function App() {
       const gtag = (window as any).gtag as undefined | ((...args: any[]) => void);
       if (typeof gtag !== "function") return;
 
-      const userId = user && (user as any).id != null ? String((user as any).id) : null;
-      const role = user && (user as any).role != null ? String((user as any).role) : undefined;
+      const userId = effectiveUser && (effectiveUser as any).id != null ? String((effectiveUser as any).id) : null;
+      const role = effectiveUser && (effectiveUser as any).role != null ? String((effectiveUser as any).role) : undefined;
 
       if (userId) {
         gtag("set", { user_id: userId });
         gtag("set", "user_properties", {
-          is_admin: isAdmin ? 1 : 0,
+          is_admin: effectiveIsAdmin ? 1 : 0,
           user_role: role,
         });
 
@@ -527,7 +534,7 @@ export default function App() {
 
       lastUserIdRef.current = userId;
     } catch {}
-  }, [user, isAdmin, isBot]);
+  }, [effectiveUser, effectiveIsAdmin, isBot]);
 
   // ✅ Quy ước hiển thị
   const isHome = location.pathname === "/";
@@ -548,13 +555,21 @@ export default function App() {
   const hideFooter = !isHome;
 
   useEffect(() => {
-    if (!user) return;
+    if (user && user !== clientUser) {
+      setClientUser(user);
+    }
+  }, [user, clientUser]);
+
+  useEffect(() => {
+    if (!effectiveUser) return;
 
     const checkUserBanStatus = async () => {
       try {
-        const response = await fetch("/api/user");
+        const response = await fetch("/api/user-status", {
+          headers: { Accept: "application/json" },
+        });
         const data = await response.json();
-        if (data.success && data.data && data.data.isBanned) {
+        if (data?.success && data?.data?.isBanned) {
           navigate("/logout");
         }
         // Sync blacklist tags to localStorage for client components (e.g., MangaCard)
@@ -586,7 +601,70 @@ export default function App() {
     performBanCheck();
     const id = setInterval(performBanCheck, BAN_CHECK_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [user, navigate]);
+  }, [effectiveUser, navigate]);
+
+  // If UI shows guest but session exists, try to refresh user once on client
+  useEffect(() => {
+    if (effectiveUser) return;
+    if (isBot) return;
+    if (userSyncAttemptedRef.current) return;
+    userSyncAttemptedRef.current = true;
+
+    let canceled = false;
+    const syncUser = async () => {
+      try {
+        const response = await fetch("/api/user", { headers: { Accept: "application/json" } });
+        const data = await response.json();
+        if (!canceled && data?.success && data?.data) {
+          setClientUser(data.data);
+          revalidator.revalidate();
+        }
+      } catch {}
+    };
+
+    syncUser();
+    return () => {
+      canceled = true;
+    };
+  }, [effectiveUser, isBot, revalidator]);
+
+  // Force revalidate when navigating back to home (SPA cache can show stale guest state)
+  useEffect(() => {
+    const nextPath = location.pathname;
+    const prevPath = lastPathnameRef.current;
+    lastPathnameRef.current = nextPath;
+
+    if (nextPath === "/" && prevPath && prevPath !== "/" && revalidator.state === "idle") {
+      const now = Date.now();
+      if (now - lastHomeRevalidateAtRef.current > 3000) {
+        lastHomeRevalidateAtRef.current = now;
+        revalidator.revalidate();
+      }
+    }
+  }, [location.pathname, revalidator]);
+
+  // Revalidate root loader when page is restored from bfcache
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        revalidator.revalidate();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        revalidator.revalidate();
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [revalidator]);
 
   // Fallback vá lỗi: nếu click vào link nội bộ mà SPA không điều hướng, ép điều hướng full page
   useEffect(() => {
@@ -636,8 +714,8 @@ export default function App() {
   }, []);
 
   return (
-    <NotificationsProvider
-      key={user ? user.id : "guest"}
+      <NotificationsProvider
+        key={effectiveUser ? effectiveUser.id : "guest"}
       initialUnreadCount={typeof unreadCount === "number" ? unreadCount : 0}
     >
       <DialogWarningAdultContent
@@ -646,13 +724,13 @@ export default function App() {
         disabled={Boolean(ageVerified)}
       />
       <Header
-        isAdmin={isAdmin}
-        user={user}
+        isAdmin={effectiveIsAdmin}
+        user={effectiveUser}
         genres={genres}
         hideBanner={hideBanner}
         disableAutoHide={isSummon}
         isFixed={!isSummon}
-        autoPrefetchNotifications={Boolean(user) && isHome}
+        autoPrefetchNotifications={false}
       />
       <Outlet />
       {!hideFooter && <Footer />}

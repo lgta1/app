@@ -25,28 +25,6 @@ export function Footer() {
                   >
                     Giới thiệu
                   </Link>
-                  <span className="text-txt-secondary mx-3">|</span>
-                  <Link
-                    to="/lien-he"
-                    className="text-txt-secondary text-sm leading-tight font-medium"
-                  >
-                    Liên hệ
-                  </Link>
-                </div>
-                <div className="flex items-center">
-                  <Link
-                    to="/dieu-khoan"
-                    className="text-txt-secondary text-sm leading-tight font-medium"
-                  >
-                    Điều khoản
-                  </Link>
-                  <span className="text-txt-secondary mx-3">|</span>
-                  <Link
-                    to="/chinh-sach-bao-mat"
-                    className="text-txt-secondary text-sm leading-tight font-medium"
-                  >
-                    Chính Sách Bảo Mật
-                  </Link>
                 </div>
               </div>
             </div>
@@ -54,7 +32,7 @@ export function Footer() {
             {/* Thông tin liên hệ */}
             <div className="flex w-full flex-col gap-4 md:w-60">
               <h3 className="text-txt-primary text-xl leading-normal font-medium md:text-2xl">
-                Liên hệ đặt quảng cáo
+                Liên hệ
               </h3>
               <div className="flex w-full flex-col gap-[5px] md:w-60">
                 <p className="text-txt-secondary text-sm leading-tight font-medium">
@@ -65,16 +43,7 @@ export function Footer() {
                   >
                     vinahentai.contact@gmail.com
                   </a>{" "}
-                  hoặc{" "}
-                  <a
-                    href="mailto:contact.vina2ten@proton.me"
-                    className="text-pink-500 hover:text-pink-400 hover:underline"
-                  >
-                    contact.vina2ten@proton.me
-                  </a>
-                </p>
-                <p className="text-txt-secondary text-sm leading-tight font-medium">
-                  Gửi kèm thông tin liên hệ (telegram)
+                  hoặc <span className="text-pink-500">@vnhtcontact</span> (telegram)
                 </p>
                 <p className="text-txt-secondary text-sm leading-tight font-medium">
                   Copyright © 2025 Vinahentai

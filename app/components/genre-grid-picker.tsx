@@ -14,6 +14,8 @@ export interface GenreGridPickerProps {
   helperText?: ReactNode;
   showLetterNav?: boolean;
   maxHeightClassName?: string;
+  gridClassName?: string;
+  panelClassName?: string;
 }
 
 const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -32,6 +34,8 @@ export function GenreGridPicker({
   helperText,
   showLetterNav = true,
   maxHeightClassName = "max-h-[360px]",
+  gridClassName = "grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3",
+  panelClassName = "overflow-y-auto rounded-lg border border-white/10 p-3 pr-1 [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]",
 }: GenreGridPickerProps) {
   const [genreQuery, setGenreQuery] = useState("");
 
@@ -118,9 +122,7 @@ export function GenreGridPicker({
         </div>
       ) : null}
 
-      <div
-        className={`${maxHeightClassName} overflow-y-auto rounded-lg border border-white/10 p-3 pr-1 [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]`}
-      >
+      <div className={`${maxHeightClassName} ${panelClassName}`}>
         <div className="space-y-4">
           {groupedGenres.map(([letter, items]) => (
             <div key={letter}>
@@ -129,7 +131,7 @@ export function GenreGridPicker({
                 <div className="h-px flex-1 bg-bd-default/60" />
               </div>
 
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+              <div className={gridClassName}>
                 {items.map((genre) => {
                   const checked = selected.has(genre.slug);
                   return (

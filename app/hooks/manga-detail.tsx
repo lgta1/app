@@ -446,9 +446,9 @@ export function MangaDetail({ manga, chapters, hideActions, hideChaptersList }: 
   useEffect(() => {
     const checkFollowStatus = async () => {
       try {
-        const response = await fetch(`/api/manga-follow?mangaId=${mangaIdSafe}`);
+        const response = await fetch(`/api/manga-status?mangaId=${mangaIdSafe}`);
         const data = await response.json();
-        if (response.ok) setIsFollowing(data.isFollowing);
+        if (response.ok) setIsFollowing(Boolean(data?.isFollowing));
       } catch (error) {
         console.error("Error checking follow status:", error);
       }
@@ -646,10 +646,9 @@ useEffect(() => {
                         aria-label={`Xem tác giả ${name}`}
                       >
                         <span className="capitalize">{name}</span>
-                      </Link>
+                      <Link
                     );
                   })}
-                </div>
                 {/* END <feature> AUTHORS_CHIP_BRAND_TINT_NO_STRETCH */}
               </>
             )}
@@ -669,10 +668,9 @@ useEffect(() => {
                       ) : (
                         <Link key={`dj-${slug}-${i}`} to={`/doujinshi/${slug}`} className={chipVariants.outlineSubtle + " w-fit"} title={name} aria-label={`Xem doujinshi ${name}`}>
                           <span className="capitalize">{name}</span>
-                        </Link>
+                        <Link
                       ))
                     );
-                  })}
                 </div>
               </>
             )}

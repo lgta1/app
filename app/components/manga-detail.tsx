@@ -679,9 +679,9 @@ export function MangaDetail({
   useEffect(() => {
     const checkFollowStatus = async () => {
       try {
-        const response = await fetch(`/api/manga-follow?mangaId=${mangaIdSafe}`);
+        const response = await fetch(`/api/manga-status?mangaId=${mangaIdSafe}`);
         const data = await response.json();
-        if (response.ok) setIsFollowing(data.isFollowing);
+        if (response.ok) setIsFollowing(Boolean(data?.isFollowing));
       } catch (error) {
         console.error("Error checking follow status:", error);
       }

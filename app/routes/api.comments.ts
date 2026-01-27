@@ -9,6 +9,15 @@ import type { Route } from "./+types/api.comments";
 import { isBusinessError, returnBusinessError } from "~/helpers/errors.helper";
 import { sharedTtlCache } from "~/.server/utils/ttl-cache";
 
+const guestCacheHeaders = {
+  "Cache-Control": "public, max-age=10, s-maxage=60, stale-while-revalidate=60",
+};
+
+const userNoStoreHeaders = {
+  "Cache-Control": "private, no-store, max-age=0",
+  Vary: "Cookie",
+};
+
 export async function loader({ request }: Route.LoaderArgs) {
   try {
     const user = await getUserInfoFromSession(request);
@@ -34,10 +43,16 @@ export async function loader({ request }: Route.LoaderArgs) {
           ...c,
           userReaction: map[String(c?.id ?? c?._id ?? "")] ?? null,
         }));
-        return Response.json({ data: withMine, success: true });
+        return Response.json(
+          { data: withMine, success: true },
+          { headers: userNoStoreHeaders },
+        );
       }
 
-      return Response.json({ data: replies, success: true });
+      return Response.json(
+        { data: replies, success: true },
+        { headers: guestCacheHeaders },
+      );
     }
 
     if (!mangaId && !postId) {
@@ -97,27 +112,33 @@ export async function loader({ request }: Route.LoaderArgs) {
         userReaction: map[String(c?.id ?? c?._id ?? "")] ?? null,
       }));
 
-      return Response.json({
-        data: withMine,
+      return Response.json(
+        {
+          data: withMine,
+          totalPages: commentsData.totalPages,
+          currentPage: commentsData.currentPage,
+          totalCount: commentsData.totalCount,
+          success: true,
+        },
+        { headers: userNoStoreHeaders },
+      );
+    }
+
+    return Response.json(
+      {
+        data: comments,
         totalPages: commentsData.totalPages,
         currentPage: commentsData.currentPage,
         totalCount: commentsData.totalCount,
         success: true,
-      });
-    }
-
-    return Response.json({
-      data: comments,
-      totalPages: commentsData.totalPages,
-      currentPage: commentsData.currentPage,
-      totalCount: commentsData.totalCount,
-      success: true,
-    });
+      },
+      { headers: guestCacheHeaders },
+    );
   } catch (error) {
     console.error("Error fetching comments:", error);
     return Response.json(
       { error: "Có lỗi xảy ra khi tải bình luận", success: false },
-      { status: 500 },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
 }
@@ -238,7 +259,6 @@ export async function action({ request }: Route.ActionArgs) {
       return returnBusinessError(error);
     }
 
-    console.error("Error in comment action:", error);
     return Response.json({ error: "Có lỗi xảy ra" }, { status: 500 });
   }
 }

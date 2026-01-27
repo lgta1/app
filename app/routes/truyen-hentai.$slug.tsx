@@ -416,7 +416,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   }, [disturbingTagSlugs, disturbingTagWarningKey]);
 
   return (
-    <div className="container-page mx-auto px-4 pb-6 pt-1 md:py-6">
+    <div className="container-page mx-auto px-4 pb-24 pt-1 md:pt-6 md:pb-32">
       <DisturbingTagsWarningDialog
         open={isDisturbingTagWarningOpen}
         onOpenChange={(open: boolean) => {

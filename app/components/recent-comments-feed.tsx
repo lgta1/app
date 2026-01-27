@@ -1,9 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Link } from "react-router-dom";
 import { User as UserIcon, MessageSquare } from "lucide-react";
 import { CommentReactionSummary } from "~/components/comment-reaction";
-import { usePagination } from "~/hooks/use-pagination";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { buildMangaUrl, getMangaHandle } from "~/utils/manga-url.utils";
 // import { formatDistanceToNow } from "~/utils/date.utils"; // replaced by compact formatAgo()
@@ -31,18 +30,79 @@ interface RecentCommentsFeedProps {
 
 export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages, limit = 5, showPagination = true }: RecentCommentsFeedProps) {
   const pageSize = 10;
-  const { data, isLoading, error, currentPage, totalPages, goToPage } =
-    usePagination<FeedItem>({
-      apiUrl: "/api/comments/recent",
-      limit: pageSize,
-      initialData,
-      initialPage,
-      initialTotalPages,
-      // Nếu có dữ liệu SSR thì bỏ qua fetch đầu để tránh spinner trên mobile
-      skipInitialFetch: !!initialData,
-    });
+  const [items, setItems] = useState<FeedItem[]>(initialData ?? []);
+  const [currentPage, setCurrentPage] = useState<number>(initialPage ?? 1);
+  const [totalPages, setTotalPages] = useState<number>(initialTotalPages ?? 1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const items = useMemo(() => data || [], [data]);
+  const loadPage = useCallback(
+    async (page: number) => {
+      if (isLoading) return;
+      if (totalPages && page > totalPages) return;
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const url = new URL("/api/comments/recent", window.location.origin);
+        url.searchParams.set("page", String(page));
+        url.searchParams.set("limit", String(pageSize));
+        url.searchParams.set("_", Date.now().toString());
+
+        const res = await fetch(url.href, { credentials: "include", headers: { "X-Requested-With": "fetch" } });
+        const data = await res.json();
+        if (!res.ok || data?.success === false) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
+
+        const nextItems = Array.isArray(data?.data) ? data.data : [];
+        setTotalPages(data?.totalPages ?? 1);
+        setCurrentPage(data?.currentPage ?? page);
+        setItems((prev) => {
+          const merged = page === 1 ? nextItems : [...prev, ...nextItems];
+          return merged.slice(0, 20);
+        });
+      } catch (e: any) {
+        setError(e?.message || "Không thể tải bình luận");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, pageSize, totalPages],
+  );
+
+  useEffect(() => {
+    if ((initialData?.length ?? 0) === 0) {
+      loadPage(1);
+    }
+  }, [initialData, loadPage]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = listRef.current;
+    if (!sentinel || !root) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) return;
+        if (isLoading) return;
+        if (currentPage >= totalPages) return;
+        loadPage(currentPage + 1);
+      },
+      {
+        root,
+        rootMargin: "0px 0px 120px 0px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [currentPage, totalPages, isLoading, loadPage]);
 
   // GIF helpers: detect server GIF links and render as images (gif + static formats)
   const GIF_REGEX = useMemo(() => /https?:\/\/[^ \n]*\/gif-meme\/[^^\s)]+\.(?:gif|webp|jpe?g|png)/gi, []);
@@ -57,7 +117,7 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
         <span className="text-txt-primary text-base font-semibold uppercase">bình luận</span>
       </div>
 
-      {isLoading && (
+      {isLoading && items.length === 0 && (
         <div className="flex justify-center py-6">
           <LoadingSpinner />
         </div>
@@ -67,8 +127,11 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
         <div className="text-error-error px-4 py-3 text-sm">{error}</div>
       )}
 
-      {!isLoading && !error && (
-        <ul className="divide-bd-default border-bd-default flex max-h-[520px] flex-col divide-y overflow-auto">
+      {!error && (
+        <ul
+          ref={listRef}
+          className="divide-bd-default border-bd-default flex max-h-[520px] flex-col divide-y overflow-y-auto overflow-x-hidden overscroll-contain"
+        >
           {items.map((c: FeedItem) => {
             const avatarUrl = c.user?.avatar || "";
             const mangaHandle = c.manga ? getMangaHandle(c.manga as any) : null;
@@ -99,7 +162,6 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
                     {mangaHref ? (
                       <Link
                         to={mangaHref}
-                        prefetch="intent"
                         className="truncate max-w-[40%] text-lav-300 hover:text-lav-200 [touch-action:manipulation]"
                       >
                         {c.manga?.title ?? "?"}
@@ -137,9 +199,8 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
                 {/* Optional small poster for quick visual context */}
                 {c.manga?.poster ? (
                   mangaHref ? (
-                    <Link
+                      <Link
                       to={mangaHref}
-                      prefetch="intent"
                       className="ml-2 flex flex-shrink-0 overflow-hidden rounded-md [touch-action:manipulation]"
                       aria-label={c.manga?.title}
                     >
@@ -172,27 +233,15 @@ export function RecentCommentsFeed({ initialData, initialPage, initialTotalPages
           {items.length === 0 && (
             <li className="px-4 py-4 text-center text-sm text-white/60">Chưa có bình luận</li>
           )}
-        </ul>
-      )}
-
-      {!isLoading && showPagination && totalPages > 1 && (
-        <div className="px-3 pb-2 pt-1">
-          {currentPage === 1 ? (
-            <button
-              onClick={() => goToPage(2)}
-              className="w-full rounded-md bg-white/5 py-2 text-sm font-medium text-white hover:bg-white/10"
-            >
-              Trang 2 ▸
-            </button>
-          ) : (
-            <button
-              onClick={() => goToPage(1)}
-              className="w-full rounded-md bg-white/5 py-2 text-sm font-medium text-white hover:bg-white/10"
-            >
-              ◂ Trang 1
-            </button>
+          {isLoading && items.length > 0 && (
+            <li className="flex justify-center px-3 py-3">
+              <LoadingSpinner />
+            </li>
           )}
-        </div>
+          <li className="px-3 py-2">
+            <div ref={sentinelRef} className="h-1" />
+          </li>
+        </ul>
       )}
     </div>
   );

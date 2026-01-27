@@ -1478,7 +1478,7 @@ export default function AdminMangaAutoDownload() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-txt-primary">Tự động tải truyện (vi-hentai.pro)</h1>
           <p className="text-sm text-txt-secondary">
@@ -1547,8 +1547,8 @@ export default function AdminMangaAutoDownload() {
             <div className="rounded-lg border border-bd-default bg-bgc-layer2/30 p-4">
               <div className="mb-2 text-sm font-semibold text-txt-primary">Batch trên server</div>
               {loaderData.batches.length ? (
-                <div className="overflow-hidden rounded-lg border border-bd-default">
-                  <table className="w-full text-xs">
+                <div className="overflow-x-auto rounded-lg border border-bd-default">
+                  <table className="min-w-[720px] w-full text-xs">
                     <thead className="bg-bgc-layer2 text-txt-secondary">
                       <tr>
                         <th className="px-3 py-2 text-left">Batch</th>
@@ -1675,7 +1675,7 @@ export default function AdminMangaAutoDownload() {
               type="button"
               onClick={() => submitExtractListing(listingUrlInput)}
               disabled={!listingUrlInput.trim() || listingFetcher.state !== "idle"}
-              className="rounded-lg border border-bd-default px-4 py-2 text-sm font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+              className="w-full rounded-lg border border-bd-default px-4 py-2 text-sm font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50 sm:w-auto"
             >
               {listingFetcher.state !== "idle" ? "Đang lấy..." : "Trích xuất link"}
             </button>
@@ -1686,15 +1686,15 @@ export default function AdminMangaAutoDownload() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <label className="text-sm font-semibold text-txt-primary">Danh sách chờ (queue)</label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={clearAllRows}
                 disabled={isRunning}
                 title="Xóa tất cả"
-                className="rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+                className="w-full rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50 sm:w-auto"
               >
                 <span className="inline-flex items-center gap-2">
                   <Trash2 className="h-4 w-4" />
@@ -1705,7 +1705,7 @@ export default function AdminMangaAutoDownload() {
                 type="button"
                 onClick={addRow}
                 disabled={enqueueFetcher.state !== "idle"}
-                className="rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+                className="w-full rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50 sm:w-auto"
               >
                 + Thêm link
               </button>
@@ -1713,7 +1713,7 @@ export default function AdminMangaAutoDownload() {
                 type="button"
                 onClick={enqueueNewRowsToCurrentBatch}
                 disabled={!isRunning || !activeBatchId || enqueueFetcher.state !== "idle"}
-                className="rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+                className="w-full rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50 sm:w-auto"
                 title="Đẩy các link mới lên queue server"
               >
                 Đẩy link mới
@@ -1722,15 +1722,15 @@ export default function AdminMangaAutoDownload() {
                 type="button"
                 onClick={resetStatuses}
                 disabled={isRunning}
-                className="rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50"
+                className="w-full rounded-lg border border-bd-default px-3 py-1.5 text-xs font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50 sm:w-auto"
               >
                 Reset trạng thái
               </button>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-bd-default">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-bd-default">
+            <table className="min-w-[720px] w-full text-sm">
               <thead className="bg-bgc-layer2 text-txt-secondary">
                 <tr>
                   <th className="w-12 px-3 py-2 text-left">STT</th>

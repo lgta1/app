@@ -13,16 +13,27 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUserInfoFromSession(request);
 
   if (!user) {
-    return Response.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    return Response.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   try {
     const { notifications, totalUnreadCount } = await getNotificationsWithUnreadCount(user.id, 10);
-    return Response.json({ success: true, data: notifications, totalUnreadCount });
+    return Response.json(
+      { success: true, data: notifications, totalUnreadCount },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=10, stale-while-revalidate=30",
+          Vary: "Cookie",
+        },
+      },
+    );
   } catch (error) {
     return Response.json(
       { success: false, message: "Lỗi khi lấy danh sách thông báo" },
-      { status: 500 },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
 }

@@ -707,7 +707,7 @@ export default function AdminMangaAutoUpdate() {
           ← Quản lý truyện
         </Link>
       </div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-txt-primary">Auto cập nhật (vi-hentai)</h1>
           <p className="text-sm text-txt-secondary">Tách 2 bước: trích xuất 30 URL → chạy queue tải chương/ảnh.</p>
@@ -729,7 +729,7 @@ export default function AdminMangaAutoUpdate() {
           </div>
         </div>
 
-        <fetcher.Form method="post" className="flex flex-wrap items-center gap-3">
+        <fetcher.Form method="post" className="flex flex-col items-start gap-3 md:flex-row md:flex-wrap md:items-center">
           <input type="hidden" name="enabled" value={enabled ? "0" : "1"} />
           <input type="hidden" name="stopEarlyEnabled" value={stopEarlyEnabled ? "0" : "1"} />
           <div className="text-sm text-txt-secondary">Cho phép tạo truyện mới: <span className="font-semibold text-txt-primary">Luôn bật</span></div>
@@ -745,7 +745,7 @@ export default function AdminMangaAutoUpdate() {
               name="ownerId"
               defaultValue={DEFAULT_OWNER_ID}
               placeholder={DEFAULT_OWNER_ID}
-              className="w-[320px] max-w-[60vw] rounded border border-border bg-card px-2 py-1 text-sm text-txt-primary outline-none"
+              className="w-full max-w-full rounded border border-border bg-card px-2 py-1 text-sm text-txt-primary outline-none md:w-[320px] md:max-w-[60vw]"
             />
           </label>
 
@@ -754,7 +754,7 @@ export default function AdminMangaAutoUpdate() {
             name="intent"
             value="extractQueue"
             disabled={running || !enabled}
-            className="rounded bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="w-full rounded bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
           >
             {running ? "Đang trích xuất..." : `Trích xuất ${DEFAULT_MAX_MANGA} URL`}
           </button>
@@ -764,7 +764,7 @@ export default function AdminMangaAutoUpdate() {
             name="intent"
             value="startQueue"
             disabled={running || !enabled || !activeQueue?.id || activeQueue.status === "running"}
-            className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
           >
             {running ? "Đang gửi lệnh..." : "Bắt đầu chạy queue"}
           </button>
@@ -774,7 +774,7 @@ export default function AdminMangaAutoUpdate() {
             name="intent"
             value="toggleEnabled"
             disabled={running}
-            className={`rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-60 ${enabled ? "bg-red-600" : "bg-sky-600"}`}
+            className={`w-full rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto ${enabled ? "bg-red-600" : "bg-sky-600"}`}
           >
             {enabled ? "Tắt" : "Bật"}
           </button>
@@ -784,7 +784,7 @@ export default function AdminMangaAutoUpdate() {
             name="intent"
             value="toggleStopEarly"
             disabled={running}
-            className={`rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-60 ${stopEarlyEnabled ? "bg-red-600" : "bg-sky-600"}`}
+            className={`w-full rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto ${stopEarlyEnabled ? "bg-red-600" : "bg-sky-600"}`}
           >
             {stopEarlyEnabled ? "Tắt dừng sớm" : "Bật dừng sớm"}
           </button>
@@ -792,7 +792,7 @@ export default function AdminMangaAutoUpdate() {
           <button
             type="button"
             onClick={clearSystemLockOnServer}
-            className="rounded border border-border bg-transparent px-3 py-2 text-sm font-medium text-txt-primary hover:bg-white/5"
+            className="w-full rounded border border-border bg-transparent px-3 py-2 text-sm font-medium text-txt-primary hover:bg-white/5 sm:w-auto"
           >
             Clear lock (queue kẹt)
           </button>
@@ -944,8 +944,8 @@ export default function AdminMangaAutoUpdate() {
         ) : null}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded border border-border">
-        <table className="w-full text-sm">
+      <div className="mt-4 overflow-x-auto rounded border border-border">
+        <table className="min-w-[720px] w-full text-sm">
           <thead className="bg-card text-left text-txt-secondary">
             <tr>
               <th className="w-12 p-2">STT</th>
@@ -963,9 +963,13 @@ export default function AdminMangaAutoUpdate() {
                 <tr key={String(it.index)} className={it.status === "running" ? "bg-card/60" : ""}>
                   <td className="p-2 text-txt-secondary">{it.index}</td>
                   <td className="p-2">
-                    <div className="truncate text-txt-primary">{it.url}</div>
-                    {it.parsedTitle ? <div className="truncate text-xs text-txt-secondary">{it.parsedTitle}</div> : null}
-                    {it.message ? <div className="truncate text-xs text-txt-secondary">{it.message}</div> : null}
+                    <div className="break-all text-txt-primary md:truncate">{it.url}</div>
+                    {it.parsedTitle ? (
+                      <div className="break-words text-xs text-txt-secondary md:truncate">{it.parsedTitle}</div>
+                    ) : null}
+                    {it.message ? (
+                      <div className="break-words text-xs text-txt-secondary md:truncate">{it.message}</div>
+                    ) : null}
                   </td>
                   <td className="p-2">{itemBadge(it.status)}</td>
                   <td className="p-2 text-txt-secondary">{it.mode || "-"}</td>
@@ -1033,7 +1037,7 @@ export default function AdminMangaAutoUpdate() {
         </div>
         {data.ok ? (
           <div className="mt-3 overflow-x-auto rounded border border-border">
-            <table className="w-full text-sm">
+            <table className="min-w-[960px] w-full text-sm">
               <thead className="bg-card">
                 <tr className="text-left text-txt-secondary">
                   <th className="p-2">Status</th>
