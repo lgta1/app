@@ -8,9 +8,22 @@ import { ChapterDetail } from "~/components/chapter-detail";
 import { CHAPTER_STATUS } from "~/constants/chapter";
 import { DEFAULT_SHARE_IMAGE } from "~/constants/share-images";
 import { ChapterModel } from "~/database/models/chapter.model";
+import { ReadingRewardModel } from "~/database/models/reading-reward.model";
 import { UserChapterReactionModel } from "~/database/models/user-chapter-reaction.model";
 import type { UserType } from "~/database/models/user.model";
 import { getChapterDisplayName } from "~/utils/chapter.utils";
+
+const READING_REWARD_RATE_LIMIT_MS = 60_000;
+const READING_REWARD_MAX_PER_DAY = 3;
+
+function getTodayInVietnam(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
 
 export async function loader({ params, request }: any) {
   const mangaHandle = String(params?.mangaSlug || "");
@@ -68,6 +81,32 @@ export async function loader({ params, request }: any) {
 
   const detailPath = manga.slug ? `/truyen-hentai/${manga.slug}` : `/truyen-hentai/${manga.id}`;
 
+  let rewardEligibility: { canClaim: boolean; remaining: number; nextEligibleAt?: string } | null = null;
+  if (user?.id) {
+    try {
+      const now = new Date();
+      const today = getTodayInVietnam(now);
+      const doc = await ReadingRewardModel.findOne({ userId: String(user.id), date: today })
+        .select({ rewardCount: 1, updatedAt: 1 })
+        .lean();
+
+      const rewardCount = typeof doc?.rewardCount === "number" ? doc.rewardCount : 0;
+      const remaining = Math.max(0, READING_REWARD_MAX_PER_DAY - rewardCount);
+      const lastUpdatedAt = doc?.updatedAt ? new Date(doc.updatedAt).getTime() : 0;
+      const nextEligibleAtMs = lastUpdatedAt ? lastUpdatedAt + READING_REWARD_RATE_LIMIT_MS : 0;
+      const isCooldownPassed = !lastUpdatedAt || lastUpdatedAt < now.getTime() - READING_REWARD_RATE_LIMIT_MS;
+      const canClaim = remaining > 0 && isCooldownPassed;
+
+      rewardEligibility = {
+        canClaim,
+        remaining,
+        nextEligibleAt: !canClaim && nextEligibleAtMs ? new Date(nextEligibleAtMs).toISOString() : undefined,
+      };
+    } catch {
+      rewardEligibility = { canClaim: false, remaining: 0 };
+    }
+  }
+
   const chapterDisplayName = getChapterDisplayName((chapter as any).title, (chapter as any).chapterNumber);
   const breadcrumb = `Trang chủ / ${manga?.title || "Manga"} / ${chapterDisplayName}`;
   const breadcrumbItems = [
@@ -121,6 +160,7 @@ export async function loader({ params, request }: any) {
     },
     recommendedManga: await getRecommendedByFeaturedGenres(manga, 10),
     isLoggedIn: !!user,
+    rewardEligibility,
     mangaTitle: manga.title,
     shareImage: manga.shareImage || manga.poster,
     origin,
@@ -165,7 +205,7 @@ export function meta({ data }: any) {
 }
 
 export default function ChapterReader() {
-  const { chapter, recommendedManga, isLoggedIn } = useLoaderData<typeof loader>();
+  const { chapter, recommendedManga, isLoggedIn, rewardEligibility } = useLoaderData<typeof loader>();
 
   return (
     <div className="container-page mx-auto overflow-x-hidden px-4 py-6 sm:px-6">
@@ -175,7 +215,8 @@ export default function ChapterReader() {
           hasPrevious: Boolean(chapter.hasPrevious),
           hasNext: Boolean(chapter.hasNext),
         }}
-        isEnableClaimReward={true}
+        isEnableClaimReward={Boolean(rewardEligibility?.canClaim)}
+        rewardEligibility={rewardEligibility}
         recommendedManga={recommendedManga}
         isLoggedIn={isLoggedIn}
       />

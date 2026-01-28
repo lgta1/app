@@ -60,6 +60,11 @@ type ChapterDetailProps = {
     mangaSlug?: string;
   };
   isEnableClaimReward?: boolean;
+  rewardEligibility?: {
+    canClaim: boolean;
+    remaining: number;
+    nextEligibleAt?: string;
+  } | null;
   recommendedManga?: MangaType[];
   /** Nếu chưa đăng nhập, không gọi các API yêu cầu session (tránh 401 spam). */
   isLoggedIn?: boolean;
@@ -68,6 +73,7 @@ type ChapterDetailProps = {
 export function ChapterDetail({
   chapter,
   isEnableClaimReward: isEnableClaimGold = false,
+  rewardEligibility,
   recommendedManga = [],
   isLoggedIn = false,
 }: ChapterDetailProps) {
@@ -415,7 +421,7 @@ export function ChapterDetail({
     const time = 60000;
     readingTimerRef.current = setTimeout(() => {
       if (!isLoggedIn) return;
-      if (!hasClaimedThisChapter && isEnableClaimGold) {
+      if (!hasClaimedThisChapter && isEnableClaimGold && rewardEligibility?.canClaim) {
         const formData = new FormData();
         formData.append("intent", "claim-reading-reward");
           try {

@@ -44,7 +44,7 @@ export function NotificationPopup({
 
       <Popover.Portal>
         <Popover.Content
-          className="outline-bd-default bg-bgc-layer1 z-50 flex w-96 max-h-[80vh] flex-col overflow-hidden rounded-lg shadow-[0px_4px_24.200000762939453px_0px_rgba(43,37,75,1.00)] outline-1 outline-offset-[-1px] sm:w-80 sm:max-h-[70vh] md:w-96 md:max-h-[34rem]"
+          className="outline-bd-default bg-bgc-layer1 z-50 flex w-96 max-h-[80vh] flex-col overflow-hidden rounded-lg outline-1 outline-offset-[-1px] sm:w-80 sm:max-h-[70vh] md:w-96 md:max-h-[34rem]"
           sideOffset={16}
           align="end"
           side="bottom"

@@ -3,7 +3,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { BookOpen, Eye, Users } from "lucide-react";
 
 import { getLeaderboard } from "@/queries/leaderboad.query";
-import { forceRefreshHotCarouselSnapshot, getHotCarouselLeaderboardWithScores, getHotCarouselSnapshotInfo, type HotCarouselScoreRow } from "@/queries/leaderboad.query";
+import { forceRefreshHotCarouselSnapshot, getHotCarouselSnapshotInfo, getHotCarouselSnapshotWithScores, type HotCarouselScoreRow } from "@/queries/leaderboad.query";
 import { getDailyRegistrationAndMangaStats, getStatistic, type DailySeriesPoint } from "@/queries/statistic.query";
 
 import RatingItem from "~/components/rating-item";
@@ -37,7 +37,7 @@ export async function loader(): Promise<Response> {
   const dailyLeaderboard = await getLeaderboard("daily");
   const weeklyLeaderboard = await getLeaderboard("weekly");
   const monthlyLeaderboard = await getLeaderboard("monthly");
-  const hotCarousel = await getHotCarouselLeaderboardWithScores();
+  const hotCarousel = await getHotCarouselSnapshotWithScores();
   const snapshotInfo = await getHotCarouselSnapshotInfo();
 
   return Response.json({

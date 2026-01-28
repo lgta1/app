@@ -52,6 +52,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const limit = 18;
 
   const cacheKey = `loader:genres:${slug}:page=${page}:sort=${sortParam}`;
+  const cursorKey = `cursor:genres:${slug}:sort=${sortParam}:page=${page}`;
+  const nextCursorKey = `cursor:genres:${slug}:sort=${sortParam}:page=${page + 1}`;
+  const cachedCursor = page > 1 ? sharedTtlCache.get<Record<string, any>>(cursorKey) : undefined;
 
   const cached = await sharedTtlCache.getOrSet(cacheKey, 30_000, async () => {
     const genre = await GenresModel.findOne({ slug }).lean();
@@ -98,11 +101,31 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     }
 
     const [manga, totalCount] = await Promise.all([
-      searchMangaApprovedWithPagination({ page, limit, query, sort }),
+      searchMangaApprovedWithPagination({ page, limit, query, sort, cursor: cachedCursor }),
       getTotalMangaCount({ query }),
     ]);
 
     const totalPages = Math.ceil(totalCount / limit);
+
+    const buildCursorFromDoc = (doc: MangaType | undefined, sortSpec: Record<string, 1 | -1> | undefined) => {
+      if (!doc || !sortSpec) return null;
+      const cursor: Record<string, any> = {};
+      for (const [field] of Object.entries(sortSpec)) {
+        const value = (doc as any)[field];
+        if (value === undefined || value === null) return null;
+        cursor[field] = value;
+      }
+      const idValue = (doc as any)._id ?? (doc as any).id;
+      if (!idValue) return null;
+      cursor._id = idValue;
+      return cursor;
+    };
+
+    const lastDoc = manga[manga.length - 1] as MangaType | undefined;
+    const nextCursor = buildCursorFromDoc(lastDoc, sort ?? { updatedAt: -1 });
+    if (nextCursor) {
+      await sharedTtlCache.getOrSet(nextCursorKey, 30_000, async () => nextCursor);
+    }
 
     return {
       genre,

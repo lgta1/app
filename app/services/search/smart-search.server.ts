@@ -58,6 +58,7 @@ type FieldMatch = {
 const BASE_FIELD_ORDER: SearchResultScope[] = ["title", "alias", "character", "doujinshi"];
 const TEXT_MATCH_LIMIT = 150;
 const REGEX_MATCH_LIMIT = 120;
+const MAX_REGEX_TOKEN_LENGTH = 3;
 
 const FIELD_CONFIGS: Record<SearchResultScope, FieldConfig> = {
   title: {
@@ -212,12 +213,17 @@ function buildRegexFilter(tokens: string[], fieldKeys: SearchResultScope[]) {
     contentType: { $in: [MANGA_CONTENT_TYPE.MANGA, null] },
   };
   const andConditions: any[] = [];
+  const allowedFieldKeys = fieldKeys.filter((key) => key === "title");
+  if (allowedFieldKeys.length === 0) {
+    return filter;
+  }
 
   tokens.forEach((token) => {
     const regex = buildTokenRegex(token);
+    if (!regex) return;
     const fieldConditions: any[] = [];
 
-    fieldKeys.forEach((fieldKey) => {
+    allowedFieldKeys.forEach((fieldKey) => {
       const config = FIELD_CONFIGS[fieldKey];
       config.regexPaths.forEach(({ path, isArray }) => {
         if (isArray) {
@@ -245,6 +251,9 @@ function buildRegexFilter(tokens: string[], fieldKeys: SearchResultScope[]) {
 
 function buildTokenRegex(token: string) {
   const escaped = escapeRegex(token);
+  if (token.length > MAX_REGEX_TOKEN_LENGTH) {
+    return null;
+  }
   if (token.length <= 2) {
     return new RegExp(escaped, "i");
   }

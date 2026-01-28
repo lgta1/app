@@ -245,13 +245,46 @@ export const searchMangaApprovedWithPagination = async ({
   limit,
   query = {},
   sort,
+  cursor,
 }: {
   keyword?: string;
   page: number;
   limit: number;
   query?: Record<string, any>;
   sort?: Record<string, 1 | -1>;
+  cursor?: Record<string, any>;
 }) => {
+  const buildSeekFilter = (
+    sortSpec: Record<string, 1 | -1>,
+    cursorValues: Record<string, any>,
+  ): Record<string, any> | null => {
+    const entries = Object.entries(sortSpec);
+    if (entries.length === 0) return null;
+
+    const tieDir = entries[entries.length - 1][1];
+    const fields: Array<[string, 1 | -1]> = [...entries, ["_id", tieDir]];
+
+    for (const [field] of fields) {
+      if (!(field in cursorValues)) return null;
+      const value = cursorValues[field];
+      if (value === undefined || value === null) return null;
+    }
+
+    const orConditions: Record<string, any>[] = [];
+    let equality: Record<string, any> = {};
+
+    for (const [field, dir] of fields) {
+      const op = dir === -1 ? "$lt" : "$gt";
+      orConditions.push({
+        ...equality,
+        [field]: { [op]: cursorValues[field] },
+      });
+      equality = { ...equality, [field]: cursorValues[field] };
+    }
+
+    return { $or: orConditions };
+  };
+
   const attachLatestChapterTitles = async (docs: any[]) => {
     const withId = normalizeMangaList(docs as any[]);
     try {
@@ -294,14 +327,22 @@ export const searchMangaApprovedWithPagination = async ({
     return await attachLatestChapterTitles(mangas as any[]);
   }
 
-  const docs = await MangaModel.find({
+  const effectiveSort = sort ?? { createdAt: -1 };
+  const seekFilter = cursor ? buildSeekFilter(effectiveSort, cursor) : null;
+  const baseFilter: Record<string, any> = {
     status: MANGA_STATUS.APPROVED,
     ...normalizedQuery,
-  })
-    .sort(sort ?? { createdAt: -1 })
-    .skip(skip)
+  };
+  if (seekFilter) {
+    Object.assign(baseFilter, seekFilter);
+  }
+
+  const queryBuilder = MangaModel.find(baseFilter)
+    .sort(effectiveSort)
     .limit(limit)
     .lean();
+
+  const docs = seekFilter ? await queryBuilder : await queryBuilder.skip(skip);
   return await attachLatestChapterTitles(docs as any[]);
 };
 

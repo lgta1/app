@@ -37,7 +37,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
         })
           .select("chapterNumber title status slug")
           .sort({ chapterNumber: -1 })
-          .lean(),
+          .lean()
+          .exec(),
     );
 
     const formattedChapters = chapters.map((chapter) => ({

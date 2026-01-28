@@ -104,9 +104,9 @@ const sleepWithAbort = (ms: number, signal?: AbortSignal) => {
 // This only applies to HTML page fetches (manga/chapter pages), NOT image downloads.
 const VIHENTAI_HTML_MIN_INTERVAL_MS = (() => {
   const raw = process.env.VIHENTAI_HTML_MIN_INTERVAL_MS;
-  if (raw == null || String(raw).trim() === "") return 1_500;
+  if (raw == null || String(raw).trim() === "") return 2_000;
   const parsed = Number.parseInt(String(raw), 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1_500;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 2_000;
 })();
 
 const getViHentaiThrottleKey = (url: string): string | null => {
@@ -122,6 +122,7 @@ const getViHentaiThrottleKey = (url: string): string | null => {
 
 const viHentaiHtmlTailByKey = new Map<string, Promise<void>>();
 const viHentaiHtmlLastAtByKey = new Map<string, number>();
+const viHentaiHtmlCountByKey = new Map<string, number>();
 
 async function runViHentaiHtmlPaced<T>(key: string, task: () => Promise<T>): Promise<T> {
   const minIntervalMs = VIHENTAI_HTML_MIN_INTERVAL_MS;
@@ -139,6 +140,13 @@ async function runViHentaiHtmlPaced<T>(key: string, task: () => Promise<T>): Pro
     const lastAt = viHentaiHtmlLastAtByKey.get(key) ?? 0;
     const waitMs = Math.max(0, lastAt + minIntervalMs - Date.now());
     if (waitMs > 0) await sleep(waitMs);
+
+    const count = (viHentaiHtmlCountByKey.get(key) ?? 0) + 1;
+    viHentaiHtmlCountByKey.set(key, count);
+    if (count % 5 === 0) {
+      await sleep(5_000);
+    }
+
     viHentaiHtmlLastAtByKey.set(key, Date.now());
     return await task();
   } finally {
@@ -415,7 +423,7 @@ export type ViHentaiAutoDownloadResult = ViHentaiImportResult & {
   chapterErrors: Array<{ chapterUrl: string; message: string }>;
 };
 
-const fetchHtml = async (url: string, options: { signal?: AbortSignal } = {}) => {
+const fetchHtmlRaw = async (url: string, options: { signal?: AbortSignal } = {}) => {
   const response = await fetch(url, { headers: HEADERS, signal: options.signal });
   if (!response.ok) {
     throw new Error(`Không thể tải trang (${response.status} ${response.statusText})`);
@@ -423,12 +431,14 @@ const fetchHtml = async (url: string, options: { signal?: AbortSignal } = {}) =>
   return response.text();
 };
 
-// Auto-update only: pace vi-hentai HTML requests to avoid 429.
-const fetchViHentaiHtmlForAutoUpdate = async (url: string) => {
+const fetchHtml = async (url: string, options: { signal?: AbortSignal } = {}) => {
   const key = getViHentaiThrottleKey(url);
-  if (!key) return fetchHtml(url);
-  return runViHentaiHtmlPaced(key, () => fetchHtml(url));
+  if (!key) return fetchHtmlRaw(url, options);
+  return runViHentaiHtmlPaced(key, () => fetchHtmlRaw(url, options));
 };
+
+// Backward-compat alias used by auto-update flow.
+const fetchViHentaiHtmlForAutoUpdate = async (url: string) => fetchHtml(url);
 
 const contentTypeToExtension = (contentType?: string | null) => {
   const ct = String(contentType || "").toLowerCase().split(";")[0].trim();
@@ -1938,10 +1948,9 @@ export async function autoDownloadViHentaiManga(
     maxChapters = 500,
     maxImagesPerChapter = 300,
     continueOnChapterError = true,
-    imageDelayMs = 50,
+    imageDelayMs = 100,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
-    chapterDelayMs = 2_000,
     onProgress,
     abortSignal,
     ...importOptions
@@ -2325,9 +2334,7 @@ export async function autoDownloadViHentaiManga(
       }
       // continue
     } finally {
-      if (chapterIndex < ordered.length - 1 && chapterDelayMs > 0) {
-        await sleepWithAbort(chapterDelayMs, abortSignal);
-      }
+      // no delay between chapters; HTML pacing is handled globally per request
     }
   }
 
@@ -2395,7 +2402,6 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     imageDelayMs = 100,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
-    chapterDelayMs = 5_000,
     onProgress,
     ...importOptions
   } = options as any;
@@ -2716,9 +2722,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
         return result;
       }
     } finally {
-      if (idx < missingOrdered.length - 1 && chapterDelayMs > 0) {
-        await sleep(chapterDelayMs);
-      }
+      // no delay between chapters; HTML pacing is handled globally per request
     }
   }
 

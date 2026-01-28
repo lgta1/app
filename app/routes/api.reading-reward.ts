@@ -14,7 +14,7 @@ import crypto from "node:crypto";
  * Config / Constants
  * ========================= */
 const GOLD_REWARD_CHANCE = 0.25;          // 25%
-const MAX_REWARD_PER_DAY = 6;            // tối đa 6 lần/ngày
+const MAX_REWARD_PER_DAY = 3;            // tối đa 3 lần/ngày
 const RATE_LIMIT_MS = 60_000;             // 1 phút
 const IDEMPOTENCY_TTL_SECONDS = 300;      // 5 phút
 
@@ -151,7 +151,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const oneMinuteAgo = new Date(now.getTime() - RATE_LIMIT_MS);
 
     const isRewardGranted = random01() < GOLD_REWARD_CHANCE;
-    const goldAmount = isRewardGranted ? 1 : 0;
+    const goldAmount = isRewardGranted ? 2 : 0;
 
     // Anti-cheat: mỗi chapter chỉ claim 1 lần / user.
     // Lưu ý: chỉ "lock" claim khi request hợp lệ (không bị rate-limit/max-day). Nếu bị gate fail,

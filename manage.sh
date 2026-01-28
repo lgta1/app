@@ -7,6 +7,41 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
 PM2_USER="${PM2_USER:-devuser}"
+RATE_LIMIT_SECONDS="${RATE_LIMIT_SECONDS:-600}"
+RATE_LIMIT_STATE_FILE="${RATE_LIMIT_STATE_FILE:-/tmp/ww-manage-last-run}"
+RATE_LIMIT_LOCK_FILE="${RATE_LIMIT_LOCK_FILE:-/tmp/ww-manage-lock}"
+
+rate_limit_guard() {
+  # Allow override for emergency operations
+  if [[ "${FORCE:-}" == "1" || "${FORCE:-}" == "true" ]]; then
+    return
+  fi
+
+  local now last
+  now=$(date +%s)
+  last=0
+  if [[ -f "$RATE_LIMIT_STATE_FILE" ]]; then
+    last=$(cat "$RATE_LIMIT_STATE_FILE" 2>/dev/null || echo 0)
+  fi
+
+  if (( now - last < RATE_LIMIT_SECONDS )); then
+    local remaining=$(( RATE_LIMIT_SECONDS - (now - last) ))
+    echo "[guard] Recent manage.sh run detected. Try again in ${remaining}s (or set FORCE=1)." >&2
+    exit 2
+  fi
+
+  echo "$now" > "$RATE_LIMIT_STATE_FILE"
+}
+
+with_lock() {
+  # Prevent concurrent or rapid repeated runs
+  exec 200>"$RATE_LIMIT_LOCK_FILE"
+  if ! flock -n 200; then
+    echo "[guard] Another manage.sh is running. Exiting." >&2
+    exit 2
+  fi
+  rate_limit_guard
+}
 
 pm2_exec() {
   if [[ "$(id -un)" == "$PM2_USER" ]]; then
@@ -70,6 +105,7 @@ rolling_pm2() {
 
 case "$1" in
   start)
+    with_lock
     # PM2 đôi khi bị trạng thái lỗi (process id bị lệch/mất), gây crash khi restart theo ecosystem.
     # Start theo kiểu idempotent: xoá instances cũ của dự án rồi start lại.
     pm2_exec delete ww-1 ww-2 ww-3 ww-4 >/dev/null 2>&1 || true
@@ -79,21 +115,26 @@ case "$1" in
     pm2_exec stop all
     ;;
   restart)
+    with_lock
     pm2_exec restart all
     ;;
   reload)
+    with_lock
     pm2_exec reload all
     ;;
   rolling-restart)
+    with_lock
     # Sequential restart ww-1..ww-N with delay (seconds, default=5)
     rolling_pm2 restart "${2:-5}"
     ;;
   rolling-start)
+    with_lock
     # Sequential start ww-1..ww-N with delay (seconds, default=5)
     pm2_exec delete $(app_names) >/dev/null 2>&1 || true
     rolling_pm2 start "${2:-5}"
     ;;
   rolling-reload)
+    with_lock
     # Sequential reload ww-1..ww-N with delay (seconds, default=5)
     rolling_pm2 reload "${2:-5}"
     ;;

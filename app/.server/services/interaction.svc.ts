@@ -19,7 +19,9 @@ export const recordInteraction = async (data: InteractionData): Promise<void> =>
       created_at: new Date(),
     });
 
-    console.info(`Đã ghi interaction: ${data.type} cho manga ${data.story_id}`);
+    if (process.env.LOG_INTERACTIONS === "true") {
+      console.info(`Đã ghi interaction: ${data.type} cho manga ${data.story_id}`);
+    }
   } catch (error) {
     console.error("Lỗi khi ghi interaction:", error);
     // Không throw error để không ảnh hưởng đến luồng chính

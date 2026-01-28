@@ -17,8 +17,6 @@ const LOCK_KEY = "vi-hentai-auto-update";
 // - Processing consumes that queue later (background worker).
 const DEFAULT_MAX_MANGA = 30;
 
-// Pacing to reduce upstream rate-limits / 429.
-const MANGA_DELAY_MS = 7_000;
 // When auto-update starts, wait for any in-flight auto-download job to finish.
 const WAIT_AUTO_DOWNLOAD_IDLE_TIMEOUT_MS = 25 * 60 * 1000;
 
@@ -575,7 +573,6 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
         maxNewChapters: maxNewChaptersPerManga,
         maxChaptersForNewManga: 200,
         imageDelayMs: 100,
-        chapterDelayMs: 3_000,
       } as any);
 
       const inc: any = {
@@ -655,9 +652,7 @@ const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> =>
       }
     }
 
-    if (i < items.length - 1 && MANGA_DELAY_MS > 0) {
-      await sleep(MANGA_DELAY_MS);
-    }
+    // no delay between manga; HTML pacing is handled per request
   }
 
   await ViHentaiAutoUpdateQueueModel.updateOne(

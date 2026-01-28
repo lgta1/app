@@ -10,8 +10,6 @@ const AUTO_UPDATE_LOCK_KEY = "vi-hentai-auto-update";
 // Auto-fail it after a grace period so the worker can continue.
 const STALE_HEARTBEAT_MS = 15 * 60 * 1000;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 const abortControllersByJobId = new Map<string, AbortController>();
 const isMongoReady = () => mongoose.connection.readyState === 1;
 
@@ -249,7 +247,6 @@ async function processOneJob(): Promise<void> {
       // ignore
     }
     abortControllersByJobId.delete(jobId);
-    // Cooldown between manga jobs (server pacing)
-    await sleep(7_000);
+    // No delay between manga jobs; HTML pacing is handled per request
   }
 }
