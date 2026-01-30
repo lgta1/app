@@ -2065,21 +2065,13 @@ export async function autoDownloadViHentaiManga(
 
   const emitProgress = async (payload: Parameters<NonNullable<typeof onProgress>>[0]) => {
     if (!onProgress) return;
-    const {
-      request,
-      url,
-      ownerId,
-      translationTeam,
-      approve,
-      dryRun,
-      skipIfExists,
-      contentType,
-      userStatusOverride,
-      downloadPoster = true,
-      downloadChapters = true,
-      maxChapters = 200,
-      maxImagesPerChapter = 300,
-      imageDelayMs = 150,
+    try {
+      await onProgress(payload);
+    } catch {
+      // Progress must never break the download flow.
+    }
+  };
+
   const unknown = mapped.unknown;
   if (!matched.length) {
     const warning = `Cảnh báo: không map được thể loại hợp lệ (nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}). Sẽ tạo truyện với 0 thể loại.`;
@@ -2517,7 +2509,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     downloadChapters = true,
     continueOnChapterError = true,
     maxImagesPerChapter = 300,
-    imageDelayMs = 100,
+    imageDelayMs = 150,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
     onProgress,
@@ -2529,18 +2521,16 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     try {
       await onProgress(payload);
     } catch {
-      // Progress must never break the update flow.
+      // Progress must never break the download flow.
     }
   };
-
-  if (!importOptions.url) throw new Error("Thiếu URL nguồn");
 
   await emitProgress({ stage: "manga", message: "Đang tải trang truyện..." });
   const parsed = parsePage(await fetchViHentaiHtmlForAutoUpdate(importOptions.url), importOptions.url);
   const title = parsed.title;
 
   const existing = await MangaModel.findOne({ title })
-    .select({ _id: 1, slug: 1, chapters: 1 })
+    .select({ _id: 1, slug: 1 })
     .lean();
 
   // If missing -> create via existing auto-download path (ensures same metadata + poster handling)
