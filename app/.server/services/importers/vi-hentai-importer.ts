@@ -2072,6 +2072,9 @@ export async function autoDownloadViHentaiManga(
     }
   };
 
+  const parsed = await fetchViHentaiPage(importOptions.url, { signal: abortSignal });
+  const mapped = await mapGenres(parsed.rawGenres);
+  const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
   const unknown = mapped.unknown;
   if (!matched.length) {
     const warning = `Cảnh báo: không map được thể loại hợp lệ (nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}). Sẽ tạo truyện với 0 thể loại.`;

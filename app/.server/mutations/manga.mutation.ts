@@ -1,16 +1,36 @@
+import mongoose, { Types } from "mongoose";
+
 import { getUserInfoFromSession } from "@/services/session.svc";
 import { generateMangaShareImage } from "@/services/share-image.svc";
 
 import { MANGA_CONTENT_TYPE, MANGA_STATUS, MANGA_USER_STATUS, type MangaContentType } from "~/constants/manga";
 import { ChapterModel } from "~/database/models/chapter.model";
 import { CommentModel } from "~/database/models/comment.model";
+import { UserLikeCommentModel } from "~/database/models/user-like-comment.model";
+import { UserReactionCommentModel } from "~/database/models/user-reaction-comment.model";
 import { generateUniqueMangaSlug, resolveMangaHandle } from "~/database/helpers/manga-slug.helper";
 import { MangaModel, type MangaType } from "~/database/models/manga.model";
+import { MangaRatingModel } from "~/database/models/manga-rating.model";
+import { MangaRevenueModel } from "~/database/models/manga-revenue.model";
 import { UserModel } from "~/database/models/user.model";
 import { AdminActionLogModel } from "~/database/models/admin-action-log.model";
 import { UserFollowMangaModel } from "~/database/models/user-follow-manga.model";
 import { UserLikeMangaModel } from "~/database/models/user-like-manga.model";
 import { UserReadChapterModel } from "~/database/models/user-read-chapter.model";
+import { UserChapterReactionModel } from "~/database/models/user-chapter-reaction.model";
+import { ReadingRewardClaimModel } from "~/database/models/reading-reward-claim.model";
+import { ReportModel } from "~/database/models/report.model";
+import { NotificationModel } from "~/database/models/notification.model";
+import { InteractionModel } from "~/database/models/interaction.model";
+import {
+  DailyLeaderboardModel,
+  WeeklyLeaderboardModel,
+  MonthlyLeaderboardModel,
+} from "~/database/models/leaderboard.model";
+import { HotCarouselSnapshotModel } from "~/database/models/hot-carousel-snapshot.model";
+import { ViHentaiAutoUpdateQueueModel } from "~/database/models/vi-hentai-auto-update-queue.model";
+import { ViHentaiAutoUpdateRunModel } from "~/database/models/vi-hentai-auto-update-run.model";
+import { ViHentaiAutoDownloadJobModel } from "~/database/models/vi-hentai-auto-download-job.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin, isDichGia } from "~/helpers/user.helper";
 import { createNotification } from "@/mutations/notification.mutation";
@@ -31,17 +51,19 @@ const resolveMangaMutationTarget = async (handle: string) => {
   return { doc, targetId };
 };
 
-export const deleteManga = async (request: Request, mangaId: string) => {
-  const userInfo = await getUserInfoFromSession(request);
-  if (!userInfo) {
-    throw new BusinessError("Bạn cần đăng nhập để xóa truyện");
-  }
+type StorageCleanupReport = {
+  deleted: boolean;
+  errors: string[];
+};
 
-  if (!isAdmin(userInfo.role)) {
-    throw new BusinessError("Bạn không có quyền xóa truyện");
-  }
+const toObjectId = (value: string | null | undefined) =>
+  value && Types.ObjectId.isValid(value) ? new Types.ObjectId(value) : null;
 
-  const manga = await MangaModel.findById(mangaId);
+const dedupeStrings = (values: Array<string | null | undefined>) =>
+  Array.from(new Set(values.filter(Boolean) as string[]));
+
+export const hardDeleteManga = async (request: Request, mangaId: string) => {
+  const manga = await MangaModel.findById(mangaId).lean();
 
   if (!manga) {
     throw new BusinessError("Không tìm thấy truyện");
@@ -78,51 +100,147 @@ export const deleteManga = async (request: Request, mangaId: string) => {
     }
   };
 
-  // Lấy tất cả chapterIds để xóa UserReadChapter records
-  const chapters = await ChapterModel.find({ mangaId: mangaId }).select("_id");
-  const chapterIds = chapters.map((chapter) => chapter._id.toString());
+  const chapters = await ChapterModel.find({ mangaId }).select("_id contentUrls").lean();
+  const chapterObjectIds = chapters.map((chapter) => chapter._id).filter(Boolean);
+  const chapterIdStrings = chapters.map((chapter) => String((chapter as any)._id || "")).filter(Boolean);
+  const contentUrls = chapters.flatMap((chapter) =>
+    Array.isArray((chapter as any).contentUrls) ? (chapter as any).contentUrls : [],
+  );
+  const contentPaths = contentUrls.map((url) => toFullPathIfInternal(String(url))).filter(Boolean) as string[];
 
-  // Xóa cascade tất cả dữ liệu liên quan
-  await Promise.all([
-    // Xóa lịch sử đọc chapters của manga này
-    UserReadChapterModel.deleteMany({ chapterId: { $in: chapterIds } }),
+  const posterFullPath = toFullPathIfInternal((manga as any)?.poster);
+  const shareFullPath = toFullPathIfInternal((manga as any)?.shareImage);
+  const extraStoragePaths = dedupeStrings([posterFullPath, shareFullPath, ...contentPaths]);
 
-    // Xóa comments của manga
-    CommentModel.deleteMany({ mangaId: mangaId }),
+  const session = await mongoose.startSession();
 
-    // Xóa follow relationships
-    UserFollowMangaModel.deleteMany({ mangaId: mangaId }),
-
-    // Xóa like relationships
-    UserLikeMangaModel.deleteMany({ mangaId: mangaId }),
-
-    // Xóa tất cả chapters của manga
-    ChapterModel.deleteMany({ mangaId: mangaId }),
-  ]);
-
-  // Best-effort cleanup storage (avoid blocking delete if storage fails)
   try {
-    await deletePrefix(`manga-images/${mangaId}`);
+    await session.withTransaction(async () => {
+      const mangaObjectId = toObjectId(mangaId);
+      const commentDocs = await CommentModel.find({ mangaId }).select("_id").session(session);
+      const commentIds = commentDocs.map((doc) => String((doc as any)._id || "")).filter(Boolean);
 
-    const posterFullPath = toFullPathIfInternal((manga as any)?.poster);
-    const shareFullPath = toFullPathIfInternal((manga as any)?.shareImage);
-    const toDelete = [posterFullPath, shareFullPath].filter(Boolean) as string[];
-    if (toDelete.length) {
-      await deleteFiles(toDelete);
-    }
-  } catch (cleanupError) {
-    console.warn("[deleteManga] storage cleanup failed", cleanupError);
+      if (commentIds.length) {
+        await UserLikeCommentModel.deleteMany({ commentId: { $in: commentIds } }, { session });
+        await UserReactionCommentModel.deleteMany({ commentId: { $in: commentIds } }, { session });
+      }
+
+      if (chapterObjectIds.length) {
+        await UserReadChapterModel.deleteMany({ chapterId: { $in: chapterObjectIds } }, { session });
+      }
+
+      if (chapterIdStrings.length) {
+        await UserChapterReactionModel.deleteMany({ chapterId: { $in: chapterIdStrings } }, { session });
+        await ReadingRewardClaimModel.deleteMany({ chapterId: { $in: chapterIdStrings } }, { session });
+      }
+
+      await CommentModel.deleteMany({ mangaId }, { session });
+      await UserFollowMangaModel.deleteMany({ mangaId }, { session });
+      await UserLikeMangaModel.deleteMany({ mangaId }, { session });
+      await MangaRatingModel.deleteMany({ mangaId }, { session });
+      await MangaRevenueModel.deleteMany({ mangaId }, { session });
+      await ChapterModel.deleteMany({ mangaId }, { session });
+
+      if (mangaObjectId) {
+        await InteractionModel.deleteMany({ story_id: mangaObjectId }, { session });
+        await DailyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, { session });
+        await WeeklyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, { session });
+        await MonthlyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, { session });
+
+        const reportFilters: any[] = [{ mangaId: mangaObjectId }, { targetId: mangaObjectId }];
+        if (chapterObjectIds.length) {
+          reportFilters.push({ targetId: { $in: chapterObjectIds } });
+        }
+        await ReportModel.deleteMany({ $or: reportFilters }, { session });
+      }
+
+      const notificationFilters: any[] = [{ targetId: mangaId }];
+      if ((manga as any)?.slug) {
+        const slug = String((manga as any).slug || "").trim();
+        if (slug) {
+          notificationFilters.push({ targetUrl: new RegExp(`/truyen-hentai/${slug}(?:$|\\?)`) });
+        }
+      }
+
+      await NotificationModel.deleteMany({ $or: notificationFilters }, { session });
+      await AdminActionLogModel.deleteMany({ mangaId }, { session });
+
+      await ViHentaiAutoDownloadJobModel.deleteMany(
+        { $or: [{ createdMangaId: mangaId }, { "progress.mangaId": mangaId }] },
+        { session },
+      );
+
+      await ViHentaiAutoUpdateQueueModel.updateMany(
+        { "items.mangaId": mangaId },
+        { $pull: { items: { mangaId } } },
+        { session },
+      );
+
+      await ViHentaiAutoUpdateRunModel.updateMany(
+        { "items.mangaId": mangaId },
+        { $pull: { items: { mangaId } } },
+        { session },
+      );
+
+      await HotCarouselSnapshotModel.updateMany({ items: mangaId }, { $pull: { items: mangaId } }, { session });
+
+      const presenceKey = `presence.${mangaId}`;
+      await HotCarouselSnapshotModel.updateMany(
+        { [presenceKey]: { $exists: true } },
+        { $unset: { [presenceKey]: "" } },
+        { session },
+      );
+
+      await MangaModel.findByIdAndDelete(mangaId, { session });
+      await UserModel.findByIdAndUpdate((manga as any).ownerId, { $inc: { mangasCount: -1 } }, { session });
+    });
+  } finally {
+    session.endSession();
   }
 
-  // Cuối cùng xóa manga
-  await MangaModel.findByIdAndDelete(mangaId);
+  const storageReport: StorageCleanupReport = { deleted: true, errors: [] };
 
-  await UserModel.findByIdAndUpdate(manga.ownerId, { $inc: { mangasCount: -1 } });
+  try {
+    await deletePrefix(`manga-images/${mangaId}`);
+  } catch (cleanupError) {
+    const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+    storageReport.deleted = false;
+    storageReport.errors.push(`deletePrefix:manga-images/${mangaId}:${message}`);
+    console.warn("[hardDeleteManga] storage prefix cleanup failed", cleanupError);
+  }
+
+  if (extraStoragePaths.length) {
+    const CHUNK = 500;
+    for (let i = 0; i < extraStoragePaths.length; i += CHUNK) {
+      try {
+        await deleteFiles(extraStoragePaths.slice(i, i + CHUNK));
+      } catch (cleanupError) {
+        const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        storageReport.deleted = false;
+        storageReport.errors.push(`deleteFiles:${message}`);
+        console.warn("[hardDeleteManga] storage file cleanup failed", cleanupError);
+      }
+    }
+  }
 
   return {
     success: true,
     message: "Xóa truyện thành công",
+    storage: storageReport,
   };
+};
+
+export const deleteManga = async (request: Request, mangaId: string) => {
+  const userInfo = await getUserInfoFromSession(request);
+  if (!userInfo) {
+    throw new BusinessError("Bạn cần đăng nhập để xóa truyện");
+  }
+
+  if (!isAdmin(userInfo.role)) {
+    throw new BusinessError("Bạn không có quyền xóa truyện");
+  }
+
+  return hardDeleteManga(request, mangaId);
 };
 
 export const createManga = async (
