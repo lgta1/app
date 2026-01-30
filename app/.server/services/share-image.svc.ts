@@ -285,7 +285,7 @@ export const generateMangaShareImage = async ({
     const uploadResult = await uploadToPublicBucket(webpBuffer, `${mangaId}.webp`, {
       prefixPath: SHARE_PREFIX,
       contentType: "image/webp",
-      cacheControl: "public,max-age=604800,immutable",
+      cacheControl: "public, max-age=604800, s-maxage=604800, immutable",
     });
 
     return uploadResult.url;

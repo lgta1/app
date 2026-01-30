@@ -49,6 +49,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const { sharedTtlCache } = ttlCacheUtils as any;
 
   const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  const { hasRestrictedGenres } = await import("~/.server/utils/seo-blocklist");
 
   const handle = params.slug;
   const origin = getCanonicalOrigin(request as any);
@@ -98,6 +99,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         recommendedManga,
         genreDisplayMap,
         uploader,
+        robotsNoIndex: hasRestrictedGenres(manga.genres),
       };
     });
 
@@ -174,6 +176,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     isAdmin: isAdminUser,
     canManageManga: isAdminUser || isOwner,
     origin,
+    robotsNoIndex: hasRestrictedGenres(manga.genres),
   };
 }
 
@@ -237,6 +240,10 @@ export function meta({ data }: Route.MetaArgs) {
     ];
   }
 
+  const robots = data?.robotsNoIndex
+    ? [{ name: "robots", content: "noindex, nofollow, noarchive, noimageindex" }]
+    : [];
+
   const origin = data.origin || "https://vinahentai.fun";
   const canonicalPath = data.manga.slug
     ? `/truyen-hentai/${data.manga.slug}`
@@ -299,6 +306,7 @@ export function meta({ data }: Route.MetaArgs) {
     { name: "twitter:description", content: description },
     { name: "twitter:image", content: image },
     { name: "twitter:url", content: canonicalUrl },
+    ...robots,
   ];
 }
 

@@ -32,6 +32,7 @@ import type { Route } from "./+types/truyen-hentai.preview.$id";
 
 import {
   approveManga,
+  deleteManga,
   rejectManga,
   submitMangaToReview,
   updateManga,
@@ -163,6 +164,12 @@ export async function action({ request, params }: Route.ActionArgs) {
           { timestamps: false },
         );
         result = { success: true, added: true, message: "Đã chọn Oneshot (thêm thể loại oneshot)" };
+        break;
+      }
+      case "deleteManga": {
+        const { mangaId } = await ensureEditableManga(request, id);
+        const deleted = await deleteManga(request, mangaId);
+        result = { ...deleted, actionType: "deleteManga" };
         break;
       }
       case "shiftPublished": {
@@ -306,6 +313,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
   const [isBulkRunning, setIsBulkRunning] = useState(false);
   const [bulkApplyCompression, setBulkApplyCompression] = useState<boolean>(() => !isSkipCompression);
+  const [bulkForceWatermarkAll, setBulkForceWatermarkAll] = useState(false);
   const [chapProgress, setChapProgress] = useState<{ done: number; total: number; current: string }>({
     done: 0,
     total: 0,
@@ -333,6 +341,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const posterUpdateFetcher = useFetcher<typeof action>();
   const statusUpdateFetcher = useFetcher<typeof action>();
   const shiftPublishedFetcher = useFetcher<typeof action>();
+  const deleteMangaFetcher = useFetcher<typeof action>();
   const pendingPosterUrlRef = useRef<string | null>(null);
   const pendingStatusRef = useRef<number | null>(null);
   const posterUpdateInFlightRef = useRef(false);
@@ -341,6 +350,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const [shiftAmount, setShiftAmount] = useState<string>("");
   const [shiftUnit, setShiftUnit] = useState<"minute" | "hour" | "day" | "month">("month");
   const [isShiftingPublished, setIsShiftingPublished] = useState(false);
+  const isDeletingManga = deleteMangaFetcher.state !== "idle";
   const createChapterHref = `/truyen-hentai/chapter/create/${mangaHandle}${isSkipCompression ? "?skipCompression=1" : ""}`;
   const canBulk = canBulkDownloadChapters(userRole, isOwner);
   const hasAtLeastOneChapter = Array.isArray(chapters) && chapters.length >= 1;
@@ -549,6 +559,23 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     setIsShiftingPublished(false);
   }, [isShiftingPublished, shiftPublishedFetcher.state, shiftPublishedFetcher.data, revalidator]);
 
+  useEffect(() => {
+    if (deleteMangaFetcher.state !== "idle") return;
+
+    const data = deleteMangaFetcher.data as
+      | { success?: boolean; error?: string; message?: string; actionType?: string }
+      | undefined;
+
+    if (data?.actionType !== "deleteManga") return;
+
+    if (data?.success) {
+      toast.success(data.message || "Đã xóa truyện");
+      window.location.href = "/admin/manga";
+    } else if (data?.error) {
+      toast.error(data.error || "Xóa truyện thất bại");
+    }
+  }, [deleteMangaFetcher.state, deleteMangaFetcher.data]);
+
   const submitShiftPublished = () => {
     if (!isAdminUser || isShiftingPublished) return;
     const n = Number(shiftAmount);
@@ -562,6 +589,20 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     formData.append("unit", shiftUnit);
     formData.append("amount", String(Math.trunc(n)));
     shiftPublishedFetcher.submit(formData, { method: "POST", action: `/truyen-hentai/preview/${mangaHandle}` });
+  };
+
+  const handleDeleteManga = () => {
+    if (!isAdminUser || isDeletingManga) return;
+    const ok = window.confirm(
+      `Xóa truyện "${manga.title}"?
+ Sẽ xóa toàn bộ chương + ảnh (R2) + dữ liệu liên quan.
+ Không thể hoàn tác.`,
+    );
+    if (!ok) return;
+
+    const formData = new FormData();
+    formData.append("actionType", "deleteManga");
+    deleteMangaFetcher.submit(formData, { method: "POST", action: `/truyen-hentai/preview/${mangaHandle}` });
   };
 
   /* ============== BULK UPLOAD HANDLERS ============== */
@@ -655,11 +696,11 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         // upload 1 lần cho cả chapter (sau nén nếu có)
         let results: Array<{ url?: string; path?: string; location?: string; key?: string }>;
         try {
-          const watermarkIndexes = selectWatermarkIndexes(effectiveList.length);
+          const watermarkIndexes = bulkForceWatermarkAll ? null : selectWatermarkIndexes(effectiveList.length);
 
           let watermarkOrder = 0;
           const filesToUpload = effectiveList.map((f, idx) => {
-            const shouldWatermark = watermarkIndexes.has(idx);
+            const shouldWatermark = bulkForceWatermarkAll || Boolean(watermarkIndexes?.has(idx));
             if (!shouldWatermark) {
               return { file: f, options: { prefixPath: "manga-images" } };
             }
@@ -868,6 +909,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                 <XCircle className="h-5 w-5" />
                 <span className="text-sm font-semibold">Từ chối</span>
               </button>
+              <button
+                type="button"
+                onClick={handleDeleteManga}
+                disabled={isDeletingManga}
+                className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-600 px-4 py-3 text-red-300 shadow-[0px_4px_8.9px_0px_rgba(239,68,68,0.25)] transition-colors hover:bg-red-600/10 disabled:cursor-not-allowed disabled:opacity-60"
+                title="Xóa truyện (kèm ảnh và dữ liệu liên quan)"
+              >
+                <Trash2 className="h-5 w-5" />
+                <span className="text-sm font-semibold">Xóa truyện</span>
+              </button>
             </>
           )}
         </div>
@@ -1072,6 +1123,18 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                     onChange={(e) => setBulkApplyCompression(e.target.checked)}
                   />
                   Nén ảnh bulk
+                </label>
+              )}
+              {canBulk && isAdminUser && (
+                <label className="flex items-center gap-2 rounded-xl bg-bgc-layer2 px-3 py-2 text-xs font-medium text-txt-primary">
+                  <input
+                    type="checkbox"
+                    className="accent-[#D373FF]"
+                    disabled={isBulkRunning}
+                    checked={bulkForceWatermarkAll}
+                    onChange={(e) => setBulkForceWatermarkAll(e.target.checked)}
+                  />
+                  Gắn dải watermark mọi ảnh
                 </label>
               )}
 

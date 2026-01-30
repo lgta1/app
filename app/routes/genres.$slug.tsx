@@ -28,6 +28,10 @@ export const meta: Route.MetaFunction = ({ data }) => {
     ];
   }
 
+  const robots = data?.robotsNoIndex
+    ? [{ name: "robots", content: "noindex, nofollow, noarchive, noimageindex" }]
+    : [];
+
   return [
     { title: `${data.genre.name} | Vinahentai` },
     {
@@ -35,12 +39,14 @@ export const meta: Route.MetaFunction = ({ data }) => {
       content:
         data.genre.description || `Khám phá thể loại ${data.genre.name} tại Vinahentai`,
     },
+    ...robots,
   ];
 };
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { sharedTtlCache } = await import("~/.server/utils/ttl-cache");
   const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  const { isRestrictedGenreSlug } = await import("~/.server/utils/seo-blocklist");
 
   const { slug } = params;
   if (!slug) {
@@ -141,9 +147,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const origin = getCanonicalOrigin(request as any);
+  const robotsNoIndex = isRestrictedGenreSlug(slug);
   return {
     ...cached,
     canonical: `${origin}/genres/${cached.genre.slug}`,
+    robotsNoIndex,
   };
 }
 

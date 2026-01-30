@@ -88,6 +88,20 @@ export default function handleRequest(
       // ignore
     }
 
+    const hasRobotsNoIndex = (() => {
+      try {
+        const loaderData = routerContext.staticHandlerContext?.loaderData;
+        if (!loaderData) return false;
+        return Object.values(loaderData).some((data) => Boolean((data as any)?.robotsNoIndex));
+      } catch {
+        return false;
+      }
+    })();
+
+    if (hasRobotsNoIndex) {
+      responseHeaders.set("X-Robots-Tag", "noindex, nofollow, noarchive, noimageindex");
+    }
+
     const canonicalHostname = (() => {
       try {
         return getCanonicalHostname(request);
@@ -199,19 +213,29 @@ export default function handleRequest(
         /^\/truyen-hentai\/[^/]+\/[^/]+$/.test(pathname) && !pathname.startsWith("/truyen-hentai/chapter/");
 
       // TTL yêu cầu (edge = s-maxage):
-      // /: 2p, /danh-sach: 10p, /genres: 1h, /genres/*: 20p,
+      // /: 2p, /danh-sach: 30p, /genres: 30p, /genres/*: 1h,
+      // /translators/*: 1h, /authors/*: 1h, /characters/*: 1h, /doujinshi/*: 1h
+      // /random: 1h, /gioi-thieu: 48h, /leaderboard/*: 24h
       // /truyen-hentai: 1h, /truyen-hentai/:slug: 5p, /truyen-hentai/:mangaSlug/:chapterSlug: 30p
       const edgeTtlSeconds =
         pathname === "/" ? 120 :
-        pathname === "/danh-sach" ? 600 :
-        pathname === "/genres" ? 3600 :
-        pathname.startsWith("/genres/") ? 1200 :
+        pathname === "/danh-sach" ? 1800 :
+        pathname === "/genres" ? 1800 :
+        pathname.startsWith("/genres/") ? 3600 :
+        pathname.startsWith("/translators/") ? 3600 :
+        pathname.startsWith("/authors/") ? 3600 :
+        pathname.startsWith("/characters/") ? 3600 :
+        pathname.startsWith("/doujinshi/") ? 3600 :
+        pathname === "/random" ? 3600 :
+        pathname === "/gioi-thieu" ? 172800 :
+        pathname === "/leaderboard" ? 86400 :
+        pathname.startsWith("/leaderboard/") ? 86400 :
         pathname === "/truyen-hentai" ? 3600 :
         isMangaDetailPage ? 300 :
         isChapterReadPage ? 1800 :
         null;
 
-      const isAllowlistedPublicPage = edgeTtlSeconds !== null;
+      const isAllowlistedPublicPage = edgeTtlSeconds !== null && !hasRobotsNoIndex;
 
       if (isManifestRequest && responseStatusCode >= 200 && responseStatusCode < 300) {
         // /__manifest là request “nóng” do React Router lazy route discovery.
@@ -220,7 +244,7 @@ export default function handleRequest(
           "Cache-Control",
           "public, max-age=300, s-maxage=3600, stale-while-revalidate=600, stale-if-error=86400",
         );
-      } else if (hasSession) {
+      } else if (hasSession || hasRobotsNoIndex) {
         responseHeaders.set("Cache-Control", "private, no-store, max-age=0");
         // Make it explicit this varies by Cookie for downstream caches.
         const vary = responseHeaders.get("Vary");

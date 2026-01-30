@@ -20,7 +20,7 @@ const HOT_CAROUSEL_PIPELINE_LIMIT = Math.max(HOT_CAROUSEL_TOTAL + 40, 120);
 const HOT_CAROUSEL_CACHE_TTL_MS = 60 * 1000; // cache snapshot for 60s to avoid re-aggregating per request
 
 // HOT carousel: time-on-leaderboard decay + re-entry cooldown
-const HOT_CAROUSEL_REENTRY_COOLDOWN_MS = 6 * 3600 * 1000;
+const HOT_CAROUSEL_REENTRY_COOLDOWN_MS = 15 * 3600 * 1000;
 const HOT_CAROUSEL_PRESENCE_PRUNE_MS = 30 * 24 * 3600 * 1000;
 
 type HotCarouselPresenceEntry = {
@@ -460,23 +460,24 @@ const aggregateHotCarouselSnapshot = async (opts?: {
     const penalty = Math.min(weeklyPenalty + monthlyPenalty, 0.7);
     const penaltyMultiplier = 1 - penalty;
 
-    // Genre penalty: if manga has genre "manhwa", reduce score by 60%.
+    // Genre penalty: if manga has one of the penalized genres, reduce score by 60%.
     // Apply to manga only (not COSPLAY).
     const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
     const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
-    const hasManhwaGenre =
-      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
-      genres.some((g) => typeof g === "string" && g.trim().toLowerCase() === "manhwa");
-    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
-
-    // Disturbing tags (guro/scat): -50% score and no recent bonus.
     const genreSlugs = genres
       .filter((g) => typeof g === "string")
       .map((g) => toSlug(String(g)).toLowerCase());
+    const penalizedGenreSlugs = new Set(["manhwa", "guro", "scat", "loli", "lolicon", "shota"]);
+    const hasManhwaGenre =
+      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
+      genreSlugs.some((slug) => penalizedGenreSlugs.has(slug));
+    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
+
+    // Disturbing tags (guro/scat): disable update boost.
     const hasDisturbingTags =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       (genreSlugs.includes("guro") || genreSlugs.includes("scat"));
-    const disturbingMultiplier = hasDisturbingTags ? 0.5 : 1;
+    const disturbingMultiplier = 1;
 
     // Boost new/short series:
     // - 1 chapter: +30%
@@ -575,7 +576,7 @@ const aggregateHotCarouselSnapshot = async (opts?: {
     const sid = String(doc?.story_id ?? doc?._id ?? "");
     if (!sid || seen.has(sid)) continue;
 
-    // Cooldown: if a story just left the HOT snapshot, keep it out for at least 6 hours.
+    // Cooldown: if a story just left the HOT snapshot, keep it out for at least 15 hours.
     if (isInHotReentryCooldown(sid, presence, activeHotSet, now)) continue;
 
     const story = storyMap.get(sid);
@@ -603,7 +604,7 @@ const aggregateHotCarouselSnapshot = async (opts?: {
     }
   }
 
-  const FIRST_COSPLAY_INSERT_INDEX = 5;
+  const FIRST_COSPLAY_INSERT_INDEX = 7;
   const combined: MangaType[] = [];
   combined.push(...mangaList.slice(0, FIRST_COSPLAY_INSERT_INDEX));
   if (cosplayList.length > 0) {
@@ -714,22 +715,23 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     const penalty = Math.min(weeklyPenalty + monthlyPenalty, 0.7);
     const penaltyMultiplier = 1 - penalty;
 
-    // Genre penalty: if manga has genre "manhwa", reduce score by 60%.
+    // Genre penalty: if manga has one of the penalized genres, reduce score by 60%.
     // Apply to manga only (not COSPLAY).
     const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
     const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
-    const hasManhwaGenre =
-      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
-      genres.some((g) => typeof g === "string" && g.trim().toLowerCase() === "manhwa");
-    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
-
     const genreSlugs = genres
       .filter((g) => typeof g === "string")
       .map((g) => toSlug(String(g)).toLowerCase());
+    const penalizedGenreSlugs = new Set(["manhwa", "guro", "scat", "loli", "lolicon", "shota"]);
+    const hasManhwaGenre =
+      (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
+      genreSlugs.some((slug) => penalizedGenreSlugs.has(slug));
+    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
+
     const hasDisturbingTags =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       (genreSlugs.includes("guro") || genreSlugs.includes("scat"));
-    const disturbingMultiplier = hasDisturbingTags ? 0.5 : 1;
+    const disturbingMultiplier = 1;
 
     // Boost new/short series:
     // - 1 chapter: +30%
@@ -848,7 +850,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     }
   }
 
-  const FIRST_COSPLAY_INSERT_INDEX = 5;
+  const FIRST_COSPLAY_INSERT_INDEX = 7;
   const combined: any[] = [];
   combined.push(...mangaList.slice(0, FIRST_COSPLAY_INSERT_INDEX));
   if (cosplayList.length > 0) combined.push(cosplayList[0]);

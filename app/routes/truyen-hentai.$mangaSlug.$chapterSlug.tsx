@@ -35,6 +35,7 @@ export async function loader({ params, request }: any) {
 
   const url = new URL(request.url);
   const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
+  const { hasRestrictedGenres } = await import("~/.server/utils/seo-blocklist");
   const origin = getCanonicalOrigin(request as any);
   const user = await getUserInfoFromSession(request);
 
@@ -164,6 +165,7 @@ export async function loader({ params, request }: any) {
     mangaTitle: manga.title,
     shareImage: manga.shareImage || manga.poster,
     origin,
+    robotsNoIndex: hasRestrictedGenres(manga.genres),
   };
 }
 
@@ -174,6 +176,10 @@ export function meta({ data }: any) {
       { name: "description", content: "Chương truyện không tồn tại" },
     ];
   }
+
+  const robots = data?.robotsNoIndex
+    ? [{ name: "robots", content: "noindex, nofollow, noarchive, noimageindex" }]
+    : [];
 
   const chapName = data.chapter.title?.trim()
     ? data.chapter.title
@@ -201,6 +207,7 @@ export function meta({ data }: any) {
     { name: "twitter:description", content: description },
     { name: "twitter:image", content: image },
     { name: "twitter:url", content: canonicalUrl },
+    ...robots,
   ];
 }
 

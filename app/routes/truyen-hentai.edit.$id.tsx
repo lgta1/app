@@ -56,6 +56,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const formData = await request.formData();
     const isCosplay = formData.get("isCosplay") === "1";
 
+    const parseJsonArray = (value: FormDataEntryValue | null): string[] => {
+      try {
+        const raw = JSON.parse((value as string) || "[]");
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    };
+
     const url = new URL(request.url);
     const newParam = url.searchParams.get("new");
     const handle = params.id;
@@ -102,19 +111,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
       alternateTitle: (formData.get("alternateTitle") as string) || "",
       description: (formData.get("description") as string) || "",
       author: (formData.get("author") as string) || "",
-      authorNames: JSON.parse((formData.get("authorNames") as string) || "[]"),
-      authorSlugs: JSON.parse((formData.get("authorSlugs") as string) || "[]"),
+      authorNames: parseJsonArray(formData.get("authorNames")),
+      authorSlugs: parseJsonArray(formData.get("authorSlugs")),
       keywords: (formData.get("keywords") as string) || "",
       userStatus: Number(formData.get("userStatus") || MANGA_USER_STATUS.ON_GOING),
       genres: parsedGenres,
       contentType: isCosplay ? MANGA_CONTENT_TYPE.COSPLAY : MANGA_CONTENT_TYPE.MANGA,
       // Optional denormalized relation arrays (name + slug)
-      doujinshiNames: JSON.parse((formData.get("doujinshiNames") as string) || "[]"),
-      doujinshiSlugs: JSON.parse((formData.get("doujinshiSlugs") as string) || "[]"),
-      translatorNames: JSON.parse((formData.get("translatorNames") as string) || "[]"),
-      translatorSlugs: JSON.parse((formData.get("translatorSlugs") as string) || "[]"),
-      characterNames: JSON.parse((formData.get("characterNames") as string) || "[]"),
-      characterSlugs: JSON.parse((formData.get("characterSlugs") as string) || "[]"),
+      doujinshiNames: parseJsonArray(formData.get("doujinshiNames")),
+      doujinshiSlugs: parseJsonArray(formData.get("doujinshiSlugs")),
+      translatorNames: parseJsonArray(formData.get("translatorNames")),
+      translatorSlugs: parseJsonArray(formData.get("translatorSlugs")),
+      characterNames: parseJsonArray(formData.get("characterNames")),
+      characterSlugs: parseJsonArray(formData.get("characterSlugs")),
     };
 
     const posterUrl = formData.get("posterUrl");

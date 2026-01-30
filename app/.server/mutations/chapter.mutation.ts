@@ -140,59 +140,61 @@ export const createChapter = async (
   // Determine final chapter number BEFORE creation (do not mutate manga yet)
   const finalNumber = (manga.chapters || 0) + 1;
 
-  try {
-    const rawTitle = (chapter.title ?? "").trim();
-    const isPlaceholder = rawTitle === "..."; // legacy placeholder to ignore
-    const finalTitle = rawTitle ? rawTitle : `Chap ${finalNumber}`;
+  const rawTitle = (chapter.title ?? "").trim();
+  const isPlaceholder = rawTitle === "..."; // legacy placeholder to ignore
+  const finalTitle = rawTitle ? rawTitle : `Chap ${finalNumber}`;
 
-    // Generate stable SEO slug ONCE, based on the initial title (or "Chap N" fallback).
-    // If duplicated within this manga, add suffix: -2, -3, ...
-    let chapterSlug = await generateUniqueChapterSlug(
-      String(chapter.mangaId),
-      isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
-    );
+  // Generate stable SEO slug ONCE, based on the initial title (or "Chap N" fallback).
+  // If duplicated within this manga, add suffix: -2, -3, ...
+  let chapterSlug = await generateUniqueChapterSlug(
+    String(chapter.mangaId),
+    isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+  );
 
-    // Best-effort retry to handle rare concurrent creates.
-    for (let attempt = 0; attempt < 3; attempt++) {
+  // Best-effort retry to handle rare concurrent creates.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const newChapter = await ChapterModel.create({
+        ...chapter,
+        contentUrls,
+        contentBytes: totalBytes,
+        title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+        chapterNumber: finalNumber,
+        slug: chapterSlug,
+      });
+
+      // Atomically bump chapters & set updatedAt to the new chapter's createdAt without auto timestamps
       try {
-        const newChapter = await ChapterModel.create({
-          ...chapter,
-          contentUrls,
-          contentBytes: totalBytes,
-          title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
-          chapterNumber: finalNumber,
-          slug: chapterSlug,
-        });
-
-        // Atomically bump chapters & set updatedAt to the new chapter's createdAt without auto timestamps
         await MangaModel.updateOne(
           { _id: manga.id },
           { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
           { timestamps: false },
         );
-
-        notifyNewChapter(newChapter, manga);
-
-        return newChapter;
-      } catch (e: any) {
-        const code = Number(e?.code);
-        const msg = String(e?.message || "");
-        const isDup = code === 11000 || msg.includes("E11000");
-        if (!isDup) throw e;
-        // Recompute based on the same base title; suffix selection depends on current DB state.
-        chapterSlug = await generateUniqueChapterSlug(
-          String(chapter.mangaId),
-          isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
-        );
+      } catch (updateError) {
+        console.warn("[createChapter] Failed to update manga counters", updateError);
       }
-    }
 
-    throw new BusinessError("Không thể tạo slug chương duy nhất, vui lòng thử lại");
-  } catch (error) {
-    // Rollback only if we already incremented chapters (best-effort: check if chapter exists?)
-    // Here we didn't increment yet unless creation succeeded; safe no-op.
-    throw new BusinessError("Lỗi khi tạo chương");
+      try {
+        await notifyNewChapter(newChapter, manga);
+      } catch (notifyError) {
+        console.warn("[createChapter] Failed to notify followers", notifyError);
+      }
+
+      return newChapter;
+    } catch (e: any) {
+      const code = Number(e?.code);
+      const msg = String(e?.message || "");
+      const isDup = code === 11000 || msg.includes("E11000");
+      if (!isDup) throw e;
+      // Recompute based on the same base title; suffix selection depends on current DB state.
+      chapterSlug = await generateUniqueChapterSlug(
+        String(chapter.mangaId),
+        isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
+      );
+    }
   }
+
+  throw new BusinessError("Không thể tạo slug chương duy nhất, vui lòng thử lại");
 };
 
 // Internal/system chapter creation (no session cookie required).
@@ -238,13 +240,21 @@ export const createChapterAsAdmin = async (
         slug: chapterSlug,
       });
 
-      await MangaModel.updateOne(
-        { _id: manga.id },
-        { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
-        { timestamps: false },
-      );
+      try {
+        await MangaModel.updateOne(
+          { _id: manga.id },
+          { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
+          { timestamps: false },
+        );
+      } catch (updateError) {
+        console.warn("[createChapterAsAdmin] Failed to update manga counters", updateError);
+      }
 
-      notifyNewChapter(newChapter, manga);
+      try {
+        await notifyNewChapter(newChapter, manga);
+      } catch (notifyError) {
+        console.warn("[createChapterAsAdmin] Failed to notify followers", notifyError);
+      }
       return newChapter;
     } catch (e: any) {
       const code = Number(e?.code);

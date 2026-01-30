@@ -1664,23 +1664,23 @@ export default function AdminMangaAutoDownload() {
 
         <div className="space-y-2">
           <label className="text-sm font-semibold text-txt-primary">Thêm nhanh từ trang thể loại / trang tổng</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <input
               value={listingUrlInput}
               onChange={(e) => setListingUrlInput(e.target.value)}
-              className="w-full flex-1 rounded-lg border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm text-txt-primary"
+              className="w-full min-w-0 flex-1 rounded-lg border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm text-txt-primary md:h-11 md:px-4 md:text-base lg:h-12"
               placeholder="https://vi-hentai.pro/the-loai/black-skin?sort=-views..."
             />
             <button
               type="button"
               onClick={() => submitExtractListing(listingUrlInput)}
               disabled={!listingUrlInput.trim() || listingFetcher.state !== "idle"}
-              className="w-full rounded-lg border border-bd-default px-4 py-2 text-sm font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50 sm:w-auto"
+              className="w-full rounded-lg border border-bd-default px-4 py-2 text-sm font-semibold text-txt-primary hover:bg-bgc-layer2/80 disabled:opacity-50 md:w-auto md:min-w-[160px] md:px-5 md:text-base lg:min-w-[200px]"
             >
               {listingFetcher.state !== "idle" ? "Đang lấy..." : "Trích xuất link"}
             </button>
           </div>
-          <p className="text-xs text-txt-secondary">
+          <p className="text-xs text-txt-secondary md:text-sm">
             Dán link trang thể loại (có thể có sort/filter/page). Hệ thống sẽ tự trích xuất các link <span className="font-semibold">/truyen/...</span> trên trang đó và hỏi bạn có muốn thêm vào queue không.
           </p>
         </div>

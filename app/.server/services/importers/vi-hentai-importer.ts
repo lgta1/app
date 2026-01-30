@@ -25,7 +25,31 @@ const HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
   "Accept-Language": "vi,en;q=0.9",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
 };
+
+const VIHENTAI_HTML_TIMEOUT_MS = (() => {
+  const raw = process.env.VIHENTAI_HTML_TIMEOUT_MS;
+  if (raw == null || String(raw).trim() === "") return 45_000;
+  const parsed = Number.parseInt(String(raw), 10);
+  return Number.isFinite(parsed) && parsed >= 5_000 ? parsed : 45_000;
+})();
+
+const VIHENTAI_HTML_RETRIES = (() => {
+  const raw = process.env.VIHENTAI_HTML_RETRIES;
+  if (raw == null || String(raw).trim() === "") return 2;
+  const parsed = Number.parseInt(String(raw), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 2;
+})();
+
+const VIHENTAI_HTML_RETRY_DELAY_MS = (() => {
+  const raw = process.env.VIHENTAI_HTML_RETRY_DELAY_MS;
+  if (raw == null || String(raw).trim() === "") return 1_200;
+  const parsed = Number.parseInt(String(raw), 10);
+  return Number.isFinite(parsed) && parsed >= 200 ? parsed : 1_200;
+})();
 
 const COVER_CANDIDATE_SELECTORS = [
   ".cover-frame",
@@ -104,9 +128,9 @@ const sleepWithAbort = (ms: number, signal?: AbortSignal) => {
 // This only applies to HTML page fetches (manga/chapter pages), NOT image downloads.
 const VIHENTAI_HTML_MIN_INTERVAL_MS = (() => {
   const raw = process.env.VIHENTAI_HTML_MIN_INTERVAL_MS;
-  if (raw == null || String(raw).trim() === "") return 2_000;
+  if (raw == null || String(raw).trim() === "") return 2_750;
   const parsed = Number.parseInt(String(raw), 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 2_000;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 2_500;
 })();
 
 const getViHentaiThrottleKey = (url: string): string | null => {
@@ -423,18 +447,95 @@ export type ViHentaiAutoDownloadResult = ViHentaiImportResult & {
   chapterErrors: Array<{ chapterUrl: string; message: string }>;
 };
 
-const fetchHtmlRaw = async (url: string, options: { signal?: AbortSignal } = {}) => {
-  const response = await fetch(url, { headers: HEADERS, signal: options.signal });
-  if (!response.ok) {
-    throw new Error(`Không thể tải trang (${response.status} ${response.statusText})`);
+const buildHtmlHeaders = (url: string): Record<string, string> => {
+  const headers: Record<string, string> = { ...HEADERS };
+  try {
+    const u = new URL(url);
+    headers.Referer = u.origin + "/";
+    headers.Origin = u.origin;
+  } catch {
+    // ignore
   }
-  return response.text();
+  return headers;
+};
+
+const shouldRetryHtmlStatus = (status: number) =>
+  status === 408 || status === 429 || status === 502 || status === 503 || status === 504 || status === 522 || status === 524;
+
+const fetchHtmlRaw = async (url: string, options: { signal?: AbortSignal } = {}) => {
+  const ac = new AbortController();
+  const signal = options.signal;
+  const timer = setTimeout(() => ac.abort(), VIHENTAI_HTML_TIMEOUT_MS);
+  const abortFromUpstream = () => ac.abort();
+
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(timer);
+      throw new Error("Đã hủy yêu cầu");
+    }
+    try {
+      signal.addEventListener("abort", abortFromUpstream, { once: true });
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: buildHtmlHeaders(url),
+      signal: ac.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Không thể tải trang (${response.status} ${response.statusText}) URL: ${url}`);
+    }
+    return response.text();
+  } catch (error) {
+    if (signal?.aborted) {
+      throw new Error("Đã hủy yêu cầu");
+    }
+    if (ac.signal.aborted) {
+      throw new Error(`Timeout sau ${VIHENTAI_HTML_TIMEOUT_MS}ms khi tải trang URL: ${url}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    if (signal) {
+      try {
+        signal.removeEventListener("abort", abortFromUpstream);
+      } catch {
+        // ignore
+      }
+    }
+  }
+};
+
+const fetchHtmlWithRetry = async (url: string, options: { signal?: AbortSignal } = {}) => {
+  const maxRetries = VIHENTAI_HTML_RETRIES;
+  let attempt = 0;
+  let lastError: unknown;
+  while (attempt <= maxRetries) {
+    try {
+      return await fetchHtmlRaw(url, options);
+    } catch (error: any) {
+      lastError = error;
+      const msg = String(error?.message || "");
+      const statusMatch = msg.match(/\((\d{3})\s/);
+      const status = statusMatch ? Number(statusMatch[1]) : 0;
+      const canRetry = !options.signal?.aborted && (status ? shouldRetryHtmlStatus(status) : true);
+      if (!canRetry || attempt >= maxRetries) break;
+      const backoff = VIHENTAI_HTML_RETRY_DELAY_MS * (attempt + 1);
+      await sleepWithAbort(backoff, options.signal);
+    }
+    attempt += 1;
+  }
+  const reason = lastError instanceof Error ? lastError.message : String(lastError || "Unknown error");
+  throw new Error(`Không thể tải trang sau ${maxRetries + 1} lần thử (URL: ${url}): ${reason}`);
 };
 
 const fetchHtml = async (url: string, options: { signal?: AbortSignal } = {}) => {
   const key = getViHentaiThrottleKey(url);
-  if (!key) return fetchHtmlRaw(url, options);
-  return runViHentaiHtmlPaced(key, () => fetchHtmlRaw(url, options));
+  if (!key) return fetchHtmlWithRetry(url, options);
+  return runViHentaiHtmlPaced(key, () => fetchHtmlWithRetry(url, options));
 };
 
 // Backward-compat alias used by auto-update flow.
@@ -1948,7 +2049,7 @@ export async function autoDownloadViHentaiManga(
     maxChapters = 500,
     maxImagesPerChapter = 300,
     continueOnChapterError = true,
-    imageDelayMs = 100,
+    imageDelayMs = 150,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
     onProgress,
@@ -1964,21 +2065,21 @@ export async function autoDownloadViHentaiManga(
 
   const emitProgress = async (payload: Parameters<NonNullable<typeof onProgress>>[0]) => {
     if (!onProgress) return;
-    try {
-      await onProgress(payload);
-    } catch {
-      // Progress must never break the download flow.
-    }
-  };
-
-  // Step 1: create Manga (same as import)
-  throwIfAborted();
-  await emitProgress({ stage: "manga", message: "Đang tải trang truyện..." });
-  const parsed = await fetchViHentaiPage(importOptions.url, { signal: abortSignal });
-  throwIfAborted();
-  await emitProgress({ stage: "manga", message: `Đã parse truyện: ${parsed.title || ""}`.trim() });
-  const mapped = await mapGenres(parsed.rawGenres);
-  const matched = dropVanillaWhenAntiVanillaPresent(mapped.matched);
+    const {
+      request,
+      url,
+      ownerId,
+      translationTeam,
+      approve,
+      dryRun,
+      skipIfExists,
+      contentType,
+      userStatusOverride,
+      downloadPoster = true,
+      downloadChapters = true,
+      maxChapters = 200,
+      maxImagesPerChapter = 300,
+      imageDelayMs = 150,
   const unknown = mapped.unknown;
   if (!matched.length) {
     const warning = `Cảnh báo: không map được thể loại hợp lệ (nhận được: ${parsed.rawGenres.join(", ") || "<empty>"}). Sẽ tạo truyện với 0 thể loại.`;
@@ -2172,6 +2273,14 @@ export async function autoDownloadViHentaiManga(
       if (!imageUrls.length) {
         throw new Error("Không tìm thấy ảnh trong trang chương");
       }
+      await emitProgress({
+        stage: "chapter",
+        message: `Đã tìm thấy ${imageUrls.length} ảnh, bắt đầu tải...`,
+        chapterIndex: chapterIndex + 1,
+        chapterCount: ordered.length,
+        chapterTitle: sanitizeWhitespace(chapterEntry.title) || undefined,
+        chapterUrl,
+      });
       if (imageUrls.length > maxImagesPerChapter) {
         throw new Error(`Số ảnh vượt giới hạn: ${imageUrls.length}/${maxImagesPerChapter}`);
       }
@@ -2293,6 +2402,15 @@ export async function autoDownloadViHentaiManga(
       const contentUrls = uploaded.map((u) => u.url);
       const fullPaths = uploaded.map((u) => u.fullPath).filter(Boolean);
       const totalBytes = uploaded.reduce((sum, u) => sum + (u.sizeBytes || 0), 0);
+
+      await emitProgress({
+        stage: "chapter",
+        message: "Đang tạo chương trong DB...",
+        chapterIndex: chapterIndex + 1,
+        chapterCount: ordered.length,
+        chapterTitle: sanitizeWhitespace(chapterEntry.title) || undefined,
+        chapterUrl,
+      });
 
       try {
         throwIfAborted();

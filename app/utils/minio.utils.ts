@@ -378,6 +378,7 @@ export const uploadToPublicBucket = async (
     };
     if (options.cacheControl) {
       headers["Cache-Control"] = options.cacheControl;
+      headers["cache-control"] = options.cacheControl;
     }
     const result = await client.putObject(bucket, fullPath, file, undefined, headers);
 
@@ -438,6 +439,7 @@ export const uploadFile = async (
     };
     if (options.cacheControl) {
       headers["Cache-Control"] = options.cacheControl;
+      headers["cache-control"] = options.cacheControl;
     }
     const result = await client.putObject(bucket, fullPath, file, undefined, headers);
 

@@ -44,18 +44,22 @@ const normalizePrefix = (value: string): string => value.trim().toLowerCase();
 const resolveCacheControlByPrefix = (prefixPath: string, generateUniqueFileName: boolean): string => {
   const prefix = normalizePrefix(prefixPath);
 
-  // Manga cover images
-  if (prefix.startsWith("story-images") || prefix.startsWith("manga-posters")) {
-    return "public, max-age=86400, immutable"; // 1 day
+  // Manga cover images + avatars: unique filenames, safe for long caching
+  if (
+    prefix.startsWith("story-images") ||
+    prefix.startsWith("manga-posters") ||
+    prefix.startsWith("avatar-uploads")
+  ) {
+    return "public, max-age=31536000, s-maxage=31536000, immutable"; // 1 year
   }
 
-  // Chapter/page images
+  // Chapter/page images (unique filenames)
   if (prefix.startsWith("manga-images")) {
-    return "public, max-age=172800, immutable"; // 2 days
+    return "public, max-age=31536000, s-maxage=31536000, immutable"; // 1 year
   }
 
   return generateUniqueFileName
-    ? "public, max-age=31536000, immutable"
+    ? "public, max-age=31536000, s-maxage=31536000, immutable"
     : "public, max-age=300";
 };
 

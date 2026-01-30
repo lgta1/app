@@ -134,6 +134,81 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // Ensure HTML cache headers for anonymous requests (edge caching).
+    // This mirrors entry.server.tsx and injects Cache-Control even if the app writes headers later.
+    try {
+      const cookieHeader = req.headers.cookie || "";
+      const hasSession = /(?:^|;\s*)__session=/.test(cookieHeader);
+      const accept = req.headers.accept || "";
+      const isHtmlRequest = req.method === "GET" && (accept.includes("text/html") || accept === "" || accept.includes("*/*"));
+
+      const pathname = (new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`))
+        .pathname.replace(/\/+$/, "") || "/";
+
+      const isMangaDetailPage =
+        /^\/truyen-hentai\/[^/]+$/.test(pathname) &&
+        !pathname.startsWith("/truyen-hentai/create") &&
+        !pathname.startsWith("/truyen-hentai/edit") &&
+        !pathname.startsWith("/truyen-hentai/manage") &&
+        !pathname.startsWith("/truyen-hentai/uploaded");
+
+      const isChapterReadPage =
+        /^\/truyen-hentai\/[^/]+\/[^/]+$/.test(pathname) && !pathname.startsWith("/truyen-hentai/chapter/");
+
+      const edgeTtlSeconds =
+        pathname === "/" ? 120 :
+        pathname === "/danh-sach" ? 1800 :
+        pathname === "/genres" ? 1800 :
+        pathname.startsWith("/genres/") ? 3600 :
+        pathname.startsWith("/translators/") ? 3600 :
+        pathname.startsWith("/authors/") ? 3600 :
+        pathname.startsWith("/characters/") ? 3600 :
+        pathname.startsWith("/doujinshi/") ? 3600 :
+        pathname === "/random" ? 3600 :
+        pathname === "/gioi-thieu" ? 172800 :
+        pathname === "/leaderboard" ? 86400 :
+        pathname.startsWith("/leaderboard/") ? 86400 :
+        pathname === "/truyen-hentai" ? 3600 :
+        isMangaDetailPage ? 300 :
+        isChapterReadPage ? 1800 :
+        null;
+
+      const isAllowlistedPublicPage = edgeTtlSeconds !== null;
+
+      const applyCacheHeaders = () => {
+        if (res.headersSent) return;
+        if (hasSession) {
+          if (!res.hasHeader("Cache-Control")) {
+            res.setHeader("Cache-Control", "private, no-store, max-age=0");
+          }
+          const vary = res.getHeader("Vary");
+          res.setHeader("Vary", vary ? `${vary}, Cookie` : "Cookie");
+          return;
+        }
+
+        if (isHtmlRequest && isAllowlistedPublicPage && res.statusCode === 200 && !res.hasHeader("Cache-Control")) {
+          res.setHeader(
+            "Cache-Control",
+            `public, max-age=0, s-maxage=${edgeTtlSeconds}, stale-while-revalidate=60, stale-if-error=86400`,
+          );
+        }
+      };
+
+      const originalWriteHead = res.writeHead;
+      res.writeHead = function writeHead(statusCode, reasonPhrase, headers) {
+        applyCacheHeaders();
+        return originalWriteHead.call(this, statusCode, reasonPhrase, headers);
+      };
+
+      const originalEnd = res.end;
+      res.end = function end(...args) {
+        applyCacheHeaders();
+        return originalEnd.apply(this, args);
+      };
+    } catch {
+      // ignore cache header guard
+    }
+
     requestListener(req, res);
   } catch (err) {
     res.statusCode = 500;

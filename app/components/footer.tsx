@@ -81,6 +81,13 @@ export function Footer() {
               Khám phá thêm
             </h3>
 
+            <a
+              href="https://hentaiz-a1.com"
+              className="inline-flex w-fit items-center rounded-md bg-black px-3 py-1.5 text-sm font-semibold text-red-500"
+            >
+              Sex Anime
+            </a>
+
             <p className="text-txt-secondary text-sm leading-tight font-medium">
               VinaHentai là nơi bạn có thể{" "}
               <Link
