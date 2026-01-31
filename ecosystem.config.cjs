@@ -1,5 +1,5 @@
-const instances = 3;           // chạy 3 tiến trình
-const basePort = 3001;         // 3001, 3002
+const instances = 6;           // chạy 6 tiến trình
+const basePort = 3001;         // 3001..3006
 
 const apps = [];
 

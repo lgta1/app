@@ -7,6 +7,20 @@ import { SystemLockModel } from "~/database/models/system-lock.model";
 const TZ = "Asia/Ho_Chi_Minh";
 const LOCK_KEY = "hot-carousel-snapshot";
 
+const getVietnamHour = (): number => {
+  try {
+    const hour = new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ,
+      hour: "2-digit",
+      hour12: false,
+    }).format(new Date());
+    const parsed = Number(hour);
+    return Number.isFinite(parsed) ? parsed : -1;
+  } catch {
+    return -1;
+  }
+};
+
 const getOwnerId = () => {
   const parts = [
     process.env.PM2_HOME ? "pm2" : undefined,
@@ -58,6 +72,11 @@ export const initHotCarouselSnapshotScheduler = (): void => {
       if (running) return;
       if (!isMongoReady()) {
         console.warn("[cron] Hot carousel snapshot skipped: MongoDB not connected");
+        return;
+      }
+      const vnHour = getVietnamHour();
+      if (vnHour >= 22 || vnHour < 1) {
+        console.info("[cron] Hot carousel snapshot skipped: quiet hours (VN 22:00-01:00)");
         return;
       }
       running = true;
