@@ -112,88 +112,113 @@ export const hardDeleteManga = async (request: Request, mangaId: string) => {
   const shareFullPath = toFullPathIfInternal((manga as any)?.shareImage);
   const extraStoragePaths = dedupeStrings([posterFullPath, shareFullPath, ...contentPaths]);
 
-  const session = await mongoose.startSession();
+  const runCascadeDeletes = async (session?: mongoose.ClientSession) => {
+    const sessionOpt = session ? { session } : undefined;
+    const mangaObjectId = toObjectId(mangaId);
 
+    const commentQuery = CommentModel.find({ mangaId }).select("_id");
+    if (session) commentQuery.session(session);
+    const commentDocs = await commentQuery;
+    const commentIds = commentDocs.map((doc) => String((doc as any)._id || "")).filter(Boolean);
+
+    if (commentIds.length) {
+      await UserLikeCommentModel.deleteMany({ commentId: { $in: commentIds } }, sessionOpt);
+      await UserReactionCommentModel.deleteMany({ commentId: { $in: commentIds } }, sessionOpt);
+    }
+
+    if (chapterObjectIds.length) {
+      await UserReadChapterModel.deleteMany({ chapterId: { $in: chapterObjectIds } }, sessionOpt);
+    }
+
+    if (chapterIdStrings.length) {
+      await UserChapterReactionModel.deleteMany({ chapterId: { $in: chapterIdStrings } }, sessionOpt);
+      await ReadingRewardClaimModel.deleteMany({ chapterId: { $in: chapterIdStrings } }, sessionOpt);
+    }
+
+    await CommentModel.deleteMany({ mangaId }, sessionOpt);
+    await UserFollowMangaModel.deleteMany({ mangaId }, sessionOpt);
+    await UserLikeMangaModel.deleteMany({ mangaId }, sessionOpt);
+    await MangaRatingModel.deleteMany({ mangaId }, sessionOpt);
+    await MangaRevenueModel.deleteMany({ mangaId }, sessionOpt);
+    await ChapterModel.deleteMany({ mangaId }, sessionOpt);
+
+    if (mangaObjectId) {
+      await InteractionModel.deleteMany({ story_id: mangaObjectId }, sessionOpt);
+      await DailyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, sessionOpt);
+      await WeeklyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, sessionOpt);
+      await MonthlyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, sessionOpt);
+
+      const reportFilters: any[] = [{ mangaId: mangaObjectId }, { targetId: mangaObjectId }];
+      if (chapterObjectIds.length) {
+        reportFilters.push({ targetId: { $in: chapterObjectIds } });
+      }
+      await ReportModel.deleteMany({ $or: reportFilters }, sessionOpt);
+    }
+
+    const notificationFilters: any[] = [{ targetId: mangaId }];
+    if ((manga as any)?.slug) {
+      const slug = String((manga as any).slug || "").trim();
+      if (slug) {
+        notificationFilters.push({ targetUrl: new RegExp(`/truyen-hentai/${slug}(?:$|\\?)`) });
+      }
+    }
+
+    await NotificationModel.deleteMany({ $or: notificationFilters }, sessionOpt);
+    await AdminActionLogModel.deleteMany({ mangaId }, sessionOpt);
+
+    await ViHentaiAutoDownloadJobModel.deleteMany(
+      { $or: [{ createdMangaId: mangaId }, { "progress.mangaId": mangaId }] },
+      sessionOpt,
+    );
+
+    await ViHentaiAutoUpdateQueueModel.updateMany(
+      { "items.mangaId": mangaId },
+      { $pull: { items: { mangaId } } },
+      sessionOpt,
+    );
+
+    await ViHentaiAutoUpdateRunModel.updateMany(
+      { "items.mangaId": mangaId },
+      { $pull: { items: { mangaId } } },
+      sessionOpt,
+    );
+
+    await HotCarouselSnapshotModel.updateMany({ items: mangaId }, { $pull: { items: mangaId } }, sessionOpt);
+
+    const presenceKey = `presence.${mangaId}`;
+    await HotCarouselSnapshotModel.updateMany(
+      { [presenceKey]: { $exists: true } },
+      { $unset: { [presenceKey]: "" } },
+      sessionOpt,
+    );
+
+    await MangaModel.findByIdAndDelete(mangaId, sessionOpt as any);
+    await UserModel.findByIdAndUpdate((manga as any).ownerId, { $inc: { mangasCount: -1 } }, sessionOpt as any);
+  };
+
+  const isTransactionUnsupported = (err: any) => {
+    const msg = String(err?.message || "").toLowerCase();
+    return (
+      msg.includes("transaction") &&
+      (msg.includes("replica set") ||
+        msg.includes("mongos") ||
+        msg.includes("not supported") ||
+        msg.includes("transaction numbers are only allowed"))
+    );
+  };
+
+  const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const mangaObjectId = toObjectId(mangaId);
-      const commentDocs = await CommentModel.find({ mangaId }).select("_id").session(session);
-      const commentIds = commentDocs.map((doc) => String((doc as any)._id || "")).filter(Boolean);
-
-      if (commentIds.length) {
-        await UserLikeCommentModel.deleteMany({ commentId: { $in: commentIds } }, { session });
-        await UserReactionCommentModel.deleteMany({ commentId: { $in: commentIds } }, { session });
-      }
-
-      if (chapterObjectIds.length) {
-        await UserReadChapterModel.deleteMany({ chapterId: { $in: chapterObjectIds } }, { session });
-      }
-
-      if (chapterIdStrings.length) {
-        await UserChapterReactionModel.deleteMany({ chapterId: { $in: chapterIdStrings } }, { session });
-        await ReadingRewardClaimModel.deleteMany({ chapterId: { $in: chapterIdStrings } }, { session });
-      }
-
-      await CommentModel.deleteMany({ mangaId }, { session });
-      await UserFollowMangaModel.deleteMany({ mangaId }, { session });
-      await UserLikeMangaModel.deleteMany({ mangaId }, { session });
-      await MangaRatingModel.deleteMany({ mangaId }, { session });
-      await MangaRevenueModel.deleteMany({ mangaId }, { session });
-      await ChapterModel.deleteMany({ mangaId }, { session });
-
-      if (mangaObjectId) {
-        await InteractionModel.deleteMany({ story_id: mangaObjectId }, { session });
-        await DailyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, { session });
-        await WeeklyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, { session });
-        await MonthlyLeaderboardModel.deleteMany({ story_id: mangaObjectId }, { session });
-
-        const reportFilters: any[] = [{ mangaId: mangaObjectId }, { targetId: mangaObjectId }];
-        if (chapterObjectIds.length) {
-          reportFilters.push({ targetId: { $in: chapterObjectIds } });
-        }
-        await ReportModel.deleteMany({ $or: reportFilters }, { session });
-      }
-
-      const notificationFilters: any[] = [{ targetId: mangaId }];
-      if ((manga as any)?.slug) {
-        const slug = String((manga as any).slug || "").trim();
-        if (slug) {
-          notificationFilters.push({ targetUrl: new RegExp(`/truyen-hentai/${slug}(?:$|\\?)`) });
-        }
-      }
-
-      await NotificationModel.deleteMany({ $or: notificationFilters }, { session });
-      await AdminActionLogModel.deleteMany({ mangaId }, { session });
-
-      await ViHentaiAutoDownloadJobModel.deleteMany(
-        { $or: [{ createdMangaId: mangaId }, { "progress.mangaId": mangaId }] },
-        { session },
-      );
-
-      await ViHentaiAutoUpdateQueueModel.updateMany(
-        { "items.mangaId": mangaId },
-        { $pull: { items: { mangaId } } },
-        { session },
-      );
-
-      await ViHentaiAutoUpdateRunModel.updateMany(
-        { "items.mangaId": mangaId },
-        { $pull: { items: { mangaId } } },
-        { session },
-      );
-
-      await HotCarouselSnapshotModel.updateMany({ items: mangaId }, { $pull: { items: mangaId } }, { session });
-
-      const presenceKey = `presence.${mangaId}`;
-      await HotCarouselSnapshotModel.updateMany(
-        { [presenceKey]: { $exists: true } },
-        { $unset: { [presenceKey]: "" } },
-        { session },
-      );
-
-      await MangaModel.findByIdAndDelete(mangaId, { session });
-      await UserModel.findByIdAndUpdate((manga as any).ownerId, { $inc: { mangasCount: -1 } }, { session });
+      await runCascadeDeletes(session);
     });
+  } catch (error) {
+    if (isTransactionUnsupported(error)) {
+      console.warn("[hardDeleteManga] transaction unsupported; falling back to non-transaction delete", error);
+      await runCascadeDeletes();
+    } else {
+      throw error;
+    }
   } finally {
     session.endSession();
   }

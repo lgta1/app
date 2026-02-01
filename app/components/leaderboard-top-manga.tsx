@@ -4,6 +4,7 @@ import { Eye } from "lucide-react";
 import type { MangaType } from "~/database/models/manga.model";
 import { formatDistanceToNow } from "~/utils/date.utils";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 interface LeaderboardTopMangaProps {
   topManga: MangaType[];
@@ -20,6 +21,9 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
     return `${Math.max(0, Math.min(10, score)).toFixed(1)}/10`;
   };
 
+  const getPosterUrl = (manga: any) =>
+    getPosterVariantForContext(manga, "leaderboard")?.url || manga?.poster;
+
   return (
     <>
       <div className="hidden w-full flex-row items-center justify-center gap-2 overflow-x-auto lg:flex">
@@ -30,7 +34,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
         >
           <div className="relative h-[360px] w-[248px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
             <img
-              src={topManga[1]?.poster}
+              src={getPosterUrl(topManga[1])}
               alt={topManga[1]?.title}
               className="h-full w-full object-cover"
             />
@@ -68,7 +72,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
         >
           <div className="relative h-[366px] w-[250px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
             <img
-              src={topManga[0]?.poster}
+              src={getPosterUrl(topManga[0])}
               alt={topManga[0]?.title}
               className="h-full w-full object-cover"
             />
@@ -106,7 +110,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
         >
           <div className="relative h-[366px] w-[248px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
             <img
-              src={topManga[2]?.poster}
+              src={getPosterUrl(topManga[2])}
               alt={topManga[2]?.title}
               className="h-full w-full object-cover"
             />
@@ -146,7 +150,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
         >
           <div className="relative h-[564px] w-[384px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,225,51,0.60)] outline-1 outline-offset-[-1px] outline-[#FFE133]">
             <img
-              src={topManga[0]?.poster}
+              src={getPosterUrl(topManga[0])}
               alt={topManga[0]?.title}
               className="h-full w-full object-cover"
             />
@@ -184,7 +188,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
         >
           <div className="relative h-[564px] w-[384px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,255,255,0.60)] outline-1 outline-offset-[-1px] outline-[#A3AFBA]">
             <img
-              src={topManga[1]?.poster}
+              src={getPosterUrl(topManga[1])}
               alt={topManga[1]?.title}
               className="h-full w-full object-cover"
             />
@@ -222,7 +226,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
         >
           <div className="relative h-[564px] w-[384px] overflow-hidden rounded-lg shadow-[0px_0px_24px_0px_rgba(255,113,88,0.60)] outline-1 outline-offset-[-1px] outline-[#FF7158]">
             <img
-              src={topManga[2]?.poster}
+              src={getPosterUrl(topManga[2])}
               alt={topManga[2]?.title}
               className="h-full w-full object-cover"
             />

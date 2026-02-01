@@ -7,6 +7,8 @@ import { AppLink } from "~/components/app-link";
 import { MANGA_USER_STATUS } from "~/constants/manga";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
 import { DEFAULT_BLACKLIST_TAGS, normalizeBlacklistTag } from "~/constants/blacklist-tags";
+import { useMediaQuery } from "~/hooks/use-media-query";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 type Props = {
   manga: Pick<
@@ -63,6 +65,9 @@ export function MangaCard({
   const matches = useMatches();
   const rootData: any = matches.find((m) => m.id === "root")?.data;
   const isLoggedIn = Boolean(rootData?.user?.id);
+
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const posterVariant = getPosterVariantForContext(manga, isDesktop ? "cardDesktop" : "cardMobile");
 
   const { id, title, poster, chapters, createdAt, updatedAt, genres, userStatus } = manga as any;
   const effectiveLatestTitle = (latestChapterTitle ?? (manga as any).latestChapterTitle ?? null) as string | null;
@@ -205,10 +210,10 @@ export function MangaCard({
             </span>
           ) : null}
           <img
-            src={poster}
+            src={posterVariant?.url || poster}
             alt={title}
-            width={300}
-            height={400}
+            width={posterVariant?.width || 300}
+            height={posterVariant?.height || 400}
             loading={imgLoading === "auto" ? undefined : imgLoading}
             decoding="async"
             fetchPriority={imgFetchPriority}

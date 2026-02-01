@@ -10,6 +10,7 @@ import type { MangaType } from "~/database/models/manga.model";
 import { formatDate, formatTime } from "~/utils/date.utils";
 import { getChapterDisplayName } from "../utils/chapter.utils";
 import { toSlug } from "~/utils/slug.utils"; // dùng để tạo slug
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 type DescriptionPart =
   | { type: "text"; value: string }
@@ -833,6 +834,8 @@ useEffect(() => {
     return `${ratingScore.toFixed(1)}/10`;
   }, [ratingChaptersWithVotes, ratingTotalVotes, ratingScore]);
 
+  const posterVariant = getPosterVariantForContext(manga, "detail");
+
   return (
     <div className="w-full">
       <div className="flex flex-col gap-6 portrait:gap-[0.9rem] sm:portrait:gap-10 md:flex-row md:items-start md:gap-5">
@@ -846,10 +849,10 @@ useEffect(() => {
           onDragLeave={canDropPoster ? handlePosterDragLeave : undefined}
         >
           <img
-            src={poster}
+            src={posterVariant?.url || poster}
             alt={`Bìa truyện ${title}`}
-            width={269}
-            height={403}
+            width={posterVariant?.width || 269}
+            height={posterVariant?.height || 403}
             className="h-full w-full object-cover"
             loading="lazy"
             decoding="async"

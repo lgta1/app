@@ -243,15 +243,16 @@ export const isUsingCloudflareR2 = (): boolean => {
  */
 export const getMinioClient = (): Minio.Client => {
   if (!minioClient) {
+    const endpoint = MINIO_CONFIG.ENDPOINT;
     const config: Minio.ClientOptions = {
-      endPoint: MINIO_CONFIG.ENDPOINT,
+      endPoint: endpoint,
       useSSL: MINIO_CONFIG.USE_SSL,
       accessKey: MINIO_CONFIG.ACCESS_KEY,
       secretKey: MINIO_CONFIG.SECRET_KEY,
     };
 
     // Hard-override for Cloudflare R2 to avoid signature mismatch
-    if (MINIO_CONFIG.ENDPOINT.includes(".r2.cloudflarestorage.com")) {
+    if (endpoint.includes(".r2.cloudflarestorage.com")) {
       config.region = "auto";
       config.pathStyle = false;
       config.useSSL = true;
@@ -263,10 +264,16 @@ export const getMinioClient = (): Minio.Client => {
 
     if (typeof MINIO_CONFIG.S3_FORCE_PATH_STYLE === "boolean") {
       config.pathStyle = MINIO_CONFIG.S3_FORCE_PATH_STYLE;
+    } else if (!endpoint.includes(".r2.cloudflarestorage.com")) {
+      const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(endpoint);
+      const isLocalhost = endpoint === "localhost" || endpoint.endsWith(".localhost");
+      if (isIpAddress || isLocalhost) {
+        config.pathStyle = true;
+      }
     }
 
     // Chỉ set port nếu không phải Cloudflare R2
-    if (!MINIO_CONFIG.ENDPOINT.includes(".r2.cloudflarestorage.com")) {
+    if (!endpoint.includes(".r2.cloudflarestorage.com")) {
       config.port = MINIO_CONFIG.PORT;
     }
 

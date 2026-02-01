@@ -4,6 +4,7 @@ import { Eye } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 export default function RatingItem({
   manga,
@@ -54,7 +55,7 @@ export default function RatingItem({
         style={{ width: usePortraitThumb ? portraitWidthPx : squareSizePx }}
       >
         <img
-          src={manga.poster}
+          src={getPosterVariantForContext(manga, "leaderboard")?.url || manga.poster}
           alt={manga.title}
           className="h-full w-full object-cover"
           loading="lazy"

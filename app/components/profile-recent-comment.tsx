@@ -7,6 +7,7 @@ import { LoadingSpinner } from "~/components/loading-spinner";
 import { usePagination } from "~/hooks/use-pagination";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
 import { formatDistanceToNow } from "~/utils/date.utils";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 interface UserComment {
   _id: string;
@@ -98,7 +99,7 @@ export function ProfileRecentComment({ className }: ProfileRecentCommentProps) {
                   <div className="flex flex-1 items-start justify-start gap-3 sm:w-[522px]">
                     <img
                       className="h-8 w-8 flex-shrink-0 rounded object-cover"
-                      src={comment.mangaId.poster || "https://placehold.co/34x34"}
+                      src={getPosterVariantForContext(comment.mangaId, "small")?.url || comment.mangaId.poster || "https://placehold.co/34x34"}
                       alt={`${comment.mangaId.title} cover`}
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;

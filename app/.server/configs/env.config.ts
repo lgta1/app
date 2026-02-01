@@ -34,7 +34,9 @@ export const ENV = {
       );
     },
     get S3_FORCE_PATH_STYLE() {
-      return process.env.S3_FORCE_PATH_STYLE === "true";
+      const value = process.env.S3_FORCE_PATH_STYLE;
+      if (typeof value === "undefined") return undefined;
+      return value === "true";
     },
   },
   LEADERBOARD: {

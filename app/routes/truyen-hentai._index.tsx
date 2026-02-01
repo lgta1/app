@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useMediaQuery } from "~/hooks/use-media-query";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 import type { Route } from "./+types/truyen-hentai._index";
 
@@ -92,6 +94,8 @@ export const meta: Route.MetaFunction = ({ data }) => {
 
 export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps) {
   const { featured, updated, origin } = loaderData;
+
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   const canonicalUrl = `${origin}/truyen-hentai`;
 
@@ -191,13 +195,20 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
               className="group rounded-2xl border border-white/5 bg-bgc-layer2/80 p-3 transition hover:-translate-y-1 hover:border-lav-500"
             >
               <div className="aspect-[3/4] w-full overflow-hidden rounded-xl bg-black">
+                {(() => {
+                  const variant = getPosterVariantForContext(m, isDesktop ? "cardDesktop" : "cardMobile");
+                  return (
                 <img
-                  src={m.poster}
+                  src={variant?.url || m.poster}
                   alt={m.title}
                   loading="lazy"
                   decoding="async"
+                  width={variant?.width}
+                  height={variant?.height}
                   className="h-full w-full object-cover object-top transition group-hover:scale-[1.03]"
                 />
+                  );
+                })()}
               </div>
               <h3 className="mt-3 line-clamp-2 text-sm font-semibold text-txt-primary group-hover:text-white">
                 {m.title}
@@ -221,13 +232,20 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
               className="group rounded-2xl border border-white/5 bg-bgc-layer2/80 p-3 transition hover:-translate-y-1 hover:border-lav-500"
             >
               <div className="aspect-[3/4] w-full overflow-hidden rounded-xl bg-black">
+                {(() => {
+                  const variant = getPosterVariantForContext(m, isDesktop ? "cardDesktop" : "cardMobile");
+                  return (
                 <img
-                  src={m.poster}
+                  src={variant?.url || m.poster}
                   alt={m.title}
                   loading="lazy"
                   decoding="async"
+                  width={variant?.width}
+                  height={variant?.height}
                   className="h-full w-full object-cover object-top transition group-hover:scale-[1.03]"
                 />
+                  );
+                })()}
               </div>
               <h3 className="mt-3 line-clamp-2 text-sm font-semibold text-txt-primary group-hover:text-white">
                 {m.title}

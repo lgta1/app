@@ -18,12 +18,15 @@ import CharacterSelect from "../components/character-select";
 import { ImageUploader } from "~/components/image-uploader";
 import { MANGA_CONTENT_TYPE, MANGA_USER_STATUS } from "~/constants/manga";
 import type { GenresType } from "~/database/models/genres.model";
+import { deletePublicFiles } from "~/utils/minio.utils";
+import { collectPosterVariantPaths, parsePosterVariantsPayload } from "~/.server/utils/poster-variants.server";
 import type { MangaType } from "~/database/models/manga.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { isAdmin } from "~/helpers/user.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
 import { resolveMangaHandle } from "~/database/helpers/manga-slug.helper";
-import { normalizePosterImage } from "~/utils/image-compression.utils";
+import { generatePosterVariants, type PosterVariantsResult } from "~/utils/image-compression.utils";
+import type { PosterVariantsPayload } from "~/utils/poster-variants.utils";
 import { toSlug } from "~/utils/slug.utils";
 import {
   ANTI_VANILLA_TAGS,
@@ -78,6 +81,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       throw new BusinessError("Không tìm thấy truyện");
     }
     const mangaId = String((target as any).id ?? (target as any)._id ?? "");
+    const existingManga = await MangaModel.findById(mangaId).lean();
     const nextHandle = target.slug || mangaId;
 
     // Normalize + validate genres payload (avoid generic errors when payload is malformed)
@@ -126,10 +130,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
       characterSlugs: parseJsonArray(formData.get("characterSlugs")),
     };
 
+    const posterVariants = parsePosterVariantsPayload(formData.get("posterVariantsJson"));
     const posterUrl = formData.get("posterUrl");
-    if (posterUrl) mangaData.poster = posterUrl as string;
+    if (posterVariants?.w625?.url) mangaData.poster = posterVariants.w625.url;
+    else if (posterUrl) mangaData.poster = posterUrl as string;
+    if (posterVariants) mangaData.posterVariants = posterVariants as any;
 
     await updateManga(request, mangaId, mangaData);
+
+    if (posterVariants && existingManga) {
+      const oldPaths = collectPosterVariantPaths((existingManga as any).posterVariants, (existingManga as any).poster);
+      const newPaths = collectPosterVariantPaths(posterVariants, posterVariants.w625?.url || (posterUrl as string));
+      const toDelete = oldPaths.filter((p) => !newPaths.includes(p));
+      if (toDelete.length) {
+        try {
+          await deletePublicFiles(toDelete);
+        } catch (error) {
+          console.warn("[edit] delete old poster variants failed", error);
+        }
+      }
+    }
     const overrideUpdatedAt = formData.get("overrideUpdatedAt");
     if (isAdmin(userInfo.role) && typeof overrideUpdatedAt === "string" && overrideUpdatedAt.trim()) {
       try {
@@ -217,6 +237,8 @@ export default function EditStory() {
 
   const [posterPreview, setPosterPreview] = useState(manga.poster || "");
   const [posterUrl, setPosterUrl] = useState("");
+  const [posterVariantsJson, setPosterVariantsJson] = useState("");
+  const [posterVariants, setPosterVariants] = useState<PosterVariantsResult | null>(null);
   const [posterDragOver, setPosterDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [useFixedSchedule, setUseFixedSchedule] = useState(false);
@@ -270,9 +292,10 @@ export default function EditStory() {
 
   const handleFileSelect = async (file: File) => {
     try {
-      const normalized = await normalizePosterImage(file);
-      setFormData((prev: FormDataShape) => ({ ...prev, poster: normalized.file }));
-      setPosterPreview(URL.createObjectURL(normalized.file));
+      const variants = await generatePosterVariants(file);
+      setPosterVariants(variants);
+      setFormData((prev: FormDataShape) => ({ ...prev, poster: variants.w625.file }));
+      setPosterPreview(URL.createObjectURL(variants.w625.file));
     } catch (error) {
       console.error("Normalize poster error", error);
       toast.error("Không thể xử lý ảnh bìa, vui lòng thử lại");
@@ -283,6 +306,8 @@ export default function EditStory() {
     setFormData((prev: FormDataShape) => ({ ...prev, poster: null }));
     setPosterPreview("");
     setPosterUrl("");
+    setPosterVariants(null);
+    setPosterVariantsJson("");
   };
 
   const ensureDescriptionNotRequired = () => {
@@ -303,12 +328,44 @@ export default function EditStory() {
 
     setIsUploading(true);
     try {
-      let posterData: any = null;
-      if (formData.poster) {
-        [posterData] = await uploadMultipleFiles([{ file: formData.poster, options: { prefixPath: "story-images" } }]);
+      let posterVariantUrl: string | undefined;
+      if (posterVariants?.w625?.file) {
+        const uploadEntries: Array<{ key: "w220" | "w400" | "w625"; width: number; height: number; file: File }> = [];
+        const uploads: Array<{ file: File; options: { prefixPath: string } }> = [];
+        const push = (key: "w220" | "w400" | "w625", variant: { file: File; width: number; height: number }) => {
+          uploadEntries.push({ key, width: variant.width, height: variant.height, file: variant.file });
+          uploads.push({ file: variant.file, options: { prefixPath: "story-images" } });
+        };
+
+        push("w625", posterVariants.w625);
+        if (posterVariants.w400) push("w400", posterVariants.w400);
+        if (posterVariants.w220) push("w220", posterVariants.w220);
+
+        const results = await uploadMultipleFiles(uploads);
+        const payload: PosterVariantsPayload = {};
+
+        uploadEntries.forEach((entry, idx) => {
+          const result: any = results[idx];
+          if (!result?.url) return;
+          (payload as any)[entry.key] = {
+            url: String(result.url),
+            width: entry.width,
+            height: entry.height,
+            fullPath: result.fullPath,
+            bytes: typeof result.size === "number" ? result.size : undefined,
+          };
+        });
+
+        posterVariantUrl = payload.w625?.url || payload.w400?.url || payload.w220?.url;
+        if (posterVariantUrl) {
+          const payloadJson = JSON.stringify(payload);
+          setPosterVariantsJson(payloadJson);
+          const hiddenVariants = formRef.current?.querySelector<HTMLInputElement>('input[name="posterVariantsJson"]');
+          if (hiddenVariants) hiddenVariants.value = payloadJson;
+        }
       }
 
-      if (posterData?.url) setPosterUrl(posterData.url);
+      if (posterVariantUrl) setPosterUrl(posterVariantUrl);
       else if (posterPreview && !posterUrl) {
         const hidden = formRef.current?.querySelector<HTMLInputElement>('input[name="posterUrl"]');
         if (hidden) hidden.value = posterPreview;
@@ -643,6 +700,7 @@ export default function EditStory() {
           <input type="hidden" name="userStatus" value={formData.userStatus} />
           <input type="hidden" name="genres" value={JSON.stringify(formData.genres)} />
           <input type="hidden" name="posterUrl" value={posterUrl} />
+          <input type="hidden" name="posterVariantsJson" value={posterVariantsJson} />
           <input type="hidden" name="author" value={formData.author} />
           <input type="hidden" name="authorNames" value={JSON.stringify(selectedAuthors.map((a) => a.name))} />
           <input type="hidden" name="authorSlugs" value={JSON.stringify(selectedAuthors.map((a) => a.slug))} />

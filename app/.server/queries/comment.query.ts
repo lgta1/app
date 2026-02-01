@@ -3,6 +3,25 @@ import { ensureMangaSlug } from "~/database/helpers/manga-slug.helper";
 import { normalizeReactionCounts, sumReactionCounts } from "~/constants/reactions";
 import { rewriteLegacyCdnUrl, rewriteLegacyCdnUrlsInText } from "~/.server/utils/cdn-url";
 
+const rewritePosterVariants = (variants: any) => {
+  if (!variants || typeof variants !== "object") return variants;
+  const normalizeEntry = (entry: any) => {
+    if (!entry || typeof entry !== "object") return entry;
+    return {
+      ...entry,
+      url: typeof entry.url === "string" ? rewriteLegacyCdnUrl(entry.url) : entry.url,
+    };
+  };
+
+  return {
+    ...(variants as any),
+    source: normalizeEntry((variants as any).source),
+    w220: normalizeEntry((variants as any).w220),
+    w400: normalizeEntry((variants as any).w400),
+    w625: normalizeEntry((variants as any).w625),
+  };
+};
+
 const normalizeCommentDoc = (comment: any) => {
   if (!comment || typeof comment !== "object") return comment;
   const userId = (comment as any)?.userId;
@@ -22,6 +41,7 @@ const normalizeCommentDoc = (comment: any) => {
       ? {
           ...mangaId,
           poster: typeof mangaId.poster === "string" ? rewriteLegacyCdnUrl(mangaId.poster) : mangaId.poster,
+          posterVariants: rewritePosterVariants((mangaId as any).posterVariants),
         }
       : mangaId;
 
@@ -190,7 +210,7 @@ export const getCommentsByUserId = async (
 
   // Get comments with pagination
   const comments = await CommentModel.find({ userId, mangaId: { $exists: true } })
-    .populate("mangaId", "title poster slug")
+    .populate("mangaId", "title poster posterVariants slug")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
@@ -218,7 +238,7 @@ export const getRecentMangaComments = async (
   // Tối ưu hiệu năng: không đếm tổng; lấy thừa 1 bản ghi để suy ra còn trang kế tiếp hay không
   const records = await CommentModel.find(filter)
     .populate("userId", "name avatar")
-    .populate("mangaId", "title poster slug")
+    .populate("mangaId", "title poster posterVariants slug")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(effectiveLimit + 1)
@@ -261,6 +281,7 @@ export const getRecentMangaComments = async (
         ? {
             ...mangaId,
             poster: typeof mangaId.poster === "string" ? rewriteLegacyCdnUrl(mangaId.poster) : mangaId.poster,
+            posterVariants: rewritePosterVariants((mangaId as any).posterVariants),
           }
         : mangaId;
 
@@ -286,6 +307,7 @@ export const getRecentMangaComments = async (
               id: String(mangaId._id ?? mangaId.id ?? ""),
               title: mangaId.title,
               poster: typeof mangaId.poster === "string" ? rewriteLegacyCdnUrl(mangaId.poster) : mangaId.poster,
+              posterVariants: rewritePosterVariants((mangaId as any).posterVariants),
               slug: mangaId.slug,
             }
           : null,

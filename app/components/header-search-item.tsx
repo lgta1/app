@@ -4,6 +4,7 @@ import * as Popover from "@radix-ui/react-popover";
 import type { SmartSearchHit } from "~/types/search";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
 import { scopeLabel } from "~/utils/text-normalize";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 interface SearchItemProps {
   result: SmartSearchHit;
@@ -23,7 +24,7 @@ export function SearchItem({ result, isFirst }: SearchItemProps) {
         } border-bd-default border-b last:border-b-0`}
       >
         <img
-          src={result.poster}
+          src={getPosterVariantForContext(result, "small")?.url || result.poster}
           alt={result.title}
           className="h-24 w-16 flex-shrink-0 rounded-lg object-cover"
         />

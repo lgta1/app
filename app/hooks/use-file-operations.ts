@@ -261,12 +261,20 @@ export function useFileOperations() {
           const response = await fetch("/api/files/upload", {
             method: "POST",
             body: formData,
+            credentials: "include",
+            headers: { "X-Requested-With": "fetch" },
           });
 
-          const result = await response.json();
+          const rawText = await response.text();
+          let result: any = null;
+          try {
+            result = rawText ? JSON.parse(rawText) : null;
+          } catch {
+            throw new BusinessError(`Phản hồi không hợp lệ (HTTP ${response.status})`);
+          }
 
-          if (!response.ok || !result.success) {
-            throw new BusinessError(result.error || "Tải file lên thất bại");
+          if (!response.ok || !result?.success) {
+            throw new BusinessError(result?.error || `Tải file lên thất bại (HTTP ${response.status})`);
           }
 
           // Execute individual success callback if provided
@@ -333,12 +341,20 @@ export function useFileOperations() {
           method: "POST",
           body: formData,
           signal: controllers[index].signal,
+          credentials: "include",
+          headers: { "X-Requested-With": "fetch" },
         });
 
-        const result = await response.json();
+        const rawText = await response.text();
+        let result: any = null;
+        try {
+          result = rawText ? JSON.parse(rawText) : null;
+        } catch {
+          throw new BusinessError(`Phản hồi không hợp lệ (HTTP ${response.status})`);
+        }
 
-        if (!response.ok || !result.success) {
-          throw new BusinessError(result.error || "Tải file lên thất bại");
+        if (!response.ok || !result?.success) {
+          throw new BusinessError(result?.error || `Tải file lên thất bại (HTTP ${response.status})`);
         }
 
         uploadedResults.push(result.data as UploadedFileResult);

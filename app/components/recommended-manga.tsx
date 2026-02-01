@@ -4,6 +4,7 @@ import { ThumbsUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { MangaCard } from "~/components/manga-card";
 import type { MangaType } from "~/database/models/manga.model";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 type Props = {
   mangaList: MangaType[];
@@ -273,7 +274,13 @@ export default function RecommendedManga({ mangaList, variant = "detail-vertical
               style={{ width: 56 * 1.68 }}
             >
               <img
-                src={(m as any).poster || (m as any).cover || (m as any).thumbnail || (m as any).image}
+                src={
+                  getPosterVariantForContext(m, "small")?.url ||
+                  (m as any).poster ||
+                  (m as any).cover ||
+                  (m as any).thumbnail ||
+                  (m as any).image
+                }
                 alt={(m as any).title}
                 className="h-full w-full object-cover"
                 loading="lazy"

@@ -22,7 +22,10 @@ import {
 
 import { useFileOperations } from "~/hooks/use-file-operations"; // giống chapter.create
 import { MangaDetail } from "~/components/manga-detail";
-import { compressMultipleImages, normalizePosterImage } from "~/utils/image-compression.utils";
+import { compressMultipleImages, generatePosterVariants } from "~/utils/image-compression.utils";
+import type { PosterVariantsPayload } from "~/utils/poster-variants.utils";
+import { deletePublicFiles } from "~/utils/minio.utils";
+import { collectPosterVariantPaths, parsePosterVariantsPayload } from "~/.server/utils/poster-variants.server";
 import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
 
 import { getChaptersByMangaId } from "@/queries/chapter.query";
@@ -141,8 +144,28 @@ export async function action({ request, params }: Route.ActionArgs) {
           throw new BusinessError("Vui lòng tải lên ảnh bìa hợp lệ");
         }
         const { mangaId } = await ensureEditableManga(request, id);
-        await updateManga(request, mangaId, { poster: posterUrl.trim() });
-        result = { success: true, poster: posterUrl.trim(), message: "Đã cập nhật ảnh bìa" };
+        const posterVariants = parsePosterVariantsPayload(formData.get("posterVariantsJson"));
+        const existing = await MangaModel.findById(mangaId).lean();
+        const nextPosterUrl = posterVariants?.w625?.url || posterUrl.trim();
+        await updateManga(request, mangaId, {
+          poster: nextPosterUrl,
+          posterVariants: posterVariants || undefined,
+        });
+
+        if (posterVariants && existing) {
+          const oldPaths = collectPosterVariantPaths((existing as any).posterVariants, (existing as any).poster);
+          const newPaths = collectPosterVariantPaths(posterVariants, nextPosterUrl);
+          const toDelete = oldPaths.filter((p) => !newPaths.includes(p));
+          if (toDelete.length) {
+            try {
+              await deletePublicFiles(toDelete);
+            } catch (error) {
+              console.warn("[preview] delete old poster variants failed", error);
+            }
+          }
+        }
+
+        result = { success: true, poster: nextPosterUrl, message: "Đã cập nhật ảnh bìa" };
         break;
       }
       case "updateUserStatus": {
@@ -343,6 +366,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const shiftPublishedFetcher = useFetcher<typeof action>();
   const deleteMangaFetcher = useFetcher<typeof action>();
   const pendingPosterUrlRef = useRef<string | null>(null);
+  const pendingPosterVariantsRef = useRef<PosterVariantsPayload | null>(null);
   const pendingStatusRef = useRef<number | null>(null);
   const posterUpdateInFlightRef = useRef(false);
   const statusUpdateInFlightRef = useRef(false);
@@ -375,6 +399,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const initialUserStatus = (manga as any)?.userStatus ?? MANGA_USER_STATUS.ON_GOING;
   const [posterUrl, setPosterUrl] = useState<string>(initialPoster || "");
   const [isPosterUpdating, setIsPosterUpdating] = useState(false);
+  const [posterVariantsState, setPosterVariantsState] = useState<PosterVariantsPayload | null>((manga as any)?.posterVariants || null);
   const [userStatusQuick, setUserStatusQuick] = useState<number>(initialUserStatus);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const oneshotGenreList = useMemo(() => {
@@ -386,8 +411,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     return original;
   }, [genres, hasOneshotQuick]);
   const displayManga = useMemo(
-    () => ({ ...manga, poster: posterUrl, userStatus: userStatusQuick, genres: oneshotGenreList }),
-    [manga, posterUrl, userStatusQuick, oneshotGenreList],
+    () => ({ ...manga, poster: posterUrl, posterVariants: posterVariantsState || (manga as any)?.posterVariants, userStatus: userStatusQuick, genres: oneshotGenreList }),
+    [manga, posterUrl, posterVariantsState, userStatusQuick, oneshotGenreList],
   );
   const canQuickEdit = isAdminUser || isOwner;
 
@@ -411,16 +436,43 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     if (!canQuickEdit || isPosterUpdating) return;
     setIsPosterUpdating(true);
     try {
-      const normalized = await normalizePosterImage(file);
-      const [upload] = await uploadMultipleFiles([{ file: normalized.file, options: { prefixPath: "story-images" } }]);
-      const remoteUrl = upload?.url || upload?.location || upload?.path || upload?.key;
+      const variants = await generatePosterVariants(file);
+      const uploadEntries: Array<{ key: "w220" | "w400" | "w625"; width: number; height: number; file: File }> = [];
+      const uploads: Array<{ file: File; options: { prefixPath: string } }> = [];
+      const push = (key: "w220" | "w400" | "w625", variant: { file: File; width: number; height: number }) => {
+        uploadEntries.push({ key, width: variant.width, height: variant.height, file: variant.file });
+        uploads.push({ file: variant.file, options: { prefixPath: "story-images" } });
+      };
+
+      push("w625", variants.w625);
+      if (variants.w400) push("w400", variants.w400);
+      if (variants.w220) push("w220", variants.w220);
+
+      const results = await uploadMultipleFiles(uploads);
+      const payload: PosterVariantsPayload = {};
+
+      uploadEntries.forEach((entry, idx) => {
+        const result: any = results[idx];
+        if (!result?.url) return;
+        (payload as any)[entry.key] = {
+          url: String(result.url),
+          width: entry.width,
+          height: entry.height,
+          fullPath: result.fullPath,
+          bytes: typeof result.size === "number" ? result.size : undefined,
+        };
+      });
+
+      const remoteUrl = payload.w625?.url || payload.w400?.url || payload.w220?.url;
       if (!remoteUrl) {
         throw new Error("Không thể tải ảnh lên");
       }
       const formData = new FormData();
       formData.append("actionType", "updatePoster");
       formData.append("posterUrl", remoteUrl);
+      formData.append("posterVariantsJson", JSON.stringify(payload));
       pendingPosterUrlRef.current = remoteUrl;
+      pendingPosterVariantsRef.current = payload;
       posterUpdateInFlightRef.current = true;
       posterUpdateFetcher.submit(formData, {
         method: "POST",
@@ -501,6 +553,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       if (nextPoster) {
         setPosterUrl(nextPoster);
       }
+      if (pendingPosterVariantsRef.current) {
+        setPosterVariantsState(pendingPosterVariantsRef.current);
+      }
       toast.success(data.message || "Đã cập nhật ảnh bìa");
     } else {
       const errorMessage = data?.error || "Cập nhật ảnh bìa thất bại";
@@ -509,6 +564,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     }
 
     pendingPosterUrlRef.current = null;
+    pendingPosterVariantsRef.current = null;
     posterUpdateInFlightRef.current = false;
     setIsPosterUpdating(false);
   }, [posterUpdateFetcher.state, posterUpdateFetcher.data]);
@@ -744,7 +800,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           const body = { entries: [{ chapter: chap, urls: uploads }] };
           const resp = await fetch(`/truyen-hentai/${mangaHandle}/bulk-upload-urls`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "fetch" },
+            credentials: "include",
             body: JSON.stringify(body),
           });
 

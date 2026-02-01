@@ -32,6 +32,14 @@ const normalizeMangaMedia = (doc: any) => {
   next.id = String(next.id ?? next._id ?? "");
   if (typeof next.poster === "string") next.poster = rewriteLegacyCdnUrl(next.poster);
   if (typeof next.shareImage === "string") next.shareImage = rewriteLegacyCdnUrl(next.shareImage);
+  if (next.posterVariants && typeof next.posterVariants === "object") {
+    const variants = next.posterVariants as Record<string, any>;
+    for (const key of ["w220", "w400", "w625", "source"]) {
+      if (variants[key]?.url && typeof variants[key].url === "string") {
+        variants[key].url = rewriteLegacyCdnUrl(variants[key].url);
+      }
+    }
+  }
   return next as any;
 };
 
@@ -66,6 +74,7 @@ export const getNewManga = async (
         alternateTitle: 1,
         slug: 1,
         poster: 1,
+        posterVariants: 1,
         chapters: 1,
         createdAt: 1,
         updatedAt: 1,

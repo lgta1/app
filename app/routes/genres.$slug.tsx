@@ -55,7 +55,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const sortParam = url.searchParams.get("sort") || "updatedAt";
-  const limit = 18;
+  const limit = 40;
 
   const cacheKey = `loader:genres:${slug}:page=${page}:sort=${sortParam}`;
   const cursorKey = `cursor:genres:${slug}:sort=${sortParam}:page=${page}`;

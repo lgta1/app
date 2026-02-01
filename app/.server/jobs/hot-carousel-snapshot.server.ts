@@ -67,7 +67,7 @@ export const initHotCarouselSnapshotScheduler = (): void => {
   const isMongoReady = () => mongoose.connection.readyState === 1;
 
   cron.schedule(
-    "*/15 * * * *",
+    "30 * * * *",
     async () => {
       if (running) return;
       if (!isMongoReady()) {
@@ -75,8 +75,10 @@ export const initHotCarouselSnapshotScheduler = (): void => {
         return;
       }
       const vnHour = getVietnamHour();
-      if (vnHour >= 22 || vnHour < 1) {
-        console.info("[cron] Hot carousel snapshot skipped: quiet hours (VN 22:00-01:00)");
+      if ([22, 23, 0, 12, 13].includes(vnHour)) {
+        console.info(
+          "[cron] Hot carousel snapshot skipped: peak-hour blackout (VN 22:30, 23:30, 00:30, 12:30, 13:30)",
+        );
         return;
       }
       running = true;

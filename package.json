@@ -12,6 +12,7 @@
     "backfill:authors": "tsx scripts/backfill-authors.ts",
     "backfill:manga-author-relations": "tsx scripts/backfill-manga-author-relations.ts",
     "backfill:manga-slugs": "tsx scripts/backfill-manga-slugs.ts",
+    "backfill:poster-variants": "tsx scripts/backfill-poster-variants.ts",
     "backfill:chapter-slugs": "tsx scripts/backfill-chapter-slugs.ts",
     "import:vi-hentai": "tsx scripts/import-vi-hentai.ts",
     "migrate:cdn-host": "tsx scripts/migrate-cdn-host.ts --dry-run",

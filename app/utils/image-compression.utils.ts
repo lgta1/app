@@ -25,7 +25,20 @@ interface PosterNormalizationResult {
   };
 }
 
-const POSTER_TARGET_WIDTH = 625;
+export interface PosterVariantFile {
+  file: File;
+  width: number;
+  height: number;
+}
+
+export interface PosterVariantsResult {
+  w625: PosterVariantFile;
+  w400?: PosterVariantFile;
+  w220?: PosterVariantFile;
+  usedWebP: boolean;
+}
+
+const POSTER_TARGET_WIDTH = 575;
 const POSTER_ASPECT_TOLERANCE = 0.01;
 const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
@@ -547,13 +560,83 @@ const resizePosterToWidth = async (
 };
 
 /**
+ * Tạo variants ảnh bìa theo quy tắc mới:
+ * - Crop về 3:4 nếu cần.
+ * - Thử convert WEBP 0.95; chỉ dùng nếu nhỏ hơn gốc.
+ * - Resize tối đa 575px (không upscale).
+ * - Tạo 400px nếu width > 450.
+ * - Tạo 220px nếu width > 301.
+ */
+export async function generatePosterVariants(file: File): Promise<PosterVariantsResult> {
+  const baseDims = await getImageDimensions(file);
+  const aspect = classifyPosterAspect(baseDims.width / baseDims.height);
+
+  let working = file;
+  let width = baseDims.width;
+  let height = baseDims.height;
+
+  if (aspect === "other") {
+    const croppedResult = await cropToThreeFour(file);
+    working = croppedResult.file;
+    width = croppedResult.width;
+    height = croppedResult.height;
+  }
+
+  let usedWebP = false;
+  if (working.type !== "image/webp" && working.type !== "image/gif") {
+    try {
+      const converted = await convertToWebP(working, 0.95);
+      if (converted.size < working.size) {
+        working = converted;
+        const dims = await getImageDimensions(working);
+        width = dims.width;
+        height = dims.height;
+        usedWebP = true;
+      }
+    } catch (e) {
+      console.warn("Poster WEBP convert failed", e);
+    }
+  }
+
+  if (width > POSTER_TARGET_WIDTH) {
+    const resizedResult = await resizePosterToWidth(working, POSTER_TARGET_WIDTH);
+    working = resizedResult.file;
+    width = resizedResult.width;
+    height = resizedResult.height;
+  }
+
+  const w625: PosterVariantFile = { file: working, width, height };
+  const variants: PosterVariantsResult = { w625, usedWebP };
+
+  if (width > 450) {
+    const w400Result = await resizePosterToWidth(working, 400);
+    variants.w400 = {
+      file: w400Result.file,
+      width: w400Result.width,
+      height: w400Result.height,
+    };
+  }
+
+  if (width > 301) {
+    const w220Result = await resizePosterToWidth(working, 220);
+    variants.w220 = {
+      file: w220Result.file,
+      width: w220Result.width,
+      height: w220Result.height,
+    };
+  }
+
+  return variants;
+}
+
+/**
  * Chuẩn hóa ảnh bìa (áp dụng cho upload mới):
  * - Nhận 3:4 hoặc 2:3; nếu khác → crop center về 3:4.
  * - JPG/JPEG: giữ nguyên định dạng.
  * - WEBP: giữ nguyên định dạng.
  * - PNG: chuyển sang WEBP (không giữ PNG sau upload).
- * - Nếu width > 625px sau bước crop/convert → resize width=625, height theo tỉ lệ.
- * - Nếu width <= 625px → giữ nguyên kích thước (không resize).
+ * - Nếu width > 575px sau bước crop/convert → resize width=575, height theo tỉ lệ.
+ * - Nếu width <= 575px → giữ nguyên kích thước (không resize).
  */
 export async function normalizePosterImage(file: File): Promise<PosterNormalizationResult> {
   const baseDims = await getImageDimensions(file);

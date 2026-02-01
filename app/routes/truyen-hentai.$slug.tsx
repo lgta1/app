@@ -21,7 +21,10 @@ import LazyRender from "~/components/lazy-render";
 import ProfileUploaderCard from "~/components/profile-uploader-card";
 import { toSlug } from "~/utils/slug.utils";
 import { useFileOperations } from "~/hooks/use-file-operations";
-import { normalizePosterImage } from "~/utils/image-compression.utils";
+import { generatePosterVariants } from "~/utils/image-compression.utils";
+import type { PosterVariantsPayload } from "~/utils/poster-variants.utils";
+import { deletePublicFiles } from "~/utils/minio.utils";
+import { collectPosterVariantPaths, parsePosterVariantsPayload } from "~/.server/utils/poster-variants.server";
 
 import type { MangaType } from "~/database/models/manga.model";
 // server helpers sẽ được import trong loader bằng dynamic import
@@ -219,13 +222,31 @@ export async function action({ request, params }: Route.ActionArgs) {
       return Response.json({ success: false, error: "Vui lòng tải lên ảnh bìa hợp lệ" }, { status: 400 });
     }
 
+    const posterVariants = parsePosterVariantsPayload(formData.get("posterVariantsJson"));
+
+    const existing = await MangaModel.findById(mangaId).lean();
+    const nextPosterUrl = posterVariants?.w625?.url || posterUrl.trim();
+
     await MangaModel.findByIdAndUpdate(
       mangaId,
-      { $set: { poster: posterUrl.trim() } },
+      { $set: { poster: nextPosterUrl, posterVariants: posterVariants || undefined } },
       { timestamps: false },
     );
 
-    return Response.json({ success: true, poster: posterUrl.trim(), message: "Đã cập nhật ảnh bìa" });
+    if (posterVariants && existing) {
+      const oldPaths = collectPosterVariantPaths((existing as any).posterVariants, (existing as any).poster);
+      const newPaths = collectPosterVariantPaths(posterVariants, nextPosterUrl);
+      const toDelete = oldPaths.filter((p) => !newPaths.includes(p));
+      if (toDelete.length) {
+        try {
+          await deletePublicFiles(toDelete);
+        } catch (error) {
+          console.warn("[manga detail] delete old poster variants failed", error);
+        }
+      }
+    }
+
+    return Response.json({ success: true, poster: nextPosterUrl, message: "Đã cập nhật ảnh bìa" });
   } catch (error) {
     console.error("[manga detail] adminUpdatePoster error", error);
     return Response.json({ success: false, error: "Internal server error" }, { status: 500 });
@@ -329,18 +350,48 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const posterUpdateFetcher = useFetcher<typeof action>();
   const posterUpdateInFlightRef = React.useRef(false);
   const pendingPosterUrlRef = React.useRef<string | null>(null);
+  const pendingPosterVariantsRef = React.useRef<PosterVariantsPayload | null>(null);
   const [posterUrl, setPosterUrl] = React.useState<string>(manga.poster || "");
   const [isPosterUpdating, setIsPosterUpdating] = React.useState(false);
+  const [posterVariantsState, setPosterVariantsState] = React.useState<PosterVariantsPayload | null>((manga as any).posterVariants || null);
 
-  const displayManga = React.useMemo(() => ({ ...manga, poster: posterUrl }), [manga, posterUrl]);
+  const displayManga = React.useMemo(
+    () => ({ ...manga, poster: posterUrl, posterVariants: posterVariantsState || (manga as any).posterVariants }),
+    [manga, posterUrl, posterVariantsState],
+  );
 
   const handlePosterDrop = async (file: File) => {
     if (!userIsAdmin || isPosterUpdating) return;
     setIsPosterUpdating(true);
     try {
-      const normalized = await normalizePosterImage(file);
-      const [upload] = await uploadMultipleFiles([{ file: normalized.file, options: { prefixPath: "story-images" } }]);
-      const remoteUrl = (upload as any)?.url || (upload as any)?.location || (upload as any)?.path || (upload as any)?.key;
+      const variants = await generatePosterVariants(file);
+      const uploadEntries: Array<{ key: "w220" | "w400" | "w625"; width: number; height: number; file: File }> = [];
+      const uploads: Array<{ file: File; options: { prefixPath: string } }> = [];
+      const push = (key: "w220" | "w400" | "w625", variant: { file: File; width: number; height: number }) => {
+        uploadEntries.push({ key, width: variant.width, height: variant.height, file: variant.file });
+        uploads.push({ file: variant.file, options: { prefixPath: "story-images" } });
+      };
+
+      push("w625", variants.w625);
+      if (variants.w400) push("w400", variants.w400);
+      if (variants.w220) push("w220", variants.w220);
+
+      const results = await uploadMultipleFiles(uploads);
+      const payload: PosterVariantsPayload = {};
+
+      uploadEntries.forEach((entry, idx) => {
+        const result: any = results[idx];
+        if (!result?.url) return;
+        (payload as any)[entry.key] = {
+          url: String(result.url),
+          width: entry.width,
+          height: entry.height,
+          fullPath: result.fullPath,
+          bytes: typeof result.size === "number" ? result.size : undefined,
+        };
+      });
+
+      const remoteUrl = payload.w625?.url || payload.w400?.url || payload.w220?.url;
       if (!remoteUrl) {
         throw new Error("Không thể tải ảnh lên");
       }
@@ -348,7 +399,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       const formData = new FormData();
       formData.append("actionType", "adminUpdatePoster");
       formData.append("posterUrl", String(remoteUrl));
+      formData.append("posterVariantsJson", JSON.stringify(payload));
       pendingPosterUrlRef.current = String(remoteUrl);
+      pendingPosterVariantsRef.current = payload;
       posterUpdateInFlightRef.current = true;
       posterUpdateFetcher.submit(formData, {
         method: "POST",
@@ -375,12 +428,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     if (data?.success) {
       const nextPoster = data.poster || pendingPosterUrlRef.current;
       if (nextPoster) setPosterUrl(nextPoster);
+      if (pendingPosterVariantsRef.current) {
+        setPosterVariantsState(pendingPosterVariantsRef.current);
+      }
       toast.success(data.message || "Đã cập nhật ảnh bìa");
     } else {
       toast.error(data?.error || "Cập nhật ảnh bìa thất bại");
     }
 
     pendingPosterUrlRef.current = null;
+    pendingPosterVariantsRef.current = null;
     posterUpdateInFlightRef.current = false;
     setIsPosterUpdating(false);
   }, [posterUpdateFetcher.state, posterUpdateFetcher.data]);

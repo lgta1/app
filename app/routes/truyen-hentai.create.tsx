@@ -38,7 +38,8 @@ import type { GenresType } from "~/database/models/genres.model";
 import { UserModel } from "~/database/models/user.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
-import { normalizePosterImage } from "~/utils/image-compression.utils";
+import { generatePosterVariants, type PosterVariantsResult } from "~/utils/image-compression.utils";
+import type { PosterVariantsPayload } from "~/utils/poster-variants.utils";
 import {
   ANTI_VANILLA_TAGS,
   normalizeGenreSlug,
@@ -87,6 +88,16 @@ export async function action({ request }: ActionFunctionArgs) {
       throw new BusinessError("Có thể loại trái ngược với vanilla đã được chọn");
     }
 
+    const posterVariantsRaw = formData.get("posterVariantsJson");
+    let posterVariants: any = null;
+    if (typeof posterVariantsRaw === "string" && posterVariantsRaw.trim()) {
+      try {
+        posterVariants = JSON.parse(posterVariantsRaw);
+      } catch {
+        posterVariants = null;
+      }
+    }
+
     const mangaData = {
       title: formData.get("title") as string,
       description: safeDescription, // <- dùng fallback
@@ -96,7 +107,8 @@ export async function action({ request }: ActionFunctionArgs) {
       authorSlugs: JSON.parse((formData.get("authorSlugs") as string) || "[]"),
       keywords: formData.get("keywords") as string,
       userStatus: Number(formData.get("userStatus")),
-      poster: formData.get("posterUrl") as string,
+      poster: (posterVariants?.w625?.url || formData.get("posterUrl")) as string,
+      posterVariants: posterVariants || undefined,
       genres: parsedGenres,
       contentType: isCosplay ? MANGA_CONTENT_TYPE.COSPLAY : MANGA_CONTENT_TYPE.MANGA,
       // Optional denormalized relations
@@ -198,6 +210,8 @@ export default function CreateStory() {
 
   const [posterPreview, setPosterPreview] = useState("");
   const [posterUrl, setPosterUrl] = useState(""); // URL sau upload
+  const [posterVariantsJson, setPosterVariantsJson] = useState("");
+  const [posterVariants, setPosterVariants] = useState<PosterVariantsResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCosplay, setIsCosplay] = useState(false);
 
@@ -250,9 +264,10 @@ export default function CreateStory() {
 
   const handleFileSelect = async (file: File) => {
     try {
-      const normalized = await normalizePosterImage(file);
-      setFormData((prev: FormDataShape) => ({ ...prev, poster: normalized.file }));
-      setPosterPreview(URL.createObjectURL(normalized.file));
+      const variants = await generatePosterVariants(file);
+      setPosterVariants(variants);
+      setFormData((prev: FormDataShape) => ({ ...prev, poster: variants.w625.file }));
+      setPosterPreview(URL.createObjectURL(variants.w625.file));
     } catch (error) {
       console.error("Normalize poster error", error);
       toast.error("Không thể xử lý ảnh bìa, vui lòng thử lại");
@@ -263,6 +278,8 @@ export default function CreateStory() {
     setFormData((prev: FormDataShape) => ({ ...prev, poster: null }));
     setPosterPreview("");
     setPosterUrl("");
+    setPosterVariants(null);
+    setPosterVariantsJson("");
   };
 
   // BEGIN <feature> MANGACREATE_DESCRIPTION_OPTIONAL
@@ -287,7 +304,7 @@ export default function CreateStory() {
     // (mô tả được phép trống)
     // END <feature> MANGACREATE_DESCRIPTION_OPTIONAL
 
-    if (!formData.poster) {
+    if (!posterVariants?.w625?.file) {
       toast.error("Vui lòng chọn ảnh bìa");
       return;
     }
@@ -313,21 +330,46 @@ export default function CreateStory() {
 
     setIsUploading(true);
     try {
-      const [posterData] = await uploadMultipleFiles([
-        {
-          file: formData.poster,
-          options: { prefixPath: "story-images" },
-        },
-      ]);
+      const uploadEntries: Array<{ key: "w220" | "w400" | "w625"; width: number; height: number; file: File }> = [];
+      const uploads: Array<{ file: File; options: { prefixPath: string } }> = [];
+      const push = (key: "w220" | "w400" | "w625", variant: { file: File; width: number; height: number }) => {
+        uploadEntries.push({ key, width: variant.width, height: variant.height, file: variant.file });
+        uploads.push({ file: variant.file, options: { prefixPath: "story-images" } });
+      };
 
-      if (!posterData?.url) {
+      push("w625", posterVariants.w625);
+      if (posterVariants.w400) push("w400", posterVariants.w400);
+      if (posterVariants.w220) push("w220", posterVariants.w220);
+
+      const results = await uploadMultipleFiles(uploads);
+      const payload: PosterVariantsPayload = {};
+
+      uploadEntries.forEach((entry, idx) => {
+        const result: any = results[idx];
+        if (!result?.url) return;
+        (payload as any)[entry.key] = {
+          url: String(result.url),
+          width: entry.width,
+          height: entry.height,
+          fullPath: result.fullPath,
+          bytes: typeof result.size === "number" ? result.size : undefined,
+        };
+      });
+
+      const posterVariantUrl = payload.w625?.url || payload.w400?.url || payload.w220?.url;
+      if (!posterVariantUrl) {
         toast.error("Lỗi khi tải ảnh lên, vui lòng thử lại");
         setIsUploading(false);
         return;
       }
 
-      setPosterUrl(posterData.url);
+      const payloadJson = JSON.stringify(payload);
+      setPosterUrl(posterVariantUrl);
+      setPosterVariantsJson(payloadJson);
       setIsUploading(false);
+
+      const hiddenVariants = formRef.current?.querySelector<HTMLInputElement>('input[name="posterVariantsJson"]');
+      if (hiddenVariants) hiddenVariants.value = payloadJson;
 
       // Loại bỏ required ở textarea (nếu còn) rồi submit native để nhận redirect
       // BEGIN <feature> MANGACREATE_DESCRIPTION_OPTIONAL
@@ -698,6 +740,7 @@ export default function CreateStory() {
           <input type="hidden" name="userStatus" value={formData.userStatus} />
           <input type="hidden" name="genres" value={JSON.stringify(formData.genres)} />
           <input type="hidden" name="posterUrl" value={posterUrl} />
+          <input type="hidden" name="posterVariantsJson" value={posterVariantsJson} />
           {/* Gửi kèm để tương lai back-end xài; hiện tại back-end có thể bỏ qua */}
           <input type="hidden" name="author" value={formData.author} />
           <input type="hidden" name="authorNames" value={JSON.stringify(selectedAuthors.map((a) => a.name))} />

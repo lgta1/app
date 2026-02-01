@@ -11,6 +11,36 @@ export type MangaType = {
   alternateTitle?: string;
   description: string;
   poster: string;
+  posterVariants?: {
+    source?: {
+      url: string;
+      width?: number;
+      height?: number;
+      fullPath?: string;
+      bytes?: number;
+    };
+    w220?: {
+      url: string;
+      width?: number;
+      height?: number;
+      fullPath?: string;
+      bytes?: number;
+    };
+    w400?: {
+      url: string;
+      width?: number;
+      height?: number;
+      fullPath?: string;
+      bytes?: number;
+    };
+    w625?: {
+      url: string;
+      width?: number;
+      height?: number;
+      fullPath?: string;
+      bytes?: number;
+    };
+  };
   shareImage?: string;
   chapters: number;
   author?: string; // optional per new requirement
@@ -57,6 +87,7 @@ const MangaSchema = new Schema<MangaType>(
     alternateTitle: { type: String },
     description: { type: String, default: "" },
     poster: { type: String, required: true },
+    posterVariants: { type: Schema.Types.Mixed, default: undefined },
     shareImage: { type: String },
     chapters: { type: Number, default: 0 },
     author: { type: String },

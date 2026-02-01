@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { User } from "lucide-react";
 import type { MangaType } from "~/database/models/manga.model";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 export function SameAuthorManga({ items }: { items: MangaType[] }) {
   if (!items || items.length === 0) return null;
@@ -33,7 +34,13 @@ export function SameAuthorManga({ items }: { items: MangaType[] }) {
                 style={{ width: THUMB_W }}
               >
                 <img
-                  src={(m as any).poster || (m as any).cover || (m as any).thumbnail || (m as any).image}
+                  src={
+                    getPosterVariantForContext(m, "small")?.url ||
+                    (m as any).poster ||
+                    (m as any).cover ||
+                    (m as any).thumbnail ||
+                    (m as any).image
+                  }
                   alt={(m as any).title}
                   className="h-full w-full object-cover"
                   loading="lazy"
