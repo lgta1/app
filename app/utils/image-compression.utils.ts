@@ -7,6 +7,13 @@ interface CompressionResult {
   compressionRatio: number;
 }
 
+export type ImageSegmentMeta = {
+  groupId?: string;
+  segmentIndex?: number;
+  segmentCount?: number;
+  noWatermark?: boolean;
+};
+
 interface CompressionProgressCallback {
   (current: number, total: number): void;
 }
@@ -43,6 +50,136 @@ const POSTER_ASPECT_TOLERANCE = 0.01;
 const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
 
+const SEGMENT_MAX_HEIGHT = 3000;
+const SEGMENT_GROUP_ID_KEY = "__segmentGroupId";
+const SEGMENT_INDEX_KEY = "__segmentIndex";
+const SEGMENT_COUNT_KEY = "__segmentCount";
+const SEGMENT_NOWATERMARK_KEY = "__noWatermark";
+
+export const getImageSegmentMeta = (file: File): ImageSegmentMeta => {
+  const anyFile = file as any;
+  return {
+    groupId: typeof anyFile?.[SEGMENT_GROUP_ID_KEY] === "string" ? anyFile[SEGMENT_GROUP_ID_KEY] : undefined,
+    segmentIndex: typeof anyFile?.[SEGMENT_INDEX_KEY] === "number" ? anyFile[SEGMENT_INDEX_KEY] : undefined,
+    segmentCount: typeof anyFile?.[SEGMENT_COUNT_KEY] === "number" ? anyFile[SEGMENT_COUNT_KEY] : undefined,
+    noWatermark: Boolean(anyFile?.[SEGMENT_NOWATERMARK_KEY]),
+  };
+};
+
+export const setImageSegmentMeta = (file: File, meta: ImageSegmentMeta): File => {
+  const anyFile = file as any;
+  if (meta.groupId) anyFile[SEGMENT_GROUP_ID_KEY] = meta.groupId;
+  if (typeof meta.segmentIndex === "number") anyFile[SEGMENT_INDEX_KEY] = meta.segmentIndex;
+  if (typeof meta.segmentCount === "number") anyFile[SEGMENT_COUNT_KEY] = meta.segmentCount;
+  if (meta.noWatermark) {
+    anyFile[SEGMENT_NOWATERMARK_KEY] = true;
+  } else if (anyFile?.[SEGMENT_NOWATERMARK_KEY]) {
+    delete anyFile[SEGMENT_NOWATERMARK_KEY];
+  }
+  return file;
+};
+
+export const copyImageSegmentMeta = (from: File, to: File): File => {
+  const meta = getImageSegmentMeta(from);
+  if (!meta.groupId && typeof meta.segmentIndex !== "number" && typeof meta.segmentCount !== "number") {
+    return to;
+  }
+  return setImageSegmentMeta(to, meta);
+};
+
+const buildSegmentFileName = (name: string, segmentIndex: number) => {
+  const dotIndex = name.lastIndexOf(".");
+  const base = dotIndex > 0 ? name.slice(0, dotIndex) : name;
+  const ext = dotIndex > 0 ? name.slice(dotIndex) : "";
+  return `${base}__p${segmentIndex + 1}${ext}`;
+};
+
+/**
+ * Cắt ảnh dài theo chiều dọc (maxHeight).
+ * - Tạo meta segment để điều khiển watermark sau này.
+ */
+export async function splitLongImages(
+  files: File[],
+  opts?: { maxHeight?: number },
+): Promise<File[]> {
+  const maxHeight = opts?.maxHeight ?? SEGMENT_MAX_HEIGHT;
+  const results: File[] = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const groupId = `seg-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (file.type === "image/gif") {
+      results.push(
+        setImageSegmentMeta(file, {
+          groupId,
+          segmentIndex: 0,
+          segmentCount: 1,
+          noWatermark: false,
+        }),
+      );
+      continue;
+    }
+
+    let dims: { width: number; height: number } | null = null;
+    try {
+      dims = await getImageDimensions(file);
+    } catch {
+      dims = null;
+    }
+
+    if (!dims || dims.height <= maxHeight) {
+      results.push(
+        setImageSegmentMeta(file, {
+          groupId,
+          segmentIndex: 0,
+          segmentCount: 1,
+          noWatermark: false,
+        }),
+      );
+      continue;
+    }
+
+    const dataUrl = await imageCompression.getDataUrlFromFile(file);
+    const img = await loadImage(dataUrl);
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+    const segmentCount = Math.ceil(height / maxHeight);
+
+    for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex++) {
+      const sy = segmentIndex * maxHeight;
+      const sHeight = Math.min(maxHeight, height - sy);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = sHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Không thể khởi tạo canvas context");
+      ctx.drawImage(img, 0, sy, width, sHeight, 0, 0, width, sHeight);
+
+      const mime = file.type || "image/jpeg";
+      const quality =
+        mime === "image/webp" || mime === "image/jpeg" || mime === "image/jpg" ? 0.98 : undefined;
+      const segmentFile = await canvasToFile(
+        canvas,
+        mime,
+        buildSegmentFileName(file.name, segmentIndex),
+        quality,
+      );
+
+      results.push(
+        setImageSegmentMeta(segmentFile, {
+          groupId,
+          segmentIndex,
+          segmentCount,
+          noWatermark: segmentIndex > 0,
+        }),
+      );
+    }
+  }
+
+  return results;
+}
+
 /**
  * QUY TẮC NÉN (cập nhật theo yêu cầu 15/01/2026):
  * 1) GIF
@@ -76,7 +213,7 @@ export async function compressImageToWebP(file: File): Promise<CompressionResult
   // 3) GIF: giữ nguyên
   if (type === "image/gif") {
     return {
-      compressedFile: file,
+      compressedFile: copyImageSegmentMeta(file, file),
       originalSize,
       compressedSize: file.size,
       compressionRatio: ((originalSize - file.size) / originalSize) * 100,
@@ -102,18 +239,26 @@ export async function compressImageToWebP(file: File): Promise<CompressionResult
       console.error("PNG->WEBP convert error", e);
       // fallback: giữ nguyên nếu thất bại convert
       return {
-        compressedFile: file,
+        compressedFile: copyImageSegmentMeta(file, file),
         originalSize,
         compressedSize: file.size,
         compressionRatio: 0,
       };
     }
     // Sau convert: áp quy tắc giống JPG/WebP/AVIF trên converted
-    return await scaleByRule(converted, originalSize);
+    const scaled = await scaleByRule(converted, originalSize);
+    return {
+      ...scaled,
+      compressedFile: copyImageSegmentMeta(file, scaled.compressedFile),
+    };
   }
 
   // 1) JPG / WEBP / AVIF: áp trực tiếp quy tắc
-  return await scaleByRule(file, originalSize);
+  const scaled = await scaleByRule(file, originalSize);
+  return {
+    ...scaled,
+    compressedFile: copyImageSegmentMeta(file, scaled.compressedFile),
+  };
 }
 
 /** Áp quy tắc cho JPG / WEBP / AVIF (và PNG đã convert sang WEBP). */

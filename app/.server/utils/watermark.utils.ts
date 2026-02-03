@@ -42,6 +42,7 @@ async function loadWatermarkMeta(): Promise<sharp.Metadata | null> {
   }
 }
 
+
 export async function applyWatermark(
   buffer: Buffer,
   opts?: {
@@ -92,6 +93,7 @@ export async function applyWatermark(
     "Đọc Hentai KHÔNG QUẢNG CÁO làm phiền tại",
   ] as const;
   const message = opts?.variant === 2 ? messages[1] : messages[0];
+  const fontFamily = "Noto Sans, DejaVu Sans, Arial, sans-serif";
 
   // Layout tuning
   const charFactor = 0.55; // rough width/height ratio for sans fonts
@@ -200,11 +202,13 @@ export async function applyWatermark(
   // Text size ~75–80% logo height (already derived via fontSize above).
   // Keep a small padding to avoid clipping.
   const padX = Math.max(10, Math.floor(width * 0.02));
-  const groupWidth = Math.min(maxGroupWidth, textW + gap + actualLogoW);
+  const maxTextWidth = Math.max(1, maxGroupWidth - actualLogoW - gap);
+  const effectiveTextWidth = Math.min(textW, maxTextWidth);
+  const groupWidth = Math.min(maxGroupWidth, effectiveTextWidth + gap + actualLogoW);
   const startX = Math.max(padX, Math.floor((width - groupWidth) / 2));
   const textX = startX;
   const textY = Math.floor(stripHeight / 2);
-  const logoX = Math.min(width - padX - actualLogoW, Math.floor(textX + textW + gap));
+  const logoX = Math.min(width - padX - actualLogoW, Math.floor(textX + effectiveTextWidth + gap));
   const logoY = Math.max(0, Math.floor((stripHeight - actualLogoH) / 2));
 
   // 7) Render text as SVG overlay (with thin outline + shadow).
@@ -217,6 +221,7 @@ export async function applyWatermark(
       .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#39;");
 
+  const shouldClampText = textW > maxTextWidth;
   const textSvg = Buffer.from(
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}">\n` +
@@ -225,8 +230,8 @@ export async function applyWatermark(
       `      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="${stroke}" flood-opacity="0.55"/>\n` +
       `    </filter>\n` +
       `  </defs>\n` +
-      `  <text x="${textX}" y="${textY}" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="700" dominant-baseline="middle" text-anchor="start"\n` +
-      `        fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" paint-order="stroke" filter="url(#shadow)">\n` +
+      `  <text x="${textX}" y="${textY}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="700" dominant-baseline="middle" text-anchor="start"\n` +
+      `        fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" paint-order="stroke" filter="url(#shadow)"${shouldClampText ? ` textLength=\"${maxTextWidth}\" lengthAdjust=\"spacingAndGlyphs\"` : ""}>\n` +
       `    ${escapeXml(message)}\n` +
       `  </text>\n` +
       `</svg>\n`,

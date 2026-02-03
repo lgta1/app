@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"; 
+import { useEffect, useMemo, useRef, useState } from "react"; 
 import { toast, Toaster } from "react-hot-toast";
 import {
   Link,
@@ -25,6 +25,8 @@ import { useFileOperations } from "~/hooks/use-file-operations";
 import {
   compressMultipleImages,
   formatFileSize,
+  getImageSegmentMeta,
+  splitLongImages,
   validateImageFile,
 } from "~/utils/image-compression.utils";
 import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
@@ -276,11 +278,13 @@ export function EditChapterView() {
       return;
     }
 
+    const splitList = await splitLongImages(list, { maxHeight: 3000 });
+
     // Set compression progress
     setCompressionProgress({
       isCompressing: true,
       current: 0,
-      total: list.length,
+      total: splitList.length,
     });
 
     try {
@@ -288,7 +292,7 @@ export function EditChapterView() {
 
       // Compress images with progress callback
       const compressionResults = await compressMultipleImages(
-        list,
+        splitList,
         (current, total) => {
           setCompressionProgress({
             isCompressing: true,
@@ -334,7 +338,7 @@ export function EditChapterView() {
         ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100;
 
       toast.success(
-        `Đã nén ${list.length} ảnh thành công! Tiết kiệm ${formatFileSize(totalOriginalSize - totalCompressedSize)} (${Math.round(totalSavings)}%)`,
+        `Đã nén ${splitList.length} ảnh thành công! Tiết kiệm ${formatFileSize(totalOriginalSize - totalCompressedSize)} (${Math.round(totalSavings)}%)`,
         { id: "compression" },
       );
     } catch (error) {
@@ -385,6 +389,24 @@ export function EditChapterView() {
     fileInputRef.current?.click();
   };
 
+  const buildWatermarkSelection = (files: File[]) => {
+    const groupIndexById = new Map<string, number>();
+    let groupCount = 0;
+    files.forEach((file, idx) => {
+      const meta = getImageSegmentMeta(file);
+      const groupId = meta.groupId || `${file.name}-${idx}`;
+      if (!groupIndexById.has(groupId)) {
+        groupIndexById.set(groupId, groupCount);
+        groupCount += 1;
+      }
+    });
+
+    return {
+      groupIndexById,
+      watermarkIndexes: selectWatermarkIndexes(groupCount),
+    };
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -405,13 +427,16 @@ export function EditChapterView() {
 
     setIsSubmitting(true);
 
-    const watermarkIndexes = selectWatermarkIndexes(contents.length);
+    const { groupIndexById, watermarkIndexes } = buildWatermarkSelection(contents);
 
     try {
       // Upload CHỈ các ảnh mới (contents)
       let watermarkOrder = 0;
       const filesToUpload = contents.map((file, idx) => {
-        const shouldWatermark = watermarkIndexes.has(idx);
+        const meta = getImageSegmentMeta(file);
+        const groupId = meta.groupId || `${file.name}-${idx}`;
+        const groupIndex = groupIndexById.get(groupId) ?? idx;
+        const shouldWatermark = !meta.noWatermark && watermarkIndexes.has(groupIndex);
         if (!shouldWatermark) {
           return { file, options: { prefixPath: "manga-images" as const } };
         }
@@ -562,6 +587,36 @@ export function EditChapterView() {
   const onCardDragEnd = () => {
     setDraggingIndex(null);
     setOverIndex(null);
+  };
+
+  const previewGroupIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let next = 0;
+    previewImages.forEach((img) => {
+      const groupId = img.file
+        ? getImageSegmentMeta(img.file).groupId || `file-${img.id}`
+        : `existing-${img.id}`;
+      if (!map.has(groupId)) {
+        map.set(groupId, next);
+        next += 1;
+      }
+    });
+    return map;
+  }, [previewImages]);
+
+  const getPreviewIndexLabel = (image: PreviewImage, fallbackIndex: number) => {
+    const groupId = image.file
+      ? getImageSegmentMeta(image.file).groupId || `file-${image.id}`
+      : `existing-${image.id}`;
+    const groupIndex = previewGroupIndexMap.get(groupId);
+    const base = (typeof groupIndex === "number" ? groupIndex : fallbackIndex) + 1;
+    if (image.file) {
+      const meta = getImageSegmentMeta(image.file);
+      if (meta.segmentCount && meta.segmentCount > 1) {
+        return `${base}.${(meta.segmentIndex ?? 0) + 1}`;
+      }
+    }
+    return String(base);
   };
 
   // Preview chế độ nội tuyến đã được tách ra trang riêng; không còn render trong trang edit
@@ -793,7 +848,7 @@ export function EditChapterView() {
                         {/* position + filename under thumbnail */}
                         <div className="mt-1 w-full">
                           <div className="text-txt-primary text-xs font-semibold">
-                            #{idx + 1}
+                            #{getPreviewIndexLabel(image, idx)}
                           </div>
                           <div
                             className="text-txt-secondary text-[11px] leading-tight truncate"

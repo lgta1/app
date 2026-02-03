@@ -96,7 +96,13 @@ const server = http.createServer(async (req, res) => {
             res.statusCode = 200;
             res.setHeader("Content-Type", contentType);
 
-            if (pathname.startsWith("/assets/")) {
+            if (
+              pathname.startsWith("/assets/") ||
+              pathname.startsWith("/images/") ||
+              pathname.startsWith("/gif-meme/") ||
+              pathname.startsWith("/videos/") ||
+              pathname.startsWith("/audio/")
+            ) {
               res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
             } else if (pathname.endsWith(".xml")) {
               res.setHeader("Cache-Control", "public, max-age=0");

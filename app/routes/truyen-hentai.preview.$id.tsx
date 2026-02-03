@@ -22,7 +22,12 @@ import {
 
 import { useFileOperations } from "~/hooks/use-file-operations"; // giống chapter.create
 import { MangaDetail } from "~/components/manga-detail";
-import { compressMultipleImages, generatePosterVariants } from "~/utils/image-compression.utils";
+import {
+  compressMultipleImages,
+  generatePosterVariants,
+  getImageSegmentMeta,
+  splitLongImages,
+} from "~/utils/image-compression.utils";
 import type { PosterVariantsPayload } from "~/utils/poster-variants.utils";
 import { deletePublicFiles } from "~/utils/minio.utils";
 import { collectPosterVariantPaths, parsePosterVariantsPayload } from "~/.server/utils/poster-variants.server";
@@ -719,6 +724,24 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       // 1 toast “đang chạy” được update liên tục
       const loadingId = toast.loading(`Đang tải… 0/${totalChaps}`);
 
+      const buildWatermarkSelection = (files: File[]) => {
+        const groupIndexById = new Map<string, number>();
+        let groupCount = 0;
+        files.forEach((file, idx) => {
+          const meta = getImageSegmentMeta(file);
+          const groupId = meta.groupId || `${file.name}-${idx}`;
+          if (!groupIndexById.has(groupId)) {
+            groupIndexById.set(groupId, groupCount);
+            groupCount += 1;
+          }
+        });
+
+        return {
+          groupIndexById,
+          watermarkIndexes: selectWatermarkIndexes(groupCount),
+        };
+      };
+
       for (const chap of chapterNames) {
         setChapProgress((p) => ({ ...p, current: chap }));
         toast.loading(`Đang tải… ${okCount}/${totalChaps} • ${chap}`, { id: loadingId });
@@ -733,12 +756,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           // KHÔNG continue; để server thực thi rule & BAN
         }
 
+        const splitList = await splitLongImages(list, { maxHeight: 3000 });
+
         // Optional compression cho bulk (per chapter) nếu đã tick
-        let effectiveList = list;
+        let effectiveList = splitList;
         if (bulkApplyCompression) {
           try {
-            const compressToastId = toast.loading(`Nén ảnh 0/${list.length} • ${chap}`);
-            const compressed = await compressMultipleImages(list, (current, total) => {
+            const compressToastId = toast.loading(`Nén ảnh 0/${splitList.length} • ${chap}`);
+            const compressed = await compressMultipleImages(splitList, (current, total) => {
               toast.loading(`Nén ảnh ${current}/${total} • ${chap}`, { id: compressToastId });
             });
             toast.dismiss(compressToastId);
@@ -746,17 +771,21 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             effectiveList = compressed.map((r) => r.compressedFile);
           } catch (err) {
             toast.error(`Nén ảnh lỗi ở chương "${chap}" → dùng ảnh gốc`);
-            effectiveList = list;
+            effectiveList = splitList;
           }
         }
         // upload 1 lần cho cả chapter (sau nén nếu có)
         let results: Array<{ url?: string; path?: string; location?: string; key?: string }>;
         try {
-          const watermarkIndexes = bulkForceWatermarkAll ? null : selectWatermarkIndexes(effectiveList.length);
+          const selection = bulkForceWatermarkAll ? null : buildWatermarkSelection(effectiveList);
 
           let watermarkOrder = 0;
           const filesToUpload = effectiveList.map((f, idx) => {
-            const shouldWatermark = bulkForceWatermarkAll || Boolean(watermarkIndexes?.has(idx));
+            const meta = getImageSegmentMeta(f);
+            const groupId = meta.groupId || `${f.name}-${idx}`;
+            const groupIndex = selection?.groupIndexById.get(groupId) ?? idx;
+            const shouldWatermark =
+              bulkForceWatermarkAll || (!meta.noWatermark && Boolean(selection?.watermarkIndexes.has(groupIndex)));
             if (!shouldWatermark) {
               return { file: f, options: { prefixPath: "manga-images" } };
             }
@@ -785,8 +814,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           .map((r: any) => r?.url || r?.location || r?.path || r?.key)
           .filter((u: unknown): u is string => typeof u === "string" && u.length > 0);
 
-        if (uploads.length !== list.length) {
-          console.error("[bulk] Missing URLs after upload", { chap, got: uploads.length, expect: list.length });
+        if (uploads.length !== effectiveList.length) {
+          console.error("[bulk] Missing URLs after upload", { chap, got: uploads.length, expect: effectiveList.length });
           toast.dismiss(loadingId);
           toast.error(`Thiếu URL sau upload ở "${chap}". Dừng bulk.`);
           setIsBulkRunning(false);

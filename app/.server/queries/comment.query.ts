@@ -232,13 +232,18 @@ export const getRecentMangaComments = async (
   const effectiveLimit = Math.max(1, Math.min(100, limit));
   const skip = (page - 1) * effectiveLimit;
 
-  // Chỉ lấy bình luận cấp 1 (parent) của manga
-  const filter = { mangaId: { $exists: true }, parentId: null } as any;
+  // Lấy cả bình luận cấp 1 và reply của manga
+  const filter = { mangaId: { $exists: true } } as any;
 
   // Tối ưu hiệu năng: không đếm tổng; lấy thừa 1 bản ghi để suy ra còn trang kế tiếp hay không
   const records = await CommentModel.find(filter)
     .populate("userId", "name avatar")
     .populate("mangaId", "title poster posterVariants slug")
+    .populate({
+      path: "parentId",
+      select: "content userId createdAt",
+      populate: { path: "userId", select: "name avatar" },
+    })
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(effectiveLimit + 1)
@@ -256,6 +261,7 @@ export const getRecentMangaComments = async (
   const data = pageItems.map((c: any) => {
     const userId = (c as any)?.userId;
     const mangaId = (c as any)?.mangaId;
+    const parentDoc = (c as any)?.parentId;
 
     const likeNumber = Number((c as any)?.likeNumber) || 0;
     const reactionCounts = normalizeReactionCounts((c as any)?.reactionCounts, likeNumber);
@@ -267,6 +273,11 @@ export const getRecentMangaComments = async (
 
     const normalizedContent =
       typeof (c as any)?.content === "string" ? rewriteLegacyCdnUrlsInText((c as any).content) : (c as any)?.content;
+
+    const normalizedParentContent =
+      parentDoc && typeof parentDoc === "object" && typeof parentDoc?.content === "string"
+        ? rewriteLegacyCdnUrlsInText(parentDoc.content)
+        : parentDoc?.content;
 
     const normalizedUserId =
       userId && typeof userId === "object"
@@ -285,10 +296,37 @@ export const getRecentMangaComments = async (
           }
         : mangaId;
 
+    const normalizedParentUser =
+      parentDoc?.userId && typeof parentDoc.userId === "object"
+        ? {
+            id: String(parentDoc.userId._id ?? parentDoc.userId.id ?? ""),
+            name: parentDoc.userId.name,
+            avatar:
+              typeof parentDoc.userId.avatar === "string"
+                ? rewriteLegacyCdnUrl(parentDoc.userId.avatar)
+                : parentDoc.userId.avatar,
+          }
+        : null;
+
+    const normalizedParent =
+      parentDoc && typeof parentDoc === "object"
+        ? {
+            id: String(parentDoc._id ?? parentDoc.id ?? ""),
+            content: normalizedParentContent,
+            createdAt: parentDoc.createdAt,
+            user: normalizedParentUser,
+          }
+        : null;
+
     return {
       ...(c ?? {}),
       id: String((c as any)?._id ?? (c as any)?.id ?? ""),
+      parentId:
+        parentDoc && typeof parentDoc === "object"
+          ? String(parentDoc._id ?? parentDoc.id ?? "")
+          : (c as any)?.parentId ?? null,
       content: normalizedContent,
+      parent: normalizedParent,
       userId: normalizedUserId,
       mangaId: normalizedMangaId,
       reactionCounts,

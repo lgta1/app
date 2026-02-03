@@ -13,6 +13,8 @@ const STALE_HEARTBEAT_MS = 15 * 60 * 1000;
 const abortControllersByJobId = new Map<string, AbortController>();
 const isMongoReady = () => mongoose.connection.readyState === 1;
 
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export const requestAbortViHentaiAutoDownloadJob = (jobId: string): boolean => {
   const ac = abortControllersByJobId.get(String(jobId));
   if (!ac) return false;
@@ -247,6 +249,7 @@ async function processOneJob(): Promise<void> {
       // ignore
     }
     abortControllersByJobId.delete(jobId);
-    // No delay between manga jobs; HTML pacing is handled per request
+    // Always pause before moving to the next URL (even if exists/duplicate/failed).
+    await sleep(3_500);
   }
 }

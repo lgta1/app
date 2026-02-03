@@ -13,6 +13,8 @@ import { useFileOperations } from "~/hooks/use-file-operations";
 import {
   compressMultipleImages,
   formatFileSize,
+  getImageSegmentMeta,
+  splitLongImages,
   validateImageFile,
 } from "~/utils/image-compression.utils";
 import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
@@ -219,21 +221,23 @@ export default function CreateChapter() {
       return;
     }
 
+    const splitList = await splitLongImages(list, { maxHeight: 3000 });
+
     // BEGIN <feature> CHAPTER_SKIP_COMPRESSION_ADD_FILES>
     if (skipCompression) {
       // KHÔNG nén + KHÔNG đổi WebP: dùng file gốc
       const now = Date.now();
-      const newPreviewImages: PreviewImage[] = list.map((file, index) => ({
+      const newPreviewImages: PreviewImage[] = splitList.map((file, index) => ({
         file,
         url: URL.createObjectURL(file),
         id: `${now}-${index}`,
         originalSize: file.size,
       }));
-      setContents((prev) => [...prev, ...list]);
+      setContents((prev) => [...prev, ...splitList]);
       setPreviewImages((prev) => [...prev, ...newPreviewImages]);
-      const totalSize = list.reduce((a, f) => a + f.size, 0);
+      const totalSize = splitList.reduce((a, f) => a + f.size, 0);
       toast.success(
-        `Đã thêm ${list.length} ảnh (KHÔNG nén, KHÔNG đổi WebP) • Tổng ~${formatFileSize(
+        `Đã thêm ${splitList.length} ảnh (KHÔNG nén, KHÔNG đổi WebP) • Tổng ~${formatFileSize(
           totalSize,
         )}`,
       );
@@ -245,13 +249,13 @@ export default function CreateChapter() {
     setCompressionProgress({
       isCompressing: true,
       current: 0,
-      total: list.length,
+      total: splitList.length,
     });
 
     try {
       toast.loading("Đang tối ưu dung lượng ảnh", { id: "compression" });
 
-      const compressionResults = await compressMultipleImages(list, (current, total) => {
+      const compressionResults = await compressMultipleImages(splitList, (current, total) => {
         setCompressionProgress({
           isCompressing: true,
           current,
@@ -282,13 +286,13 @@ export default function CreateChapter() {
         const totalCompressedSize = compressionResults.reduce((acc, curr) => acc + curr.compressedSize, 0);
         const totalSavings = ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100;
         toast.success(
-          `Đã tối ưu ${list.length} ảnh thành công! Tiết kiệm ${formatFileSize(
+          `Đã tối ưu ${splitList.length} ảnh thành công! Tiết kiệm ${formatFileSize(
             totalOriginalSize - totalCompressedSize,
           )} (${Math.round(totalSavings)}%)`,
           { id: "compression" },
         );
       } else {
-        toast.success(`Đã tối ưu ${list.length} ảnh thành công!`, { id: "compression" });
+        toast.success(`Đã tối ưu ${splitList.length} ảnh thành công!`, { id: "compression" });
       }
     } catch (error) {
       console.error("Error compressing images:", error);
@@ -408,6 +412,24 @@ export default function CreateChapter() {
   };
   // ====== END <feature> FOLDER_PICKER_SUPPORT_REFS> ======
 
+  const buildWatermarkSelection = (files: File[]) => {
+    const groupIndexById = new Map<string, number>();
+    let groupCount = 0;
+    files.forEach((file, idx) => {
+      const meta = getImageSegmentMeta(file);
+      const groupId = meta.groupId || `${file.name}-${idx}`;
+      if (!groupIndexById.has(groupId)) {
+        groupIndexById.set(groupId, groupCount);
+        groupCount += 1;
+      }
+    });
+
+    return {
+      groupIndexById,
+      watermarkIndexes: selectWatermarkIndexes(groupCount),
+    };
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -428,12 +450,15 @@ export default function CreateChapter() {
 
     setIsSubmitting(true);
 
-    const watermarkIndexes = selectWatermarkIndexes(contents.length);
+    const { groupIndexById, watermarkIndexes } = buildWatermarkSelection(contents);
 
     // Prepare files for upload - only content pages
     let watermarkOrder = 0;
     const filesToUpload = contents.map((file, idx) => {
-      const shouldWatermark = watermarkIndexes.has(idx);
+      const meta = getImageSegmentMeta(file);
+      const groupId = meta.groupId || `${file.name}-${idx}`;
+      const groupIndex = groupIndexById.get(groupId) ?? idx;
+      const shouldWatermark = !meta.noWatermark && watermarkIndexes.has(groupIndex);
       if (!shouldWatermark) {
         return { file, options: { prefixPath: "manga-images" } };
       }
@@ -611,6 +636,33 @@ export default function CreateChapter() {
   const onCardDragEnd = () => {
     setDraggingIndex(null);
     setOverIndex(null);
+  };
+
+  const previewGroupIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let next = 0;
+    previewImages.forEach((img) => {
+      if (!img.file) return;
+      const meta = getImageSegmentMeta(img.file);
+      const groupId = meta.groupId || `file-${img.id}`;
+      if (!map.has(groupId)) {
+        map.set(groupId, next);
+        next += 1;
+      }
+    });
+    return map;
+  }, [previewImages]);
+
+  const getPreviewIndexLabel = (image: PreviewImage, fallbackIndex: number) => {
+    if (!image.file) return String(fallbackIndex + 1);
+    const meta = getImageSegmentMeta(image.file);
+    const groupId = meta.groupId || `file-${image.id}`;
+    const groupIndex = previewGroupIndexMap.get(groupId);
+    const base = (typeof groupIndex === "number" ? groupIndex : fallbackIndex) + 1;
+    if (meta.segmentCount && meta.segmentCount > 1) {
+      return `${base}.${(meta.segmentIndex ?? 0) + 1}`;
+    }
+    return String(base);
   };
  // (7) Cleanup URL preview khi unmount (bảo hiểm rò rỉ)
  const latestPreviewsRef = useRef<PreviewImage[]>([]);
@@ -955,7 +1007,7 @@ export default function CreateChapter() {
                         {/* position + filename under thumbnail */}
                         <div className="mt-1 w-full">
                           <div className="text-txt-primary text-xs font-semibold">
-                            #{idx + 1}
+                            #{getPreviewIndexLabel(image, idx)}
                           </div>
                           <div
                             className="text-txt-secondary text-[11px] leading-tight truncate"

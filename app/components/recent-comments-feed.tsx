@@ -15,6 +15,12 @@ interface FeedItem {
   id: string;
   content: string;
   parentId?: string;
+  parent?: {
+    id: string;
+    content?: string;
+    createdAt?: string | Date;
+    user?: { id: string; name: string; avatar?: string } | null;
+  } | null;
   createdAt: string | Date;
   reactionCounts?: Partial<ReactionCounts>;
   totalReactions?: number;
@@ -121,6 +127,12 @@ export default function RecentCommentsFeed({
   );
   const stripGifLinks = (text: string) => (text || "").replace(GIF_REGEX, "").replace(/\n{3,}/g, "\n\n").trim();
   const extractGifLinks = (text: string) => (text.match(GIF_REGEX) ?? []).slice(0, 1);
+  const formatShortDistance = (date: Date) => {
+    const text = formatDistanceToNow(date);
+    if (/\b\d+\s*phút trước\b/.test(text)) return text.replace(/\s*phút trước/, "p");
+    if (/\b\d+\s*giờ trước\b/.test(text)) return text.replace(/\s*giờ trước/, "h");
+    return text;
+  };
 
   return (
     <div className="bg-bgc-layer1 border-bd-default w-full overflow-hidden rounded-2xl border p-0 ml-auto mt-6 md:mt-8">
@@ -146,6 +158,7 @@ export default function RecentCommentsFeed({
             const avatarUrl = c.user?.avatar || "";
             const mangaHandle = c.manga ? getMangaHandle(c.manga as any) : null;
             const mangaHref = mangaHandle ? buildMangaUrl(c.manga as any) : null;
+            const parentPreview = c.parent?.content ? stripGifLinks(c.parent.content) : "";
             return (
               <li key={c.id} className="flex items-start gap-3 px-3 py-3">
                 <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#121826] ring-1 ring-white/10">
@@ -177,9 +190,22 @@ export default function RecentCommentsFeed({
                     ) : (
                       <span className="truncate max-w-[40%] text-white/60">{c.manga?.title ?? "?"}</span>
                     )}
-                    <span className="ml-auto text-[11px] text-white/40">{formatDistanceToNow(new Date(c.createdAt))}</span>
+                    <span className="ml-auto text-[11px] text-white/40">{formatShortDistance(new Date(c.createdAt))}</span>
                   </div>
                   <div className="mt-1 text-sm leading-5 text-white/90">
+                    {c.parentId ? (
+                      <div className="mb-1 text-[11px] leading-4 text-white/50">
+                        <span className="mr-1">↳</span>
+                        <span className="font-medium text-white/70">
+                          {c.parent?.user?.name ?? "Ẩn danh"}
+                        </span>
+                        {parentPreview ? (
+                          <span className="ml-1 line-clamp-1 text-white/50">{parentPreview}</span>
+                        ) : (
+                          <span className="ml-1 text-white/40">Bình luận gốc</span>
+                        )}
+                      </div>
+                    ) : null}
                     {stripGifLinks(c.content)}
                     {extractGifLinks(c.content).length > 0 && (
                       <span className="ml-2 inline-flex items-center gap-1 align-middle">
