@@ -14,6 +14,7 @@ import {
   compressMultipleImages,
   formatFileSize,
   getImageSegmentMeta,
+  mergeImagesVertically,
   splitLongImages,
   validateImageFile,
 } from "~/utils/image-compression.utils";
@@ -136,6 +137,8 @@ export default function CreateChapter() {
     total: 0,
   });
   const [folderSupported, setFolderSupported] = useState(false);
+  const [mergeTailEnabled, setMergeTailEnabled] = useState(false);
+  const [mergeTailCount, setMergeTailCount] = useState(5);
 
   // Dropzone highlight
   const [dragOver, setDragOver] = useState(false);
@@ -450,11 +453,44 @@ export default function CreateChapter() {
 
     setIsSubmitting(true);
 
-    const { groupIndexById, watermarkIndexes } = buildWatermarkSelection(contents);
+    let uploadContents = contents;
+    if (isAdminUser && mergeTailEnabled) {
+      const safeCount = Math.max(2, Math.min(mergeTailCount, contents.length));
+      if (safeCount >= 2 && contents.length >= safeCount) {
+        try {
+          const tail = contents.slice(-safeCount);
+          const head = contents.slice(0, Math.max(0, contents.length - safeCount));
+          const tailMime = tail[tail.length - 1]?.type || "image/webp";
+          const tailExt =
+            tailMime === "image/png"
+              ? "png"
+              : tailMime === "image/jpeg" || tailMime === "image/jpg"
+                ? "jpg"
+                : tailMime === "image/webp"
+                  ? "webp"
+                  : "webp";
+          const merged = await mergeImagesVertically(tail, {
+            outputName: `merged-tail-${Date.now()}.${tailExt}`,
+            outputMime: tailMime,
+          });
+          uploadContents = [...head, merged];
+        } catch (mergeError) {
+          const message =
+            mergeError instanceof Error
+              ? mergeError.message
+              : "Không thể ghép ảnh cuối. Vui lòng thử lại hoặc tắt tùy chọn.";
+          toast.error(message);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
+
+    const { groupIndexById, watermarkIndexes } = buildWatermarkSelection(uploadContents);
 
     // Prepare files for upload - only content pages
     let watermarkOrder = 0;
-    const filesToUpload = contents.map((file, idx) => {
+    const filesToUpload = uploadContents.map((file, idx) => {
       const meta = getImageSegmentMeta(file);
       const groupId = meta.groupId || `${file.name}-${idx}`;
       const groupIndex = groupIndexById.get(groupId) ?? idx;
@@ -944,6 +980,41 @@ export default function CreateChapter() {
               <p className="text-txt-secondary text-center text-sm leading-tight font-medium">
                 Truyện ghép từ các ảnh ngắn sẽ tải nhanh hơn. Ảnh giữ nguyên thứ tự khi upload; có thể kéo-thả để đổi thứ tự hiển thị.
               </p>
+
+              {isAdminUser && (
+                <div className="bg-bgc-layer2 border-bd-default mt-2 flex w-full flex-col items-center gap-2 rounded-xl border px-3 py-2.5">
+                  <label className="text-txt-primary flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={mergeTailEnabled}
+                      onChange={(e) => setMergeTailEnabled(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span>Ghép ảnh cuối thành 1 ảnh khi upload</span>
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-txt-secondary text-sm">Số ảnh ghép:</span>
+                    <input
+                      type="number"
+                      min={2}
+                      max={50}
+                      value={mergeTailCount}
+                      onChange={(e) => {
+                        const next = Number.parseInt(e.target.value, 10);
+                        if (Number.isNaN(next)) return;
+                        setMergeTailCount(Math.max(2, Math.min(50, next)));
+                      }}
+                      disabled={!mergeTailEnabled}
+                      className="bg-bgc-layer1 border-bd-default text-txt-primary w-20 rounded-lg border px-2 py-1 text-center text-sm font-semibold disabled:opacity-50"
+                    />
+                  </div>
+
+                  <p className="text-txt-secondary text-center text-xs leading-tight">
+                    Chỉ admin: sau khi nén và watermark, hệ thống sẽ ghép N ảnh cuối thành 1 ảnh trước khi upload.
+                  </p>
+                </div>
+              )}
 
               {/* Preview Images - Below text */}
               {previewImages.length > 0 && (

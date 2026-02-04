@@ -1,5 +1,6 @@
-import { redirect } from "react-router";
 import type { LoaderFunctionArgs } from "react-router-dom";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 export async function loader(_args: LoaderFunctionArgs) {
   try {
@@ -20,7 +21,23 @@ export async function loader(_args: LoaderFunctionArgs) {
     // ignore
   }
 
-  const res = redirect("/sitemap4.xml", { status: 301 });
-  res.headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
-  return res;
+  try {
+    const sitemapPath = path.join(process.cwd(), "public", "sitemapforfun2.xml");
+    const xml = await readFile(sitemapPath, "utf-8");
+    return new Response(xml, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=300, s-maxage=300",
+      },
+    });
+  } catch {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: "/sitemapforfun2.xml",
+        "Cache-Control": "public, max-age=300, s-maxage=300",
+      },
+    });
+  }
 }

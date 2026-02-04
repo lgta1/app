@@ -1,8 +1,14 @@
 import { getUserInfoFromSession } from "@/services/session.svc";
+import { MINIO_CONFIG } from "@/configs/minio.config";
 
 import type { Route } from "./+types/api.files.download";
 
-import { downloadFile, getPublicFileInfo, getPublicFileUrl } from "~/utils/minio.utils";
+import {
+  downloadFile,
+  getEnvironmentPrefix,
+  getPublicFileInfo,
+  getPublicFileUrl,
+} from "~/utils/minio.utils";
 import { getCdnBase } from "~/.server/utils/cdn-url";
 import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 
@@ -35,10 +41,46 @@ export async function loader({ request }: Route.LoaderArgs) {
       );
     }
 
+    const normalizePath = (value: string) => String(value || "").replace(/^\/+/, "");
+    const resolvePublicInfo = async (value: string) => {
+      const raw = normalizePath(value);
+      const candidates = new Set<string>();
+      if (raw) candidates.add(raw);
+
+      // Handle bucket-prefixed paths
+      const bucket = MINIO_CONFIG.DEFAULT_BUCKET || "";
+      if (bucket && raw.startsWith(`${bucket}/`)) {
+        candidates.add(raw.slice(bucket.length + 1));
+      }
+
+      // Handle env prefix (test/)
+      const envPrefix = getEnvironmentPrefix();
+      if (envPrefix) {
+        const withEnv = `${envPrefix}/${raw}`.replace(/^\/+/, "");
+        candidates.add(withEnv);
+        if (raw.startsWith(`${envPrefix}/`)) {
+          candidates.add(raw.slice(envPrefix.length + 1));
+        }
+      }
+
+      let lastError: unknown = null;
+      for (const candidate of candidates) {
+        try {
+          const info = await getPublicFileInfo(candidate);
+          return { info, fullPath: candidate };
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error("File not found");
+    };
+
     if (download) {
       // Direct download - stream the file
-      const fileStream = await downloadFile(fullPath);
-      const fileInfo = await getPublicFileInfo(fullPath);
+      const resolved = await resolvePublicInfo(fullPath);
+      const fileStream = await downloadFile(resolved.fullPath);
+      const fileInfo = resolved.info;
 
       // Convert stream to response
       const chunks: Buffer[] = [];
@@ -63,14 +105,15 @@ export async function loader({ request }: Route.LoaderArgs) {
       });
     } else {
       // Return direct public URL (no expiration needed)
-      const downloadUrl = getPublicFileUrl(fullPath);
-      const fileInfo = await getPublicFileInfo(fullPath);
+      const resolved = await resolvePublicInfo(fullPath);
+      const downloadUrl = getPublicFileUrl(resolved.fullPath);
+      const fileInfo = resolved.info;
 
       const payload = {
         success: true,
         data: {
           downloadUrl, // Direct public URL
-          fullPath,
+          fullPath: resolved.fullPath,
           isPublic: true,
           fileInfo: {
             name: fileInfo.name,

@@ -22,6 +22,7 @@ import {
 
 import { useFileOperations } from "~/hooks/use-file-operations"; // giống chapter.create
 import { MangaDetail } from "~/components/manga-detail";
+import DownloadChaptersDialog from "~/components/download-chapters-dialog";
 import {
   compressMultipleImages,
   generatePosterVariants,
@@ -51,6 +52,7 @@ import { MangaModel } from "~/database/models/manga.model";
 import { BusinessError } from "~/helpers/errors.helper";
 import { toastWarning } from "~/helpers/toast.helper";
 import { isAdmin, isDichGia, canBulkDownloadChapters } from "~/helpers/user.helper";
+import { toSlug } from "~/utils/slug.utils";
 import { formatDate, formatTime } from "~/utils/date.utils";
 import { buildGenreDisplayMap } from "~/.server/utils/genre-display-map";
 
@@ -387,6 +389,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const showChapterSize = isAdminUser;
   const hasOneshotGenre =
     Array.isArray(genres) && genres.some((g: unknown) => String(g).toLowerCase() === "oneshot");
+  const costPerChapter = useMemo(() => {
+    const list = Array.isArray(genres) ? genres : [];
+    const isOneshot = list
+      .map((item: any) => toSlug(String(item)))
+      .map((slug: string) => slug.toLowerCase())
+      .includes("oneshot");
+    return isOneshot ? 3 : 1;
+  }, [genres]);
 
   // Keep local chapters in sync with loader data (supports redirect/revalidate without requiring F5)
   useEffect(() => {
@@ -961,16 +971,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     <div className="container-page mx-auto px-4 py-6">
       <Toaster position="bottom-right" />
       <div className="w-full">
-        {/* Khu vực nút quản lý riêng (sửa, duyệt, từ chối) đặt TRÊN phần mô tả */}
+        {/* Khu vực nút quản lý riêng (admin giữ nguyên) */}
         <div className="mb-6 flex flex-wrap items-center gap-4">
-          <Link to={`/truyen-hentai/edit/${mangaHandle}`}>
-            <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors">
-              <Edit className="h-5 w-5" />
-              <span className="text-sm font-semibold">Sửa thông tin chung</span>
-            </button>
-          </Link>
           {isAdminUser && (
             <>
+              <Link to={`/truyen-hentai/edit/${mangaHandle}`}>
+                <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors">
+                  <Edit className="h-5 w-5" />
+                  <span className="text-sm font-semibold">Sửa thông tin chung</span>
+                </button>
+              </Link>
               {status !== MANGA_STATUS.APPROVED && (
                 <button
                   className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-green-500 px-4 py-3 text-green-400 shadow-[0px_4px_8.9px_0px_rgba(34,197,94,0.25)] transition-colors hover:bg-green-500/10"
@@ -1033,6 +1043,21 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               </div>
             </div>
 
+            {!isAdminUser && (isOwner || isDichGiaUser) ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-semibold text-txt-primary">Tải truyện</p>
+                <DownloadChaptersDialog
+                  mangaId={String(manga.id)}
+                  mangaTitle={String(manga.title || "")}
+                  mangaSlug={String(manga.slug || manga.id)}
+                  chapters={chapters as any}
+                  isFreeDownload={true}
+                  costPerChapter={costPerChapter}
+                  className="mt-0"
+                />
+              </div>
+            ) : null}
+
             {isAdminUser ? (
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-semibold text-txt-primary">Lùi thời gian đăng</p>
@@ -1073,6 +1098,17 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             ) : null}
           </div>
         )}
+
+        {!isAdminUser ? (
+          <div className="mb-6">
+            <Link to={`/truyen-hentai/edit/${mangaHandle}`}>
+              <button className="border-lav-500 text-txt-focus hover:bg-lav-500/10 flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-3 shadow-[0px_4px_8.9px_0px_rgba(146,53,190,0.25)] transition-colors">
+                <Edit className="h-5 w-5" />
+                <span className="text-sm font-semibold">Sửa thông tin chung</span>
+              </button>
+            </Link>
+          </div>
+        ) : null}
 
         {/* Preview hiển thị giống trang công khai (ẩn nút hành động đọc / follow) */}
         <MangaDetail

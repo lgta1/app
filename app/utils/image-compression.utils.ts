@@ -171,13 +171,102 @@ export async function splitLongImages(
           groupId,
           segmentIndex,
           segmentCount,
-          noWatermark: segmentIndex > 0,
+          noWatermark: segmentIndex < segmentCount - 1,
         }),
       );
     }
   }
 
   return results;
+}
+
+/**
+ * Ghép nhiều ảnh theo chiều dọc thành 1 ảnh.
+ * - Chỉ hỗ trợ ảnh tĩnh (không hỗ trợ GIF).
+ * - Không resize các ảnh phía trên; ảnh cuối sẽ resize theo chiều ngang của ảnh ngay trên nó.
+ */
+export async function mergeImagesVertically(
+  files: File[],
+  opts?: { outputName?: string; outputMime?: string; quality01?: number },
+): Promise<File> {
+  if (files.length < 2) {
+    throw new Error("Cần ít nhất 2 ảnh để ghép");
+  }
+
+  const gif = files.find((f) => f.type === "image/gif");
+  if (gif) {
+    throw new Error(`Không hỗ trợ ghép ảnh GIF: ${gif.name}`);
+  }
+
+  const images = await Promise.all(
+    files.map(async (file) => {
+      const dataUrl = await imageCompression.getDataUrlFromFile(file);
+      const img = await loadImage(dataUrl);
+      return {
+        file,
+        img,
+        width: img.naturalWidth || img.width,
+        height: img.naturalHeight || img.height,
+      };
+    }),
+  );
+
+  const nonLastImages = images.slice(0, -1);
+  const nonLastMaxWidth = nonLastImages.length > 0
+    ? Math.max(...nonLastImages.map((i) => i.width))
+    : images[0].width;
+  const targetLastWidth = nonLastImages.length > 0 ? nonLastImages[nonLastImages.length - 1].width : images[0].width;
+  const totalHeight = images.reduce((sum, i, idx) => {
+    if (idx !== images.length - 1) return sum + i.height;
+    const scale = targetLastWidth > 0 ? targetLastWidth / i.width : 1;
+    return sum + Math.max(1, Math.round(i.height * scale));
+  }, 0);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, nonLastMaxWidth);
+  canvas.height = Math.max(1, totalHeight);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Không thể khởi tạo canvas context");
+
+  let y = 0;
+  images.forEach((item, idx) => {
+    if (idx !== images.length - 1) {
+      ctx.drawImage(item.img, 0, y, item.width, item.height);
+      y += item.height;
+      return;
+    }
+
+    const scale = targetLastWidth > 0 ? targetLastWidth / item.width : 1;
+    const drawWidth = targetLastWidth > 0 ? targetLastWidth : item.width;
+    const drawHeight = Math.max(1, Math.round(item.height * scale));
+    ctx.drawImage(item.img, 0, y, drawWidth, drawHeight);
+    y += drawHeight;
+  });
+
+  const lastFile = files[files.length - 1];
+  const fallbackMime = "image/webp";
+  const preferredMime = lastFile.type || fallbackMime;
+  const outputMime = opts?.outputMime || preferredMime;
+  const quality01 =
+    typeof opts?.quality01 === "number" && Number.isFinite(opts.quality01)
+      ? opts.quality01
+      : outputMime === "image/webp" || outputMime === "image/jpeg" || outputMime === "image/jpg"
+        ? 1
+        : undefined;
+
+  const nameWithoutExt = lastFile.name.replace(/\.[^/.]+$/, "");
+  const ext =
+    outputMime === "image/png"
+      ? "png"
+      : outputMime === "image/jpeg" || outputMime === "image/jpg"
+        ? "jpg"
+        : outputMime === "image/webp"
+          ? "webp"
+          : "webp";
+  const rawOutputName = opts?.outputName || `${nameWithoutExt}__merged.${ext}`;
+  const outputName = rawOutputName.includes(".") ? rawOutputName : `${rawOutputName}.${ext}`;
+
+  return canvasToFile(canvas, outputMime, outputName, quality01);
 }
 
 /**

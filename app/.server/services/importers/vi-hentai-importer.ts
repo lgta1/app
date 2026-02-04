@@ -18,6 +18,7 @@ import { GenresModel } from "~/database/models/genres.model";
 import { slugify } from "~/utils/slug.utils";
 import { stripDiacritics } from "~/utils/text-normalize";
 import { deleteFiles as deletePublicFiles } from "~/utils/minio.utils";
+import type { PosterVariantsPayload } from "~/utils/poster-variants.utils";
 import genresData from "~/../data/genres-full.json";
 import supplementalGenresData from "~/../data/genres-missing-upsert.json";
 
@@ -581,6 +582,8 @@ const POSTER_TARGET_WIDTH = 625;
 const POSTER_ASPECT_TOLERANCE = 0.01;
 const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
+const POSTER_VARIANT_400_MIN_WIDTH = 450;
+const POSTER_VARIANT_220_MIN_WIDTH = 301;
 
 const classifyPosterAspect = (ratio: number): PosterAspect => {
   if (Math.abs(ratio - ASPECT_THREE_FOUR) <= POSTER_ASPECT_TOLERANCE) return "3:4";
@@ -591,7 +594,7 @@ const classifyPosterAspect = (ratio: number): PosterAspect => {
 async function normalizePosterBuffer(
   buffer: Buffer,
   input: { contentType: string | null },
-): Promise<{ buffer: Buffer; contentType: string | null }> {
+): Promise<{ buffer: Buffer; contentType: string | null; width?: number; height?: number }> {
   try {
     const base = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS }).rotate();
     const meta = await base.metadata();
@@ -610,7 +613,7 @@ async function normalizePosterBuffer(
 
     // Match client behavior: if no changes needed (and not PNG conversion), keep as-is.
     if (!needsCrop && !needsResize && !needsPngConvert) {
-      return { buffer, contentType: input.contentType || formatToContentType(format) };
+      return { buffer, contentType: input.contentType || formatToContentType(format), width, height };
     }
 
     let pipeline = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS }).rotate();
@@ -637,21 +640,25 @@ async function normalizePosterBuffer(
     // Convert PNG -> WebP (quality 95). JPG/WEBP keep.
     if (format === "png") {
       const out = await pipeline.webp({ quality: 95, effort: 4 }).toBuffer();
-      return { buffer: out, contentType: "image/webp" };
+      const dims = await getImageDimensions(out);
+      return { buffer: out, contentType: "image/webp", width: dims.width, height: dims.height };
     }
 
     // Keep input format but do a deterministic encode.
     if (format === "jpeg" || format === "jpg") {
       const out = await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
-      return { buffer: out, contentType: "image/jpeg" };
+      const dims = await getImageDimensions(out);
+      return { buffer: out, contentType: "image/jpeg", width: dims.width, height: dims.height };
     }
     if (format === "webp") {
       const out = await pipeline.webp({ quality: 92, effort: 4 }).toBuffer();
-      return { buffer: out, contentType: "image/webp" };
+      const dims = await getImageDimensions(out);
+      return { buffer: out, contentType: "image/webp", width: dims.width, height: dims.height };
     }
     if (format === "avif") {
       const out = await pipeline.avif({ quality: 60, effort: 4 }).toBuffer();
-      return { buffer: out, contentType: "image/avif" };
+      const dims = await getImageDimensions(out);
+      return { buffer: out, contentType: "image/avif", width: dims.width, height: dims.height };
     }
 
     // Fallback: passthrough (unknown format)
@@ -659,6 +666,119 @@ async function normalizePosterBuffer(
   } catch {
     return { buffer, contentType: input.contentType };
   }
+}
+
+const contentTypeToFormat = (contentType?: string | null): string => {
+  const ct = String(contentType || "").toLowerCase();
+  if (ct.includes("image/webp")) return "webp";
+  if (ct.includes("image/avif")) return "avif";
+  if (ct.includes("image/png")) return "png";
+  return "jpeg";
+};
+
+async function encodePosterWithFormat(pipeline: sharp.Sharp, format: string): Promise<{ buffer: Buffer; contentType: string }>{
+  const f = String(format || "").toLowerCase();
+  if (f === "webp") return { buffer: await pipeline.webp({ quality: 92, effort: 4 }).toBuffer(), contentType: "image/webp" };
+  if (f === "avif") return { buffer: await pipeline.avif({ quality: 60, effort: 4 }).toBuffer(), contentType: "image/avif" };
+  if (f === "png") return { buffer: await pipeline.png({ compressionLevel: 9 }).toBuffer(), contentType: "image/png" };
+  return { buffer: await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer(), contentType: "image/jpeg" };
+}
+
+async function resizePosterVariantBuffer(
+  buffer: Buffer,
+  contentType: string | null,
+  targetWidth: number,
+): Promise<{ buffer: Buffer; contentType: string; width?: number; height?: number }> {
+  const pipeline = sharp(buffer, { limitInputPixels: IMAGE_LIMIT_PIXELS })
+    .rotate()
+    .resize({ width: targetWidth, withoutEnlargement: true });
+  const format = contentTypeToFormat(contentType);
+  const encoded = await encodePosterWithFormat(pipeline, format);
+  const dims = await getImageDimensions(encoded.buffer);
+  return { buffer: encoded.buffer, contentType: encoded.contentType, width: dims.width, height: dims.height };
+}
+
+async function buildPosterVariantsFromBuffer(
+  input: { buffer: Buffer; contentType: string | null; width?: number; height?: number },
+): Promise<{
+  base: { buffer: Buffer; contentType: string | null; width?: number; height?: number };
+  w400?: { buffer: Buffer; contentType: string; width?: number; height?: number };
+  w220?: { buffer: Buffer; contentType: string; width?: number; height?: number };
+}> {
+  const base = input;
+  const baseWidth = typeof base.width === "number" ? base.width : undefined;
+
+  let w400: { buffer: Buffer; contentType: string; width?: number; height?: number } | undefined;
+  let w220: { buffer: Buffer; contentType: string; width?: number; height?: number } | undefined;
+
+  if (typeof baseWidth === "number" && baseWidth > POSTER_VARIANT_400_MIN_WIDTH) {
+    w400 = await resizePosterVariantBuffer(base.buffer, base.contentType, 400);
+  }
+
+  if (typeof baseWidth === "number" && baseWidth > POSTER_VARIANT_220_MIN_WIDTH) {
+    w220 = await resizePosterVariantBuffer(base.buffer, base.contentType, 220);
+  }
+
+  return { base, w400, w220 };
+}
+
+async function downloadAndUploadPosterVariants(options: {
+  posterUrl: string;
+  refererUrl: string;
+  originUrl: string;
+  timeoutMs: number;
+  retries: number;
+  abortSignal?: AbortSignal;
+}): Promise<{ posterUrl: string; posterVariants: PosterVariantsPayload } | null> {
+  const fetchedPoster = await fetchRemoteBufferWithRetry(options.posterUrl, {
+    timeoutMs: options.timeoutMs,
+    retries: options.retries,
+    retryDelayMs: 800,
+    signal: options.abortSignal,
+    headers: {
+      ...HEADERS,
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      Referer: options.refererUrl,
+      Origin: options.originUrl,
+    },
+  });
+
+  const normalizedPoster = await normalizePosterBuffer(fetchedPoster.buffer, {
+    contentType: fetchedPoster.contentType,
+  });
+
+  const variants = await buildPosterVariantsFromBuffer(normalizedPoster);
+
+  const uploadEntry = async (key: "w625" | "w400" | "w220", variant: { buffer: Buffer; contentType: string | null; width?: number; height?: number }) => {
+    const uploaded = await uploadImageBuffer(options.posterUrl, variant.buffer, variant.contentType, {
+      prefixPath: "manga-posters",
+      filenameHintBase: `poster-${key}`,
+      maxSizeInBytes: 9 * 1024 * 1024,
+    });
+    return {
+      url: uploaded.url,
+      width: variant.width,
+      height: variant.height,
+      fullPath: uploaded.fullPath,
+      bytes: uploaded.sizeBytes,
+    };
+  };
+
+  const posterVariants: PosterVariantsPayload = {};
+  posterVariants.w625 = await uploadEntry("w625", variants.base);
+
+  if (variants.w400) {
+    posterVariants.w400 = await uploadEntry("w400", variants.w400);
+  }
+
+  if (variants.w220) {
+    posterVariants.w220 = await uploadEntry("w220", variants.w220);
+  }
+
+  return {
+    posterUrl: posterVariants.w625?.url || posterVariants.w400?.url || posterVariants.w220?.url || options.posterUrl,
+    posterVariants,
+  };
 }
 
 async function reencodeKeepResolutionMinus10(
@@ -2117,32 +2237,24 @@ export async function autoDownloadViHentaiManga(
     throwIfAborted();
     await emitProgress({ stage: "poster", message: "Đang tải poster..." });
     try {
-      const fetchedPoster = await fetchRemoteBufferWithRetry(parsed.poster, {
+      const posterResult = await downloadAndUploadPosterVariants({
+        posterUrl: parsed.poster,
+        refererUrl: importOptions.url,
+        originUrl: new URL(importOptions.url).origin,
         timeoutMs: imageTimeoutMs,
         retries: imageRetries,
-        retryDelayMs: 800,
-        signal: abortSignal,
-        headers: {
-          ...HEADERS,
-          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-          Referer: importOptions.url,
-          Origin: new URL(importOptions.url).origin,
-        },
-      });
-
-      const normalizedPoster = await normalizePosterBuffer(fetchedPoster.buffer, {
-        contentType: fetchedPoster.contentType,
+        abortSignal,
       });
 
       throwIfAborted();
 
-      const uploaded = await uploadImageBuffer(parsed.poster, normalizedPoster.buffer, normalizedPoster.contentType, {
-        prefixPath: "manga-posters",
-        filenameHintBase: "poster",
-        maxSizeInBytes: 9 * 1024 * 1024,
-      });
-
-      payload = { ...payload, poster: uploaded.url };
+      if (posterResult) {
+        payload = {
+          ...payload,
+          poster: posterResult.posterUrl,
+          posterVariants: posterResult.posterVariants,
+        };
+      }
       await emitProgress({ stage: "poster", message: "Poster OK" });
     } catch (e) {
       // Keep original remote poster as fallback
@@ -2515,6 +2627,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     imageDelayMs = 150,
     imageTimeoutMs = 30_000,
     imageRetries = 2,
+    abortSignal,
     onProgress,
     ...importOptions
   } = options as any;
@@ -2592,7 +2705,10 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     };
   }
 
+  const mangaId = String(existing._id);
+
   await emitProgress({ stage: "chapters", message: "Đang lấy danh sách chương..." });
+
   const chapterListHtml = await fetchViHentaiHtmlForAutoUpdate(importOptions.url);
   const chapterList = parseChapterList(load(chapterListHtml), importOptions.url);
   const sourceEntries = chapterList.entries;
@@ -2602,15 +2718,13 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
       mode: "noop",
       message: "Danh sách chương rỗng",
       parsedTitle: title,
-      mangaId: String(existing._id),
+      mangaId,
       mangaSlug: String(existing.slug || existing._id),
       chaptersAdded: 0,
       imagesUploaded: 0,
       chapterErrors: [],
     };
   }
-
-  const mangaId = String(existing._id);
 
   // IMPORTANT: Do NOT rely on MangaModel.chapters here.
   // In practice it can be stale or represent a different count than the actual chapter documents.
@@ -2837,8 +2951,8 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     }
   }
 
-  // Best-effort: set Manga.updatedAt based on source "Lần cuối".
-  if (parsed.lastUpdatedAt) {
+  // Best-effort: set Manga.updatedAt based on source "Lần cuối" only when new chapters were added.
+  if (parsed.lastUpdatedAt && result.chaptersAdded > 0) {
     try {
       await MangaModel.updateOne(
         { _id: mangaId },

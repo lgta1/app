@@ -10,7 +10,6 @@ import type { Route } from "./+types/truyen-hentai.$slug";
 import CommentDetail from "~/components/comment-detail";
 import { MangaDetail } from "~/components/manga-detail";
 import RatingItem from "~/components/rating-item";
-import ShareButtons from "~/components/share-buttons";
 import { DisturbingTagsWarningDialog } from "~/components/dialog-warning-disturbing-tags";
 
 // Related list tại trang chapter vẫn dùng component riêng
@@ -19,6 +18,7 @@ import { SameAuthorManga } from "~/components/same-author-manga";
 import React from "react"; // đảm bảo JSX types
 import LazyRender from "~/components/lazy-render";
 import ProfileUploaderCard from "~/components/profile-uploader-card";
+import DownloadChaptersDialog from "~/components/download-chapters-dialog";
 import { toSlug } from "~/utils/slug.utils";
 import { useFileOperations } from "~/hooks/use-file-operations";
 import { generatePosterVariants } from "~/utils/image-compression.utils";
@@ -27,9 +27,9 @@ import { deletePublicFiles } from "~/utils/minio.utils";
 import { collectPosterVariantPaths, parsePosterVariantsPayload } from "~/.server/utils/poster-variants.server";
 
 import type { MangaType } from "~/database/models/manga.model";
+import type { ChapterType } from "~/database/models/chapter.model";
 // server helpers sẽ được import trong loader bằng dynamic import
 import { isAdmin } from "~/helpers/user.helper";
-import { DEFAULT_SHARE_IMAGE } from "~/constants/share-images";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const [mangaQuery, chapterQuery, leaderboardQuery, sessionSvc, userModel, genreDisplayUtils, ttlCacheUtils] =
@@ -94,6 +94,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           buildGenreDisplayMap(manga.genres as string[]),
         ]);
 
+      const rawGenres = Array.isArray((manga as any)?.genres) ? (manga as any).genres : [];
+      const isOneshot = rawGenres
+        .map((item: any) => toSlug(String(item)))
+        .map((slug: string) => slug.toLowerCase())
+        .includes("oneshot");
+      const costPerChapter = isOneshot ? 3 : 1;
+
       return {
         manga,
         chapters,
@@ -102,6 +109,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         recommendedManga,
         genreDisplayMap,
         uploader,
+        costPerChapter,
         robotsNoIndex: hasRestrictedGenres(manga.genres),
       };
     });
@@ -167,6 +175,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       buildGenreDisplayMap(manga.genres as string[]),
     ]);
 
+  const rawGenres = Array.isArray((manga as any)?.genres) ? (manga as any).genres : [];
+  const isOneshot = rawGenres
+    .map((item: any) => toSlug(String(item)))
+    .map((slug: string) => slug.toLowerCase())
+    .includes("oneshot");
+  const costPerChapter = isOneshot ? 3 : 1;
+
   return {
     manga,
     chapters,
@@ -175,6 +190,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     recommendedManga,
     genreDisplayMap,
     uploader,
+    costPerChapter,
     isLoggedIn: !!currentUser,
     isAdmin: isAdminUser,
     canManageManga: isAdminUser || isOwner,
@@ -270,7 +286,7 @@ export function meta({ data }: Route.MetaArgs) {
     ? `/truyen-hentai/${data.manga.slug}`
     : `/truyen-hentai/${data.manga.id}`;
   const canonicalUrl = `${origin}${canonicalPath}`;
-  const image = data.manga.shareImage || data.manga.poster || DEFAULT_SHARE_IMAGE;
+  const image = data.manga.poster || "";
 
   // Title cắt tối đa 50 ký tự trước khi thêm suffix
   const truncate = (str: string, max: number) =>
@@ -340,6 +356,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     isAdmin: userIsAdmin,
     canManageManga,
     uploader,
+    costPerChapter,
     sameAuthorManga,
     recommendedManga,
     genreDisplayMap,
@@ -571,7 +588,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             posterDropUploading={isPosterUpdating}
             posterDropHint="Ảnh mới được lưu ngay khi thả"
           />
-          <ShareButtons title={manga.title} />
+          {isLoggedIn ? (
+            <DownloadChaptersDialog
+              mangaId={String(manga.id)}
+              mangaTitle={String(manga.title || "")} 
+              mangaSlug={String(manga.slug || manga.id)}
+              chapters={chapters as ChapterType[]}
+              isFreeDownload={Boolean(canManageManga)}
+              costPerChapter={costPerChapter}
+            />
+          ) : null}
 
           {uploader ? (
             <div className="mt-6 md:hidden">
