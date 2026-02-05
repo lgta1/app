@@ -68,6 +68,46 @@ const MIME_TYPES: Record<string, string> = {
   ".csv": "text/csv",
 };
 
+const RETRYABLE_UPLOAD_ERRORS = [
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "RequestTimeout",
+  "ServiceUnavailable",
+  "timeout",
+  "socket hang up",
+];
+
+const isRetryableUploadError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return RETRYABLE_UPLOAD_ERRORS.some((token) => message.includes(token));
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const putObjectWithRetry = async (
+  client: Minio.Client,
+  bucket: string,
+  fullPath: string,
+  file: Buffer | Readable | string,
+  headers: Record<string, string>,
+  maxAttempts = 3,
+) => {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await client.putObject(bucket, fullPath, file, undefined, headers);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableUploadError(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+      const backoffMs = 300 * attempt + Math.floor(Math.random() * 200);
+      await sleep(backoffMs);
+    }
+  }
+  throw lastError;
+};
+
 // =============================================================================
 // INTERFACES
 // =============================================================================
@@ -310,6 +350,23 @@ export const getPublicFileUrl = (fullPath: string): string => {
 };
 
 /**
+ * Resolve storage fullPath from a public URL (CDN or MinIO style).
+ */
+export const getFullPathFromPublicUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    let path = parsed.pathname.replace(/^\/+/, "");
+    const bucket = MINIO_CONFIG.DEFAULT_BUCKET;
+    if (path.startsWith(bucket + "/")) {
+      path = path.slice(bucket.length + 1);
+    }
+    return path;
+  } catch {
+    return url;
+  }
+};
+
+/**
  * Lấy URL để download file - Hỗ trợ cả public và private, MinIO và R2
  */
 export const getFileUrl = async (
@@ -387,7 +444,7 @@ export const uploadToPublicBucket = async (
       headers["Cache-Control"] = options.cacheControl;
       headers["cache-control"] = options.cacheControl;
     }
-    const result = await client.putObject(bucket, fullPath, file, undefined, headers);
+    const result = await putObjectWithRetry(client, bucket, fullPath, file, headers);
 
     // Generate public URL
     const url = getPublicFileUrl(fullPath);
@@ -448,7 +505,7 @@ export const uploadFile = async (
       headers["Cache-Control"] = options.cacheControl;
       headers["cache-control"] = options.cacheControl;
     }
-    const result = await client.putObject(bucket, fullPath, file, undefined, headers);
+    const result = await putObjectWithRetry(client, bucket, fullPath, file, headers);
 
     // Generate private URL (presigned)
     const url = await getFileUrl(fullPath);

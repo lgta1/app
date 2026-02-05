@@ -95,6 +95,14 @@ export const createChapter = async (
     throw new BusinessError("Bạn cần đăng nhập để thực hiện hành động này");
   }
 
+  const requestId = typeof (chapter as any).requestId === "string" ? (chapter as any).requestId.trim() : "";
+  if (requestId) {
+    const existing = await ChapterModel.findOne({ mangaId: chapter.mangaId, requestId }).lean();
+    if (existing) {
+      return existing as any;
+    }
+  }
+
   let query: any = {
     _id: chapter.mangaId,
   };
@@ -161,6 +169,7 @@ export const createChapter = async (
         title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
         chapterNumber: finalNumber,
         slug: chapterSlug,
+        ...(requestId ? { requestId } : {}),
       });
 
       // Atomically bump chapters & set updatedAt to the new chapter's createdAt without auto timestamps
@@ -186,6 +195,18 @@ export const createChapter = async (
       const msg = String(e?.message || "");
       const isDup = code === 11000 || msg.includes("E11000");
       if (!isDup) throw e;
+
+      if (requestId) {
+        const existingByRequest = await ChapterModel.findOne({ mangaId: chapter.mangaId, requestId }).lean();
+        if (existingByRequest) return existingByRequest as any;
+      }
+
+      const existingByNumber = await ChapterModel.findOne({
+        mangaId: chapter.mangaId,
+        chapterNumber: finalNumber,
+      }).lean();
+      if (existingByNumber) return existingByNumber as any;
+
       // Recompute based on the same base title; suffix selection depends on current DB state.
       chapterSlug = await generateUniqueChapterSlug(
         String(chapter.mangaId),
@@ -202,6 +223,14 @@ export const createChapter = async (
 export const createChapterAsAdmin = async (
   chapter: Omit<ChapterType, "id" | "createdAt" | "updatedAt">,
 ) => {
+  const requestId = typeof (chapter as any).requestId === "string" ? (chapter as any).requestId.trim() : "";
+  if (requestId) {
+    const existing = await ChapterModel.findOne({ mangaId: chapter.mangaId, requestId }).lean();
+    if (existing) {
+      return existing as any;
+    }
+  }
+
   const manga = await MangaModel.findById(chapter.mangaId);
   if (!manga) {
     throw new BusinessError("Không tìm thấy manga");
@@ -238,6 +267,7 @@ export const createChapterAsAdmin = async (
         title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
         chapterNumber: finalNumber,
         slug: chapterSlug,
+        ...(requestId ? { requestId } : {}),
       });
 
       try {
@@ -261,6 +291,18 @@ export const createChapterAsAdmin = async (
       const msg = String(e?.message || "");
       const isDup = code === 11000 || msg.includes("E11000");
       if (!isDup) throw e;
+
+      if (requestId) {
+        const existingByRequest = await ChapterModel.findOne({ mangaId: chapter.mangaId, requestId }).lean();
+        if (existingByRequest) return existingByRequest as any;
+      }
+
+      const existingByNumber = await ChapterModel.findOne({
+        mangaId: chapter.mangaId,
+        chapterNumber: finalNumber,
+      }).lean();
+      if (existingByNumber) return existingByNumber as any;
+
       chapterSlug = await generateUniqueChapterSlug(
         String(chapter.mangaId),
         isPlaceholder ? `Chap ${finalNumber}` : finalTitle,

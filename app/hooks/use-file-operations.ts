@@ -52,6 +52,7 @@ export function useFileOperations() {
   const submit = useSubmit();
   const uploadFetcher = useFetcher();
   const deleteFetcher = useFetcher();
+  const MAX_UPLOAD_CONCURRENCY = 4;
 
   // Use refs to store callbacks
   const uploadCallbacksRef = useRef<UploadFileOptions | null>(null);
@@ -250,8 +251,17 @@ export function useFileOperations() {
         let completed = 0;
         const total = uploads.length;
         if (onProgress) onProgress(0, total);
-        // Parallel upload, update progress as each finishes
-        const uploadPromises = uploads.map(async ({ file, options }) => {
+        const results: UploadedFileResult[] = new Array(total);
+        let inFlight = 0;
+        let nextIndex = 0;
+
+        const runNext = async (): Promise<void> => {
+          if (nextIndex >= uploads.length) return;
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          inFlight += 1;
+
+          const { file, options } = uploads[currentIndex];
           const formData = new FormData();
           formData.append("file", file);
 
@@ -286,17 +296,25 @@ export function useFileOperations() {
             throw new BusinessError(result?.error || `Tải file lên thất bại (HTTP ${response.status})`);
           }
 
-          // Execute individual success callback if provided
           options.onSuccess?.(result.data);
 
           completed += 1;
           if (onProgress) onProgress(completed, total);
 
-          return result.data;
-        });
+          results[currentIndex] = result.data as UploadedFileResult;
+          inFlight -= 1;
 
-        // Wait for all uploads to complete
-        const results = await Promise.all(uploadPromises);
+          if (nextIndex < uploads.length) {
+            await runNext();
+          }
+        };
+
+        const starters = Array.from(
+          { length: Math.min(MAX_UPLOAD_CONCURRENCY, uploads.length) },
+          () => runNext(),
+        );
+
+        await Promise.all(starters);
 
         toast.success(`Upload ${results.length} file thành công!`);
         if (onProgress) onProgress(total, total);
@@ -327,66 +345,81 @@ export function useFileOperations() {
       let completed = 0;
       const total = uploads.length;
       let canceled = false;
+      let stopped = false;
 
       if (onProgress) onProgress(0, total);
 
-      const uploadPromises = uploads.map(async ({ file, options }, index) => {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        if (options.prefixPath) {
-          formData.append("prefixPath", options.prefixPath);
-        }
-
-        if (options.watermark) {
-          formData.append("watermark", "true");
-
-          if (options.watermarkVariant) {
-            formData.append("watermarkVariant", String(options.watermarkVariant));
-          }
-
-          if (options.watermarkStyle) {
-            formData.append("watermarkStyle", options.watermarkStyle);
-          }
-
-          if (options.watermarkStyle) {
-            formData.append("watermarkStyle", options.watermarkStyle);
-          }
-        }
-
-        const response = await fetch("/api/files/upload", {
-          method: "POST",
-          body: formData,
-          signal: controllers[index].signal,
-          credentials: "include",
-          headers: { "X-Requested-With": "fetch" },
-        });
-
-        const rawText = await response.text();
-        let result: any = null;
-        try {
-          result = rawText ? JSON.parse(rawText) : null;
-        } catch {
-          throw new BusinessError(`Phản hồi không hợp lệ (HTTP ${response.status})`);
-        }
-
-        if (!response.ok || !result?.success) {
-          throw new BusinessError(result?.error || `Tải file lên thất bại (HTTP ${response.status})`);
-        }
-
-        uploadedResults.push(result.data as UploadedFileResult);
-
-        options.onSuccess?.(result.data);
-
-        completed += 1;
-        if (onProgress) onProgress(completed, total);
-
-        return result.data as UploadedFileResult;
-      });
-
       const promise = (async () => {
         try {
-          const results = await Promise.all(uploadPromises);
+          const results: UploadedFileResult[] = new Array(total);
+          let inFlight = 0;
+          let nextIndex = 0;
+
+          const runNext = async (): Promise<void> => {
+            if (stopped || canceled || nextIndex >= uploads.length) return;
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            inFlight += 1;
+
+            const { file, options } = uploads[currentIndex];
+            const formData = new FormData();
+            formData.append("file", file);
+
+            if (options.prefixPath) {
+              formData.append("prefixPath", options.prefixPath);
+            }
+
+            if (options.watermark) {
+              formData.append("watermark", "true");
+
+              if (options.watermarkVariant) {
+                formData.append("watermarkVariant", String(options.watermarkVariant));
+              }
+
+              if (options.watermarkStyle) {
+                formData.append("watermarkStyle", options.watermarkStyle);
+              }
+            }
+
+            const response = await fetch("/api/files/upload", {
+              method: "POST",
+              body: formData,
+              signal: controllers[currentIndex].signal,
+              credentials: "include",
+              headers: { "X-Requested-With": "fetch" },
+            });
+
+            const rawText = await response.text();
+            let result: any = null;
+            try {
+              result = rawText ? JSON.parse(rawText) : null;
+            } catch {
+              throw new BusinessError(`Phản hồi không hợp lệ (HTTP ${response.status})`);
+            }
+
+            if (!response.ok || !result?.success) {
+              throw new BusinessError(result?.error || `Tải file lên thất bại (HTTP ${response.status})`);
+            }
+
+            uploadedResults.push(result.data as UploadedFileResult);
+            options.onSuccess?.(result.data);
+
+            completed += 1;
+            if (onProgress) onProgress(completed, total);
+
+            results[currentIndex] = result.data as UploadedFileResult;
+            inFlight -= 1;
+
+            if (nextIndex < uploads.length) {
+              await runNext();
+            }
+          };
+
+          const starters = Array.from(
+            { length: Math.min(MAX_UPLOAD_CONCURRENCY, uploads.length) },
+            () => runNext(),
+          );
+          await Promise.all(starters);
 
           if (!canceled) {
             toast.success(`Upload ${results.length} file thành công!`);
@@ -395,6 +428,7 @@ export function useFileOperations() {
 
           return results;
         } catch (error) {
+          stopped = true;
           if (isAbortError(error) || canceled) {
             throw new DOMException("Upload canceled", "AbortError");
           }

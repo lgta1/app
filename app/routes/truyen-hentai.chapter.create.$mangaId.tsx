@@ -1,6 +1,6 @@
 import { useRef, useState, useMemo, useEffect } from "react"; 
 import { toast, Toaster } from "react-hot-toast";
-import { Link, redirect, useActionData, useFetcher, useParams, useLoaderData } from "react-router";
+import { Link, useFetcher, useNavigate, useParams, useLoaderData } from "react-router";
 import { ArrowLeft, BookOpen, FileText, Upload, X } from "lucide-react";
 
 import { createChapter } from "@/mutations/chapter.mutation";
@@ -41,6 +41,9 @@ interface CompressionProgress {
   current: number;
   total: number;
 }
+
+const TMP_CHAPTER_PREFIX = "tmp/manga-images";
+const FINAL_CHAPTER_PREFIX = "manga-images";
 
 // BEGIN <feature> CHAPTER_CREATE_LOADER_FETCH_GENRES>
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -92,38 +95,102 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const title = formData.get("title") as string | null;
     const contentUrls = JSON.parse(formData.get("contentUrls") as string);
+    const requestIdRaw = formData.get("requestId");
+    const requestId = typeof requestIdRaw === "string" ? requestIdRaw.trim() : "";
 
     if (!contentUrls || contentUrls.length === 0) {
       throw new BusinessError("Vui lòng tải lên ít nhất một ảnh");
     }
 
-  await createChapter(request, {
+    const { fileExists, getFullPathFromPublicUrl, getPublicFileUrl, moveFile } =
+      await import("~/utils/minio.utils");
+
+    const finalizeChapterUploads = async (rawUrls: string[], reqId: string): Promise<string[]> => {
+      if (!Array.isArray(rawUrls) || rawUrls.length === 0) return [];
+      if (!reqId) return rawUrls;
+
+      const tmpPrefix = `${TMP_CHAPTER_PREFIX}/${reqId}`;
+      const results: string[] = new Array(rawUrls.length);
+      const concurrency = 5;
+      let nextIndex = 0;
+      let stopped = false;
+
+      const runNext = async (): Promise<void> => {
+        if (stopped || nextIndex >= rawUrls.length) return;
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+
+        const url = rawUrls[currentIndex];
+        const fullPath = getFullPathFromPublicUrl(url);
+        if (!fullPath || !fullPath.includes(tmpPrefix)) {
+          results[currentIndex] = url;
+          if (nextIndex < rawUrls.length) await runNext();
+          return;
+        }
+
+        const destinationFullPath = fullPath.replace(`${tmpPrefix}/`, `${FINAL_CHAPTER_PREFIX}/`);
+        const sourceExists = await fileExists(fullPath);
+
+        if (sourceExists) {
+          await moveFile(fullPath, destinationFullPath);
+        } else {
+          const destExists = await fileExists(destinationFullPath);
+          if (!destExists) {
+            throw new BusinessError("Không tìm thấy ảnh đã tải lên, vui lòng thử lại");
+          }
+        }
+
+        results[currentIndex] = getPublicFileUrl(destinationFullPath);
+        if (nextIndex < rawUrls.length) await runNext();
+      };
+
+      const starters = Array.from(
+        { length: Math.min(concurrency, rawUrls.length) },
+        () => runNext(),
+      );
+
+      try {
+        await Promise.all(starters);
+      } catch (error) {
+        stopped = true;
+        throw error;
+      }
+
+      return results;
+    };
+
+    const finalContentUrls = await finalizeChapterUploads(contentUrls, requestId);
+
+    await createChapter(request, {
       // Allow blank: server will normalize to "Chap N" after numbering if empty
       title: (title ?? "").trim(),
-      contentUrls,
+      contentUrls: finalContentUrls,
       mangaId,
+      ...(requestId ? { requestId } : {}),
     });
 
-  // Sau khi tạo chương, điều hướng về trang preview của manga
-  const nextHandle = target.slug || mangaId;
-  return redirect(`/truyen-hentai/preview/${nextHandle}`);
+    // Sau khi tạo chương, trả link preview cho client điều hướng
+    const nextHandle = target.slug || mangaId;
+    return Response.json({ success: true, redirectTo: `/truyen-hentai/preview/${nextHandle}` });
   } catch (error) {
     if (error instanceof BusinessError) {
-      return {
-        success: false,
-        error: { message: error.message },
-      };
+      return Response.json(
+        { success: false, error: { message: error.message } },
+        { status: 400 },
+      );
     }
-    return {
-      success: false,
-      error: { message: "Có lỗi xảy ra, vui lòng thử lại" },
-    };
+    return Response.json(
+      { success: false, error: { message: "Có lỗi xảy ra, vui lòng thử lại" } },
+      { status: 500 },
+    );
   }
 }
+
 
 export default function CreateChapter() {
   const { mangaId } = useParams();
   const fetcher = useFetcher<typeof action>();
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [contents, setContents] = useState<File[]>([]);
   const [previewImages, setPreviewImages] = useState<PreviewImage[]>([]);
@@ -148,12 +215,12 @@ export default function CreateChapter() {
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
-  const actionData = useActionData<typeof action>();
-  const responseData = fetcher.data || actionData;
+  const responseData = fetcher.data;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const pendingServerSubmitRef = useRef(false);
+  const requestIdRef = useRef<string | null>(null);
   const uploadSessionRef = useRef<ReturnType<typeof uploadMultipleFilesCancelable> | null>(null);
   const { uploadMultipleFilesCancelable } = useFileOperations();
 
@@ -211,6 +278,13 @@ export default function CreateChapter() {
     ["manhwa", "manhua"].includes(String(g).toLowerCase()),
   );
   // END <feature> CHAPTER_CREATE_USE_GENRES_FROM_LOADER>
+
+  const createRequestId = () => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return (crypto as Crypto).randomUUID();
+    }
+    return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  };
 
   // unified add files (used by input change & drag-drop)
   const addFiles = async (filesLike: FileList | File[]) => {
@@ -454,6 +528,12 @@ export default function CreateChapter() {
 
     setIsSubmitting(true);
 
+    if (!requestIdRef.current) {
+      requestIdRef.current = createRequestId();
+    }
+    const uploadRequestId = requestIdRef.current;
+    const uploadPrefix = `${TMP_CHAPTER_PREFIX}/${uploadRequestId}`;
+
     let uploadContents = contents;
     if (isAdminUser && mergeTailEnabled) {
       const safeCount = Math.max(2, Math.min(mergeTailCount, contents.length));
@@ -497,7 +577,7 @@ export default function CreateChapter() {
       const groupIndex = groupIndexById.get(groupId) ?? idx;
       const shouldWatermark = !meta.noWatermark && watermarkIndexes.has(groupIndex);
       if (!shouldWatermark) {
-        return { file, options: { prefixPath: "manga-images" } };
+        return { file, options: { prefixPath: uploadPrefix } };
       }
 
       watermarkOrder += 1;
@@ -506,7 +586,7 @@ export default function CreateChapter() {
       return {
         file,
         options: {
-          prefixPath: "manga-images",
+          prefixPath: uploadPrefix,
           watermark: true,
           watermarkVariant,
           watermarkStyle,
@@ -530,9 +610,10 @@ export default function CreateChapter() {
 
       // Create chapter using fetcher
       const formData = new FormData();
-  // Send raw trimmed title (can be empty). Server mutation will auto-fill.
-  formData.append("title", (title ?? "").trim());
+        // Send raw trimmed title (can be empty). Server mutation will auto-fill.
+        formData.append("title", (title ?? "").trim());
       formData.append("contentUrls", JSON.stringify(contentUrls));
+        formData.append("requestId", uploadRequestId);
 
       setUploadProgress({ current: uploadResults.length, total: uploadResults.length, active: false });
       setIsCancellingUpload(false);
@@ -565,6 +646,7 @@ export default function CreateChapter() {
       setUploadProgress({ current: 0, total: 0, active: false });
       setIsCancellingUpload(false);
       pendingServerSubmitRef.current = false;
+      requestIdRef.current = null;
     } finally {
       uploadSessionRef.current = null;
     }
@@ -587,12 +669,21 @@ export default function CreateChapter() {
     pendingServerSubmitRef.current = false;
     setIsSubmitting(false);
     setUploadProgress({ current: 0, total: 0, active: false });
-  }, [fetcher.state]);
 
-  useEffect(() => {
-    if (!responseData?.error?.message) return;
-    toast.error(responseData.error.message);
-  }, [responseData?.error?.message]);
+    if (!responseData) return;
+
+    if (responseData.success && responseData.redirectTo) {
+      requestIdRef.current = null;
+      navigate(responseData.redirectTo);
+      return;
+    }
+
+    if (responseData?.error?.message) {
+      toast.error(responseData.error.message);
+    }
+
+    requestIdRef.current = null;
+  }, [fetcher.state, navigate, responseData]);
 
   const handlePreview = () => {
     if (contents.length === 0) {

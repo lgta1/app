@@ -7,6 +7,8 @@ export type ChapterType = {
   title: string;
   /** Stable SEO slug for chapter URL (generated once, never changes). */
   slug?: string;
+  /** Idempotency key for chapter creation. */
+  requestId?: string;
   /** Source chapter URL on upstream site (used for sync/dedup). */
   sourceChapterUrl?: string;
   viewNumber?: number;
@@ -27,6 +29,7 @@ const ChapterSchema = new Schema<ChapterType>(
   {
     title: { type: String, required: true },
     slug: { type: String, default: "" },
+    requestId: { type: String },
     sourceChapterUrl: { type: String },
     viewNumber: { type: Number, default: 0 },
     likeNumber: { type: Number, default: 0 },
@@ -45,6 +48,7 @@ const ChapterSchema = new Schema<ChapterType>(
 // Index tối ưu cho các query patterns
 ChapterSchema.index({ mangaId: 1, chapterNumber: 1 }, { unique: true }); // Unique lookup và prevent duplicate
 ChapterSchema.index({ mangaId: 1, slug: 1 }, { unique: true, sparse: true }); // Stable SEO URL per manga
+ChapterSchema.index({ mangaId: 1, requestId: 1 }, { unique: true, sparse: true }); // Idempotency key for create
 ChapterSchema.index({ mangaId: 1, sourceChapterUrl: 1 }, { unique: true, sparse: true }); // Upstream URL dedup/sync
 ChapterSchema.index({ mangaId: 1, createdAt: -1 }); // List chapters của manga theo thời gian
 

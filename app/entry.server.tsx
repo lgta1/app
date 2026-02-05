@@ -9,6 +9,7 @@ import { PassThrough } from "node:stream";
 import { ENV } from "@/configs/env.config";
 import { initLeaderboardScheduler } from "@/jobs/leaderboard.server";
 import { initHotCarouselSnapshotScheduler } from "@/jobs/hot-carousel-snapshot.server";
+import { initTmpUploadCleanupScheduler } from "@/jobs/tmp-upload-cleanup.server";
 import { initViHentaiAutoDownloadQueueWorker } from "@/jobs/vi-hentai-auto-download-queue.server";
 import { initViHentaiAutoUpdateScheduler } from "@/jobs/vi-hentai-auto-update.server";
 import {
@@ -36,6 +37,7 @@ initMongoDB();
 if (ENV.IS_PRODUCTION) {
   initLeaderboardScheduler();
   initHotCarouselSnapshotScheduler();
+  initTmpUploadCleanupScheduler();
   initViHentaiAutoDownloadQueueWorker();
   initViHentaiAutoUpdateScheduler();
 }
