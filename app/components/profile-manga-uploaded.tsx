@@ -4,20 +4,24 @@ import { Edit, Eye, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 import { WarningActionDialog } from "~/components/dialog-warning-action";
+import LazyImage from "~/components/lazy-image";
 import { LoadingSpinner } from "~/components/loading-spinner";
 import { Pagination } from "~/components/pagination";
 import { MANGA_STATUS, MANGA_USER_STATUS } from "~/constants/manga";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { getPosterUrlForContext } from "~/utils/poster-variants.utils";
 
 interface ProfileMangaUploadedProps {
   userId?: string;
 }
 
-const PAGE_LIMIT = 5;
+const PAGE_LIMIT = 30;
 const MAX_TITLE_LENGTH = 40;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const TABLE_GRID_MD =
+  "md:grid-cols-[72px_minmax(320px,1fr)_minmax(200px,240px)_minmax(160px,200px)]";
 
 export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
   const queryParams = userId ? { userId } : undefined;
@@ -42,6 +46,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
   const [chapterCounts, setChapterCounts] = useState<Record<string, number>>({});
 
   const deleteFetcher = useFetcher();
+  const resubmitFetcher = useFetcher();
 
   const totalUploadedCount =
     typeof responseMeta?.totalUploaded === "number" ? responseMeta.totalUploaded : null;
@@ -73,6 +78,16 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
     }
   }, [deleteFetcher.data, deleteFetcher.state, refresh]);
 
+  useEffect(() => {
+    if (resubmitFetcher.state !== "idle" || !resubmitFetcher.data) return;
+    if (resubmitFetcher.data.success) {
+      toast.success(resubmitFetcher.data.message || "Đã gửi duyệt lại");
+      refresh();
+    } else if (resubmitFetcher.data.error) {
+      toast.error(resubmitFetcher.data.error);
+    }
+  }, [resubmitFetcher.data, resubmitFetcher.state, refresh]);
+
   const getStatusText = (status: number) => {
     switch (status) {
       case MANGA_STATUS.PENDING:
@@ -80,7 +95,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
       case MANGA_STATUS.APPROVED:
         return "Đã duyệt";
       case MANGA_STATUS.REJECTED:
-        return "Bị từ chối";
+        return "Từ chối";
       default:
         return "Không xác định";
     }
@@ -189,7 +204,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
       {/* Header với tổng số và button đăng truyện */}
       <div className="flex w-full items-center justify-between">
         <div className="text-txt-secondary text-sm font-medium">
-          tổng số view bạn kiếm được từ mọi truyện: {totalViewsText}
+          Tổng số view bạn kiếm được từ mọi truyện: {totalViewsText}
         </div>
         {!userId && (
           <Link
@@ -210,7 +225,15 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
         </div>
       ) : (
         <>
-          <div className="flex w-full flex-col gap-2">
+          <div className="bg-bgc-layer1 border-bd-default w-full overflow-hidden rounded-xl border">
+            <div
+              className={`border-bd-default grid w-full grid-cols-1 gap-3 border-b px-3 py-2 text-xs font-semibold text-txt-secondary ${TABLE_GRID_MD} md:gap-0`}
+            >
+              <div className="flex items-center justify-center md:pr-4">STT</div>
+              <div className="md:border-l md:border-bd-default md:px-4">Truyện</div>
+              <div className="md:border-l md:border-bd-default md:px-4">Trạng thái</div>
+              <div className="md:border-l md:border-bd-default md:px-4 md:text-right">Hành động</div>
+            </div>
             {uploadedMangas.map((manga, index) => {
               const sttValue = getSttValue(index);
               const { label: userStatusLabel, style: userStatusStyle } =
@@ -218,34 +241,52 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
               const truncatedTitle = truncateTitle(manga.title);
               const canDelete = canDeleteManga(manga);
               const previewHandle = manga.slug || manga.id;
+              const isRejected = manga.status === MANGA_STATUS.REJECTED;
+              const rejectReason = String(manga.rejectReason || "").trim();
+              const posterUrl = getPosterUrlForContext(manga, "small");
 
               return (
-                <Link
-                  key={manga.id}
-                  to={buildMangaUrl(manga)}
-                  className="bg-bgc-layer1 border-bd-default flex w-full items-center justify-between rounded-xl border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex w-12 flex-col items-center">
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-txt-secondary">
-                        STT
-                      </span>
+                <div key={manga.id} className="border-bd-default border-b last:border-b-0">
+                  <div
+                    className={`grid w-full grid-cols-1 items-start gap-4 px-3 py-3 ${TABLE_GRID_MD} md:gap-0 md:items-stretch`}
+                  >
+                    <div className="flex flex-col items-center justify-center md:pr-4">
                       <span className="text-lg font-bold text-white">{sttValue}</span>
                     </div>
-                    <img
-                      className="h-24 w-16 rounded object-cover"
-                      src={manga.poster}
-                      alt={manga.title}
-                    />
-                    <div className="flex flex-1 flex-col gap-0.5">
-                      <div className="flex flex-wrap items-center gap-1">
-                        <h3
-                          className="text-txt-primary line-clamp-1 text-sm leading-tight font-medium"
-                          title={manga.title}
+                    <div className="flex items-start gap-3 md:border-l md:border-bd-default md:px-4">
+                      <Link to={buildMangaUrl(manga)} className="flex items-start gap-3">
+                        <LazyImage
+                          className="w-20 min-w-[80px] rounded object-cover aspect-[2/3]"
+                          src={posterUrl || manga.poster}
+                          alt={manga.title}
+                          rootMargin="200px"
+                        />
+                        <div className="flex flex-col gap-1">
+                          <h3
+                            className="text-txt-primary line-clamp-1 text-sm leading-tight font-medium"
+                            title={manga.title}
+                          >
+                            {truncatedTitle}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-txt-focus text-xs font-medium">
+                              Số lượng chap: {chapterCounts[manga.id] ?? manga.chapters}
+                            </span>
+                            <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
+                              <Eye className="text-txt-secondary h-3 w-3" />
+                              <span className="text-txt-secondary text-xs font-medium">
+                                {manga.viewNumber?.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    </div>
+                    <div className="flex flex-col gap-2 md:border-l md:border-bd-default md:px-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-[32px] px-2 py-1 text-xs font-medium backdrop-blur-[3.4px] ${getStatusStyle(manga.status)}`}
                         >
-                          {truncatedTitle}
-                        </h3>
-                        <span className={`rounded-[32px] px-2 py-1 text-xs font-medium backdrop-blur-[3.4px] ${getStatusStyle(manga.status)}`}>
                           {getStatusText(manga.status)}
                         </span>
                         <span
@@ -254,70 +295,70 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                           {userStatusLabel}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-start gap-2">
-                        <span className="text-txt-focus text-xs font-medium">
-                          Số lượng chap: {chapterCounts[manga.id] ?? manga.chapters}
-                        </span>
-                        <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
-                          <Eye className="text-txt-secondary h-3 w-3" />
-                          <span className="text-txt-secondary text-xs font-medium">
-                            {manga.viewNumber?.toLocaleString()}
-                          </span>
+                      {isRejected && (
+                        <div className="text-xs text-red-400">
+                          {rejectReason ? `Lý do: ${rejectReason}` : "Lý do: (chưa có)"}
                         </div>
-                        <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]" title="Điểm truyện">
-                          <span className="text-txt-secondary text-xs font-medium tabular-nums">
-                            {(() => {
-                              const chaptersWithVotes = Number((manga as any)?.ratingChaptersWithVotes ?? 0);
-                              const totalVotes = Number((manga as any)?.ratingTotalVotes ?? 0);
-                              const score = Number((manga as any)?.ratingScore ?? 0);
-                              if (chaptersWithVotes < 3 || totalVotes < 5) return "0.0/0";
-                              return `${Math.max(0, Math.min(10, score)).toFixed(1)}/10`;
-                            })()}
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
-                  </div>
-                  {!userId && (
-                    <div className="flex items-center gap-2">
-                      <Link
-                        to={`/truyen-hentai/preview/${previewHandle}`}
-                        className="flex items-center gap-1.5 rounded-lg border border-[#25EBAC] px-2.5 py-1.5 text-sm font-medium text-[#25EBAC] transition-colors hover:bg-[#25EBAC]/10"
-                      >
-                        <Edit className="h-4 w-4" />
-                        <span>Chỉnh sửa/Thêm chương mới</span>
-                      </Link>
-                      <Trash2
-                        className={`h-5 w-5 transition-colors ${
-                          deleteFetcher.state === "submitting"
-                            ? "text-txt-disabled cursor-not-allowed"
-                            : canDelete
-                              ? "text-txt-secondary hover:text-error-error cursor-pointer"
-                              : "text-txt-disabled cursor-not-allowed"
-                        }`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (deleteFetcher.state === "submitting") return;
-                          if (!canDelete) {
-                            toast.error(
-                              "Bạn không thể xoá truyện đã đăng quá 7 ngày. Chỉ admin có thể xoá.",
-                            );
-                            return;
+                    {!userId && (
+                      <div className="flex flex-col items-start gap-2 md:items-end md:border-l md:border-bd-default md:px-4 md:justify-self-stretch">
+                        <Link
+                          to={`/truyen-hentai/preview/${previewHandle}`}
+                          className="flex items-center gap-1.5 rounded-lg border border-[#25EBAC] px-2.5 py-1.5 text-sm font-medium text-[#25EBAC] transition-colors hover:bg-[#25EBAC]/10"
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span>Quản lý</span>
+                        </Link>
+                        {isRejected && (
+                          <button
+                            type="button"
+                            className="flex items-center gap-1.5 rounded-lg border border-[#DD94FF] px-2.5 py-1.5 text-sm font-medium text-[#DD94FF] transition-colors hover:bg-[#DD94FF]/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={resubmitFetcher.state !== "idle"}
+                            onClick={() => {
+                              const fd = new FormData();
+                              fd.append("actionType", "submit");
+                              resubmitFetcher.submit(fd, {
+                                method: "post",
+                                action: `/truyen-hentai/preview/${previewHandle}`,
+                              });
+                            }}
+                          >
+                            Đã sửa lỗi và gửi duyệt lại
+                          </button>
+                        )}
+                        <Trash2
+                          className={`h-5 w-5 transition-colors ${
+                            deleteFetcher.state === "submitting"
+                              ? "text-txt-disabled cursor-not-allowed"
+                              : canDelete
+                                ? "text-txt-secondary hover:text-error-error cursor-pointer"
+                                : "text-txt-disabled cursor-not-allowed"
+                          }`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (deleteFetcher.state === "submitting") return;
+                            if (!canDelete) {
+                              toast.error(
+                                "Bạn không thể xoá truyện đã đăng quá 7 ngày. Chỉ admin có thể xoá.",
+                              );
+                              return;
+                            }
+                            setDeleteDialog({
+                              open: true,
+                              mangaId: manga.id,
+                            });
+                          }}
+                          aria-label={
+                            canDelete
+                              ? "Xóa truyện"
+                              : "Bạn không thể xoá truyện đã đăng quá 7 ngày. Chỉ admin có thể xoá."
                           }
-                          setDeleteDialog({
-                            open: true,
-                            mangaId: manga.id,
-                          });
-                        }}
-                        aria-label={
-                          canDelete
-                            ? "Xóa truyện"
-                            : "Bạn không thể xoá truyện đã đăng quá 7 ngày. Chỉ admin có thể xoá."
-                        }
-                      />
-                    </div>
-                  )}
-                </Link>
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>

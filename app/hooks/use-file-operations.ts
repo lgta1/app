@@ -10,6 +10,7 @@ interface UploadFileOptions {
   onError?: (error: string) => void;
   watermark?: boolean;
   watermarkVariant?: 1 | 2;
+  watermarkStyle?: "glow" | "stroke";
 }
 
 interface UploadedFileResult {
@@ -106,6 +107,10 @@ export function useFileOperations() {
         if (options.watermarkVariant) {
           formData.append("watermarkVariant", String(options.watermarkVariant));
         }
+
+        if (options.watermarkStyle) {
+          formData.append("watermarkStyle", options.watermarkStyle);
+        }
       }
 
       submit(formData, {
@@ -132,6 +137,10 @@ export function useFileOperations() {
 
         if (options.watermarkVariant) {
           formData.append("watermarkVariant", String(options.watermarkVariant));
+        }
+
+        if (options.watermarkStyle) {
+          formData.append("watermarkStyle", options.watermarkStyle);
         }
       }
 
@@ -334,6 +343,14 @@ export function useFileOperations() {
 
           if (options.watermarkVariant) {
             formData.append("watermarkVariant", String(options.watermarkVariant));
+          }
+
+          if (options.watermarkStyle) {
+            formData.append("watermarkStyle", options.watermarkStyle);
+          }
+
+          if (options.watermarkStyle) {
+            formData.append("watermarkStyle", options.watermarkStyle);
           }
         }
 

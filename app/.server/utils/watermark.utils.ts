@@ -15,6 +15,7 @@ export async function applyWatermark(
   buffer: Buffer,
   opts?: {
     variant?: 1 | 2;
+    style?: "glow" | "stroke";
   },
 ): Promise<WatermarkResult> {
   let image = sharp(buffer, { limitInputPixels: LIMIT_PIXELS });
@@ -129,7 +130,7 @@ export async function applyWatermark(
   const textX = Math.floor(width / 2);
   const textY = Math.floor(stripHeight / 2);
 
-  // 7) Render text as SVG overlay (no stroke, no shadow; pure outer glow on brand).
+  // 7) Render text as SVG overlay.
   const escapeXml = (s: string) =>
     s
       .replace(/&/g, "&amp;")
@@ -139,27 +140,43 @@ export async function applyWatermark(
       .replace(/'/g, "&#39;");
 
   const shouldClampText = textW > maxTextWidth;
-  const textSvg = Buffer.from(
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}">\n` +
-      `  <defs>\n` +
-      `    <filter id="vhGlow" x="-50%" y="-50%" width="200%" height="200%">\n` +
+  const style = opts?.style === "stroke" ? "stroke" : "glow";
+  const strokeColor = fill === "#FFFFFF" ? "#111111" : "#FFFFFF";
+  const strokeWidth = Math.max(1, Math.round(fontSize * 0.08));
+  const baseTextMarkup = escapeXml(message).replace(escapeXml(brandText), `<tspan>${escapeXml(brandText)}</tspan>`);
+
+  const glowDefs =
+    `  <defs>\n` +
+    `    <filter id="vhGlow" x="-50%" y="-50%" width="200%" height="200%">\n` +
     `      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur1"/>\n` +
     `      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur2"/>\n` +
     `      <feFlood flood-color="#ff6bd6" flood-opacity="0.55" result="color1"/>\n` +
     `      <feFlood flood-color="#a855f7" flood-opacity="0.45" result="color2"/>\n` +
     `      <feComposite in="color1" in2="blur1" operator="in" result="glow1"/>\n` +
     `      <feComposite in="color2" in2="blur2" operator="in" result="glow2"/>\n` +
-      `      <feMerge>\n` +
-      `        <feMergeNode in="glow1"/>\n` +
-      `        <feMergeNode in="glow2"/>\n` +
-      `        <feMergeNode in="SourceGraphic"/>\n` +
-      `      </feMerge>\n` +
-      `    </filter>\n` +
-      `  </defs>\n` +
+    `      <feMerge>\n` +
+    `        <feMergeNode in="glow1"/>\n` +
+    `        <feMergeNode in="glow2"/>\n` +
+    `        <feMergeNode in="SourceGraphic"/>\n` +
+    `      </feMerge>\n` +
+    `    </filter>\n` +
+    `  </defs>\n`;
+
+  const textSvg = Buffer.from(
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}">\n` +
+      (style === "glow" ? glowDefs : "") +
       `  <text x="${textX}" y="${textY}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="700" dominant-baseline="middle" text-anchor="middle"\n` +
-      `        fill="${fill}" filter="url(#vhGlow)"${shouldClampText ? ` textLength=\"${maxTextWidth}\" lengthAdjust=\"spacingAndGlyphs\"` : ""}>\n` +
-      `    ${escapeXml(message).replace(escapeXml(brandText), `<tspan filter=\"url(#vhGlow)\">${escapeXml(brandText)}</tspan>`)}\n` +
+      `        fill="${fill}"` +
+      (style === "glow"
+        ? ` filter="url(#vhGlow)"`
+        : ` stroke="${strokeColor}" stroke-width="${strokeWidth}" paint-order="stroke" stroke-linejoin="round" stroke-linecap="round"`) +
+      `${shouldClampText ? ` textLength=\"${maxTextWidth}\" lengthAdjust=\"spacingAndGlyphs\"` : ""}>\n` +
+      `    ${
+        style === "glow"
+          ? baseTextMarkup.replace(`<tspan>${escapeXml(brandText)}</tspan>`, `<tspan filter=\"url(#vhGlow)\">${escapeXml(brandText)}</tspan>`)
+          : baseTextMarkup
+      }\n` +
       `  </text>\n` +
       `</svg>\n`,
     "utf-8",

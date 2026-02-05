@@ -139,6 +139,7 @@ export default function CreateChapter() {
   const [folderSupported, setFolderSupported] = useState(false);
   const [mergeTailEnabled, setMergeTailEnabled] = useState(false);
   const [mergeTailCount, setMergeTailCount] = useState(5);
+  const [watermarkStyle, setWatermarkStyle] = useState<"glow" | "stroke">("glow");
 
   // Dropzone highlight
   const [dragOver, setDragOver] = useState(false);
@@ -508,6 +509,7 @@ export default function CreateChapter() {
           prefixPath: "manga-images",
           watermark: true,
           watermarkVariant,
+          watermarkStyle,
         },
       };
     });
@@ -980,6 +982,42 @@ export default function CreateChapter() {
               <p className="text-txt-secondary text-center text-sm leading-tight font-medium">
                 Truyện ghép từ các ảnh ngắn sẽ tải nhanh hơn. Ảnh giữ nguyên thứ tự khi upload; có thể kéo-thả để đổi thứ tự hiển thị.
               </p>
+
+              <div className="bg-bgc-layer2 border-bd-default mt-2 flex w-full flex-col gap-3 rounded-xl border px-3 py-3">
+                <div className="text-txt-primary text-sm font-semibold">Chọn kiểu watermark</div>
+                <label className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="watermarkStyle"
+                    value="glow"
+                    checked={watermarkStyle === "glow"}
+                    onChange={() => setWatermarkStyle("glow")}
+                    className="mt-1 h-4 w-4"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-txt-primary text-sm font-semibold">Glow tím hồng (mặc định)</span>
+                    <span className="text-txt-secondary text-xs">
+                      Phù hợp truyện có màu, truyện 3D. Chữ có hiệu ứng glow tím-hồng.
+                    </span>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="watermarkStyle"
+                    value="stroke"
+                    checked={watermarkStyle === "stroke"}
+                    onChange={() => setWatermarkStyle("stroke")}
+                    className="mt-1 h-4 w-4"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-txt-primary text-sm font-semibold">Stroke đen/trắng (không glow)</span>
+                    <span className="text-txt-secondary text-xs">
+                      Phù hợp truyện không màu, trắng đen. Chỉ viền stroke theo màu nền (đen khi chữ trắng, trắng khi chữ đen).
+                    </span>
+                  </div>
+                </label>
+              </div>
 
               {isAdminUser && (
                 <div className="bg-bgc-layer2 border-bd-default mt-2 flex w-full flex-col items-center gap-2 rounded-xl border px-3 py-2.5">

@@ -102,6 +102,7 @@ export async function action({ request }: Route.ActionArgs) {
     let prefixPath: string;
     let watermarkFlagRaw: FormDataEntryValue | null = null;
     let watermarkVariantRaw: FormDataEntryValue | null = null;
+    let watermarkStyleRaw: FormDataEntryValue | null = null;
 
     try {
       formData = await request.formData();
@@ -109,6 +110,7 @@ export async function action({ request }: Route.ActionArgs) {
       prefixPath = (formData.get("prefixPath") as string) || "uploads";
       watermarkFlagRaw = formData.get("watermark");
       watermarkVariantRaw = formData.get("watermarkVariant");
+      watermarkStyleRaw = formData.get("watermarkStyle");
     } catch (error) {
       console.error("Error parsing form data:", error);
       return Response.json(
@@ -184,10 +186,15 @@ export async function action({ request }: Route.ActionArgs) {
       typeof watermarkVariantRaw === "string" && /^\d+$/.test(watermarkVariantRaw)
         ? Number.parseInt(watermarkVariantRaw, 10)
         : undefined;
+    const watermarkStyle =
+      typeof watermarkStyleRaw === "string" && ["glow", "stroke"].includes(watermarkStyleRaw)
+        ? (watermarkStyleRaw as "glow" | "stroke")
+        : undefined;
     const watermarkResult =
       shouldWatermark && watermarkRequested
         ? await applyWatermark(buffer, {
             variant: watermarkVariant === 2 ? 2 : watermarkVariant === 1 ? 1 : undefined,
+            style: watermarkStyle,
           })
         : { buffer, applied: false };
     const effectiveBuffer = watermarkResult.buffer;
@@ -207,6 +214,7 @@ export async function action({ request }: Route.ActionArgs) {
       "user-agent": encodeForMetadata(request.headers.get("user-agent") || "unknown"),
       "upload-timestamp": Date.now().toString(),
       "watermark-applied": watermarkResult.applied ? "true" : "false",
+      ...(watermarkResult.applied && watermarkStyle ? { "watermark-style": watermarkStyle } : {}),
     } satisfies Record<string, string>;
 
     const result = await uploadBufferWithValidation({

@@ -432,7 +432,7 @@ export const submitMangaToReview = async (request: Request, mangaId: string) => 
 
   await MangaModel.findByIdAndUpdate(
     resolved.targetId,
-    { $set: { status: MANGA_STATUS.PENDING } },
+    { $set: { status: MANGA_STATUS.PENDING, rejectReason: "" } },
     { timestamps: false },
   );
 
