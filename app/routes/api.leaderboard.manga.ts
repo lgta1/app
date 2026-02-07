@@ -19,8 +19,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const total = (all || []).length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
-    return Response.json({ success: true, period, page, limit, total, totalPages, data });
+    return Response.json(
+      { success: true, period, page, limit, total, totalPages, data },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=600, s-maxage=600",
+        },
+      },
+    );
   } catch (err: any) {
-    return Response.json({ success: false, error: String(err?.message || err) }, { status: 500 });
+    return Response.json(
+      { success: false, error: String(err?.message || err) },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

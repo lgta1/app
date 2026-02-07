@@ -8,7 +8,7 @@ import { MANGA_USER_STATUS } from "~/constants/manga";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
 import { DEFAULT_BLACKLIST_TAGS, normalizeBlacklistTag } from "~/constants/blacklist-tags";
 import { useMediaQuery } from "~/hooks/use-media-query";
-import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
+import { buildPosterSrcSet, getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 type Props = {
   manga: Pick<
@@ -68,6 +68,28 @@ export function MangaCard({
 
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const posterVariant = getPosterVariantForContext(manga, isDesktop ? "cardDesktop" : "cardMobile");
+  const posterVariants = (manga as any)?.posterVariants as any | undefined;
+  const desktopPosterSrcSet = buildPosterSrcSet(posterVariants);
+  const mobileVariant = posterVariants?.w360 || posterVariants?.w320 || posterVariants?.w200 || posterVariants?.w220;
+  const mobileVariantWidth = posterVariants?.w360
+    ? posterVariants.w360.width || 360
+    : posterVariants?.w320
+    ? posterVariants.w320.width || 320
+    : posterVariants?.w200
+    ? posterVariants.w200.width || 200
+    : posterVariants?.w220
+    ? posterVariants.w220.width || 220
+    : undefined;
+  const mobilePosterSrcSet = mobileVariant?.url && mobileVariantWidth
+    ? `${mobileVariant.url} ${mobileVariantWidth}w`
+    : undefined;
+  const effectivePosterSrcSet = isDesktop ? desktopPosterSrcSet : mobilePosterSrcSet;
+  const posterSizes = variant === "bannerDesktop"
+    ? "(min-width: 1024px) 20vw, 50vw"
+    : "(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw";
+  const effectivePosterSizes = !isDesktop && mobileVariantWidth
+    ? `${mobileVariantWidth}px`
+    : posterSizes;
 
   const { id, title, poster, chapters, createdAt, updatedAt, genres, userStatus } = manga as any;
   const effectiveLatestTitle = (latestChapterTitle ?? (manga as any).latestChapterTitle ?? null) as string | null;
@@ -214,6 +236,8 @@ export function MangaCard({
             alt={title}
             width={posterVariant?.width || 300}
             height={posterVariant?.height || 400}
+            srcSet={effectivePosterSrcSet}
+            sizes={effectivePosterSrcSet ? effectivePosterSizes : undefined}
             loading={imgLoading === "auto" ? undefined : imgLoading}
             decoding="async"
             fetchPriority={imgFetchPriority}

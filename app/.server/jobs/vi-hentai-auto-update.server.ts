@@ -12,6 +12,32 @@ import { getFeatureFlag, setFeatureFlag } from "~/.server/services/system-featur
 const TZ = "Asia/Ho_Chi_Minh";
 const LOCK_KEY = "vi-hentai-auto-update";
 
+const getVietnamMinutes = (): number | null => {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date());
+    const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "NaN");
+    const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "NaN");
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return hour * 60 + minute;
+  } catch {
+    return null;
+  }
+};
+
+const isVietnamBlackoutWindow = (): boolean => {
+  const minutes = getVietnamMinutes();
+  if (minutes == null) return false;
+
+  const inMidday = minutes >= 11 * 60 + 30 && minutes < 13 * 60 + 30;
+  const inLate = minutes >= 21 * 60 + 30 || minutes < 30;
+  return inMidday || inLate;
+};
+
 // We keep extraction and processing separated:
 // - Extraction builds a queue of URLs (30 items) without downloading.
 // - Processing consumes that queue later (background worker).
@@ -689,6 +715,10 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
           return;
         }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
+        if (isVietnamBlackoutWindow()) {
+          console.info("[cron] vi-hentai queue extract skipped: blackout window (VN 11:30-13:30, 21:30-00:30)");
+          return;
+        }
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;
 
@@ -730,6 +760,10 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
           return;
         }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
+        if (isVietnamBlackoutWindow()) {
+          console.info("[cron] vi-hentai queue worker skipped: blackout window (VN 11:30-13:30, 21:30-00:30)");
+          return;
+        }
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;
 

@@ -1,8 +1,23 @@
-import { type MetaFunction, useLocation } from "react-router-dom";
+import { type MetaFunction, useLoaderData, useLocation } from "react-router-dom";
 
 import LeaderboardUserWaifuItem from "~/components/leaderboard-user-waifu-item";
 import type { UserWaifuLeaderboardType } from "~/database/models/user-waifu-leaderboard.model";
-import { usePagination } from "~/hooks/use-pagination";
+import { getWaifuLeaderboardSnapshot } from "~/.server/services/waifu-leaderboard.svc";
+
+export async function loader() {
+  const history = await getWaifuLeaderboardSnapshot(1, 100);
+
+  return Response.json(
+    {
+      leaderboardData: history.data,
+    },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=43200, s-maxage=43200",
+      },
+    },
+  );
+}
 
 export const meta: MetaFunction = () => {
   return [
@@ -16,14 +31,7 @@ export const meta: MetaFunction = () => {
 
 export default function LeaderboardWaifu() {
   const { pathname } = useLocation();
-  const {
-    data: leaderboardData,
-    isLoading,
-    error,
-  } = usePagination<UserWaifuLeaderboardType>({
-    apiUrl: "/api/waifu/leaderboard",
-    limit: 100,
-  });
+  const { leaderboardData } = useLoaderData<{ leaderboardData: UserWaifuLeaderboardType[] }>();
 
   return (
     <div className="container-page flex flex-col items-center justify-center gap-11 px-4 py-8 md:px-6 lg:px-0">
@@ -50,6 +58,13 @@ export default function LeaderboardWaifu() {
         >
           Top Harem
         </a>
+        <a
+          href="/leaderboard/translator"
+          aria-current={pathname === "/leaderboard/translator" ? "page" : undefined}
+          className={`${pathname === "/leaderboard/translator" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+        >
+          BXH Dịch Giả
+        </a>
       </div>
 
       {/* Title */}
@@ -57,23 +72,7 @@ export default function LeaderboardWaifu() {
 
       {/* Leaderboard List */}
       <div className="bg-bgc-layer1 mx-auto flex w-full max-w-[750px] flex-col gap-4 space-y-0 overflow-hidden rounded-2xl px-4 py-4">
-        {isLoading && (
-          <div className="py-8 text-center">
-            <div className="text-txt-secondary font-sans text-base leading-6 font-medium">
-              Đang tải...
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="py-8 text-center">
-            <div className="font-sans text-base leading-6 font-medium text-red-500">
-              {error}
-            </div>
-          </div>
-        )}
-
-        {!isLoading && !error && leaderboardData.length === 0 && (
+        {leaderboardData.length === 0 && (
           <div className="py-8 text-center">
             <div className="text-txt-secondary font-sans text-base leading-6 font-medium">
               Chưa có dữ liệu bảng xếp hạng
@@ -81,16 +80,14 @@ export default function LeaderboardWaifu() {
           </div>
         )}
 
-        {!isLoading &&
-          !error &&
-          leaderboardData.map((leaderboard, index) => (
-            <LeaderboardUserWaifuItem
-              key={leaderboard.userId}
-              leaderboard={leaderboard}
-              index={index + 1}
-              expandTopN={5}
-            />
-          ))}
+        {leaderboardData.map((leaderboard, index) => (
+          <LeaderboardUserWaifuItem
+            key={leaderboard.userId}
+            leaderboard={leaderboard}
+            index={index + 1}
+            expandTopN={5}
+          />
+        ))}
       </div>
     </div>
   );

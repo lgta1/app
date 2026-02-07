@@ -275,6 +275,10 @@ export function useFileOperations() {
             if (options.watermarkVariant) {
               formData.append("watermarkVariant", String(options.watermarkVariant));
             }
+
+            if (options.watermarkStyle) {
+              formData.append("watermarkStyle", options.watermarkStyle);
+            }
           }
 
           const response = await fetch("/api/files/upload", {

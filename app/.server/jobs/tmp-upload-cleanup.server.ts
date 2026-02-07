@@ -52,7 +52,7 @@ export const initTmpUploadCleanupScheduler = (): void => {
   const isMongoReady = () => mongoose.connection.readyState === 1;
 
   cron.schedule(
-    "15 23 * * *",
+    "0 5 * * *",
     async () => {
       if (running) return;
       if (!isMongoReady()) {

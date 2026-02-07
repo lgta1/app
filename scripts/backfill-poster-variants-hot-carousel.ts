@@ -2,7 +2,6 @@
 import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
-import readline from "readline";
 import sharp from "sharp";
 import dotenv from "dotenv";
 
@@ -20,22 +19,17 @@ import type { AllowedFileFormat } from "~/types/minio.types";
 import type { PosterVariantsPayload } from "~/utils/poster-variants.utils";
 import { deletePublicFiles, getPublicFileUrl } from "~/utils/minio.utils";
 import { collectPosterVariantPaths } from "~/.server/utils/poster-variants.server";
+import { getHotCarouselLeaderboard } from "~/.server/queries/leaderboad.query";
 
-const DEFAULT_BATCH_LIMIT = 0; // 0 = process all
 const POSTER_TARGET_WIDTH = 575;
 const POSTER_ASPECT_TOLERANCE = 0.01;
 const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
-
 const ALLOWED_FORMATS: AllowedFileFormat[] = ["jpeg", "jpg", "png", "webp", "gif"];
 
 type CliOptions = {
   dryRun: boolean;
-  force: boolean;
   limit: number;
-  batchSize: number;
-  pauseSeconds: number;
-  interactive: boolean;
 };
 
 type ImagePayload = {
@@ -49,84 +43,22 @@ const parseArgs = (): CliOptions => {
   const args = process.argv.slice(2);
   const options: CliOptions = {
     dryRun: false,
-    force: false,
-    limit: DEFAULT_BATCH_LIMIT,
-    batchSize: 0,
-    pauseSeconds: 0,
-    interactive: false,
+    limit: 0,
   };
 
   for (const arg of args) {
     if (arg === "--dry-run") {
       options.dryRun = true;
-    } else if (arg === "--force") {
-      options.force = true;
     } else if (arg.startsWith("--limit=")) {
       const [, rawValue] = arg.split("=");
       const parsed = Number.parseInt(rawValue ?? "", 10);
       if (!Number.isNaN(parsed) && parsed >= 0) {
         options.limit = parsed;
       }
-    } else if (arg.startsWith("--batch-size=")) {
-      const [, rawValue] = arg.split("=");
-      const parsed = Number.parseInt(rawValue ?? "", 10);
-      if (!Number.isNaN(parsed) && parsed >= 0) {
-        options.batchSize = parsed;
-      }
-    } else if (arg.startsWith("--pause-seconds=")) {
-      const [, rawValue] = arg.split("=");
-      const parsed = Number.parseInt(rawValue ?? "", 10);
-      if (!Number.isNaN(parsed) && parsed >= 0) {
-        options.pauseSeconds = parsed;
-      }
-    } else if (arg === "--interactive") {
-      options.interactive = true;
     }
   }
 
   return options;
-};
-
-const waitForDecision = async (seconds: number): Promise<boolean> => {
-  if (seconds <= 0) return true;
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const question = `Tạm dừng sau batch. Gõ 'dung' để dừng hoặc Enter để tiếp tục (tự chạy sau ${seconds}s): `;
-
-  const response = await Promise.race<string | null>([
-    new Promise((resolve) => rl.question(question, (answer) => resolve(answer))),
-    new Promise((resolve) => setTimeout(() => resolve(null), seconds * 1000)),
-  ]);
-
-  rl.close();
-
-  if (response === null) return true;
-  const normalized = response.trim().toLowerCase();
-  if (!normalized) return true;
-  return !(normalized === "dung" || normalized === "stop" || normalized === "no" || normalized === "n");
-};
-
-const buildQuery = (force: boolean) => {
-  const base = { poster: { $exists: true, $ne: "" } };
-  if (force) return base;
-
-  return {
-    ...base,
-    $or: [
-      { posterVariants: { $exists: false } },
-      { "posterVariants.w575": { $exists: false } },
-      { "posterVariants.w320": { $exists: false } },
-      { "posterVariants.w220": { $exists: false } },
-    ],
-  };
-};
-
-const logSummary = (label: string, value: number) => {
-  console.info(`${label.padEnd(12, " ")}: ${value}`);
 };
 
 const resolvePosterUrl = (poster: string): string => {
@@ -222,10 +154,7 @@ const maybeConvertToWebP = async (payload: ImagePayload): Promise<ImagePayload> 
   return payload;
 };
 
-const resizeToWidth = async (
-  payload: ImagePayload,
-  targetWidth: number,
-): Promise<ImagePayload> => {
+const resizeToWidth = async (payload: ImagePayload, targetWidth: number): Promise<ImagePayload> => {
   const pipeline = sharp(payload.buffer).resize({
     width: targetWidth,
     withoutEnlargement: true,
@@ -294,6 +223,48 @@ const hasCompleteVariants = (doc: any) => {
   return Boolean(variants?.w575?.url && variants?.w320?.url && variants?.w220?.url);
 };
 
+const hasLegacyVariants = (doc: any) => {
+  const variants = (doc as any)?.posterVariants as any | undefined;
+  return Boolean(variants?.w400?.url || variants?.w625?.url);
+};
+
+const extractFullPathFromUrl = (value: string): string | null => {
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const prefix = "story-images/";
+  const idx = text.indexOf(prefix);
+  if (idx >= 0) return text.slice(idx);
+
+  try {
+    const url = new URL(text);
+    const pathValue = url.pathname.replace(/^\/+/, "");
+    const prefixIdx = pathValue.indexOf(prefix);
+    if (prefixIdx >= 0) return pathValue.slice(prefixIdx);
+    return pathValue || null;
+  } catch {
+    return null;
+  }
+};
+
+const collectLegacyPaths = (doc: any): string[] => {
+  const variants = (doc as any)?.posterVariants as any | undefined;
+  const legacyEntries = [variants?.w400, variants?.w625];
+  const paths: string[] = [];
+  for (const entry of legacyEntries) {
+    if (!entry) continue;
+    if (entry.fullPath) {
+      paths.push(entry.fullPath);
+      continue;
+    }
+    if (entry.url) {
+      const derived = extractFullPathFromUrl(entry.url);
+      if (derived) paths.push(derived);
+    }
+  }
+  return Array.from(new Set(paths)).filter(Boolean);
+};
+
 const buildVariants = async (
   mangaId: string,
   posterUrl: string,
@@ -343,43 +314,44 @@ const buildVariants = async (
 
 const run = async () => {
   const options = parseArgs();
-  const query = buildQuery(options.force);
-  const limitInfo = options.limit > 0 ? `${options.limit} items` : "all items";
-  const batchInfo = options.batchSize > 0 ? `${options.batchSize}` : "off";
-  const pauseInfo = options.pauseSeconds > 0 ? `${options.pauseSeconds}s` : "off";
   console.info(
-    `[poster-variants:backfill] Starting with query=${JSON.stringify(query)} limit=${limitInfo} batchSize=${batchInfo} pause=${pauseInfo}`,
+    `[poster-variants:hot-carousel] Starting dryRun=${options.dryRun} limit=${options.limit || "all"}`,
   );
 
-  const processedItems: Array<{ id: string; slug?: string; title?: string }> = [];
+  await mongoose.connect(ENV.MONGO.URI, { maxPoolSize: 10 });
 
-  await mongoose.connect(ENV.MONGO.URI, { maxPoolSize: 20 });
+  const hotItems = await getHotCarouselLeaderboard();
+  const ids = hotItems
+    .map((item: any) => String(item?.id ?? item?._id ?? ""))
+    .filter(Boolean);
 
-  const cursor = MangaModel.find(query).sort({ updatedAt: 1 }).cursor();
+  const limited = options.limit > 0 ? ids.slice(0, options.limit) : ids;
 
   let processed = 0;
   let updated = 0;
   let skipped = 0;
   let failed = 0;
 
+  const processedItems: Array<{ id: string; slug?: string; title?: string }> = [];
+
   try {
-    for await (const doc of cursor) {
-      if (options.limit > 0 && processed >= options.limit) {
-        break;
-      }
-
+    for (const id of limited) {
       processed += 1;
-      const mangaId = String(doc._id);
-      const title = doc.title ?? "Untitled";
-      const poster = doc.poster ?? "";
-
-      if (!poster) {
+      const doc = await MangaModel.findById(id).lean();
+      if (!doc) {
         skipped += 1;
-        console.warn(`[skip] Missing poster for manga ${mangaId} (${title})`);
         continue;
       }
 
-      if (!options.force && hasCompleteVariants(doc)) {
+      const poster = (doc as any).poster ?? "";
+      if (!poster) {
+        skipped += 1;
+        console.warn(`[skip] Missing poster for manga ${id}`);
+        continue;
+      }
+
+      const needsUpdate = !hasCompleteVariants(doc) || hasLegacyVariants(doc);
+      if (!needsUpdate) {
         skipped += 1;
         continue;
       }
@@ -387,103 +359,83 @@ const run = async () => {
       const posterUrl = resolvePosterUrl(poster);
       if (!posterUrl) {
         skipped += 1;
-        console.warn(`[skip] Invalid poster URL for manga ${mangaId}`);
+        console.warn(`[skip] Invalid poster URL for manga ${id}`);
         continue;
       }
 
       if (options.dryRun) {
-        const baseName = path.basename(new URL(posterUrl).pathname || "poster");
-        console.info(`[dry-run] Would build variants for ${mangaId} (${baseName})`);
+        console.info(`[dry-run] Would build variants for ${id}`);
         updated += 1;
-      } else {
-        try {
-          const variants = await buildVariants(mangaId, posterUrl, options.dryRun);
-          if (!variants?.w575?.url) {
-            failed += 1;
-            console.error(`[failed] Unable to build variants for ${mangaId}`);
-          } else {
-            await MangaModel.updateOne(
-              { _id: doc._id },
-              {
-                $set: {
-                  poster: variants.w575.url,
-                  posterVariants: variants,
-                },
-              },
-              { timestamps: false },
-            );
+        continue;
+      }
 
-            processedItems.push({
-              id: mangaId,
-              slug: (doc as any).slug ? String((doc as any).slug) : undefined,
-              title: doc.title ? String(doc.title) : undefined,
-            });
-
-            const oldPaths = collectPosterVariantPaths((doc as any).posterVariants, (doc as any).poster);
-            const newPaths = collectPosterVariantPaths(variants, variants.w575.url);
-            const toDelete = oldPaths.filter((p) => !newPaths.includes(p));
-            if (toDelete.length) {
-              try {
-                await deletePublicFiles(toDelete);
-              } catch (error) {
-                console.warn(`[cleanup] delete old poster variants failed for ${mangaId}`, error);
-              }
-            }
-
-            updated += 1;
-            console.info(`[done] Updated poster variants for ${mangaId}`);
-          }
-        } catch (error) {
+      try {
+        const variants = await buildVariants(id, posterUrl, options.dryRun);
+        if (!variants?.w575?.url) {
           failed += 1;
-          console.error(`[error] Unexpected failure for ${mangaId}`, error);
+          console.error(`[failed] Unable to build variants for ${id}`);
+          continue;
         }
-      }
 
-      if (processed % 3000 === 0) {
-        console.info(`[progress] processed=${processed} updated=${updated} skipped=${skipped} failed=${failed}`);
-      }
+        await MangaModel.updateOne(
+          { _id: doc._id },
+          {
+            $set: {
+              poster: variants.w575.url,
+              posterVariants: variants,
+            },
+          },
+          { timestamps: false },
+        );
 
-      if (options.batchSize > 0 && processed % options.batchSize === 0) {
-        const shouldContinue = options.interactive
-          ? await waitForDecision(options.pauseSeconds)
-          : options.pauseSeconds > 0
-          ? await new Promise<boolean>((resolve) =>
-              setTimeout(() => resolve(true), options.pauseSeconds * 1000),
-            )
-          : true;
+        processedItems.push({
+          id,
+          slug: (doc as any).slug ? String((doc as any).slug) : undefined,
+          title: (doc as any).title ? String((doc as any).title) : undefined,
+        });
 
-        if (!shouldContinue) {
-          console.info("[poster-variants:backfill] Stopped by user");
-          break;
+        const oldPaths = collectPosterVariantPaths((doc as any).posterVariants, (doc as any).poster);
+        const legacyPaths = collectLegacyPaths(doc);
+        const newPaths = collectPosterVariantPaths(variants, variants.w575.url);
+        const toDelete = Array.from(new Set([...oldPaths, ...legacyPaths])).filter(
+          (p) => !newPaths.includes(p),
+        );
+        if (toDelete.length) {
+          try {
+            await deletePublicFiles(toDelete);
+          } catch (error) {
+            console.warn(`[cleanup] delete old poster variants failed for ${id}`, error);
+          }
         }
+
+        updated += 1;
+        console.info(`[done] Updated poster variants for ${id}`);
+      } catch (error) {
+        failed += 1;
+        console.error(`[error] Unexpected failure for ${id}`, error);
       }
     }
   } finally {
-    await cursor.close();
     await mongoose.disconnect();
   }
 
-  console.info("[poster-variants:backfill] Completed");
-  logSummary("processed", processed);
-  logSummary("updated", updated);
-  logSummary("skipped", skipped);
-  logSummary("failed", failed);
+  const logDir = path.resolve(process.cwd(), "tmp");
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  const logFile = path.join(
+    logDir,
+    `backfill-poster-variants-hot-carousel-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
+  );
+  fs.writeFileSync(logFile, JSON.stringify({ processedItems }, null, 2));
 
-  if (processedItems.length > 0) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const outPath = path.resolve(process.cwd(), "tmp", `backfill-poster-variants-${stamp}.json`);
-    try {
-      fs.mkdirSync(path.dirname(outPath), { recursive: true });
-      fs.writeFileSync(outPath, JSON.stringify(processedItems, null, 2));
-      console.info(`[poster-variants:backfill] Wrote ${processedItems.length} items to ${outPath}`);
-    } catch (error) {
-      console.warn("[poster-variants:backfill] Failed to write log file", error);
-    }
-  }
+  console.info("\n[poster-variants:hot-carousel] Done");
+  console.info(`Processed : ${processed}`);
+  console.info(`Updated   : ${updated}`);
+  console.info(`Skipped   : ${skipped}`);
+  console.info(`Failed    : ${failed}`);
+  console.info(`Log file  : ${logFile}`);
 };
 
-run().catch((error) => {
-  console.error("[poster-variants:backfill] Fatal error", error);
-  mongoose.disconnect().catch(() => undefined);
-  process.exitCode = 1;
+run().catch((err) => {
+  console.error("[poster-variants:hot-carousel] Fatal error", err);
+  process.exit(1);
 });

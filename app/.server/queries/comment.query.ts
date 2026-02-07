@@ -16,9 +16,11 @@ const rewritePosterVariants = (variants: any) => {
   return {
     ...(variants as any),
     source: normalizeEntry((variants as any).source),
+    w200: normalizeEntry((variants as any).w200),
     w220: normalizeEntry((variants as any).w220),
-    w400: normalizeEntry((variants as any).w400),
-    w625: normalizeEntry((variants as any).w625),
+    w320: normalizeEntry((variants as any).w320),
+    w360: normalizeEntry((variants as any).w360),
+    w575: normalizeEntry((variants as any).w575),
   };
 };
 

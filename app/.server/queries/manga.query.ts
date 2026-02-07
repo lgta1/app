@@ -34,7 +34,7 @@ const normalizeMangaMedia = (doc: any) => {
   if (typeof next.shareImage === "string") next.shareImage = rewriteLegacyCdnUrl(next.shareImage);
   if (next.posterVariants && typeof next.posterVariants === "object") {
     const variants = next.posterVariants as Record<string, any>;
-    for (const key of ["w220", "w400", "w625", "source"]) {
+    for (const key of ["w200", "w220", "w320", "w360", "w575", "source"]) {
       if (variants[key]?.url && typeof variants[key].url === "string") {
         variants[key].url = rewriteLegacyCdnUrl(variants[key].url);
       }

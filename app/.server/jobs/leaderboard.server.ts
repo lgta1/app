@@ -1,6 +1,8 @@
 import cron from "node-cron";
 import mongoose from "mongoose";
 import { calculateLeaderboard } from "@/services/leaderboard.svc";
+import { calculateTranslatorLeaderboard } from "@/services/translator-leaderboard.svc";
+import { calculateWaifuLeaderboardSnapshot } from "@/services/waifu-leaderboard.svc";
 import { MangaModel } from "~/database/models/manga.model";
 
 /**
@@ -22,30 +24,7 @@ export const initLeaderboardScheduler = (): void => {
   const isMongoReady = () => mongoose.connection.readyState === 1;
 
   // ─────────────────────────────────────────────────────────────
-  // DAILY: chạy MỖI 30 PHÚT cả ngày (rolling 6h được xử lý trong service)
-  // ─────────────────────────────────────────────────────────────
-  let runningDaily = false;
-  cron.schedule(
-    "*/30 * * * *",
-    async () => {
-      if (runningDaily) return; // chống chồng job
-      if (!isMongoReady()) {
-        console.warn("[cron] Leaderboard daily skipped: MongoDB not connected");
-        return;
-      }
-      runningDaily = true;
-      try {
-        await calculateLeaderboard("daily");
-      } catch (error) {
-        console.error("Lỗi khi tính toán BXH ngày (30p):", error);
-      } finally {
-        runningDaily = false;
-      }
-    },
-    { timezone: TZ },
-  );
-
-  // ─────────────────────────────────────────────────────────────
+  // (ĐÃ LOẠI BỎ) Daily rolling 6h không còn được dùng ở UI.
   // (ĐÃ LOẠI BỎ) Weekly/Monthly aggregation cũ không còn chạy.
   // Hiện tại BXH tuần/tháng dùng counters trực tiếp (weeklyViews/monthlyViews).
 
@@ -116,6 +95,58 @@ export const initLeaderboardScheduler = (): void => {
         console.info(`[cron] Monthly views reset → matched ${matched} docs`);
       } catch (e) {
         console.error("[cron] Monthly views reset failed", e);
+      }
+    },
+    { timezone: TZ },
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // TRANSLATOR LEADERBOARD SNAPSHOTS: daily at 04:30 (Asia/Ho_Chi_Minh)
+  // ─────────────────────────────────────────────────────────────
+  let runningTranslator = false;
+  cron.schedule(
+    "30 4 * * *",
+    async () => {
+      if (runningTranslator) return;
+      if (!isMongoReady()) {
+        console.warn("[cron] Translator leaderboard skipped: MongoDB not connected");
+        return;
+      }
+      runningTranslator = true;
+      try {
+        await Promise.all([
+          calculateTranslatorLeaderboard("weekly"),
+          calculateTranslatorLeaderboard("monthly"),
+          calculateTranslatorLeaderboard("alltime"),
+        ]);
+      } catch (error) {
+        console.error("[cron] Translator leaderboard failed", error);
+      } finally {
+        runningTranslator = false;
+      }
+    },
+    { timezone: TZ },
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // WAIFU LEADERBOARD SNAPSHOT: daily at 04:45 (Asia/Ho_Chi_Minh)
+  // ─────────────────────────────────────────────────────────────
+  let runningWaifu = false;
+  cron.schedule(
+    "45 4 * * *",
+    async () => {
+      if (runningWaifu) return;
+      if (!isMongoReady()) {
+        console.warn("[cron] Waifu leaderboard skipped: MongoDB not connected");
+        return;
+      }
+      runningWaifu = true;
+      try {
+        await calculateWaifuLeaderboardSnapshot();
+      } catch (error) {
+        console.error("[cron] Waifu leaderboard failed", error);
+      } finally {
+        runningWaifu = false;
       }
     },
     { timezone: TZ },

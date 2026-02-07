@@ -26,14 +26,14 @@ export type MangaType = {
       fullPath?: string;
       bytes?: number;
     };
-    w400?: {
+    w320?: {
       url: string;
       width?: number;
       height?: number;
       fullPath?: string;
       bytes?: number;
     };
-    w625?: {
+    w575?: {
       url: string;
       width?: number;
       height?: number;

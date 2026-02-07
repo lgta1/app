@@ -17,7 +17,14 @@ export const meta: MetaFunction = () => {
 
 export async function loader() {
   const topUsers = await getTopUser(100);
-  return { topUsers };
+  return Response.json(
+    { topUsers },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=21600, s-maxage=21600",
+      },
+    },
+  );
 }
 
 export default function LeaderboardMember() {
@@ -49,6 +56,13 @@ export default function LeaderboardMember() {
           className={`${pathname === "/leaderboard/waifu" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
         >
           Top Harem
+        </a>
+        <a
+          href="/leaderboard/translator"
+          aria-current={pathname === "/leaderboard/translator" ? "page" : undefined}
+          className={`${pathname === "/leaderboard/translator" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+        >
+          BXH Dịch Giả
         </a>
       </div>
 

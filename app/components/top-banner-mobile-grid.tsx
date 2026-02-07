@@ -85,33 +85,75 @@ export default function TopBannerMobileGrid({
       `}</style>
   );
 
-  const Skeleton = () => {
-    const dots = Math.max(3, Math.min(6, Math.ceil(Math.max(1, columns.length || 3))));
+  const Skeleton = () => (
+    <div className="relative -mx-2 overflow-hidden sm:mx-0" data-mobile-hot-grid>
+      <div
+        className="grid grid-cols-2"
+        style={{ columnGap: spaceX, rowGap: spaceY }}
+      >
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div key={idx} className="hot-grid-slide flex flex-col" style={{ gap: spaceY }}>
+            <div className="aspect-[2/3] w-full rounded-xl border border-white/10 bg-white/5 animate-pulse" />
+            <div className="aspect-[2/3] w-full rounded-xl border border-white/10 bg-white/5 animate-pulse" />
+          </div>
+        ))}
+      </div>
+      <GridStyle />
+    </div>
+  );
+
+  const renderCard = (m: MangaType, itemIdx: number) => {
+    const isEager = itemIdx < EAGER_IMAGES;
+    const fetchPriority = itemIdx < HIGH_PRIORITY_IMAGES ? "high" : isEager ? "auto" : "low";
     return (
-      <div className="relative -mx-2 overflow-hidden sm:mx-0" data-mobile-hot-grid>
+      <div
+        key={(m as any).id ?? (m as any)._id ?? itemIdx}
+        className={"relative" + (isIOS && dragging ? " ios-reduce-blur" : "")}
+      >
         <div
-          className="grid grid-cols-2"
-          style={{ columnGap: spaceX, rowGap: spaceY }}
+          className="ios-composite"
+          style={{
+            transform: "translateZ(0)",
+            WebkitTransform: "translateZ(0)",
+            backfaceVisibility: "hidden" as any,
+            WebkitBackfaceVisibility: "hidden" as any,
+            WebkitFontSmoothing: "antialiased" as any,
+            willChange: "transform",
+            contain: "paint",
+            isolation: "isolate",
+          }}
         >
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="hot-grid-slide flex flex-col" style={{ gap: spaceY }}>
-              <div className="aspect-[2/3] w-full rounded-xl border border-white/10 bg-white/5 animate-pulse" />
-              <div className="aspect-[2/3] w-full rounded-xl border border-white/10 bg-white/5 animate-pulse" />
-            </div>
-          ))}
+          <MangaCard
+            manga={m as any}
+            hideBottomOverlay
+            imgLoading={isEager ? "eager" : "lazy"}
+            imgFetchPriority={fetchPriority}
+          />
         </div>
-        <div className="flex items-center justify-center gap-2 pt-4 pb-1">
-          {Array.from({ length: dots }).map((_, i) => (
-            <span key={i} className="h-2 w-2 rounded-full bg-white/25" />
-          ))}
-        </div>
-        <GridStyle />
       </div>
     );
   };
 
-  if (!mounted || columns.length === 0) {
+  const renderColumn = (col: MangaType[], cIdx: number) => (
+    <div key={cIdx} className="hot-grid-slide flex flex-col" style={{ gap: spaceY }}>
+      {col.map((m, i) => renderCard(m, cIdx * 2 + i))}
+    </div>
+  );
+
+  if (columns.length === 0) {
     return <Skeleton />;
+  }
+
+  if (!mounted) {
+    const ssrColumns = columns.slice(0, 2);
+    return (
+      <div className="relative -mx-2 overflow-hidden sm:mx-0" data-mobile-hot-grid>
+        <div className="grid grid-cols-2" style={{ columnGap: spaceX, rowGap: spaceY }}>
+          {ssrColumns.map(renderColumn)}
+        </div>
+        <GridStyle />
+      </div>
+    );
   }
 
   // Each slide = 1 column => 5 slides => 5 bullets. Autoplay moves 1 column.
@@ -162,45 +204,7 @@ export default function TopBannerMobileGrid({
         className="swiper_columns"
       >
         {columns.map((col, cIdx) => (
-          <SwiperSlide key={cIdx}>
-            <div
-              className="hot-grid-slide flex flex-col"
-              style={{ gap: spaceY }}
-            >
-              {col.map((m, i) => {
-                const itemIdx = cIdx * 2 + i;
-                const isEager = itemIdx < EAGER_IMAGES;
-                const fetchPriority = itemIdx < HIGH_PRIORITY_IMAGES ? "high" : isEager ? "auto" : "low";
-                return (
-                <div
-                  key={(m as any).id ?? (m as any)._id ?? i}
-                  className={"relative" + (isIOS && dragging ? " ios-reduce-blur" : "")}
-                >
-                  <div
-                    className="ios-composite"
-                    style={{
-                      transform: "translateZ(0)",
-                      WebkitTransform: "translateZ(0)",
-                      backfaceVisibility: "hidden" as any,
-                      WebkitBackfaceVisibility: "hidden" as any,
-                      WebkitFontSmoothing: "antialiased" as any,
-                      willChange: "transform",
-                      contain: "paint",
-                      isolation: "isolate",
-                    }}
-                  >
-                    <MangaCard
-                      manga={m as any}
-                      hideBottomOverlay
-                      imgLoading={isEager ? "eager" : "lazy"}
-                      imgFetchPriority={fetchPriority}
-                    />
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-          </SwiperSlide>
+          <SwiperSlide key={cIdx}>{renderColumn(col, cIdx)}</SwiperSlide>
         ))}
       </Swiper>
       <GridStyle />

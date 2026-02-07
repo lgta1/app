@@ -37,9 +37,11 @@ export const collectPosterVariantPaths = (
   };
 
   if (variants) {
+    push(variants.w200);
     push(variants.w220);
-    push(variants.w400);
-    push(variants.w625);
+    push(variants.w320);
+    push(variants.w360);
+    push(variants.w575);
     push(variants.source);
   }
 

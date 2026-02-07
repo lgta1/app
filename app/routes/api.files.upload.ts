@@ -180,7 +180,9 @@ export async function action({ request }: Route.ActionArgs) {
     const validPrefixPath = sanitizePrefixPath(prefixPath as string);
 
     // Apply server-side watermark only for manga page uploads when explicitly requested
-    const shouldWatermark = validPrefixPath.startsWith("manga-images");
+    const shouldWatermark =
+      validPrefixPath.startsWith("manga-images") ||
+      validPrefixPath.startsWith("tmp/manga-images");
     const watermarkRequested = typeof watermarkFlagRaw === "string" && ["true", "1", "yes"].includes(watermarkFlagRaw.toLowerCase());
     const watermarkVariant =
       typeof watermarkVariantRaw === "string" && /^\d+$/.test(watermarkVariantRaw)

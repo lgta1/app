@@ -24,11 +24,18 @@ export async function loader() {
     getLeaderboard("monthly"),
   ]);
 
-  return {
-    dailyLeaderboard: dailyLeaderboard.length > 0 ? dailyLeaderboard : weeklyLeaderboard,
-    weeklyLeaderboard,
-    monthlyLeaderboard,
-  };
+  return Response.json(
+    {
+      dailyLeaderboard: dailyLeaderboard.length > 0 ? dailyLeaderboard : weeklyLeaderboard,
+      weeklyLeaderboard,
+      monthlyLeaderboard,
+    },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=600, s-maxage=600",
+      },
+    },
+  );
 }
 
 export default function LeaderboardIndex() {
@@ -64,6 +71,13 @@ export default function LeaderboardIndex() {
             >
               Top Harem
             </a>
+            <a
+              href="/leaderboard/translator"
+              aria-current={pathname === "/leaderboard/translator" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/translator" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+            >
+              BXH Dịch Giả
+            </a>
           </>
         ) : (
           <>
@@ -87,6 +101,13 @@ export default function LeaderboardIndex() {
               className={`${pathname === "/leaderboard/waifu" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
             >
               Top Harem
+            </a>
+            <a
+              href="/leaderboard/translator"
+              aria-current={pathname === "/leaderboard/translator" ? "page" : undefined}
+              className={`${pathname === "/leaderboard/translator" ? "bg-btn-primary text-txt-inverse" : "bg-bgc-layer-semi-neutral text-txt-primary"} rounded-[32px] px-3 py-1.5 text-center text-xs leading-normal font-medium backdrop-blur-[3.4px] sm:text-base touch-manipulation [touch-action:manipulation]`}
+            >
+              BXH Dịch Giả
             </a>
           </>
         )}

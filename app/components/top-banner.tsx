@@ -364,16 +364,30 @@ function TopBannerBase(
         <div className="tb-marquee overflow-hidden w-full">
           <div className="flex" aria-live="off" aria-roledescription="carousel">
             <div className="tb-group" style={{ ...groupStyle, animation: `tb-marquee-steps-${baseLen}-${holdSec}-${moveSec}`.replace(/\./g, "_") + ` ${totalDurationSec}s linear infinite` }}>
-              {items.map((m, i) => (
+              {items.map((m, i) => {
+                const isEager = i < 5;
+                const fetchPriority = i < 4 ? "high" : isEager ? "auto" : "low";
+                return (
                 <div key={`${(m as any).id ?? (m as any)._id ?? "x"}-A-${i}`} className="shrink-0" style={cardStyle}>
-                  <TopBannerItem manga={m as any} className="h-full w-full" />
+                  <TopBannerItem
+                    manga={m as any}
+                    className="h-full w-full"
+                    imgLoading={isEager ? "eager" : "lazy"}
+                    imgFetchPriority={fetchPriority}
+                  />
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div className="tb-group" aria-hidden style={{ ...groupStyle, animation: `tb-marquee-steps-${baseLen}-${holdSec}-${moveSec}`.replace(/\./g, "_") + ` ${totalDurationSec}s linear infinite` }}>
               {items.map((m, i) => (
                 <div key={`${(m as any).id ?? (m as any)._id ?? "x"}-B-${i}`} className="shrink-0" style={cardStyle}>
-                  <TopBannerItem manga={m as any} className="h-full w-full" />
+                  <TopBannerItem
+                    manga={m as any}
+                    className="h-full w-full"
+                    imgLoading="lazy"
+                    imgFetchPriority="low"
+                  />
                 </div>
               ))}
             </div>
@@ -393,15 +407,24 @@ function TopBannerBase(
       `}</style>
       <div ref={containerRef} className="overflow-hidden w-full pb-2">
         <div ref={trackRef} className="flex gap-3" style={{ willChange: "transform" }}>
-          {items.map((m: MangaType, i: number) => (
+          {items.map((m: MangaType, i: number) => {
+            const isEager = i < 5;
+            const fetchPriority = i < 4 ? "high" : isEager ? "auto" : "low";
+            return (
             <div
               key={`${(m as any).id ?? (m as any)._id ?? "x"}-${i}`}
               className="shrink-0"
               style={{ width: "calc((100% - (var(--tb-cols) - 1) * var(--tb-gap)) / var(--tb-cols))" }}
             >
-              <TopBannerItem manga={m as any} className="w-full" />
+              <TopBannerItem
+                manga={m as any}
+                className="w-full"
+                imgLoading={isEager ? "eager" : "lazy"}
+                imgFetchPriority={fetchPriority}
+              />
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       {baseLen > 0 ? (

@@ -39,22 +39,13 @@ export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: appStylesheetUrl },
   { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
   { rel: "shortcut icon", href: "/favicon.ico" },
+  { rel: "preconnect", href: "https://cdn.vinahentai.fun", crossOrigin: "anonymous" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-  {
-    rel: "stylesheet",
-    href:
-      "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
-  {
-    rel: "stylesheet",
-    href:
-      "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap",
-  },
+  // Google Fonts stylesheets are deferred and preloaded
+  // { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" },
+  // { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" },
+  // { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap" },
 ];
 
 export function meta({ data }: Route.MetaArgs) {
@@ -84,6 +75,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const data = useLoaderData<RootLoaderData | undefined>();
   const canonicalUrl = data?.canonicalUrl;
   const cdnBase = data?.cdnBase;
+  const fontStylesheets = [
+    "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap",
+  ];
   const htmlStyle = cdnBase
     ? ({
         "--cdn-base": cdnBase,
@@ -97,6 +92,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}
+        <link rel="preload" as="style" href={appStylesheetUrl} />
+        {fontStylesheets.map((href) => (
+          <link key={href} rel="preload" as="style" href={href} />
+        ))}
         {ENABLE_GA4 ? (
           <>
             {/* Google tag (gtag.js) */}
@@ -124,12 +123,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   if(nofonts){
                     localStorage.setItem('vh_nofonts','1');
                     document.documentElement.setAttribute('data-nofonts','1');
+                    return;
                   }
-                }catch(_){}
+                  var fontLinks = ${JSON.stringify(fontStylesheets)};
+                  var head = document.head || document.getElementsByTagName('head')[0];
+                  if (!head || !fontLinks || !fontLinks.length) return;
+                  window.requestAnimationFrame(function(){
+                    for (var i = 0; i < fontLinks.length; i++) {
+                      var link = document.createElement('link');
+                      link.rel = 'stylesheet';
+                      link.href = fontLinks[i];
+                      head.appendChild(link);
+                    }
+                  });
+                }catch(_){
+                  try{
+                    var fontLinksFallback = ${JSON.stringify(fontStylesheets)};
+                    var headFallback = document.head || document.getElementsByTagName('head')[0];
+                    if (!headFallback || !fontLinksFallback || !fontLinksFallback.length) return;
+                    for (var j = 0; j < fontLinksFallback.length; j++) {
+                      var linkFallback = document.createElement('link');
+                      linkFallback.rel = 'stylesheet';
+                      linkFallback.href = fontLinksFallback[j];
+                      headFallback.appendChild(linkFallback);
+                    }
+                  }catch(__){}
+                }
               })();
             `,
           }}
         />
+        <noscript>
+          {fontStylesheets.map((href) => (
+            <link key={href} rel="stylesheet" href={href} />
+          ))}
+        </noscript>
         {/* Critical inline CSS: đảm bảo khung ảnh ổn định trước khi Tailwind tải xong */}
         <style data-critical-img>{`
           .aspect-\\[2\\/3\\]{aspect-ratio:2/3}

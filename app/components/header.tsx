@@ -110,11 +110,7 @@ function RandomNavButton() {
 
 export function Header({ user, isAdmin = false, genres = [], hideBanner = false, disableAutoHide = false, isFixed = true, autoPrefetchNotifications = false }: HeaderProps) {
   const [isHidden, setIsHidden] = useState(false);
-  const bannerRef = useRef<HTMLDivElement | null>(null);
-  const [bannerMounted, setBannerMounted] = useState(false);
-  const [bannerVisible, setBannerVisible] = useState(false);
   const [isHome, setIsHome] = useState(false);
-  const bannerName = (user as any)?.displayName || (user as any)?.username || (user as any)?.name || "";
 
   // Headroom-like behavior
   useEffect(() => {
@@ -149,37 +145,6 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
     return () => window.removeEventListener("scroll", onScroll);
   }, [disableAutoHide, isFixed]);
 
-  // Banner display once per session
-  useEffect(() => {
-    if (hideBanner) {
-      setBannerVisible(false);
-      setBannerMounted(false);
-      return;
-    }
-    try {
-      if (sessionStorage.getItem("vh_banner_shown")) {
-        setBannerVisible(false);
-        setBannerMounted(false);
-        return;
-      }
-      sessionStorage.setItem("vh_banner_shown", "1");
-    } catch {}
-
-    setBannerMounted(true);
-    const rafId = window.requestAnimationFrame(() => setBannerVisible(true));
-    const visibleDuration = 4500;
-    const animDuration = 300;
-    const hideTimer = window.setTimeout(() => {
-      setBannerVisible(false);
-      window.setTimeout(() => setBannerMounted(false), animDuration);
-    }, visibleDuration);
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.clearTimeout(hideTimer);
-    };
-  }, [hideBanner]);
-
   // Detect homepage to scale logo only on index
   useEffect(() => {
     try {
@@ -191,31 +156,6 @@ export function Header({ user, isAdmin = false, genres = [], hideBanner = false,
 
   return (
     <header className="flex w-full flex-col">
-      {/* Banner */}
-      {bannerMounted && !hideBanner && (
-        <div
-          ref={bannerRef}
-          className={`fixed left-0 right-0 bottom-4 z-[60] bg-lav-500 flex items-center justify-center mx-auto max-w-[1200px] px-3 py-2 md:gap-4 md:px-8 rounded-md shadow-lg transition-transform transition-opacity duration-300 ease-out ${
-            bannerVisible ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-2 pointer-events-none"
-          }`}
-          role="dialog"
-          aria-live="polite"
-        >
-          <img src="/images/icons/star-icon.svg" alt="Star" className="hidden h-2 w-2 md:block md:h-4 md:w-4" />
-          <span className="text-center text-[10px] leading-tight font-semibold text-[#0A1020] md:text-sm max-[376px]:hidden">
-            {bannerName
-              ? `VinaHentai không đặt quảng cáo, chúc đồng dâm ${bannerName} đọc truyện vui vẻ ❤️`
-              : `VinaHentai không đặt quảng cáo, chúc đồng dâm đọc truyện vui vẻ ❤️`}
-          </span>
-          <span className="hidden text-center text-[10px] leading-tight font-semibold text-[#0A1020] md:text-sm max-[376px]:inline">
-            {bannerName
-              ? `VinaHentai không đặt quảng cáo. Chúc ${bannerName} đọc truyện vui vẻ ❤️`
-              : `VinaHentai không đặt quảng cáo. Cảm ơn đồng dâm ❤️`}
-          </span>
-          <img src="/images/icons/star-icon.svg" alt="Star" className="hidden h-2 w-2 md:block md:h-4 md:w-4" />
-        </div>
-      )}
-
       {/* Fixed wrapper */}
       <div
         className={

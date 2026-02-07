@@ -132,7 +132,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const posterVariants = parsePosterVariantsPayload(formData.get("posterVariantsJson"));
     const posterUrl = formData.get("posterUrl");
-    if (posterVariants?.w625?.url) mangaData.poster = posterVariants.w625.url;
+    if (posterVariants?.w575?.url) mangaData.poster = posterVariants.w575.url;
     else if (posterUrl) mangaData.poster = posterUrl as string;
     if (posterVariants) mangaData.posterVariants = posterVariants as any;
 
@@ -140,7 +140,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (posterVariants && existingManga) {
       const oldPaths = collectPosterVariantPaths((existingManga as any).posterVariants, (existingManga as any).poster);
-      const newPaths = collectPosterVariantPaths(posterVariants, posterVariants.w625?.url || (posterUrl as string));
+      const newPaths = collectPosterVariantPaths(posterVariants, posterVariants.w575?.url || (posterUrl as string));
       const toDelete = oldPaths.filter((p) => !newPaths.includes(p));
       if (toDelete.length) {
         try {
@@ -294,8 +294,8 @@ export default function EditStory() {
     try {
       const variants = await generatePosterVariants(file);
       setPosterVariants(variants);
-      setFormData((prev: FormDataShape) => ({ ...prev, poster: variants.w625.file }));
-      setPosterPreview(URL.createObjectURL(variants.w625.file));
+      setFormData((prev: FormDataShape) => ({ ...prev, poster: variants.w575.file }));
+      setPosterPreview(URL.createObjectURL(variants.w575.file));
     } catch (error) {
       console.error("Normalize poster error", error);
       toast.error("Không thể xử lý ảnh bìa, vui lòng thử lại");
@@ -329,17 +329,17 @@ export default function EditStory() {
     setIsUploading(true);
     try {
       let posterVariantUrl: string | undefined;
-      if (posterVariants?.w625?.file) {
-        const uploadEntries: Array<{ key: "w220" | "w400" | "w625"; width: number; height: number; file: File }> = [];
+      if (posterVariants?.w575?.file) {
+        const uploadEntries: Array<{ key: "w200" | "w360" | "w575"; width: number; height: number; file: File }> = [];
         const uploads: Array<{ file: File; options: { prefixPath: string } }> = [];
-        const push = (key: "w220" | "w400" | "w625", variant: { file: File; width: number; height: number }) => {
+        const push = (key: "w200" | "w360" | "w575", variant: { file: File; width: number; height: number }) => {
           uploadEntries.push({ key, width: variant.width, height: variant.height, file: variant.file });
           uploads.push({ file: variant.file, options: { prefixPath: "story-images" } });
         };
 
-        push("w625", posterVariants.w625);
-        if (posterVariants.w400) push("w400", posterVariants.w400);
-        if (posterVariants.w220) push("w220", posterVariants.w220);
+        push("w575", posterVariants.w575);
+        if (posterVariants.w360) push("w360", posterVariants.w360);
+        if (posterVariants.w200) push("w200", posterVariants.w200);
 
         const results = await uploadMultipleFiles(uploads);
         const payload: PosterVariantsPayload = {};
@@ -356,7 +356,7 @@ export default function EditStory() {
           };
         });
 
-        posterVariantUrl = payload.w625?.url || payload.w400?.url || payload.w220?.url;
+        posterVariantUrl = payload.w575?.url || payload.w360?.url || payload.w200?.url;
         if (posterVariantUrl) {
           const payloadJson = JSON.stringify(payload);
           setPosterVariantsJson(payloadJson);

@@ -39,9 +39,9 @@ export interface PosterVariantFile {
 }
 
 export interface PosterVariantsResult {
-  w625: PosterVariantFile;
-  w400?: PosterVariantFile;
-  w220?: PosterVariantFile;
+  w575: PosterVariantFile;
+  w360?: PosterVariantFile;
+  w200?: PosterVariantFile;
   usedWebP: boolean;
 }
 
@@ -798,8 +798,8 @@ const resizePosterToWidth = async (
  * - Crop về 3:4 nếu cần.
  * - Thử convert WEBP 0.95; chỉ dùng nếu nhỏ hơn gốc.
  * - Resize tối đa 575px (không upscale).
- * - Tạo 400px nếu width > 450.
- * - Tạo 220px nếu width > 301.
+ * - Tạo 360px nếu width > 420.
+ * - Tạo 200px nếu width > 280.
  */
 export async function generatePosterVariants(file: File): Promise<PosterVariantsResult> {
   const baseDims = await getImageDimensions(file);
@@ -839,24 +839,24 @@ export async function generatePosterVariants(file: File): Promise<PosterVariants
     height = resizedResult.height;
   }
 
-  const w625: PosterVariantFile = { file: working, width, height };
-  const variants: PosterVariantsResult = { w625, usedWebP };
+  const w575: PosterVariantFile = { file: working, width, height };
+  const variants: PosterVariantsResult = { w575, usedWebP };
 
-  if (width > 450) {
-    const w400Result = await resizePosterToWidth(working, 400);
-    variants.w400 = {
-      file: w400Result.file,
-      width: w400Result.width,
-      height: w400Result.height,
+  if (width > 420) {
+    const w360Result = await resizePosterToWidth(working, 360);
+    variants.w360 = {
+      file: w360Result.file,
+      width: w360Result.width,
+      height: w360Result.height,
     };
   }
 
-  if (width > 301) {
-    const w220Result = await resizePosterToWidth(working, 220);
-    variants.w220 = {
-      file: w220Result.file,
-      width: w220Result.width,
-      height: w220Result.height,
+  if (width > 280) {
+    const w200Result = await resizePosterToWidth(working, 200);
+    variants.w200 = {
+      file: w200Result.file,
+      width: w200Result.width,
+      height: w200Result.height,
     };
   }
 

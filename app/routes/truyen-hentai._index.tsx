@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useMediaQuery } from "~/hooks/use-media-query";
-import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
+import { buildPosterSrcSet, getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 import type { Route } from "./+types/truyen-hentai._index";
 
@@ -188,7 +188,7 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
           <span className="text-sm text-txt-secondary">Top tuần + Top tháng (không trùng)</span>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {featured.map((m) => (
+          {featured.map((m, idx) => (
             <Link
               key={m.slug}
               to={`/truyen-hentai/${m.slug}`}
@@ -197,14 +197,39 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
               <div className="aspect-[3/4] w-full overflow-hidden rounded-xl bg-black">
                 {(() => {
                   const variant = getPosterVariantForContext(m, isDesktop ? "cardDesktop" : "cardMobile");
+                  const isEager = idx < 4;
+                  const variants = (m as any)?.posterVariants as any | undefined;
+                  const desktopPosterSrcSet = buildPosterSrcSet(variants);
+                  const mobileVariant = variants?.w360 || variants?.w320 || variants?.w200 || variants?.w220;
+                  const mobileVariantWidth = variants?.w360
+                    ? variants.w360.width || 360
+                    : variants?.w320
+                    ? variants.w320.width || 320
+                    : variants?.w200
+                    ? variants.w200.width || 200
+                    : variants?.w220
+                    ? variants.w220.width || 220
+                    : undefined;
+                  const mobilePosterSrcSet = mobileVariant?.url && mobileVariantWidth
+                    ? `${mobileVariant.url} ${mobileVariantWidth}w`
+                    : undefined;
+                  const posterSrcSet = isDesktop ? desktopPosterSrcSet : mobilePosterSrcSet;
+                  const posterSizes = isDesktop
+                    ? "(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
+                    : mobileVariantWidth
+                    ? `${mobileVariantWidth}px`
+                    : "(min-width: 640px) 33vw, 50vw";
                   return (
                 <img
                   src={variant?.url || m.poster}
                   alt={m.title}
-                  loading="lazy"
+                  loading={isEager ? "eager" : "lazy"}
                   decoding="async"
+                  fetchPriority={isEager ? "high" : "low"}
                   width={variant?.width}
                   height={variant?.height}
+                  srcSet={posterSrcSet}
+                  sizes={posterSrcSet ? posterSizes : undefined}
                   className="h-full w-full object-cover object-top transition group-hover:scale-[1.03]"
                 />
                   );
@@ -234,6 +259,27 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
               <div className="aspect-[3/4] w-full overflow-hidden rounded-xl bg-black">
                 {(() => {
                   const variant = getPosterVariantForContext(m, isDesktop ? "cardDesktop" : "cardMobile");
+                  const variants = (m as any)?.posterVariants as any | undefined;
+                  const desktopPosterSrcSet = buildPosterSrcSet(variants);
+                  const mobileVariant = variants?.w360 || variants?.w320 || variants?.w200 || variants?.w220;
+                  const mobileVariantWidth = variants?.w360
+                    ? variants.w360.width || 360
+                    : variants?.w320
+                    ? variants.w320.width || 320
+                    : variants?.w200
+                    ? variants.w200.width || 200
+                    : variants?.w220
+                    ? variants.w220.width || 220
+                    : undefined;
+                  const mobilePosterSrcSet = mobileVariant?.url && mobileVariantWidth
+                    ? `${mobileVariant.url} ${mobileVariantWidth}w`
+                    : undefined;
+                  const posterSrcSet = isDesktop ? desktopPosterSrcSet : mobilePosterSrcSet;
+                  const posterSizes = isDesktop
+                    ? "(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
+                    : mobileVariantWidth
+                    ? `${mobileVariantWidth}px`
+                    : "(min-width: 640px) 33vw, 50vw";
                   return (
                 <img
                   src={variant?.url || m.poster}
@@ -242,6 +288,8 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
                   decoding="async"
                   width={variant?.width}
                   height={variant?.height}
+                  srcSet={posterSrcSet}
+                  sizes={posterSrcSet ? posterSizes : undefined}
                   className="h-full w-full object-cover object-top transition group-hover:scale-[1.03]"
                 />
                   );

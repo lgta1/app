@@ -573,17 +573,17 @@ const normalizeFilenameForContentType = (filename: string, contentType?: string 
 
 // Server-side re-implementation of the client rules in `app/utils/image-compression.utils.ts`.
 // - Chapter images: size-based scaling + PNG->WebP + small quality trial.
-// - Posters: crop to 3:4 when needed + width<=625 + PNG->WebP.
+// - Posters: crop to 3:4 when needed + width<=575 + PNG->WebP.
 const IMAGE_LIMIT_PIXELS = 64_000_000;
 const MB = 1024 * 1024;
 
 type PosterAspect = "3:4" | "2:3" | "other";
-const POSTER_TARGET_WIDTH = 625;
+const POSTER_TARGET_WIDTH = 575;
 const POSTER_ASPECT_TOLERANCE = 0.01;
 const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
-const POSTER_VARIANT_400_MIN_WIDTH = 450;
-const POSTER_VARIANT_220_MIN_WIDTH = 301;
+const POSTER_VARIANT_360_MIN_WIDTH = 420;
+const POSTER_VARIANT_200_MIN_WIDTH = 280;
 
 const classifyPosterAspect = (ratio: number): PosterAspect => {
   if (Math.abs(ratio - ASPECT_THREE_FOUR) <= POSTER_ASPECT_TOLERANCE) return "3:4";
@@ -632,7 +632,7 @@ async function normalizePosterBuffer(
       }
     }
 
-    // Resize to width=625 if larger.
+    // Resize to width=575 if larger.
     if (needsResize) {
       pipeline = pipeline.resize({ width: POSTER_TARGET_WIDTH, withoutEnlargement: true });
     }
@@ -702,24 +702,24 @@ async function buildPosterVariantsFromBuffer(
   input: { buffer: Buffer; contentType: string | null; width?: number; height?: number },
 ): Promise<{
   base: { buffer: Buffer; contentType: string | null; width?: number; height?: number };
-  w400?: { buffer: Buffer; contentType: string; width?: number; height?: number };
-  w220?: { buffer: Buffer; contentType: string; width?: number; height?: number };
+  w360?: { buffer: Buffer; contentType: string; width?: number; height?: number };
+  w200?: { buffer: Buffer; contentType: string; width?: number; height?: number };
 }> {
   const base = input;
   const baseWidth = typeof base.width === "number" ? base.width : undefined;
 
-  let w400: { buffer: Buffer; contentType: string; width?: number; height?: number } | undefined;
-  let w220: { buffer: Buffer; contentType: string; width?: number; height?: number } | undefined;
+  let w360: { buffer: Buffer; contentType: string; width?: number; height?: number } | undefined;
+  let w200: { buffer: Buffer; contentType: string; width?: number; height?: number } | undefined;
 
-  if (typeof baseWidth === "number" && baseWidth > POSTER_VARIANT_400_MIN_WIDTH) {
-    w400 = await resizePosterVariantBuffer(base.buffer, base.contentType, 400);
+  if (typeof baseWidth === "number" && baseWidth > POSTER_VARIANT_360_MIN_WIDTH) {
+    w360 = await resizePosterVariantBuffer(base.buffer, base.contentType, 360);
   }
 
-  if (typeof baseWidth === "number" && baseWidth > POSTER_VARIANT_220_MIN_WIDTH) {
-    w220 = await resizePosterVariantBuffer(base.buffer, base.contentType, 220);
+  if (typeof baseWidth === "number" && baseWidth > POSTER_VARIANT_200_MIN_WIDTH) {
+    w200 = await resizePosterVariantBuffer(base.buffer, base.contentType, 200);
   }
 
-  return { base, w400, w220 };
+  return { base, w360, w200 };
 }
 
 async function downloadAndUploadPosterVariants(options: {
@@ -749,7 +749,7 @@ async function downloadAndUploadPosterVariants(options: {
 
   const variants = await buildPosterVariantsFromBuffer(normalizedPoster);
 
-  const uploadEntry = async (key: "w625" | "w400" | "w220", variant: { buffer: Buffer; contentType: string | null; width?: number; height?: number }) => {
+  const uploadEntry = async (key: "w575" | "w360" | "w200", variant: { buffer: Buffer; contentType: string | null; width?: number; height?: number }) => {
     const uploaded = await uploadImageBuffer(options.posterUrl, variant.buffer, variant.contentType, {
       prefixPath: "manga-posters",
       filenameHintBase: `poster-${key}`,
@@ -765,18 +765,18 @@ async function downloadAndUploadPosterVariants(options: {
   };
 
   const posterVariants: PosterVariantsPayload = {};
-  posterVariants.w625 = await uploadEntry("w625", variants.base);
+  posterVariants.w575 = await uploadEntry("w575", variants.base);
 
-  if (variants.w400) {
-    posterVariants.w400 = await uploadEntry("w400", variants.w400);
+  if (variants.w360) {
+    posterVariants.w360 = await uploadEntry("w360", variants.w360);
   }
 
-  if (variants.w220) {
-    posterVariants.w220 = await uploadEntry("w220", variants.w220);
+  if (variants.w200) {
+    posterVariants.w200 = await uploadEntry("w200", variants.w200);
   }
 
   return {
-    posterUrl: posterVariants.w625?.url || posterVariants.w400?.url || posterVariants.w220?.url || options.posterUrl,
+    posterUrl: posterVariants.w575?.url || posterVariants.w360?.url || posterVariants.w200?.url || options.posterUrl,
     posterVariants,
   };
 }

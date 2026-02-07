@@ -107,7 +107,7 @@ export async function action({ request }: ActionFunctionArgs) {
       authorSlugs: JSON.parse((formData.get("authorSlugs") as string) || "[]"),
       keywords: formData.get("keywords") as string,
       userStatus: Number(formData.get("userStatus")),
-      poster: (posterVariants?.w625?.url || formData.get("posterUrl")) as string,
+      poster: (posterVariants?.w575?.url || formData.get("posterUrl")) as string,
       posterVariants: posterVariants || undefined,
       genres: parsedGenres,
       contentType: isCosplay ? MANGA_CONTENT_TYPE.COSPLAY : MANGA_CONTENT_TYPE.MANGA,
@@ -266,8 +266,8 @@ export default function CreateStory() {
     try {
       const variants = await generatePosterVariants(file);
       setPosterVariants(variants);
-      setFormData((prev: FormDataShape) => ({ ...prev, poster: variants.w625.file }));
-      setPosterPreview(URL.createObjectURL(variants.w625.file));
+      setFormData((prev: FormDataShape) => ({ ...prev, poster: variants.w575.file }));
+      setPosterPreview(URL.createObjectURL(variants.w575.file));
     } catch (error) {
       console.error("Normalize poster error", error);
       toast.error("Không thể xử lý ảnh bìa, vui lòng thử lại");
@@ -304,7 +304,7 @@ export default function CreateStory() {
     // (mô tả được phép trống)
     // END <feature> MANGACREATE_DESCRIPTION_OPTIONAL
 
-    if (!posterVariants?.w625?.file) {
+    if (!posterVariants?.w575?.file) {
       toast.error("Vui lòng chọn ảnh bìa");
       return;
     }
@@ -330,16 +330,16 @@ export default function CreateStory() {
 
     setIsUploading(true);
     try {
-      const uploadEntries: Array<{ key: "w220" | "w400" | "w625"; width: number; height: number; file: File }> = [];
+      const uploadEntries: Array<{ key: "w200" | "w360" | "w575"; width: number; height: number; file: File }> = [];
       const uploads: Array<{ file: File; options: { prefixPath: string } }> = [];
-      const push = (key: "w220" | "w400" | "w625", variant: { file: File; width: number; height: number }) => {
+      const push = (key: "w200" | "w360" | "w575", variant: { file: File; width: number; height: number }) => {
         uploadEntries.push({ key, width: variant.width, height: variant.height, file: variant.file });
         uploads.push({ file: variant.file, options: { prefixPath: "story-images" } });
       };
 
-      push("w625", posterVariants.w625);
-      if (posterVariants.w400) push("w400", posterVariants.w400);
-      if (posterVariants.w220) push("w220", posterVariants.w220);
+      push("w575", posterVariants.w575);
+      if (posterVariants.w360) push("w360", posterVariants.w360);
+      if (posterVariants.w200) push("w200", posterVariants.w200);
 
       const results = await uploadMultipleFiles(uploads);
       const payload: PosterVariantsPayload = {};
@@ -356,7 +356,7 @@ export default function CreateStory() {
         };
       });
 
-      const posterVariantUrl = payload.w625?.url || payload.w400?.url || payload.w220?.url;
+      const posterVariantUrl = payload.w575?.url || payload.w360?.url || payload.w200?.url;
       if (!posterVariantUrl) {
         toast.error("Lỗi khi tải ảnh lên, vui lòng thử lại");
         setIsUploading(false);

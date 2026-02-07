@@ -8,6 +8,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { getHotCarouselLeaderboard, getLeaderboard } from "@/queries/leaderboad.query";
 import { getNewCosplay, getNewManga } from "@/queries/manga.query";
 import { getTopUser } from "@/queries/user.query";
+import { getTranslatorLeaderboard } from "@/queries/translator-leaderboard.query";
 import { getRecentMangaComments } from "@/queries/comment.query";
 
 import type { Route } from "./+types/_index";
@@ -17,6 +18,7 @@ import LatestUpdates from "~/components/latest-updates";
 import CosplayPreviewGrid from "~/components/cosplay-preview-grid";
 import RatingItem from "~/components/rating-item";
 import RatingItemUser from "~/components/rating-item-user";
+import RatingItemTranslator from "~/components/rating-item-translator";
 import { TopBanner, type TopBannerHandle } from "~/components/top-banner";
 import TopBannerMobileGrid from "~/components/top-banner-mobile-grid";
 import RecentCommentsFeed from "~/components/recent-comments-feed";
@@ -62,7 +64,7 @@ function ResponsiveLazyRender({
 export async function loader({ request }: Route.LoaderArgs) {
   const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
 
-  const [topUser, hotLeaderboard, weeklyLeaderboard, latestPage, recentComments, cosplayPreview] =
+  const [topUser, hotLeaderboard, weeklyLeaderboard, latestPage, recentComments, cosplayPreview, weeklyTranslatorLeaderboard] =
     await Promise.all([
       getTopUser(),
       getHotCarouselLeaderboard(),
@@ -72,6 +74,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       getNewManga(1, 40, { minChapters: 1 }),
       getRecentMangaComments(1, 5),
       getNewCosplay(1, 4),
+      getTranslatorLeaderboard("weekly", 10),
     ]);
 
   return {
@@ -82,6 +85,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     latestPage,
     recentComments,
     cosplayPreview,
+    weeklyTranslatorLeaderboard,
   };
 }
 
@@ -155,6 +159,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     latestPage,
     recentComments,
     cosplayPreview,
+    weeklyTranslatorLeaderboard,
   } = loaderData;
 
   // Dùng MobileGrid cho mobile/tablet, và TopBanner (5 cột + nút click) cho desktop
@@ -371,6 +376,39 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                 <div className="bg-bgc-layer1 border-bd-default space-y-0 overflow-hidden rounded-2xl border p-0 py-4">
                   {topUser.map((user, index) => (
                     <RatingItemUser key={user.id} user={user} index={index + 1} />
+                  ))}
+                </div>
+              </div>
+            </ResponsiveLazyRender>
+
+            {/* BXH Dịch Giả */}
+            <ResponsiveLazyRender
+              placeholder={
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-[15px] w-[15px]">
+                      <div className="h-4 w-4 rounded bg-[rgba(255,255,255,0.02)] animate-pulse" />
+                    </div>
+                    <h2 className="text-txt-primary text-xl font-semibold uppercase">BXH Dịch Giả</h2>
+                  </div>
+                  <div className="bg-bgc-layer1 border-bd-default overflow-hidden rounded-2xl border p-4 py-8">
+                    <div className="h-36 w-full rounded bg-[rgba(255,255,255,0.02)] animate-pulse" />
+                  </div>
+                </div>
+              }
+              once
+            >
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="relative h-[15px] w-[15px]">
+                    <div className="h-4 w-4 rounded bg-[rgba(255,255,255,0.08)]" />
+                  </div>
+                  <h2 className="text-txt-primary text-xl font-semibold uppercase">BXH Dịch Giả</h2>
+                </div>
+
+                <div className="bg-bgc-layer1 border-bd-default space-y-0 overflow-hidden rounded-2xl border p-0 py-4">
+                  {(weeklyTranslatorLeaderboard || []).map((row: any, index: number) => (
+                    <RatingItemTranslator key={row.userId || index} row={row} index={index + 1} />
                   ))}
                 </div>
               </div>

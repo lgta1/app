@@ -1,21 +1,25 @@
-import { UserModel } from "../../database/models/user.model";
-import { UserWaifuInventoryModel } from "../../database/models/user-waifu-inventory";
-import { WaifuModel } from "../../database/models/waifu.model";
-import { getUserWaifuInventoryCollection } from "./user-waifu-inventory.query";
-import { rewriteLegacyCdnUrl } from "../utils/cdn-url";
-import { normalizeWaifuImageUrl } from "../utils/waifu-image";
-import { ROLES } from "../../constants/user";
+import { ROLES } from "~/constants/user";
+import { UserModel } from "~/database/models/user.model";
+import { UserWaifuInventoryModel } from "~/database/models/user-waifu-inventory";
+import { WaifuModel } from "~/database/models/waifu.model";
+import { WaifuLeaderboardSnapshotModel } from "~/database/models/waifu-leaderboard-snapshot.model";
+import { getUserWaifuInventoryCollection } from "~/.server/queries/user-waifu-inventory.query";
+import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
+import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
-export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 10) => {
-  const skip = (page - 1) * limit;
+const WAIFU_LEADERBOARD_MAX_ITEMS =
+  Number(process.env.WAIFU_LEADERBOARD_MAX_ITEMS) || 1000;
 
+const normalizeUserAvatar = (avatar: unknown) =>
+  typeof avatar === "string" ? rewriteLegacyCdnUrl(avatar) : avatar;
+
+export const calculateWaifuLeaderboardSnapshot = async (): Promise<number> => {
   const waifuCollectionName = WaifuModel.collection.name;
   const userCollectionName = UserModel.collection.name;
   const objectIdLike = /^[a-f\d]{24}$/i;
+  const now = new Date();
 
-  // Aggregate unique waifu counts per user from canonical inventory.
-  // Note: inventory stores ids as strings; $lookup requires ObjectId, so we cast with $toObjectId.
-  const agg = await UserWaifuInventoryModel.aggregate([
+  const rows = await UserWaifuInventoryModel.aggregate([
     {
       $match: {
         count: { $gt: 0 },
@@ -88,30 +92,20 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
         totalWaifu: -1,
       },
     },
-    {
-      $facet: {
-        data: [{ $skip: skip }, { $limit: limit }],
-        totalCount: [{ $count: "count" }],
-      },
-    },
+    { $limit: WAIFU_LEADERBOARD_MAX_ITEMS },
   ]);
 
-  const rows: any[] = agg?.[0]?.data ?? [];
-  const totalCount = Number(agg?.[0]?.totalCount?.[0]?.count ?? 0);
-  const totalPages = Math.ceil(totalCount / limit);
-
-  const startRank = skip + 1;
-
-  const normalized = await Promise.all(
-    rows.map(async (row: any, idx: number) => {
+  const payload = await Promise.all(
+    rows.map(async (row: any, index: number) => {
       const userId = String(row?._id || "");
       const u = row?.user;
-      const rank = startRank + idx;
+      const rank = index + 1;
 
       const base: any = {
+        rank,
         userId,
         userName: u?.name,
-        userAvatar: typeof u?.avatar === "string" ? rewriteLegacyCdnUrl(u.avatar) : u?.avatar,
+        userAvatar: normalizeUserAvatar(u?.avatar),
         userLevel: u?.level,
         userFaction: u?.faction,
         userGender: u?.gender,
@@ -119,9 +113,10 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
         totalWaifu3Stars: row?.totalWaifu3Stars ?? 0,
         totalWaifu4Stars: row?.totalWaifu4Stars ?? 0,
         totalWaifu5Stars: row?.totalWaifu5Stars ?? 0,
+        waifuCollection: [],
+        calculatedAt: now,
       };
 
-      // Keep behavior: only include waifuCollection for global top 5.
       if (rank <= 5) {
         const inv = await getUserWaifuInventoryCollection(userId);
         base.waifuCollection = (inv?.waifuCollection || []).map((w: any) => {
@@ -134,9 +129,31 @@ export const getUserWaifuLeaderboard = async (page: number = 1, limit: number = 
     }),
   );
 
+  await WaifuLeaderboardSnapshotModel.deleteMany({});
+  if (payload.length > 0) {
+    await WaifuLeaderboardSnapshotModel.insertMany(payload, { ordered: false });
+  }
+
+  return payload.length;
+};
+
+export const getWaifuLeaderboardSnapshot = async (page: number = 1, limit: number = 10) => {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const safePage = Math.max(1, page);
+  const skip = (safePage - 1) * safeLimit;
+
+  const totalCount = await WaifuLeaderboardSnapshotModel.countDocuments();
+  const totalPages = Math.max(1, Math.ceil(totalCount / safeLimit));
+
+  const data = await WaifuLeaderboardSnapshotModel.find({})
+    .sort({ rank: 1 })
+    .skip(skip)
+    .limit(safeLimit)
+    .lean();
+
   return {
-    data: normalized,
-    currentPage: page,
+    data,
+    currentPage: safePage,
     totalPages,
     totalCount,
   };

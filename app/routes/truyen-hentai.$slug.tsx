@@ -241,7 +241,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const posterVariants = parsePosterVariantsPayload(formData.get("posterVariantsJson"));
 
     const existing = await MangaModel.findById(mangaId).lean();
-    const nextPosterUrl = posterVariants?.w625?.url || posterUrl.trim();
+    const nextPosterUrl = posterVariants?.w575?.url || posterUrl.trim();
 
     await MangaModel.findByIdAndUpdate(
       mangaId,
@@ -382,16 +382,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     setIsPosterUpdating(true);
     try {
       const variants = await generatePosterVariants(file);
-      const uploadEntries: Array<{ key: "w220" | "w400" | "w625"; width: number; height: number; file: File }> = [];
+      const uploadEntries: Array<{ key: "w200" | "w360" | "w575"; width: number; height: number; file: File }> = [];
       const uploads: Array<{ file: File; options: { prefixPath: string } }> = [];
-      const push = (key: "w220" | "w400" | "w625", variant: { file: File; width: number; height: number }) => {
+      const push = (key: "w200" | "w360" | "w575", variant: { file: File; width: number; height: number }) => {
         uploadEntries.push({ key, width: variant.width, height: variant.height, file: variant.file });
         uploads.push({ file: variant.file, options: { prefixPath: "story-images" } });
       };
 
-      push("w625", variants.w625);
-      if (variants.w400) push("w400", variants.w400);
-      if (variants.w220) push("w220", variants.w220);
+      push("w575", variants.w575);
+      if (variants.w360) push("w360", variants.w360);
+      if (variants.w200) push("w200", variants.w200);
 
       const results = await uploadMultipleFiles(uploads);
       const payload: PosterVariantsPayload = {};
@@ -408,7 +408,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         };
       });
 
-      const remoteUrl = payload.w625?.url || payload.w400?.url || payload.w220?.url;
+      const remoteUrl = payload.w575?.url || payload.w360?.url || payload.w200?.url;
       if (!remoteUrl) {
         throw new Error("Không thể tải ảnh lên");
       }

@@ -1,4 +1,4 @@
-export type PosterVariantKey = "w220" | "w400" | "w625";
+export type PosterVariantKey = "w200" | "w220" | "w320" | "w360" | "w575";
 
 export type PosterVariantEntry = {
   url: string;
@@ -10,9 +10,11 @@ export type PosterVariantEntry = {
 
 export type PosterVariantsPayload = {
   source?: PosterVariantEntry;
+  w200?: PosterVariantEntry;
   w220?: PosterVariantEntry;
-  w400?: PosterVariantEntry;
-  w625?: PosterVariantEntry;
+  w320?: PosterVariantEntry;
+  w360?: PosterVariantEntry;
+  w575?: PosterVariantEntry;
 };
 
 export type PosterContext =
@@ -27,9 +29,11 @@ const pickVariant = (
   desired: PosterVariantKey,
 ): PosterVariantEntry | undefined => {
   if (!variants) return undefined;
-  if (desired === "w220") return variants.w220 || variants.w400 || variants.w625;
-  if (desired === "w400") return variants.w400 || variants.w625;
-  return variants.w625;
+  if (desired === "w200") return variants.w200 || variants.w220 || variants.w320 || variants.w360 || variants.w575;
+  if (desired === "w220") return variants.w220 || variants.w200 || variants.w320 || variants.w360 || variants.w575;
+  if (desired === "w320") return variants.w320 || variants.w360 || variants.w575 || variants.w220 || variants.w200;
+  if (desired === "w360") return variants.w360 || variants.w320 || variants.w575 || variants.w220 || variants.w200;
+  return variants.w575 || variants.w360 || variants.w320 || variants.w220 || variants.w200;
 };
 
 export const getPosterVariantForContext = (
@@ -39,10 +43,10 @@ export const getPosterVariantForContext = (
   const variants = (manga as any)?.posterVariants as PosterVariantsPayload | undefined;
   const desired: PosterVariantKey =
     context === "small" || context === "leaderboard"
-      ? "w220"
+      ? "w200"
       : context === "cardMobile"
-      ? "w400"
-      : "w625";
+      ? "w360"
+      : "w575";
 
   const picked = pickVariant(variants, desired);
   if (picked?.url) return picked;
@@ -53,4 +57,28 @@ export const getPosterVariantForContext = (
 
 export const getPosterUrlForContext = (manga: any, context: PosterContext): string => {
   return getPosterVariantForContext(manga, context)?.url || "";
+};
+
+const FALLBACK_WIDTHS: Record<PosterVariantKey, number> = {
+  w200: 200,
+  w220: 220,
+  w320: 320,
+  w360: 360,
+  w575: 575,
+};
+
+export const buildPosterSrcSet = (
+  variants: PosterVariantsPayload | undefined | null,
+): string | undefined => {
+  if (!variants) return undefined;
+  const entries: Array<{ url: string; width: number }> = [];
+  (Object.keys(FALLBACK_WIDTHS) as PosterVariantKey[]).forEach((key) => {
+    const entry = (variants as any)[key] as PosterVariantEntry | undefined;
+    if (!entry?.url) return;
+    const width = entry.width || FALLBACK_WIDTHS[key];
+    entries.push({ url: entry.url, width });
+  });
+  if (entries.length === 0) return undefined;
+  entries.sort((a, b) => a.width - b.width);
+  return entries.map((item) => `${item.url} ${item.width}w`).join(", ");
 };
