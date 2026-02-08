@@ -23,6 +23,7 @@ export async function loader({ request, params }: any) {
   }
 
   const user = (await requireLogin(request)) as UserType;
+  const canSkipWatermark = isDichGia(String((user as any).role || "")) && Boolean((user as any).canSkipWatermark);
 
   const target = await resolveMangaHandle(handle);
   if (!target) {
@@ -50,7 +51,7 @@ export async function loader({ request, params }: any) {
     throw new BusinessError("Không tìm thấy chương");
   }
 
-  return { chapter, mangaHandle: canonicalHandle };
+  return { chapter, mangaHandle: canonicalHandle, canSkipWatermark };
 }
 
 export async function action({ request, params }: any) {

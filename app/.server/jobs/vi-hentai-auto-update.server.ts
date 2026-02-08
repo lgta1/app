@@ -33,9 +33,7 @@ const isVietnamBlackoutWindow = (): boolean => {
   const minutes = getVietnamMinutes();
   if (minutes == null) return false;
 
-  const inMidday = minutes >= 11 * 60 + 30 && minutes < 13 * 60 + 30;
-  const inLate = minutes >= 21 * 60 + 30 || minutes < 30;
-  return inMidday || inLate;
+  return minutes >= 15 * 60 + 30 && minutes < 18 * 60 + 30;
 };
 
 // We keep extraction and processing separated:
@@ -328,7 +326,7 @@ export const runViHentaiAutoUpdateOnce = async (
   // Phase 2: mark running (actual downloading happens in background worker)
   await ViHentaiAutoUpdateQueueModel.updateOne(
     { _id: createdQueue.queueId },
-    { $set: { status: "running", startedAt: new Date(), lockedBy } },
+    { $set: { status: "running", startedAt: new Date(), lockedBy, manualOverride: true } },
   );
 
   return { ok: true, runId: createdQueue.queueId };
@@ -433,7 +431,10 @@ export const createViHentaiAutoUpdateQueue = async (
   return { ok: true, queueId: String((queue as any)._id) };
 };
 
-export const startViHentaiAutoUpdateQueue = async (queueId: string): Promise<boolean> => {
+export const startViHentaiAutoUpdateQueue = async (
+  queueId: string,
+  options: { manual?: boolean } = {},
+): Promise<boolean> => {
   if (!queueId) return false;
   if (!(await getViHentaiAutoUpdateEnabled())) return false;
 
@@ -443,7 +444,7 @@ export const startViHentaiAutoUpdateQueue = async (queueId: string): Promise<boo
 
   const res = await ViHentaiAutoUpdateQueueModel.updateOne(
     { _id: queueId, status: { $in: ["queued", "failed"] } },
-    { $set: { status: "running", startedAt: new Date() } },
+    { $set: { status: "running", startedAt: new Date(), manualOverride: Boolean(options.manual) } },
   );
   return Boolean((res as any).modifiedCount || (res as any).nModified);
 };
@@ -716,7 +717,7 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
         }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
         if (isVietnamBlackoutWindow()) {
-          console.info("[cron] vi-hentai queue extract skipped: blackout window (VN 11:30-13:30, 21:30-00:30)");
+          console.info("[cron] vi-hentai queue extract skipped: blackout window (VN 15:30-18:30)");
           return;
         }
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
@@ -761,8 +762,15 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
         }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
         if (isVietnamBlackoutWindow()) {
-          console.info("[cron] vi-hentai queue worker skipped: blackout window (VN 11:30-13:30, 21:30-00:30)");
-          return;
+          const manualRunning = await ViHentaiAutoUpdateQueueModel.exists({
+            status: "running",
+            manualOverride: true,
+          });
+          if (!manualRunning) {
+            console.info("[cron] vi-hentai queue worker skipped: blackout window (VN 15:30-18:30)");
+            return;
+          }
+          console.info("[cron] vi-hentai queue worker: blackout window bypassed (manual override)");
         }
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;

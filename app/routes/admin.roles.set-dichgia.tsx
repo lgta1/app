@@ -16,6 +16,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const admin = await requireAdminLogin(request);
   const form = await request.formData();
   const userId = form.get('userId');
+  const canSkipWatermark = form.get('canSkipWatermark') === 'on';
 
   if (!userId || typeof userId !== 'string') {
     return Response.json({ success: false, message: 'userId không hợp lệ' }, { status: 400 });
@@ -27,7 +28,8 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (user.role === ROLES.DICHGIA) {
-    return Response.json({ success: true, message: 'User đã là dịch giả' });
+    await UserModel.findByIdAndUpdate(userId, { $set: { canSkipWatermark } });
+    return Response.json({ success: true, message: 'Cập nhật quyền dịch giả thành công' });
   }
 
   // Không chuyển admin/mod thành dịch giả (giữ nguyên logic scope isolation)
@@ -35,7 +37,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ success: false, message: 'Không thể đổi vai trò của quản trị' }, { status: 400 });
   }
 
-  await UserModel.findByIdAndUpdate(userId, { $set: { role: ROLES.DICHGIA } });
+  await UserModel.findByIdAndUpdate(userId, { $set: { role: ROLES.DICHGIA, canSkipWatermark } });
 
   try {
     await AdminActionLogModel.create({
@@ -54,8 +56,12 @@ export default function SetDichGia() {
   return (
     <div className="p-6">
       <h1 className="text-xl font-semibold mb-4 text-txt-primary">Gán quyền Dịch giả</h1>
-      <form method="post" className="flex items-center gap-2">
+      <form method="post" className="flex flex-wrap items-center gap-2">
         <input name="userId" required placeholder="Nhập ID User" className="rounded border border-bd-default bg-bgc-layer2 px-3 py-2 text-sm" />
+        <label className="flex items-center gap-2 text-sm text-txt-primary">
+          <input type="checkbox" name="canSkipWatermark" className="h-4 w-4" />
+          Cho phép tắt watermark
+        </label>
         <button className="rounded bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] px-4 py-2 text-sm font-semibold text-black shadow">Set làm Dịch giả</button>
       </form>
       <p className="mt-4 text-xs text-txt-secondary">Chỉ ADMIN có thể thao tác. Không đổi vai trò Admin/Mod.</p>

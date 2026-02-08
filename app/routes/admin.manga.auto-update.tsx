@@ -395,7 +395,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return Response.json(body, { status: 200 });
     }
 
-    const started = await startViHentaiAutoUpdateQueue(queueId);
+    const started = await startViHentaiAutoUpdateQueue(queueId, { manual: true });
     if (!started) {
       const body: ActionResult = { ok: false, error: "Không thể start queue (có thể đang có queue khác running)" };
       return Response.json(body, { status: 200 });

@@ -193,7 +193,7 @@ export function EditChapterView() {
   const params = useParams();
   const routeHandle = params.mangaId;
   const navigate = useNavigate();
-  const { chapter, mangaHandle } = useLoaderData() as any;
+  const { chapter, mangaHandle, canSkipWatermark } = useLoaderData() as any;
   const canonicalHandle = mangaHandle || routeHandle;
   const fetcher = useFetcher() as any;
   const [title, setTitle] = useState("");
@@ -206,6 +206,7 @@ export function EditChapterView() {
     total: 0,
   });
   const [watermarkStyle, setWatermarkStyle] = useState<"glow" | "stroke">("glow");
+  const [skipWatermark, setSkipWatermark] = useState(false);
   const actionData = useActionData() as any;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -439,7 +440,7 @@ export function EditChapterView() {
         const groupIndex = groupIndexById.get(groupId) ?? idx;
         const shouldWatermark = !meta.noWatermark && watermarkIndexes.has(groupIndex);
         if (!shouldWatermark) {
-          return { file, options: { prefixPath: "manga-images" as const } };
+          return { file, options: { prefixPath: "manga-images" as const, watermarkSkip: skipWatermark } };
         }
 
         watermarkOrder += 1;
@@ -452,6 +453,7 @@ export function EditChapterView() {
             watermark: true,
             watermarkVariant,
             watermarkStyle,
+            watermarkSkip: skipWatermark,
           },
         };
       });
@@ -824,6 +826,17 @@ export function EditChapterView() {
                     </span>
                   </div>
                 </label>
+                {canSkipWatermark && (
+                  <label className="flex items-center gap-2 text-sm text-txt-primary">
+                    <input
+                      type="checkbox"
+                      checked={skipWatermark}
+                      onChange={(e) => setSkipWatermark(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    Tắt watermark cho chương này
+                  </label>
+                )}
               </div>
 
               {/* Preview Images - Below text */}

@@ -11,6 +11,7 @@ interface UploadFileOptions {
   watermark?: boolean;
   watermarkVariant?: 1 | 2;
   watermarkStyle?: "glow" | "stroke";
+  watermarkSkip?: boolean;
 }
 
 interface UploadedFileResult {
@@ -114,6 +115,14 @@ export function useFileOperations() {
         }
       }
 
+        if (options.watermarkSkip) {
+          formData.append("watermarkSkip", "true");
+        }
+
+      if (options.watermarkSkip) {
+        formData.append("watermarkSkip", "true");
+      }
+
       submit(formData, {
         action: "/api/files/upload",
         method: "post",
@@ -143,6 +152,10 @@ export function useFileOperations() {
         if (options.watermarkStyle) {
           formData.append("watermarkStyle", options.watermarkStyle);
         }
+      }
+
+      if (options.watermarkSkip) {
+        formData.append("watermarkSkip", "true");
       }
 
       // Store callbacks before submitting
@@ -281,6 +294,14 @@ export function useFileOperations() {
             }
           }
 
+          if (options.watermarkSkip) {
+            formData.append("watermarkSkip", "true");
+          }
+
+          if (options.watermarkSkip) {
+            formData.append("watermarkSkip", "true");
+          }
+
           const response = await fetch("/api/files/upload", {
             method: "POST",
             body: formData,
@@ -383,6 +404,10 @@ export function useFileOperations() {
               if (options.watermarkStyle) {
                 formData.append("watermarkStyle", options.watermarkStyle);
               }
+            }
+
+            if (options.watermarkSkip) {
+              formData.append("watermarkSkip", "true");
             }
 
             const response = await fetch("/api/files/upload", {

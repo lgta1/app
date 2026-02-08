@@ -117,90 +117,343 @@ export function HydrateFallback() {
 export async function action({ request }: ActionFunctionArgs) {
   // Import động các module server-only bên trong action để tránh lọt vào client bundle
   const { requireLogin } = await import("@/services/auth.server");
-  const { commitUserSession } = await import("@/services/session.svc");
+  const { commitUserSession, getUserSession, setUserDataToSession } = await import(
+    "@/services/session.svc",
+  );
   const { multiSummon, summon } = await import("@/services/summon.svc");
   const { incrementBannerRolls } = await import("@/mutations/banner.mutation");
   const { BannerModel } = await import("~/database/models/banner.model");
   const { PityCumulativeModel } = await import("~/database/models/pity-cumulative.model");
+  const { SummonTransactionModel } = await import(
+    "~/database/models/summon-transaction.model",
+  );
   const { UserModel } = await import("~/database/models/user.model");
   const { BusinessError } = await import("~/helpers/errors.helper");
+  const { default: mongoose } = await import("mongoose");
 
   const user = await requireLogin(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as "single" | "multi";
   const bannerId = formData.get("bannerId") as string;
+  const idempotencyKey =
+    request.headers.get("Idempotency-Key") ||
+    (formData.get("idempotencyKey") as string | null);
 
   if (!bannerId) {
     return Response.json({ message: "Banner ID is required" }, { status: 400 });
   }
 
+  const isTransactionUnsupported = (err: any) => {
+    const message = String(err?.message || "");
+    return (
+      err?.codeName === "IllegalOperation" ||
+      err?.code === 20 ||
+      message.includes("Transaction numbers are only allowed")
+    );
+  };
+
   try {
-    const cum = await PityCumulativeModel.findOne({ level: user.level }).lean();
-    if (!cum) throw new BusinessError("Level không hợp lệ");
+    if (idempotencyKey) {
+      const existing = await SummonTransactionModel.findOne({
+        idempotencyKey,
+        userId: user.id,
+      }).lean();
 
-    const banner = await BannerModel.findOne({
-      _id: bannerId,
-      startDate: { $lte: new Date() },
-      endDate: { $gte: new Date() },
-    }).lean();
-    if (!banner) throw new BusinessError("Banner không tồn tại");
-
-    if (intent === "single") {
-      const goldCost = banner.isRateUp
-        ? GOLD_COST_PER_SUMMON.rateUp
-        : GOLD_COST_PER_SUMMON.normal;
-      const goldReduce = await UserModel.findOneAndUpdate(
-        { _id: user.id, gold: { $gte: goldCost } },
-        { $inc: { gold: -goldCost } },
-        { new: true },
-      );
-      if (!goldReduce) throw new BusinessError("Không đủ dâm ngọc");
-      await incrementBannerRolls(bannerId);
-
-      const result = await summon(user, banner, cum, request);
-      const response = {
-        success: true,
-        data: { type: "single", items: [result] },
-        message: "Triệu hồi thành công",
-      };
-
-      if (result.updatedSession) {
-        return Response.json(response, {
-          headers: { "Set-Cookie": await commitUserSession(result.updatedSession) },
+      if (existing?.status === "committed" && existing?.response) {
+        const session = await getUserSession(request);
+        const latest = await UserModel.findById(user.id).lean();
+        if (latest) {
+          const prev = session.get("user") || {};
+          setUserDataToSession(session, { ...prev, ...latest });
+        }
+        const sessionCookie = await commitUserSession(session);
+        return Response.json(existing.response, {
+          headers: { "Set-Cookie": sessionCookie },
         });
       }
-      return response;
+
+      if (existing?.status === "started") {
+        return Response.json(
+          { message: "Giao dịch đang xử lý, vui lòng thử lại sau" },
+          { status: 409 },
+        );
+      }
     }
 
-    if (intent === "multi") {
-      const goldCost = banner.isRateUp
-        ? GOLD_COST_PER_SUMMON_MULTI.rateUp
-        : GOLD_COST_PER_SUMMON_MULTI.normal;
-      const goldReduce = await UserModel.findOneAndUpdate(
-        { _id: user.id, gold: { $gte: goldCost } },
-        { $inc: { gold: -goldCost } },
-        { new: true },
-      );
-      if (!goldReduce) throw new BusinessError("Không đủ dâm ngọc");
-      await incrementBannerRolls(bannerId, 10);
+    if (intent !== "single" && intent !== "multi") {
+      return Response.json({ message: "Hành động không hợp lệ" }, { status: 400 });
+    }
 
-      const result = await multiSummon(user, banner, cum, 10, request);
-      const response = {
-        success: true,
-        data: { type: "multi", items: result.items },
-        message: "Triệu hồi thành công",
-      };
+    const session = await mongoose.startSession();
+    let response: any = null;
+    let usedTransaction = false;
 
-      if (result.updatedSession) {
-        return Response.json(response, {
-          headers: { "Set-Cookie": await commitUserSession(result.updatedSession) },
+    try {
+      await session.withTransaction(async () => {
+        usedTransaction = true;
+        const [cum, banner] = await Promise.all([
+          PityCumulativeModel.findOne({ level: user.level }).session(session).lean(),
+          BannerModel.findOne({
+            _id: bannerId,
+            startDate: { $lte: new Date() },
+            endDate: { $gte: new Date() },
+          })
+            .session(session)
+            .lean(),
+        ]);
+
+        if (!cum) throw new BusinessError("Level không hợp lệ");
+        if (!banner) throw new BusinessError("Banner không tồn tại");
+
+        const goldCost =
+          intent === "multi"
+            ? banner.isRateUp
+              ? GOLD_COST_PER_SUMMON_MULTI.rateUp
+              : GOLD_COST_PER_SUMMON_MULTI.normal
+            : banner.isRateUp
+              ? GOLD_COST_PER_SUMMON.rateUp
+              : GOLD_COST_PER_SUMMON.normal;
+
+        if (idempotencyKey) {
+          await SummonTransactionModel.create(
+            [
+              {
+                idempotencyKey,
+                userId: user.id,
+                bannerId,
+                intent,
+                cost: goldCost,
+                status: "started",
+              },
+            ],
+            { session },
+          );
+        }
+
+        const goldReduce = await UserModel.findOneAndUpdate(
+          { _id: user.id, gold: { $gte: goldCost } },
+          { $inc: { gold: -goldCost } },
+          { new: true, session },
+        ).lean();
+
+        if (!goldReduce) throw new BusinessError("Không đủ dâm ngọc");
+
+        await incrementBannerRolls(bannerId, intent === "multi" ? 10 : 1, session);
+
+        if (intent === "single") {
+          const result = await summon(user, banner, cum, undefined, { session });
+          response = {
+            success: true,
+            data: { type: "single", items: [result] },
+            message: "Triệu hồi thành công",
+          };
+        } else {
+          const result = await multiSummon(user, banner, cum, 10, undefined, { session });
+          response = {
+            success: true,
+            data: { type: "multi", items: result.items },
+            message: "Triệu hồi thành công",
+          };
+        }
+
+        if (idempotencyKey) {
+          await SummonTransactionModel.updateOne(
+            { idempotencyKey, userId: user.id },
+            { $set: { status: "committed", response } },
+            { session },
+          );
+        }
+      });
+    } catch (err) {
+      if (!usedTransaction && isTransactionUnsupported(err)) {
+        // Ignore, fall back below.
+      } else if (isTransactionUnsupported(err)) {
+        // If transactions are unsupported, fall back below.
+      } else {
+        throw err;
+      }
+    } finally {
+      session.endSession();
+    }
+
+    if (!response) {
+      const [cum, banner] = await Promise.all([
+        PityCumulativeModel.findOne({ level: user.level }).lean(),
+        BannerModel.findOne({
+          _id: bannerId,
+          startDate: { $lte: new Date() },
+          endDate: { $gte: new Date() },
+        }).lean(),
+      ]);
+
+      if (!cum) throw new BusinessError("Level không hợp lệ");
+      if (!banner) throw new BusinessError("Banner không tồn tại");
+
+      const goldCost =
+        intent === "multi"
+          ? banner.isRateUp
+            ? GOLD_COST_PER_SUMMON_MULTI.rateUp
+            : GOLD_COST_PER_SUMMON_MULTI.normal
+          : banner.isRateUp
+            ? GOLD_COST_PER_SUMMON.rateUp
+            : GOLD_COST_PER_SUMMON.normal;
+
+      if (idempotencyKey) {
+        const existing = await SummonTransactionModel.findOne({
+          idempotencyKey,
+          userId: user.id,
+        }).lean();
+
+        if (!existing) {
+          try {
+            await SummonTransactionModel.create({
+              idempotencyKey,
+              userId: user.id,
+              bannerId,
+              intent,
+              cost: goldCost,
+              status: "started",
+            });
+          } catch (err: any) {
+            if (err?.code === 11000) {
+              const dupe = await SummonTransactionModel.findOne({
+                idempotencyKey,
+                userId: user.id,
+              }).lean();
+              if (dupe?.status === "committed" && dupe?.response) {
+                const session = await getUserSession(request);
+                const latest = await UserModel.findById(user.id).lean();
+                if (latest) {
+                  const prev = session.get("user") || {};
+                  setUserDataToSession(session, { ...prev, ...latest });
+                }
+                const sessionCookie = await commitUserSession(session);
+                return Response.json(dupe.response, {
+                  headers: { "Set-Cookie": sessionCookie },
+                });
+              }
+            } else {
+              throw err;
+            }
+          }
+        } else if (existing.status === "started") {
+          return Response.json(
+            { message: "Giao dịch đang xử lý, vui lòng thử lại sau" },
+            { status: 409 },
+          );
+        } else if (existing.status === "committed" && existing.response) {
+          const session = await getUserSession(request);
+          const latest = await UserModel.findById(user.id).lean();
+          if (latest) {
+            const prev = session.get("user") || {};
+            setUserDataToSession(session, { ...prev, ...latest });
+          }
+          const sessionCookie = await commitUserSession(session);
+          return Response.json(existing.response, {
+            headers: { "Set-Cookie": sessionCookie },
+          });
+        } else {
+          await SummonTransactionModel.updateOne(
+            { idempotencyKey, userId: user.id },
+            { $set: { status: "started", error: null } },
+          );
+        }
+      }
+
+      let goldDeducted = false;
+      try {
+        const goldReduce = await UserModel.findOneAndUpdate(
+          { _id: user.id, gold: { $gte: goldCost } },
+          { $inc: { gold: -goldCost } },
+          { new: true },
+        ).lean();
+        if (!goldReduce) throw new BusinessError("Không đủ dâm ngọc");
+        goldDeducted = true;
+
+        await incrementBannerRolls(bannerId, intent === "multi" ? 10 : 1);
+
+        if (intent === "single") {
+          const result = await summon(user, banner, cum, undefined, {});
+          response = {
+            success: true,
+            data: { type: "single", items: [result] },
+            message: "Triệu hồi thành công",
+          };
+        } else {
+          const result = await multiSummon(user, banner, cum, 10, undefined, {});
+          response = {
+            success: true,
+            data: { type: "multi", items: result.items },
+            message: "Triệu hồi thành công",
+          };
+        }
+
+        if (idempotencyKey) {
+          await SummonTransactionModel.updateOne(
+            { idempotencyKey, userId: user.id },
+            { $set: { status: "committed", response } },
+          );
+        }
+      } catch (err) {
+        if (goldDeducted) {
+          try {
+            await UserModel.updateOne(
+              { _id: user.id },
+              { $inc: { gold: goldCost } },
+            );
+          } catch (refundErr) {
+            console.error("Summon refund failed:", refundErr);
+          }
+        }
+        if (idempotencyKey) {
+          await SummonTransactionModel.updateOne(
+            { idempotencyKey, userId: user.id },
+            { $set: { status: "failed", error: String((err as any)?.message || err) } },
+          ).catch(() => null);
+        }
+        throw err;
+      }
+    }
+
+    const userSession = await getUserSession(request);
+    const latest = await UserModel.findById(user.id).lean();
+    if (latest) {
+      const prev = userSession.get("user") || {};
+      setUserDataToSession(userSession, { ...prev, ...latest });
+    }
+    const sessionCookie = await commitUserSession(userSession);
+
+    return Response.json(response, {
+      headers: { "Set-Cookie": sessionCookie },
+    });
+  } catch (error: any) {
+    if (error instanceof BusinessError) {
+      return Response.json({ message: error.message }, { status: 400 });
+    }
+    if (idempotencyKey && error?.code === 11000) {
+      const existing = await SummonTransactionModel.findOne({
+        idempotencyKey,
+        userId: user.id,
+      }).lean();
+      if (existing?.status === "committed" && existing?.response) {
+        const session = await getUserSession(request);
+        const latest = await UserModel.findById(user.id).lean();
+        if (latest) {
+          const prev = session.get("user") || {};
+          setUserDataToSession(session, { ...prev, ...latest });
+        }
+        const sessionCookie = await commitUserSession(session);
+        return Response.json(existing.response, {
+          headers: { "Set-Cookie": sessionCookie },
         });
       }
-      return response;
+
+      return Response.json(
+        { message: "Giao dịch đang xử lý, vui lòng thử lại sau" },
+        { status: 409 },
+      );
     }
 
-    return Response.json({ message: "Hành động không hợp lệ" }, { status: 400 });
-  } catch (error) {
     console.error("Summon error:", error);
     return Response.json(
       { message: "Có lỗi xảy ra, vui lòng tải lại trang" },

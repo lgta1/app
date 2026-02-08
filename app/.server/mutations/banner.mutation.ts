@@ -1,3 +1,5 @@
+import type { ClientSession } from "mongoose";
+
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { BannerModel } from "~/database/models/banner.model";
@@ -133,10 +135,16 @@ export const deleteBanner = async (request: Request, bannerId: string) => {
   };
 };
 
-export const incrementBannerRolls = async (bannerId: string, count: number = 1) => {
-  const banner = await BannerModel.findByIdAndUpdate(bannerId, {
+export const incrementBannerRolls = async (
+  bannerId: string,
+  count: number = 1,
+  session?: ClientSession,
+) => {
+  const query = BannerModel.findByIdAndUpdate(bannerId, {
     $inc: { totalRolls: count },
   });
+  if (session) query.session(session);
+  const banner = await query;
 
   if (!banner) {
     throw new BusinessError("Banner không tồn tại");

@@ -48,7 +48,7 @@ export async function getUserInfoFromSession(
   try {
     const { UserModel } = await import("~/database/models/user.model");
     const fresh = await UserModel.findById(userInfo.id)
-      .select("name email faction gender role level avatar isDeleted")
+      .select("name email faction gender role level avatar isDeleted canSkipWatermark")
       .lean();
 
     if (!fresh || (fresh as any).isDeleted) return undefined;
@@ -62,6 +62,7 @@ export async function getUserInfoFromSession(
       role: (fresh as any).role,
       level: (fresh as any).level,
       avatar: (fresh as any).avatar,
+      canSkipWatermark: Boolean((fresh as any).canSkipWatermark),
     } as UserType;
   } catch {
     // Fail open to the session snapshot (keeps app working if DB temporarily fails).
@@ -87,6 +88,7 @@ export const setUserDataToSession = (session: Session, user: UserType) => {
     role: user.role,
     level: user.level,
     avatar: user.avatar,
+    canSkipWatermark: Boolean((user as any).canSkipWatermark),
   });
 };
 

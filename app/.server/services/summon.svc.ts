@@ -1,4 +1,5 @@
 import Promise from "bluebird";
+import type { ClientSession } from "mongoose";
 
 import { grantWaifu } from "@/services/waifu-inventory.svc";
 
@@ -17,6 +18,10 @@ import { normalizeWaifuImageUrl } from "~/.server/utils/waifu-image";
 
 const RATE_UP_PERCENT = 55;
 
+type SummonOptions = {
+  session?: ClientSession;
+};
+
 const getExpValue = (star: number) => {
   if (star === 1) return 5;
   if (star === 2) return 10;
@@ -29,7 +34,9 @@ export const summon = async (
   banner: BannerType,
   cum: PityCumulativeType,
   request?: Request,
+  options: SummonOptions = {},
 ) => {
+  const { session } = options;
   const bannerIdStr =
     (banner as any)?._id?.toString?.() ?? (banner as any)?.id?.toString?.() ?? "";
   if (!bannerIdStr) throw new BusinessError("Thiếu bannerId");
@@ -38,11 +45,13 @@ export const summon = async (
   let updatedSession = null;
 
   if (banner.isRateUp) {
-    const userFull = await UserModel.findOneAndUpdate(
+    const userFullQuery = UserModel.findOneAndUpdate(
       { _id: user.id },
       { $inc: { summonCount: 1 } },
       { new: true },
-    ).lean();
+    );
+    if (session) userFullQuery.session(session);
+    const userFull = await userFullQuery.lean();
     reachedMilestone = await checkEligibleGift(userFull?.summonCount ?? 0);
   }
 
@@ -63,7 +72,9 @@ export const summon = async (
     const expValue = getExpValue(itemStar);
 
     // Lấy thông tin user hiện tại trước khi update
-    const currentUserForExp = await UserModel.findById(user.id).lean();
+    const currentUserForExpQuery = UserModel.findById(user.id);
+    if (session) currentUserForExpQuery.session(session);
+    const currentUserForExp = await currentUserForExpQuery.lean();
     if (!currentUserForExp) {
       throw new BusinessError("Không tìm thấy thông tin người dùng");
     }
@@ -78,6 +89,7 @@ export const summon = async (
       await UserModel.updateOne(
         { _id: user.id },
         { $set: { exp: newExp, level: newLevel } },
+        session ? { session } : undefined,
       );
 
       // Cập nhật session nếu có request
@@ -89,41 +101,74 @@ export const summon = async (
       }
     } else {
       // Nếu không level up, chỉ tăng exp (in-level)
-      await UserModel.updateOne({ _id: user.id }, { $inc: { exp: expValue } });
+      await UserModel.updateOne(
+        { _id: user.id },
+        { $inc: { exp: expValue } },
+        session ? { session } : undefined,
+      );
     }
 
-    const expItem = await WaifuModel.findOne({ stars: itemStar }).lean();
+    const expItemQuery = WaifuModel.findOne({
+      $or: [{ stars: itemStar }, { stars: String(itemStar) }],
+    });
+    if (session) expItemQuery.session(session);
+    const expItem = await expItemQuery.lean();
+    if (!expItem) {
+      throw new BusinessError("Thiếu vật phẩm EXP 1-2 sao trong admin");
+    }
+    const expItemResolved: any = expItem;
 
     try {
-      const nextImg = normalizeWaifuImageUrl((expItem as any)?.image);
-      if (expItem && nextImg) (expItem as any).image = nextImg;
+      const nextImg = normalizeWaifuImageUrl((expItemResolved as any)?.image);
+      if (nextImg) (expItemResolved as any).image = nextImg;
     } catch {}
 
-    if (expItem && typeof (expItem as any).image === "string") {
-      const nextImg = normalizeWaifuImageUrl((expItem as any).image);
-      if (nextImg) (expItem as any).image = nextImg;
+    if (typeof (expItemResolved as any).image === "string") {
+      const nextImg = normalizeWaifuImageUrl((expItemResolved as any).image);
+      if (nextImg) (expItemResolved as any).image = nextImg;
     }
 
-    await cleanupUserSummonHistory(user.id, 50);
+    await cleanupUserSummonHistory(user.id, 50, session);
 
     // Debug: log exp item created
     try {
       // eslint-disable-next-line no-console
-      console.log(`[summon.svc] creating EXP item for user=${user.id} expItemId=${expItem?.id} name=${expItem?.name}`);
+      console.log(
+        `[summon.svc] creating EXP item for user=${user.id} expItemId=${expItemResolved?.id ?? expItemResolved?._id?.toString?.()} name=${expItemResolved?.name}`,
+      );
     } catch {}
 
-    await UserWaifuModel.create({
-      bannerId: bannerIdStr,
-      userId: user.id,
-      waifuId: expItem?.id,
-      waifuName: expItem?.name,
-      waifuStars: expItem?.stars,
-    });
+    const expItemId =
+      (expItemResolved as any)?.id ?? (expItemResolved as any)?._id?.toString?.();
+    if (!expItemId) throw new BusinessError("Thiếu ID vật phẩm EXP");
+
+    if (session) {
+      await UserWaifuModel.create(
+        [
+          {
+            bannerId: bannerIdStr,
+            userId: user.id,
+            waifuId: expItemId,
+            waifuName: expItemResolved?.name,
+            waifuStars: expItemResolved?.stars,
+          },
+        ],
+        { session },
+      );
+    } else {
+      await UserWaifuModel.create({
+        bannerId: bannerIdStr,
+        userId: user.id,
+        waifuId: expItemId,
+        waifuName: expItemResolved?.name,
+        waifuStars: expItemResolved?.stars,
+      });
+    }
 
     return {
       type: "exp",
       itemStar,
-      item: expItem,
+      item: expItemResolved,
       expValue,
       updatedSession,
       milestoneReached: reachedMilestone || null,
@@ -139,9 +184,13 @@ export const summon = async (
     }
   }
   if (!waifu) {
-    const waifuCount = await WaifuModel.countDocuments({ stars: itemStar });
+    const waifuCountQuery = WaifuModel.countDocuments({ stars: itemStar });
+    if (session) waifuCountQuery.session(session);
+    const waifuCount = await waifuCountQuery;
     const waifuIndex = Math.floor(Math.random() * waifuCount);
-    waifu = await WaifuModel.findOne({ stars: itemStar }).skip(waifuIndex).lean();
+    const waifuQuery = WaifuModel.findOne({ stars: itemStar }).skip(waifuIndex);
+    if (session) waifuQuery.session(session);
+    waifu = await waifuQuery.lean();
   }
 
   try {
@@ -156,14 +205,19 @@ export const summon = async (
 
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");
 
-  await cleanupUserSummonHistory(user.id, 50);
+  await cleanupUserSummonHistory(user.id, 50, session);
+
+  const waifuIdStr =
+    (waifu as any)?._id?.toString?.() ?? (waifu as any)?.id ?? "";
+  if (!waifuIdStr) throw new BusinessError("Thiếu waifuId");
 
   await grantWaifu({
     userId: user.id,
     bannerId: bannerIdStr,
-    waifuId: waifu.id,
-    waifuName: waifu.name,
-    waifuStars: waifu.stars,
+    waifuId: waifuIdStr,
+    waifuName: (waifu as any)?.name,
+    waifuStars: (waifu as any)?.stars,
+    session,
   });
 
   return {
@@ -180,7 +234,9 @@ const summonForcedWaifuStar = async (
   banner: BannerType,
   itemStar: number,
   request?: Request,
+  options: SummonOptions = {},
 ) => {
+  const { session } = options;
   const bannerIdStr =
     (banner as any)?._id?.toString?.() ?? (banner as any)?.id?.toString?.() ?? "";
   if (!bannerIdStr) throw new BusinessError("Thiếu bannerId");
@@ -190,11 +246,13 @@ const summonForcedWaifuStar = async (
   let updatedSession = null;
 
   if (banner.isRateUp) {
-    const userFull = await UserModel.findOneAndUpdate(
+    const userFullQuery = UserModel.findOneAndUpdate(
       { _id: user.id },
       { $inc: { summonCount: 1 } },
       { new: true },
-    ).lean();
+    );
+    if (session) userFullQuery.session(session);
+    const userFull = await userFullQuery.lean();
     reachedMilestone = await checkEligibleGift(userFull?.summonCount ?? 0);
   }
 
@@ -210,10 +268,14 @@ const summonForcedWaifuStar = async (
 
   // Global pool fallback
   if (!waifu) {
-    const waifuCount = await WaifuModel.countDocuments({ stars: itemStar });
+    const waifuCountQuery = WaifuModel.countDocuments({ stars: itemStar });
+    if (session) waifuCountQuery.session(session);
+    const waifuCount = await waifuCountQuery;
     if (waifuCount <= 0) throw new BusinessError("Không tìm thấy waifu phù hợp");
     const waifuIndex = Math.floor(Math.random() * waifuCount);
-    waifu = await WaifuModel.findOne({ stars: itemStar }).skip(waifuIndex).lean();
+    const waifuQuery = WaifuModel.findOne({ stars: itemStar }).skip(waifuIndex);
+    if (session) waifuQuery.session(session);
+    waifu = await waifuQuery.lean();
   }
 
   try {
@@ -228,7 +290,7 @@ const summonForcedWaifuStar = async (
 
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");
 
-  await cleanupUserSummonHistory(user.id, 50);
+  await cleanupUserSummonHistory(user.id, 50, session);
 
   await grantWaifu({
     userId: user.id,
@@ -236,6 +298,7 @@ const summonForcedWaifuStar = async (
     waifuId: (waifu as any)?.id ?? (waifu as any)?._id?.toString?.() ?? "",
     waifuName: (waifu as any)?.name,
     waifuStars: (waifu as any)?.stars,
+    session,
   });
 
   return {
@@ -252,17 +315,21 @@ export const summonGuaranteedWaifu = async (
   user: UserType,
   banner: BannerType,
   starWanted: number,
+  options: SummonOptions = {},
 ) => {
+  const { session } = options;
   try {
     // eslint-disable-next-line no-console
     console.log(`[summonGuaranteedWaifu] start user=${user.id} banner=${banner.id} star=${starWanted}`);
   } catch {}
   // Increase summonCount like a real summon (accept chain milestone behavior)
-  const userFull = await UserModel.findOneAndUpdate(
+  const userFullQuery = UserModel.findOneAndUpdate(
     { _id: user.id },
     { $inc: { summonCount: 1 } },
     { new: true },
-  ).lean();
+  );
+  if (session) userFullQuery.session(session);
+  const userFull = await userFullQuery.lean();
 
   // Pick waifu by forced stars
   // 1) Ưu tiên danh sách banner nếu có (đảm bảo đúng theme sự kiện)
@@ -280,10 +347,14 @@ export const summonGuaranteedWaifu = async (
 
   // 2) Fallback global pool nếu banner rỗng hoặc waifu bị thiếu
   if (!waifu) {
-    const waifuCount = await WaifuModel.countDocuments({ stars: starWanted });
+    const waifuCountQuery = WaifuModel.countDocuments({ stars: starWanted });
+    if (session) waifuCountQuery.session(session);
+    const waifuCount = await waifuCountQuery;
     if (waifuCount <= 0) throw new BusinessError("Không tìm thấy waifu phù hợp");
-    const waifuPool = await WaifuModel.find({ stars: starWanted })
-      .select(["_id", "name", "image", "stars"]).limit(50).lean();
+    const waifuPoolQuery = WaifuModel.find({ stars: starWanted })
+      .select(["_id", "name", "image", "stars"]).limit(50);
+    if (session) waifuPoolQuery.session(session);
+    const waifuPool = await waifuPoolQuery.lean();
     if (!waifuPool || waifuPool.length === 0) throw new BusinessError("Không tìm thấy waifu phù hợp");
     waifu = waifuPool[Math.floor(Math.random() * waifuPool.length)];
   }
@@ -297,7 +368,7 @@ export const summonGuaranteedWaifu = async (
   const waifuIdStr = (waifu as any)?._id?.toString?.() ?? (waifu as any)?.id;
   if (!waifuIdStr) throw new BusinessError("Thiếu mã waifu");
 
-  await cleanupUserSummonHistory(user.id, 50);
+  await cleanupUserSummonHistory(user.id, 50, session);
 
   const bannerIdStr = (banner as any)?._id?.toString?.() ?? (banner as any)?.id;
   if (!bannerIdStr) throw new BusinessError("Thiếu bannerId");
@@ -308,6 +379,7 @@ export const summonGuaranteedWaifu = async (
     waifuId: waifuIdStr,
     waifuName: waifu.name,
     waifuStars: waifu.stars,
+    session,
   });
 
   // Check if new milestone reached due to this free roll
@@ -332,6 +404,7 @@ export const multiSummon = async (
   cum: PityCumulativeType,
   count: number,
   request?: Request,
+  options: SummonOptions = {},
 ) => {
   const summonResults: any[] = [];
 
@@ -341,14 +414,14 @@ export const multiSummon = async (
     for (let i = 0; i < 10; i++) {
       const result =
         i === guaranteedIndex
-          ? await summonForcedWaifuStar(user, banner, 3, request)
-          : await summon(user, banner, cum, request);
+          ? await summonForcedWaifuStar(user, banner, 3, request, options)
+          : await summon(user, banner, cum, request, options);
       summonResults.push(result);
     }
   } else {
     const summons = Array(count).fill(null);
     await Promise.each(summons, async () => {
-      const result = await summon(user, banner, cum, request);
+      const result = await summon(user, banner, cum, request, options);
       summonResults.push(result);
     });
   }

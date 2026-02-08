@@ -12,18 +12,21 @@ export type GrantWaifuOptions = {
   // Optional: override name/stars for the history log (defaults to WaifuModel values)
   waifuName?: string | null;
   waifuStars?: number | null;
+  session?: mongoose.ClientSession;
 };
 
 export const grantWaifu = async (options: GrantWaifuOptions) => {
-  const { userId, waifuId, bannerId } = options;
+  const { userId, waifuId, bannerId, session } = options;
 
   if (!userId) throw new BusinessError("Thiếu userId");
   if (!waifuId) throw new BusinessError("Thiếu waifuId");
   if (!bannerId) throw new BusinessError("Thiếu bannerId");
 
-  const waifu = await WaifuModel.findById(waifuId)
+  const waifuQuery = WaifuModel.findById(waifuId)
     .select(["_id", "name", "image", "stars", "expBuff", "goldBuff"])
     .lean();
+  if (session) waifuQuery.session(session);
+  const waifu = await waifuQuery;
   if (!waifu) throw new BusinessError("Không tìm thấy waifu");
 
   const waifuIdStr = (waifu as any)?._id?.toString?.() ?? (waifu as any)?.id ?? String(waifuId);
@@ -34,18 +37,44 @@ export const grantWaifu = async (options: GrantWaifuOptions) => {
 
   const waifuName = String(options.waifuName ?? (waifu as any)?.name ?? "");
 
+  if (session) {
+    const inventoryRow = await UserWaifuInventoryModel.findOneAndUpdate(
+      { userId, waifuId: waifuIdStr },
+      { $inc: { count: 1 } },
+      { upsert: true, new: true, setDefaultsOnInsert: true, session },
+    );
+
+    await UserWaifuModel.create(
+      [
+        {
+          bannerId,
+          userId,
+          waifuId: waifuIdStr,
+          waifuName,
+          waifuStars,
+        },
+      ],
+      { session },
+    );
+
+    return {
+      waifu,
+      inventory: inventoryRow,
+    };
+  }
+
   // Transaction when possible. If MongoDB is not configured for transactions,
   // we fall back to best-effort sequential writes.
-  const session = await mongoose.startSession();
+  const localSession = await mongoose.startSession();
   try {
     let inventoryRow: any = null;
 
     try {
-      await session.withTransaction(async () => {
+      await localSession.withTransaction(async () => {
         inventoryRow = await UserWaifuInventoryModel.findOneAndUpdate(
           { userId, waifuId: waifuIdStr },
           { $inc: { count: 1 } },
-          { upsert: true, new: true, setDefaultsOnInsert: true, session },
+          { upsert: true, new: true, setDefaultsOnInsert: true, session: localSession },
         );
 
         await UserWaifuModel.create(
@@ -58,7 +87,7 @@ export const grantWaifu = async (options: GrantWaifuOptions) => {
               waifuStars,
             },
           ],
-          { session },
+          { session: localSession },
         );
       });
 
@@ -90,7 +119,7 @@ export const grantWaifu = async (options: GrantWaifuOptions) => {
       inventory: inventoryRowFallback,
     };
   } finally {
-    session.endSession();
+    localSession.endSession();
   }
 };
 

@@ -24,7 +24,7 @@ import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
 import { requireLogin } from "~/.server/services/auth.server";
 import { resolveMangaHandle } from "~/database/helpers/manga-slug.helper";
-import { isAdmin } from "~/helpers/user.helper";
+import { isAdmin, isDichGia } from "~/helpers/user.helper";
 // END <feature> CHAPTER_LOADER_IMPORTS_PERMISSION>
 
 interface PreviewImage {
@@ -50,6 +50,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const { mangaId } = params;
   const user = await requireLogin(request);
   const isAdminUser = isAdmin(user.role);
+  const canSkipWatermark = isDichGia(user.role) && Boolean((user as any).canSkipWatermark);
 
   if (!mangaId) {
     throw new BusinessError("Không tìm thấy manga ID");
@@ -74,6 +75,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       genres: Array.isArray(manga.genres) ? manga.genres : [],
     },
     isAdminUser,
+    canSkipWatermark,
   };
 }
 // END <feature> CHAPTER_CREATE_LOADER_FETCH_GENRES>
@@ -207,6 +209,7 @@ export default function CreateChapter() {
   const [mergeTailEnabled, setMergeTailEnabled] = useState(false);
   const [mergeTailCount, setMergeTailCount] = useState(5);
   const [watermarkStyle, setWatermarkStyle] = useState<"glow" | "stroke">("glow");
+  const [skipWatermark, setSkipWatermark] = useState(false);
 
   // Dropzone highlight
   const [dragOver, setDragOver] = useState(false);
@@ -272,7 +275,7 @@ export default function CreateChapter() {
   };
 
   // BEGIN <feature> CHAPTER_CREATE_USE_GENRES_FROM_LOADER>
-  const { manga, isAdminUser } = useLoaderData<typeof loader>();
+  const { manga, isAdminUser, canSkipWatermark } = useLoaderData<typeof loader>();
   const genres: string[] = Array.isArray(manga?.genres) ? (manga.genres as string[]) : [];
   const skipCompression = genres.some((g) =>
     ["manhwa", "manhua"].includes(String(g).toLowerCase()),
@@ -577,7 +580,7 @@ export default function CreateChapter() {
       const groupIndex = groupIndexById.get(groupId) ?? idx;
       const shouldWatermark = !meta.noWatermark && watermarkIndexes.has(groupIndex);
       if (!shouldWatermark) {
-        return { file, options: { prefixPath: uploadPrefix } };
+        return { file, options: { prefixPath: uploadPrefix, watermarkSkip: skipWatermark } };
       }
 
       watermarkOrder += 1;
@@ -590,6 +593,7 @@ export default function CreateChapter() {
           watermark: true,
           watermarkVariant,
           watermarkStyle,
+          watermarkSkip: skipWatermark,
         },
       };
     });
@@ -1108,6 +1112,17 @@ export default function CreateChapter() {
                     </span>
                   </div>
                 </label>
+                {canSkipWatermark && (
+                  <label className="flex items-center gap-2 text-sm text-txt-primary">
+                    <input
+                      type="checkbox"
+                      checked={skipWatermark}
+                      onChange={(e) => setSkipWatermark(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    Tắt watermark cho chương này
+                  </label>
+                )}
               </div>
 
               {isAdminUser && (

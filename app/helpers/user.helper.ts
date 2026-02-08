@@ -1,3 +1,5 @@
+import type { ClientSession } from "mongoose";
+
 import { ROLES } from "~/constants/user";
 import { MANGA_STATUS } from "~/constants/manga";
 import type { UserType } from "~/database/models/user.model";
@@ -57,27 +59,34 @@ export const getAvatarPath = (user: UserType) => {
 export const cleanupUserSummonHistory = async (
   userId: string,
   maxRecords: number = 50,
+  session?: ClientSession,
 ) => {
   try {
     // Đếm số bản ghi hiện tại cho user này
-    const count = await UserWaifuModel.countDocuments({ userId });
+    const countQuery = UserWaifuModel.countDocuments({ userId });
+    if (session) countQuery.session(session);
+    const count = await countQuery;
 
     // Nếu vượt quá giới hạn, xóa các bản ghi cũ nhất
     if (count > maxRecords) {
       const recordsToDelete = count - maxRecords;
 
       // Lấy danh sách các bản ghi cũ nhất để xóa
-      const oldestRecords = await UserWaifuModel.find({ userId })
+      const oldestQuery = UserWaifuModel.find({ userId })
         .sort({ createdAt: 1 })
         .limit(recordsToDelete)
         .select("_id")
         .lean();
+      if (session) oldestQuery.session(session);
+      const oldestRecords = await oldestQuery;
 
       if (oldestRecords.length > 0) {
         const idsToDelete = oldestRecords
           .filter((record) => record.waifuStars <= 2)
           .map((record) => record._id);
-        await UserWaifuModel.deleteMany({ _id: { $in: idsToDelete } });
+        const deleteQuery = UserWaifuModel.deleteMany({ _id: { $in: idsToDelete } });
+        if (session) deleteQuery.session(session);
+        await deleteQuery;
       }
     }
   } catch (error) {

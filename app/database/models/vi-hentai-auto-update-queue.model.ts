@@ -31,6 +31,7 @@ export type ViHentaiAutoUpdateQueueType = {
   maxNewChaptersPerManga: number;
   ownerId?: string;
   approveNewManga?: boolean;
+  manualOverride?: boolean;
   lockedBy?: string;
   startedAt?: Date;
   finishedAt?: Date;
@@ -53,6 +54,7 @@ const ViHentaiAutoUpdateQueueSchema = new Schema<ViHentaiAutoUpdateQueueType>(
     maxNewChaptersPerManga: { type: Number, required: true },
     ownerId: { type: String },
     approveNewManga: { type: Boolean },
+    manualOverride: { type: Boolean },
     lockedBy: { type: String },
     startedAt: { type: Date },
     finishedAt: { type: Date },

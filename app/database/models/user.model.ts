@@ -34,6 +34,8 @@ export type UserType = {
   blacklistTags?: string[];
   // Whether the user has ever configured blacklistTags (used to apply defaults once)
   hasConfiguredBlacklistTags?: boolean;
+  // Allow translator to skip watermark on chapter uploads
+  canSkipWatermark?: boolean;
 };
 
 const UserSchema = new Schema<UserType>(
@@ -66,6 +68,8 @@ const UserSchema = new Schema<UserType>(
     blacklistTags: { type: [String], default: [] },
     // Marker: has the user ever explicitly configured their blacklist?
     hasConfiguredBlacklistTags: { type: Boolean, default: false },
+    // Translator-only permission: allow skipping watermark on chapter uploads
+    canSkipWatermark: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

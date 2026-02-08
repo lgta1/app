@@ -12,6 +12,7 @@ import {
 import { applyWatermark } from "~/.server/utils/watermark.utils";
 import { getCdnBase } from "~/.server/utils/cdn-url";
 import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
+import { isDichGia } from "~/helpers/user.helper";
 
 function getErrorMessage(error: unknown): { message: string; statusCode: number } {
   if (isBusinessError(error)) {
@@ -103,6 +104,7 @@ export async function action({ request }: Route.ActionArgs) {
     let watermarkFlagRaw: FormDataEntryValue | null = null;
     let watermarkVariantRaw: FormDataEntryValue | null = null;
     let watermarkStyleRaw: FormDataEntryValue | null = null;
+    let watermarkSkipRaw: FormDataEntryValue | null = null;
 
     try {
       formData = await request.formData();
@@ -111,6 +113,7 @@ export async function action({ request }: Route.ActionArgs) {
       watermarkFlagRaw = formData.get("watermark");
       watermarkVariantRaw = formData.get("watermarkVariant");
       watermarkStyleRaw = formData.get("watermarkStyle");
+      watermarkSkipRaw = formData.get("watermarkSkip");
     } catch (error) {
       console.error("Error parsing form data:", error);
       return Response.json(
@@ -184,6 +187,10 @@ export async function action({ request }: Route.ActionArgs) {
       validPrefixPath.startsWith("manga-images") ||
       validPrefixPath.startsWith("tmp/manga-images");
     const watermarkRequested = typeof watermarkFlagRaw === "string" && ["true", "1", "yes"].includes(watermarkFlagRaw.toLowerCase());
+    const watermarkSkipRequested =
+      typeof watermarkSkipRaw === "string" && ["true", "1", "yes"].includes(watermarkSkipRaw.toLowerCase());
+    const canSkipWatermark = Boolean(userInfo?.canSkipWatermark) && isDichGia(String(userInfo?.role || ""));
+    const allowSkipWatermark = shouldWatermark && watermarkSkipRequested && canSkipWatermark;
     const watermarkVariant =
       typeof watermarkVariantRaw === "string" && /^\d+$/.test(watermarkVariantRaw)
         ? Number.parseInt(watermarkVariantRaw, 10)
@@ -193,7 +200,7 @@ export async function action({ request }: Route.ActionArgs) {
         ? (watermarkStyleRaw as "glow" | "stroke")
         : undefined;
     const watermarkResult =
-      shouldWatermark && watermarkRequested
+      shouldWatermark && watermarkRequested && !allowSkipWatermark
         ? await applyWatermark(buffer, {
             variant: watermarkVariant === 2 ? 2 : watermarkVariant === 1 ? 1 : undefined,
             style: watermarkStyle,
