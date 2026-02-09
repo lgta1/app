@@ -45,6 +45,11 @@ export const ADMIN_NAVIGATION_ITEMS: NavigationItem[] = [
     mobile: true,
   },
   {
+    label: "Quyền watermark",
+    href: "/admin/roles/skip-watermark",
+    mobile: true,
+  },
+  {
     label: "Quản lý truyện",
     href: "/admin/manga",
     mobile: true,

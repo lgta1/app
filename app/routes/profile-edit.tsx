@@ -20,6 +20,7 @@ import { ImageUploader } from "~/components/image-uploader";
 import { UserModel } from "~/database/models/user.model";
 import { useFileOperations } from "~/hooks/use-file-operations";
 import { normalizeAvatarImage } from "~/utils/image-compression.utils";
+import { getRuntimeCdnBase } from "~/utils/cdn-base";
 import { validateUsername, USERNAME_CHANGE_COST } from "~/utils/username-validator.client";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -194,8 +195,45 @@ export default function ProfileEdit() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const resolveAvatarFullPath = (avatarUrl: string): string | null => {
+      if (!avatarUrl || avatarUrl.startsWith("blob:")) return null;
+
+      const trimmed = avatarUrl.trim();
+      if (!trimmed) return null;
+
+      try {
+        const cdnBase = getRuntimeCdnBase();
+        const url = new URL(trimmed, cdnBase);
+        return url.pathname.replace(/^\/+/, "");
+      } catch {
+        return trimmed.replace(/^\/+/, "");
+      }
+    };
+
     // Nếu có file mới được chọn, upload trước
     if (selectedFile) {
+      const previousAvatarUrl = uploadedAvatarUrl || user.avatar || "";
+      const previousFullPath = resolveAvatarFullPath(previousAvatarUrl);
+      if (previousFullPath) {
+        try {
+          const deleteForm = new FormData();
+          deleteForm.append("fullPath", previousFullPath);
+          const deleteResp = await fetch("/api/files/delete", {
+            method: "post",
+            body: deleteForm,
+          });
+          const deleteJson = await deleteResp.json();
+          if (!deleteResp.ok || !deleteJson?.success) {
+            toast.error(deleteJson?.error || "Xóa avatar cũ thất bại");
+            return;
+          }
+        } catch (error) {
+          console.error("Delete avatar failed", error);
+          toast.error("Xóa avatar cũ thất bại");
+          return;
+        }
+      }
+
       uploadFileWithFetcher(selectedFile, {
         prefixPath: "avatar-uploads",
         onSuccess: (data) => {

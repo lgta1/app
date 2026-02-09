@@ -566,8 +566,7 @@ type AvatarNormalizationResult = {
   steps: {
     convertedToWebP: boolean;
     croppedToSquare: boolean;
-    resizedTo300: boolean;
-    keptOriginalSize: boolean;
+    resizedTo120: boolean;
   };
 };
 
@@ -616,12 +615,12 @@ const resizeSquareToTarget = async (file: File, targetSize: number): Promise<Fil
  * Chuẩn hóa ảnh đại diện (avatar) theo chuẩn:
  * - PNG -> chuyển WEBP (quality 0.99) trước, các định dạng JPG/WEBP giữ nguyên.
  * - Center crop về hình vuông nếu chưa vuông.
- * - Sau khi vuông: nếu cạnh > 300px -> resize về 300x300; nếu <= 300px giữ nguyên.
+ * - Sau khi vuông: resize về 120x120 cho đồng nhất.
  */
 export async function normalizeAvatarImage(file: File): Promise<AvatarNormalizationResult> {
   validateImageFile(file);
 
-  const targetSize = 300;
+  const targetSize = 120;
   let working = file;
   let convertedToWebP = false;
 
@@ -637,8 +636,7 @@ export async function normalizeAvatarImage(file: File): Promise<AvatarNormalizat
 
   const baseDims = await getImageDimensions(working);
   let croppedToSquare = false;
-  let resizedTo300 = false;
-  let keptOriginalSize = false;
+  let resizedTo120 = false;
 
   let squareResult: { file: File; size: number } = { file: working, size: Math.min(baseDims.width, baseDims.height) };
   if (baseDims.width !== baseDims.height) {
@@ -649,12 +647,10 @@ export async function normalizeAvatarImage(file: File): Promise<AvatarNormalizat
   let finalFile = squareResult.file;
   let finalSize = squareResult.size;
 
-  if (finalSize > targetSize) {
+  if (finalSize !== targetSize) {
     finalFile = await resizeSquareToTarget(finalFile, targetSize);
     finalSize = targetSize;
-    resizedTo300 = true;
-  } else {
-    keptOriginalSize = true;
+    resizedTo120 = true;
   }
 
   return {
@@ -664,8 +660,7 @@ export async function normalizeAvatarImage(file: File): Promise<AvatarNormalizat
     steps: {
       convertedToWebP,
       croppedToSquare,
-      resizedTo300,
-      keptOriginalSize,
+      resizedTo120,
     },
   };
 }
