@@ -43,16 +43,10 @@ export type SmartSearchParams = {
 
 type FieldConfig = {
   key: SearchResultScope;
-  weight: number;
+  exactWeight: number;
+  tokenWeight: number;
   regexPaths: Array<{ path: keyof MangaType | string; isArray?: boolean }>;
   getValues: (doc: MangaType) => string[];
-};
-
-type FieldMatch = {
-  key: SearchResultScope;
-  score: number;
-  tokens: Set<string>;
-  snippet?: string;
 };
 
 const BASE_FIELD_ORDER: SearchResultScope[] = ["title", "alias", "character", "doujinshi"];
@@ -63,13 +57,15 @@ const MAX_REGEX_TOKEN_LENGTH = 3;
 const FIELD_CONFIGS: Record<SearchResultScope, FieldConfig> = {
   title: {
     key: "title",
-    weight: 5,
+    exactWeight: 10,
+    tokenWeight: 2,
     regexPaths: [{ path: "title" }],
     getValues: (doc) => (doc.title ? [doc.title] : []),
   },
   alias: {
     key: "alias",
-    weight: 4,
+    exactWeight: 8,
+    tokenWeight: 1,
     regexPaths: [{ path: "alternateTitle" }, { path: "keywords" }],
     getValues: (doc) => {
       const values: string[] = [];
@@ -85,13 +81,15 @@ const FIELD_CONFIGS: Record<SearchResultScope, FieldConfig> = {
   },
   character: {
     key: "character",
-    weight: 3,
+    exactWeight: 5,
+    tokenWeight: 1,
     regexPaths: [{ path: "characterNames", isArray: true }],
     getValues: (doc) => doc.characterNames || [],
   },
   doujinshi: {
     key: "doujinshi",
-    weight: 3,
+    exactWeight: 4,
+    tokenWeight: 1,
     regexPaths: [
       { path: "doujinshiNames", isArray: true },
       { path: "author" },
@@ -299,18 +297,17 @@ function rankCandidates(
   scope: SearchScope,
 ): RankedEntry[] {
   const displayTokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const normalizedQuery = normalizeText(query);
   const orderedFields = scope === "all" ? BASE_FIELD_ORDER : [scope, ...BASE_FIELD_ORDER.filter((f) => f !== scope)];
 
   const results: RankedEntry[] = [];
 
   for (const doc of candidates) {
-    const analysis = analyzeDocument(doc, tokens, displayTokens, orderedFields, scope);
+    const analysis = scoreDocument(doc, tokens, displayTokens, normalizedQuery, orderedFields, scope);
     if (!analysis) continue;
 
-    const popularity = computePopularity(doc);
     const textScore = Number((doc as any).__textScore ?? 0) * 5;
-    const totalScore = analysis.totalScore + popularity + textScore;
-
+    const totalScore = analysis.score + textScore;
     const altTitle = deriveAlternateTitle(doc);
 
     results.push({
@@ -351,119 +348,104 @@ function deriveAlternateTitle(doc: MangaType): string | undefined {
   return undefined;
 }
 
-function analyzeDocument(
+function scoreDocument(
   doc: MangaType,
   tokens: string[],
   displayTokens: string[],
+  normalizedQuery: string,
   orderedFields: SearchResultScope[],
   scope: SearchScope,
 ) {
-  const matchedTokensGlobal = new Set<string>();
-  const fieldMatches: Record<SearchResultScope, FieldMatch> = {
-    title: initFieldMatch("title"),
-    alias: initFieldMatch("alias"),
-    character: initFieldMatch("character"),
-    doujinshi: initFieldMatch("doujinshi"),
-  };
+  let totalMatchedTokens = 0;
+  let totalScore = 0;
+  let bestField: SearchResultScope = orderedFields[0] ?? "title";
+  let bestSnippet: string | undefined;
+  let bestFieldScore = -1;
 
-  BASE_FIELD_ORDER.forEach((fieldKey) => {
+  for (const fieldKey of BASE_FIELD_ORDER) {
     const config = FIELD_CONFIGS[fieldKey];
-    const values = config.getValues(doc).filter(Boolean);
-    if (values.length === 0) {
-      fieldMatches[fieldKey] = initFieldMatch(fieldKey);
-      return;
-    }
+    const rawValues = config.getValues(doc).filter(Boolean);
+    if (rawValues.length === 0) continue;
 
     const matchedTokens = new Set<string>();
-    let snippet: string | undefined;
-    let fieldScore = 0;
+    let exactHit = false;
+    let partialHit = false;
 
-    values.forEach((value) => {
+    for (const value of rawValues) {
       const normalized = normalizeText(value);
       const compact = normalized.replace(NON_WORD, "");
-      const localTokens: string[] = [];
 
-      tokens.forEach((token) => {
-        if (!token) return;
+      if (normalizedQuery) {
+        if (normalized === normalizedQuery || compact === normalizedQuery) {
+          exactHit = true;
+        } else if (normalized.includes(normalizedQuery) || compact.includes(normalizedQuery)) {
+          partialHit = true;
+        }
+      }
+
+      for (const token of tokens) {
+        if (!token) continue;
         if (normalized.includes(token) || compact.includes(token)) {
           matchedTokens.add(token);
-          matchedTokensGlobal.add(token);
-          localTokens.push(token);
-          fieldScore += config.weight;
-          if (normalized.startsWith(token)) {
-            fieldScore += 1;
-          }
-        } else if (token.length >= 3 && hasFuzzyWordMatch(normalized, token)) {
-          matchedTokens.add(token);
-          matchedTokensGlobal.add(token);
-          localTokens.push(token);
-          fieldScore += config.weight - 1;
-        } else if (config.key === "alias" && /^\d+$/.test(token) && String(doc.code || "").includes(token)) {
-          matchedTokens.add(token);
-          matchedTokensGlobal.add(token);
-          localTokens.push(token);
-          fieldScore += config.weight + 2;
+          continue;
         }
-      });
-
-      if (localTokens.length > 0 && !snippet) {
-        snippet = buildHighlightSnippet(value, displayTokens.length ? displayTokens : localTokens);
+        if (token.length >= 4 && hasFuzzyWordMatch(normalized, token)) {
+          matchedTokens.add(token);
+        }
       }
-    });
-
-    const scopeMultiplier = scope === "all" || scope === fieldKey ? 1 : 0.6;
-    fieldMatches[fieldKey] = {
-      key: fieldKey,
-      tokens: matchedTokens,
-      snippet,
-      score: fieldScore * scopeMultiplier,
-    };
-  });
-
-  if (scope !== "all" && fieldMatches[scope]?.tokens.size === 0) {
-    return null;
-  }
-
-  if (matchedTokensGlobal.size === 0) {
-    return null;
-  }
-
-  let bestField: SearchResultScope = orderedFields[0] ?? "title";
-  let bestSnippet = fieldMatches[bestField].snippet;
-  let totalScore = matchedTokensGlobal.size * 10;
-
-  orderedFields.forEach((fieldKey) => {
-    totalScore += fieldMatches[fieldKey]?.score ?? 0;
-    if (!bestSnippet && fieldMatches[fieldKey]?.snippet) {
-      bestField = fieldKey;
-      bestSnippet = fieldMatches[fieldKey]?.snippet;
     }
-  });
+
+    if (fieldKey === "alias" && /^\d+$/.test(normalizedQuery) && String(doc.code || "").includes(normalizedQuery)) {
+      exactHit = true;
+    }
+
+    const tokenScore = matchedTokens.size * config.tokenWeight;
+    const exactScore = exactHit
+      ? config.exactWeight
+      : partialHit
+        ? Math.round(config.exactWeight * 0.7)
+        : 0;
+    const fieldScore = exactScore + tokenScore;
+
+    if (matchedTokens.size > 0 || exactHit || partialHit) {
+      totalMatchedTokens += matchedTokens.size;
+      totalScore += fieldScore;
+      if (!bestSnippet || fieldScore > bestFieldScore) {
+        bestField = fieldKey;
+        bestFieldScore = fieldScore;
+        bestSnippet = buildHighlightSnippet(rawValues[0], displayTokens.length ? displayTokens : tokens);
+      }
+    }
+  }
+
+  if (scope !== "all") {
+    const scopedValues = FIELD_CONFIGS[scope].getValues(doc).filter(Boolean);
+    const scopedMatch = scopedValues.some((value) => {
+      const normalized = normalizeText(value);
+      if (normalizedQuery && normalized.includes(normalizedQuery)) return true;
+      return tokens.some((token) => token && normalized.includes(token));
+    });
+    if (!scopedMatch) return null;
+  }
+
+  if (totalScore === 0 && totalMatchedTokens === 0) return null;
+
+  totalScore += totalMatchedTokens * 2;
 
   if (!bestSnippet) {
     const fallbackValues = FIELD_CONFIGS[bestField].getValues(doc);
     bestSnippet = fallbackValues[0] || doc.title;
   }
 
-  const highlight = bestSnippet
-    ? {
-        field: bestField,
-        snippet: bestSnippet,
-      }
-    : undefined;
-
   return {
-    totalScore,
+    score: totalScore,
     scope: bestField,
-    highlight,
-  };
-}
-
-function initFieldMatch(key: SearchResultScope): FieldMatch {
-  return {
-    key,
-    tokens: new Set<string>(),
-    score: 0,
+    highlight: bestSnippet
+      ? {
+          field: bestField,
+          snippet: bestSnippet,
+        }
+      : undefined,
   };
 }
 
@@ -486,12 +468,6 @@ function hasFuzzyWordMatch(normalizedValue: string, token: string) {
   });
 }
 
-function computePopularity(doc: MangaType) {
-  const view = doc.viewNumber ?? 0;
-  const follow = doc.followNumber ?? 0;
-  const like = doc.likeNumber ?? 0;
-  return Math.log10(1 + view + follow * 5 + like * 3);
-}
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

@@ -277,6 +277,7 @@ export default function CreateChapter() {
   // BEGIN <feature> CHAPTER_CREATE_USE_GENRES_FROM_LOADER>
   const { manga, isAdminUser, canSkipWatermark } = useLoaderData<typeof loader>();
   const genres: string[] = Array.isArray(manga?.genres) ? (manga.genres as string[]) : [];
+  const skipCut = genres.some((g) => String(g).toLowerCase() === "manhwa");
   const skipCompression = genres.some((g) =>
     ["manhwa", "manhua"].includes(String(g).toLowerCase()),
   );
@@ -302,7 +303,7 @@ export default function CreateChapter() {
       return;
     }
 
-    const splitList = await splitLongImages(list, { maxHeight: 3000 });
+    const splitList = skipCut ? list : await splitLongImages(list, { maxHeight: 3000 });
 
     // BEGIN <feature> CHAPTER_SKIP_COMPRESSION_ADD_FILES>
     if (skipCompression) {

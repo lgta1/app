@@ -41,6 +41,16 @@ export const getPosterVariantForContext = (
   context: PosterContext,
 ): PosterVariantEntry | undefined => {
   const variants = (manga as any)?.posterVariants as PosterVariantsPayload | undefined;
+  if (context === "cardMobile") {
+    const preferred = variants?.w360 || variants?.w320;
+    if (preferred?.url) return preferred;
+
+    const fallbackUrl = (manga as any)?.poster as string | undefined;
+    if (fallbackUrl) return { url: fallbackUrl };
+
+    const fallbackVariant = variants?.w220 || variants?.w200;
+    return fallbackVariant?.url ? fallbackVariant : undefined;
+  }
   const desired: PosterVariantKey =
     context === "small" || context === "leaderboard"
       ? "w200"

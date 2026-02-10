@@ -7,11 +7,15 @@ import type { Route } from "./+types/manga.$mangaId.bulk-upload-urls";
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
 import { createChapter } from "@/mutations/chapter.mutation";
 import { MANGA_STATUS } from "~/constants/manga";
+import { fileExists, getFullPathFromPublicUrl, getPublicFileUrl, moveFile } from "~/utils/minio.utils";
 
 // 👉 Dùng server-only mutation
 import { systemBanDirect } from "~/.server/mutations/system-ban.direct";
 
-type Entry = { chapter?: string; urls: string[] };
+type Entry = { chapter?: string; urls: string[]; requestId?: string };
+
+const TMP_CHAPTER_PREFIX = "tmp/manga-images";
+const FINAL_CHAPTER_PREFIX = "manga-images";
 
 /* ============ CONFIG GIỚI HẠN ============ */
 const MAX_IMAGE_BYTES = 9 * 1024 * 1024;         // 1) ảnh đơn ≤ 9MB
@@ -49,6 +53,60 @@ async function banAndFail(uploaderId: string, reason: string) {
     { status: 403 }
   );
 }
+
+const finalizeChapterUploads = async (rawUrls: string[], requestId?: string): Promise<string[]> => {
+  if (!Array.isArray(rawUrls) || rawUrls.length === 0) return [];
+  if (!requestId) return rawUrls;
+
+  const tmpPrefix = `${TMP_CHAPTER_PREFIX}/${requestId}`;
+  const results: string[] = new Array(rawUrls.length);
+  const concurrency = 5;
+  let nextIndex = 0;
+  let stopped = false;
+
+  const runNext = async (): Promise<void> => {
+    if (stopped || nextIndex >= rawUrls.length) return;
+    const currentIndex = nextIndex;
+    nextIndex += 1;
+
+    const url = rawUrls[currentIndex];
+    const fullPath = getFullPathFromPublicUrl(url);
+    if (!fullPath || !fullPath.includes(tmpPrefix)) {
+      results[currentIndex] = url;
+      if (nextIndex < rawUrls.length) await runNext();
+      return;
+    }
+
+    const destinationFullPath = fullPath.replace(`${tmpPrefix}/`, `${FINAL_CHAPTER_PREFIX}/`);
+    const sourceExists = await fileExists(fullPath);
+
+    if (sourceExists) {
+      await moveFile(fullPath, destinationFullPath);
+    } else {
+      const destExists = await fileExists(destinationFullPath);
+      if (!destExists) {
+        throw new BusinessError("Không tìm thấy ảnh đã tải lên, vui lòng thử lại");
+      }
+    }
+
+    results[currentIndex] = getPublicFileUrl(destinationFullPath);
+    if (nextIndex < rawUrls.length) await runNext();
+  };
+
+  const starters = Array.from(
+    { length: Math.min(concurrency, rawUrls.length) },
+    () => runNext(),
+  );
+
+  try {
+    await Promise.all(starters);
+  } catch (error) {
+    stopped = true;
+    throw error;
+  }
+
+  return results;
+};
 
 /* ============ ACTION ============ */
 export async function action({ request, params }: Route.ActionArgs) {
@@ -92,6 +150,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     for (const entry of entries) {
       const rawUrls = Array.isArray(entry?.urls) ? entry.urls : [];
+      const requestId = typeof entry?.requestId === "string" ? entry.requestId.trim() : "";
       if (rawUrls.length === 0) {
         return Response.json({ error: `Chapter "${entry?.chapter ?? ""}" không có ảnh.` }, { status: 400 });
       }
@@ -148,16 +207,18 @@ export async function action({ request, params }: Route.ActionArgs) {
         }
       }
 
+      const finalUrls = await finalizeChapterUploads(urls, requestId);
+
       // Tạo chapter
       try {
         await createChapter(request, {
           title,
-          contentUrls: urls,
+          contentUrls: finalUrls,
           mangaId,
           contentBytes: total,
         });
         createdChapters += 1;
-        savedImages += urls.length;
+        savedImages += finalUrls.length;
       } catch (e: any) {
         console.error("[bulk-upload-urls] createChapter error:", e?.stack || e);
         return Response.json(

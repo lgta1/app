@@ -538,7 +538,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         {canManageManga ? (
           <Link
             to={`/truyen-hentai/preview/${manageHandle}`}
-            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(225,29,72,0.35)] transition-transform hover:scale-[1.02]"
+            className="flex items-center gap-1.5 rounded-lg border border-[#25EBAC] px-2.5 py-1.5 text-sm font-medium text-[#25EBAC] transition-colors hover:bg-[#25EBAC]/10"
           >
             Quản lý
           </Link>
@@ -571,7 +571,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             <div className="mb-4 flex justify-end md:hidden">
               <Link
                 to={`/truyen-hentai/preview/${manageHandle}`}
-                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(225,29,72,0.35)] transition-transform hover:scale-[1.02]"
+                className="flex items-center gap-1.5 rounded-lg border border-[#25EBAC] px-2.5 py-1.5 text-sm font-medium text-[#25EBAC] transition-colors hover:bg-[#25EBAC]/10"
               >
                 Quản lý
               </Link>

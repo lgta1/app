@@ -8,6 +8,7 @@ import {
   createViHentaiAutoUpdateQueue,
   getViHentaiAutoUpdateEnabled,
   getViHentaiAutoUpdateStopEarlyEnabled,
+  kickViHentaiAutoUpdateQueue,
   setViHentaiAutoUpdateStopEarlyEnabled,
   setViHentaiAutoUpdateEnabled,
   startViHentaiAutoUpdateQueue,
@@ -132,13 +133,45 @@ const formatMs = (ms: number) => {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 };
 
-const getNextHourTick = (now: Date) => {
-  const next = new Date(now.getTime());
-  next.setMilliseconds(0);
-  next.setSeconds(0);
-  next.setMinutes(0);
-  next.setHours(next.getHours() + 1);
-  return next;
+const PARIS_TZ = "Europe/Paris";
+const BLACKOUT_HOURS = new Set([6, 7, 17, 18]);
+
+const getParisParts = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: PARIS_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "NaN");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "NaN");
+  const second = Number(parts.find((p) => p.type === "second")?.value ?? "NaN");
+  return {
+    hour: Number.isFinite(hour) ? hour : 0,
+    minute: Number.isFinite(minute) ? minute : 0,
+    second: Number.isFinite(second) ? second : 0,
+  };
+};
+
+const getNextCronTick = (now: Date) => {
+  const paris = getParisParts(now);
+  let nextHour = paris.hour;
+  if (paris.minute > 20 || (paris.minute === 20 && paris.second > 0)) {
+    nextHour += 1;
+  } else if (paris.minute === 20 && paris.second === 0) {
+    nextHour += 1;
+  }
+
+  while (BLACKOUT_HOURS.has(((nextHour % 24) + 24) % 24)) {
+    nextHour += 1;
+  }
+
+  const currentMinutes = paris.hour * 60 + paris.minute + paris.second / 60;
+  const targetMinutes = ((nextHour % 24) + 24) % 24 * 60 + 20;
+  let deltaMinutes = targetMinutes - currentMinutes;
+  if (deltaMinutes <= 0) deltaMinutes += 24 * 60;
+  return new Date(now.getTime() + deltaMinutes * 60 * 1000);
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -397,8 +430,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const started = await startViHentaiAutoUpdateQueue(queueId, { manual: true });
     if (!started) {
-      const body: ActionResult = { ok: false, error: "Không thể start queue (có thể đang có queue khác running)" };
-      return Response.json(body, { status: 200 });
+      const kicked = await kickViHentaiAutoUpdateQueue(queueId);
+      if (!kicked.ok) {
+        const body: ActionResult = { ok: false, error: kicked.message || "Không thể start queue" };
+        return Response.json(body, { status: 200 });
+      }
+    } else {
+      void kickViHentaiAutoUpdateQueue(queueId);
     }
 
     const body: ActionResult = { ok: true, queueId };
@@ -549,8 +587,11 @@ export default function AdminMangaAutoUpdate() {
   const running = fetcher.state !== "idle";
 
   const [cronNow, setCronNow] = useState(() => new Date());
-  const nextCronAt = useMemo(() => getNextHourTick(cronNow), [cronNow]);
-  const remainingMs = useMemo(() => (enabled ? nextCronAt.getTime() - cronNow.getTime() : 0), [enabled, nextCronAt, cronNow]);
+  const nextCronAt = useMemo(() => getNextCronTick(cronNow), [cronNow]);
+  const remainingMs = useMemo(
+    () => (enabled ? Math.max(0, nextCronAt.getTime() - cronNow.getTime()) : 0),
+    [enabled, nextCronAt, cronNow],
+  );
 
   useEffect(() => {
     if (!enabled) return;
@@ -715,8 +756,9 @@ export default function AdminMangaAutoUpdate() {
             Auto-update: <span className={enabled ? "text-emerald-300" : "text-red-300"}>{enabled ? "ON" : "OFF"}</span>.{" "}
             {enabled ? (
               <>
-                Cron mỗi 1 giờ sẽ tự trích xuất <span className="text-txt-primary">{DEFAULT_MAX_MANGA}</span> URL và auto chạy (primary). Lần tiếp theo:{" "}
-                <span className="text-txt-primary">{nextCronAt.toLocaleString()}</span> — còn lại{" "}
+                Cron chạy lúc phút 20 mỗi giờ (trừ 06:20, 07:20, 17:20, 18:20 giờ Paris) sẽ tự trích xuất{" "}
+                <span className="text-txt-primary">{DEFAULT_MAX_MANGA}</span> URL và auto chạy (primary). Lần tiếp theo:{" "}
+                <span className="text-txt-primary">{nextCronAt.toLocaleString("fr-FR", { timeZone: PARIS_TZ })}</span> — còn lại{" "}
                 <span className="font-semibold text-txt-primary">{formatMs(remainingMs)}</span> (list: {DEFAULT_LIST_URL})
               </>
             ) : (
@@ -763,7 +805,7 @@ export default function AdminMangaAutoUpdate() {
             type="submit"
             name="intent"
             value="startQueue"
-            disabled={running || !enabled || !activeQueue?.id || activeQueue.status === "running"}
+            disabled={running || !enabled || !activeQueue?.id || (activeQueue.status === "running" && anyItemRunning)}
             className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
           >
             {running ? "Đang gửi lệnh..." : "Bắt đầu chạy queue"}

@@ -341,6 +341,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   // Link "Thêm chương" có skipCompression theo genres
   const isSkipCompression =
     Array.isArray(genres) && genres.some((g: string) => ["manhwa", "manhua"].includes(String(g).toLowerCase()));
+  const skipCut = Array.isArray(genres) && genres.some((g: string) => String(g).toLowerCase() === "manhwa");
 
   const [isBulkRunning, setIsBulkRunning] = useState(false);
   const [bulkApplyCompression, setBulkApplyCompression] = useState<boolean>(() => !isSkipCompression);
@@ -681,6 +682,13 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
   const pickFolder = () => folderInputRef.current?.click();
 
+  const createRequestId = () => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return (crypto as Crypto).randomUUID();
+    }
+    return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  };
+
   async function handleFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
     try {
       const rawList = e.target.files;
@@ -757,6 +765,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         setChapProgress((p) => ({ ...p, current: chap }));
         toast.loading(`Đang tải… ${okCount}/${totalChaps} • ${chap}`, { id: loadingId });
 
+        const uploadRequestId = createRequestId();
+        const uploadPrefix = `tmp/manga-images/${uploadRequestId}`;
+
         // sort ảnh trong 1 chap
         const list = groups[chap].sort((a, b) => nat(a.name, b.name));
 
@@ -767,7 +778,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           // KHÔNG continue; để server thực thi rule & BAN
         }
 
-        const splitList = await splitLongImages(list, { maxHeight: 3000 });
+        const splitList = skipCut ? list : await splitLongImages(list, { maxHeight: 3000 });
 
         // Optional compression cho bulk (per chapter) nếu đã tick
         let effectiveList = splitList;
@@ -798,7 +809,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             const shouldWatermark =
               bulkForceWatermarkAll || (!meta.noWatermark && Boolean(selection?.watermarkIndexes.has(groupIndex)));
             if (!shouldWatermark) {
-              return { file: f, options: { prefixPath: "manga-images" } };
+              return { file: f, options: { prefixPath: uploadPrefix } };
             }
 
             watermarkOrder += 1;
@@ -806,7 +817,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
             return {
               file: f,
-              options: { prefixPath: "manga-images", watermark: true, watermarkVariant },
+              options: { prefixPath: uploadPrefix, watermark: true, watermarkVariant },
             };
           });
           results = await uploadMultipleFiles(filesToUpload);
@@ -837,7 +848,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
         // gọi API headless tạo chapter
         try {
-          const body = { entries: [{ chapter: chap, urls: uploads }] };
+          const body = { entries: [{ chapter: chap, urls: uploads, requestId: uploadRequestId }] };
           const resp = await fetch(`/truyen-hentai/${mangaHandle}/bulk-upload-urls`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "fetch" },

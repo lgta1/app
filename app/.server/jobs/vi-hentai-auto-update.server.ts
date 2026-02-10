@@ -9,10 +9,10 @@ import { ViHentaiAutoUpdateQueueModel } from "~/database/models/vi-hentai-auto-u
 import { MANGA_CONTENT_TYPE } from "~/constants/manga";
 import { getFeatureFlag, setFeatureFlag } from "~/.server/services/system-feature-flag.server";
 
-const TZ = "Asia/Ho_Chi_Minh";
+const TZ = "Europe/Paris";
 const LOCK_KEY = "vi-hentai-auto-update";
 
-const getVietnamMinutes = (): number | null => {
+const getParisMinutes = (): number | null => {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: TZ,
@@ -29,11 +29,13 @@ const getVietnamMinutes = (): number | null => {
   }
 };
 
-const isVietnamBlackoutWindow = (): boolean => {
-  const minutes = getVietnamMinutes();
+const isParisBlackoutWindow = (): boolean => {
+  const minutes = getParisMinutes();
   if (minutes == null) return false;
-
-  return minutes >= 15 * 60 + 30 && minutes < 18 * 60 + 30;
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  if (minute !== 1 && minute !== 5) return false;
+  return hour === 6 || hour === 7 || hour === 17 || hour === 18;
 };
 
 // We keep extraction and processing separated:
@@ -258,6 +260,9 @@ export const runViHentaiAutoUpdateOnce = async (
   if (!(await getViHentaiAutoUpdateEnabled())) {
     return { ok: false, message: "Auto-update đang tắt" };
   }
+  if (isParisBlackoutWindow()) {
+    return { ok: false, message: "Đang trong khung giờ giới nghiêm, auto-update bị chặn" };
+  }
   // Back-compat: old API name kept, but now it creates a queue and starts it.
   const listUrlRaw = (options.listUrl || process.env.VIHENTAI_AUTO_UPDATE_LIST_URL || DEFAULT_LIST_URL).trim();
 
@@ -288,7 +293,7 @@ export const runViHentaiAutoUpdateOnce = async (
   const maxNewChaptersPerManga =
     typeof options.maxNewChaptersPerManga === "number" && options.maxNewChaptersPerManga > 0
       ? options.maxNewChaptersPerManga
-      : Number.parseInt(String(process.env.VIHENTAI_AUTO_UPDATE_MAX_NEW_CHAPTERS || "20"), 10) || 20;
+      : Number.parseInt(String(process.env.VIHENTAI_AUTO_UPDATE_MAX_NEW_CHAPTERS || "100"), 10) || 100;
 
   const lockedBy = getOwnerId();
 
@@ -338,6 +343,9 @@ export const createViHentaiAutoUpdateQueue = async (
   if (!(await getViHentaiAutoUpdateEnabled())) {
     return { ok: false, message: "Auto-update đang tắt" };
   }
+  if (isParisBlackoutWindow()) {
+    return { ok: false, message: "Đang trong khung giờ giới nghiêm, auto-update bị chặn" };
+  }
   const listUrlRaw = (options.listUrl || process.env.VIHENTAI_AUTO_UPDATE_LIST_URL || DEFAULT_LIST_URL).trim();
 
   let listUrl: URL;
@@ -360,7 +368,7 @@ export const createViHentaiAutoUpdateQueue = async (
   const maxNewChaptersPerManga =
     typeof options.maxNewChaptersPerManga === "number" && options.maxNewChaptersPerManga > 0
       ? options.maxNewChaptersPerManga
-      : 20;
+      : 100;
 
   const ownerId = (options.ownerId || process.env.VIHENTAI_AUTO_UPDATE_OWNER_ID || DEFAULT_OWNER_ID).trim();
   if (ownerId && !isValidMongoObjectId(ownerId)) {
@@ -437,6 +445,7 @@ export const startViHentaiAutoUpdateQueue = async (
 ): Promise<boolean> => {
   if (!queueId) return false;
   if (!(await getViHentaiAutoUpdateEnabled())) return false;
+  if (isParisBlackoutWindow()) return false;
 
   // Ensure we only have a single active running queue at a time.
   const otherRunning = await ViHentaiAutoUpdateQueueModel.exists({ status: "running", _id: { $ne: queueId } });
@@ -447,6 +456,43 @@ export const startViHentaiAutoUpdateQueue = async (
     { $set: { status: "running", startedAt: new Date(), manualOverride: Boolean(options.manual) } },
   );
   return Boolean((res as any).modifiedCount || (res as any).nModified);
+};
+
+export const kickViHentaiAutoUpdateQueue = async (
+  queueId: string,
+): Promise<{ ok: boolean; message?: string }> => {
+  if (!queueId) return { ok: false, message: "Thiếu queueId" };
+  if (!(await getViHentaiAutoUpdateEnabled())) return { ok: false, message: "Auto-update đang tắt" };
+  if (isParisBlackoutWindow()) return { ok: false, message: "Đang trong khung giờ giới nghiêm" };
+
+  const queue = await ViHentaiAutoUpdateQueueModel.findById(queueId)
+    .select({ _id: 1, status: 1 })
+    .lean();
+  if (!queue) return { ok: false, message: "Không tìm thấy queue" };
+
+  if (String((queue as any).status) !== "running") {
+    await ViHentaiAutoUpdateQueueModel.updateOne(
+      { _id: queueId },
+      { $set: { status: "running", startedAt: new Date(), manualOverride: true } },
+    );
+  }
+
+  void (async () => {
+    const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
+    if (!acquired) {
+      console.warn("[vi-hentai] manual kick skipped: lock busy");
+      return;
+    }
+    try {
+      await processViHentaiAutoUpdateQueue(queueId);
+    } catch (e) {
+      console.error("[vi-hentai] manual kick failed", e);
+    } finally {
+      await releaseLock();
+    }
+  })();
+
+  return { ok: true };
 };
 
 const processViHentaiAutoUpdateQueue = async (queueId: string): Promise<void> => {
@@ -704,9 +750,9 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
   let running = false;
   const isMongoReady = () => mongoose.connection.readyState === 1;
 
-  // 1) Every 30 minutes: extract 30 URLs into a new queue (status=queued).
+  // 1) Every hour at minute 01: extract 30 URLs into a new queue (status=queued).
   cron.schedule(
-    "*/30 * * * *",
+    "1 * * * *",
     async () => {
       if (running) return;
       running = true;
@@ -716,8 +762,8 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
           return;
         }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
-        if (isVietnamBlackoutWindow()) {
-          console.info("[cron] vi-hentai queue extract skipped: blackout window (VN 15:30-18:30)");
+        if (isParisBlackoutWindow()) {
+          console.info("[cron] vi-hentai queue extract skipped: blackout slot (Paris 06:01, 07:01, 17:01, 18:01)");
           return;
         }
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
@@ -749,9 +795,9 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
     { timezone: TZ },
   );
 
-  // 2) Every minute: if there is a running queue, process it.
+  // 2) Every hour at minute 05: if there is a running queue, process it.
   cron.schedule(
-    "*/1 * * * *",
+    "5 * * * *",
     async () => {
       if (running) return;
       running = true;
@@ -761,16 +807,9 @@ export const initViHentaiAutoUpdateScheduler = (): void => {
           return;
         }
         if (!(await getViHentaiAutoUpdateEnabled())) return;
-        if (isVietnamBlackoutWindow()) {
-          const manualRunning = await ViHentaiAutoUpdateQueueModel.exists({
-            status: "running",
-            manualOverride: true,
-          });
-          if (!manualRunning) {
-            console.info("[cron] vi-hentai queue worker skipped: blackout window (VN 15:30-18:30)");
-            return;
-          }
-          console.info("[cron] vi-hentai queue worker: blackout window bypassed (manual override)");
+        if (isParisBlackoutWindow()) {
+          console.info("[cron] vi-hentai queue worker skipped: blackout slot (Paris 06:05, 07:05, 17:05, 18:05)");
+          return;
         }
         const acquired = await tryAcquireLock(4 * 60 * 60 * 1000);
         if (!acquired) return;

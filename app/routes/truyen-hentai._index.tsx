@@ -200,23 +200,16 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
                   const isEager = idx < 4;
                   const variants = (m as any)?.posterVariants as any | undefined;
                   const desktopPosterSrcSet = buildPosterSrcSet(variants);
-                  const mobileVariant = variants?.w360 || variants?.w320 || variants?.w200 || variants?.w220;
-                  const mobileVariantWidth = variants?.w360
-                    ? variants.w360.width || 360
-                    : variants?.w320
-                    ? variants.w320.width || 320
-                    : variants?.w200
-                    ? variants.w200.width || 200
-                    : variants?.w220
-                    ? variants.w220.width || 220
-                    : undefined;
+                  const mobileVariant = variants?.w360 || variants?.w320;
+                  const defaultMobileWidth = mobileVariant === variants?.w360 ? 360 : 320;
+                  const mobileVariantWidth = mobileVariant?.width || (mobileVariant?.url ? defaultMobileWidth : undefined);
                   const mobilePosterSrcSet = mobileVariant?.url && mobileVariantWidth
                     ? `${mobileVariant.url} ${mobileVariantWidth}w`
                     : undefined;
                   const posterSrcSet = isDesktop ? desktopPosterSrcSet : mobilePosterSrcSet;
                   const posterSizes = isDesktop
                     ? "(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
-                    : mobileVariantWidth
+                    : mobilePosterSrcSet && mobileVariantWidth
                     ? `${mobileVariantWidth}px`
                     : "(min-width: 640px) 33vw, 50vw";
                   return (
@@ -261,23 +254,16 @@ export default function TruyenHentaiPillar({ loaderData }: Route.ComponentProps)
                   const variant = getPosterVariantForContext(m, isDesktop ? "cardDesktop" : "cardMobile");
                   const variants = (m as any)?.posterVariants as any | undefined;
                   const desktopPosterSrcSet = buildPosterSrcSet(variants);
-                  const mobileVariant = variants?.w360 || variants?.w320 || variants?.w200 || variants?.w220;
-                  const mobileVariantWidth = variants?.w360
-                    ? variants.w360.width || 360
-                    : variants?.w320
-                    ? variants.w320.width || 320
-                    : variants?.w200
-                    ? variants.w200.width || 200
-                    : variants?.w220
-                    ? variants.w220.width || 220
-                    : undefined;
+                  const mobileVariant = variants?.w360 || variants?.w320;
+                  const defaultMobileWidth = mobileVariant === variants?.w360 ? 360 : 320;
+                  const mobileVariantWidth = mobileVariant?.width || (mobileVariant?.url ? defaultMobileWidth : undefined);
                   const mobilePosterSrcSet = mobileVariant?.url && mobileVariantWidth
                     ? `${mobileVariant.url} ${mobileVariantWidth}w`
                     : undefined;
                   const posterSrcSet = isDesktop ? desktopPosterSrcSet : mobilePosterSrcSet;
                   const posterSizes = isDesktop
                     ? "(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
-                    : mobileVariantWidth
+                    : mobilePosterSrcSet && mobileVariantWidth
                     ? `${mobileVariantWidth}px`
                     : "(min-width: 640px) 33vw, 50vw";
                   return (

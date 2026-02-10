@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { calculateLeaderboard } from "@/services/leaderboard.svc";
 import { calculateTranslatorLeaderboard } from "@/services/translator-leaderboard.svc";
 import { calculateWaifuLeaderboardSnapshot } from "@/services/waifu-leaderboard.svc";
+import { rewardWeeklyTranslatorLeaderboard } from "@/services/translator-reward.svc";
 import { MangaModel } from "~/database/models/manga.model";
 
 /**
@@ -53,10 +54,10 @@ export const initLeaderboardScheduler = (): void => {
   );
 
   // ─────────────────────────────────────────────────────────────
-  // WEEKLY RESET COUNTER: 00:00 every Monday — set weeklyViews = 0
+  // WEEKLY RESET COUNTER: 02:10 every Monday — set weeklyViews = 0
   // ─────────────────────────────────────────────────────────────
   cron.schedule(
-    "0 0 * * 1",
+    "10 2 * * 1",
     async () => {
       try {
         if (!isMongoReady()) {
@@ -71,6 +72,33 @@ export const initLeaderboardScheduler = (): void => {
         console.info(`[cron] Weekly views reset → matched ${matched} docs`);
       } catch (e) {
         console.error("[cron] Weekly views reset failed", e);
+      }
+    },
+    { timezone: TZ },
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // WEEKLY TRANSLATOR REWARD: 02:00 every Monday (Asia/Ho_Chi_Minh)
+  // ─────────────────────────────────────────────────────────────
+  let runningTranslatorReward = false;
+  cron.schedule(
+    "0 2 * * 1",
+    async () => {
+      if (runningTranslatorReward) return;
+      if (!isMongoReady()) {
+        console.warn("[cron] Translator weekly reward skipped: MongoDB not connected");
+        return;
+      }
+      runningTranslatorReward = true;
+      try {
+        const result = await rewardWeeklyTranslatorLeaderboard();
+        console.info(
+          `[cron] Translator weekly reward done: week=${result.weekKey}, rewarded=${result.rewardedCount}`,
+        );
+      } catch (error) {
+        console.error("[cron] Translator weekly reward failed", error);
+      } finally {
+        runningTranslatorReward = false;
       }
     },
     { timezone: TZ },

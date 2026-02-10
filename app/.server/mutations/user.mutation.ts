@@ -1,6 +1,7 @@
 import { isValidObjectId } from "mongoose";
 
 import { createNotification } from "@/mutations/notification.mutation";
+import { grantGoldReward } from "@/services/gold-reward.svc";
 import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { ROLES } from "~/constants/user";
@@ -179,15 +180,11 @@ export const rewardGoldUser = async (
     throw new BusinessError("ID người dùng không hợp lệ");
   }
 
-  await Promise.all([
-    UserModel.findByIdAndUpdate(userId, { $inc: { gold: amount } }),
-    createNotification({
-      userId,
-      title: `Bạn đã nhận được ${amount} dâm ngọc. Vì ${message}`,
-      imgUrl: "/images/noti/gold.png",
-      type: "gold-reward",
-    }),
-  ]);
+  await grantGoldReward({
+    userId,
+    amount,
+    title: `Bạn đã nhận được ${amount} dâm ngọc. Vì ${message}`,
+  });
 
   return {
     success: true,

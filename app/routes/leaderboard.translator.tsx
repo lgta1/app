@@ -106,8 +106,11 @@ export default function LeaderboardTranslator() {
           </Tabs.Content>
 
           <Tabs.Content value="weekly" className="space-y-0 pb-4">
+            <div className="px-3 pt-3 text-xs text-txt-secondary">
+              Thưởng tuần được gửi vào sáng thứ 2 khi kết thúc tuần. 1000 views = 1 dâm ngọc.
+            </div>
             {(weekly || []).map((row: any, index: number) => (
-              <RatingItemTranslator key={row.userId || index} row={row} index={index + 1} />
+              <RatingItemTranslator key={row.userId || index} row={row} index={index + 1} showReward />
             ))}
           </Tabs.Content>
         </Tabs.Root>

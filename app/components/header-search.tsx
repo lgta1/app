@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useFetcher } from "react-router-dom";
 import * as Popover from "@radix-ui/react-popover";
 import { Search } from "lucide-react";
@@ -11,7 +11,6 @@ import type { SmartSearchHit, SmartSearchResponse as SearchResponse } from "~/ty
 const RESULT_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 1000;
 const SCOPE_STORAGE_KEY = "ww:search-scope";
-const STATUS_MIN_VISIBLE_MS = 600;
 
 export function HeaderSearch() {
   const [query, setQuery] = useState("");
@@ -19,7 +18,6 @@ export function HeaderSearch() {
   const [results, setResults] = useState<SmartSearchHit[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingVisible, setIsLoadingVisible] = useState(false);
   const [offset, setOffset] = useState(0);
   const [scope, setScope] = useState<SearchScope>(DEFAULT_SCOPE);
 
@@ -27,8 +25,6 @@ export function HeaderSearch() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const loadingVisibilityTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const loadingStartedAtRef = useRef<number>(0);
   const scopeRef = useRef<SearchScope>(DEFAULT_SCOPE);
   const trimmedQuery = query.trim();
 
@@ -37,43 +33,7 @@ export function HeaderSearch() {
     setHasMore(false);
     setIsOpen(false);
     setIsLoading(false);
-    setIsLoadingVisible(false);
     setOffset(0);
-    loadingStartedAtRef.current = 0;
-    if (loadingVisibilityTimeoutRef.current) {
-      clearTimeout(loadingVisibilityTimeoutRef.current);
-      loadingVisibilityTimeoutRef.current = undefined;
-    }
-  }, []);
-
-  const showLoadingStatus = useCallback(() => {
-    if (loadingVisibilityTimeoutRef.current) {
-      clearTimeout(loadingVisibilityTimeoutRef.current);
-      loadingVisibilityTimeoutRef.current = undefined;
-    }
-    loadingStartedAtRef.current = Date.now();
-    setIsLoadingVisible(true);
-  }, []);
-
-  const hideLoadingStatus = useCallback(() => {
-    const elapsed = Date.now() - loadingStartedAtRef.current;
-    const remaining = Math.max(STATUS_MIN_VISIBLE_MS - elapsed, 0);
-    if (loadingVisibilityTimeoutRef.current) {
-      clearTimeout(loadingVisibilityTimeoutRef.current);
-    }
-    loadingVisibilityTimeoutRef.current = setTimeout(() => {
-      setIsLoadingVisible(false);
-      loadingStartedAtRef.current = 0;
-      loadingVisibilityTimeoutRef.current = undefined;
-    }, remaining);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (loadingVisibilityTimeoutRef.current) {
-        clearTimeout(loadingVisibilityTimeoutRef.current);
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -103,7 +63,6 @@ export function HeaderSearch() {
 
       const activeScope = overrideScope ?? scopeRef.current;
       setIsLoading(true);
-      showLoadingStatus();
       setIsOpen(true);
       const params = new URLSearchParams({
         q: trimmedQuery,
@@ -113,7 +72,7 @@ export function HeaderSearch() {
       });
       fetcher.load(`/api/search?${params.toString()}`);
     },
-    [fetcher, resetResults, showLoadingStatus],
+    [fetcher, resetResults],
   );
 
   useEffect(() => {
@@ -132,7 +91,6 @@ export function HeaderSearch() {
 
     setHasMore(data.hasMore);
     setIsLoading(false);
-    hideLoadingStatus();
     setOffset(data.nextOffset);
 
     if (data.requestedOffset === 0) {
@@ -194,20 +152,7 @@ export function HeaderSearch() {
     }
   }, [handleScroll]);
 
-  const shouldShowDropdown = Boolean(trimmedQuery) && (results.length > 0 || isLoadingVisible || isLoading);
-
-  const statusMessage = useMemo(() => {
-    if (!trimmedQuery) return "";
-    if (isLoadingVisible) {
-      return "Nhấn lại \"kính lúp\" để hiển thị kết quả mới";
-    }
-    if (!isLoading && results.length === 0) {
-      return "Không tìm thấy truyện nào";
-    }
-    return "";
-  }, [isLoading, isLoadingVisible, results.length, trimmedQuery]);
-
-  const hasStatusMessage = Boolean(statusMessage);
+  const shouldShowDropdown = Boolean(trimmedQuery) && (results.length > 0 || isLoading);
 
   const handleScopeChange = (value: string) => {
     if (value === scope) return;
@@ -263,15 +208,6 @@ export function HeaderSearch() {
               ref={scrollRef}
               className="scrollbar-thin scrollbar-thumb-bd-default scrollbar-track-transparent max-h-96 overflow-y-auto"
             >
-              <div className="border-b border-bd-default px-3" aria-live="polite">
-                <p
-                  className={`py-3 text-center text-sm transition-opacity duration-200 ${hasStatusMessage ? "text-txt-secondary opacity-100" : "opacity-0"}`}
-                  aria-hidden={!hasStatusMessage}
-                >
-                  {hasStatusMessage ? statusMessage : "\u00A0"}
-                </p>
-              </div>
-
               {results.map((item, index) => (
                 <SearchItem key={item.id} result={item} isFirst={index === 0} />
               ))}

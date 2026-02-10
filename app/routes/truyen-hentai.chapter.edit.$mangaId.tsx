@@ -193,7 +193,8 @@ export function EditChapterView() {
   const params = useParams();
   const routeHandle = params.mangaId;
   const navigate = useNavigate();
-  const { chapter, mangaHandle, canSkipWatermark } = useLoaderData() as any;
+  const { chapter, mangaHandle, canSkipWatermark, mangaGenres } = useLoaderData() as any;
+  const skipCut = Array.isArray(mangaGenres) && mangaGenres.some((g: unknown) => String(g).toLowerCase() === "manhwa");
   const canonicalHandle = mangaHandle || routeHandle;
   const fetcher = useFetcher() as any;
   const [title, setTitle] = useState("");
@@ -280,7 +281,7 @@ export function EditChapterView() {
       return;
     }
 
-    const splitList = await splitLongImages(list, { maxHeight: 3000 });
+    const splitList = skipCut ? list : await splitLongImages(list, { maxHeight: 3000 });
 
     // Set compression progress
     setCompressionProgress({

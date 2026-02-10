@@ -64,7 +64,16 @@ function ResponsiveLazyRender({
 export async function loader({ request }: Route.LoaderArgs) {
   const { getCanonicalOrigin } = await import("~/.server/utils/canonical-url");
 
-  const [topUser, hotLeaderboard, weeklyLeaderboard, latestPage, recentComments, cosplayPreview, weeklyTranslatorLeaderboard] =
+  const [
+    topUser,
+    hotLeaderboard,
+    weeklyLeaderboard,
+    latestPage,
+    recentComments,
+    cosplayPreview,
+    weeklyTranslatorLeaderboard,
+    monthlyTranslatorLeaderboard,
+  ] =
     await Promise.all([
       getTopUser(),
       getHotCarouselLeaderboard(),
@@ -75,6 +84,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       getRecentMangaComments(1, 5),
       getNewCosplay(1, 4),
       getTranslatorLeaderboard("weekly", 10),
+      getTranslatorLeaderboard("monthly", 10),
     ]);
 
   return {
@@ -86,6 +96,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     recentComments,
     cosplayPreview,
     weeklyTranslatorLeaderboard,
+    monthlyTranslatorLeaderboard,
   };
 }
 
@@ -160,6 +171,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     recentComments,
     cosplayPreview,
     weeklyTranslatorLeaderboard,
+    monthlyTranslatorLeaderboard,
   } = loaderData;
 
   // Dùng MobileGrid cho mobile/tablet, và TopBanner (5 cột + nút click) cho desktop
@@ -344,11 +356,13 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <div className="relative h-[15px] w-[15px]">
-                      <img
-                        src="/images/icons/multi-star.svg"
-                        alt=""
-                        className="absolute top-0 left-[4.62px] h-4"
-                      />
+                      <span
+                        role="img"
+                        aria-label="Rồng"
+                        className="absolute top-0 left-[1px] text-lg leading-none"
+                      >
+                        🐉
+                      </span>
                     </div>
                     <h2 className="text-txt-primary text-xl font-semibold uppercase">Thánh Lọ Bảng</h2>
                   </div>
@@ -362,11 +376,13 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="relative h-[15px] w-[15px]">
-                    <img
-                      src="/images/icons/multi-star.svg"
-                      alt=""
-                      className="absolute top-0 left-[4.62px] h-4"
-                    />
+                    <span
+                      role="img"
+                      aria-label="Rồng"
+                      className="absolute top-0 left-[1px] text-lg leading-none"
+                    >
+                      🐉
+                    </span>
                   </div>
                   <h2 className="text-txt-primary text-xl font-semibold uppercase">
                     Thánh Lọ Bảng
@@ -387,7 +403,13 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <div className="relative h-[15px] w-[15px]">
-                      <div className="h-4 w-4 rounded bg-[rgba(255,255,255,0.02)] animate-pulse" />
+                      <span
+                        role="img"
+                        aria-label="Bút"
+                        className="absolute top-0 left-[1px] text-lg leading-none"
+                      >
+                        ✍️
+                      </span>
                     </div>
                     <h2 className="text-txt-primary text-xl font-semibold uppercase">BXH Dịch Giả</h2>
                   </div>
@@ -401,15 +423,51 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="relative h-[15px] w-[15px]">
-                    <div className="h-4 w-4 rounded bg-[rgba(255,255,255,0.08)]" />
+                    <span
+                      role="img"
+                      aria-label="Bút"
+                      className="absolute top-0 left-[1px] text-lg leading-none"
+                    >
+                      ✍️
+                    </span>
                   </div>
                   <h2 className="text-txt-primary text-xl font-semibold uppercase">BXH Dịch Giả</h2>
                 </div>
 
-                <div className="bg-bgc-layer1 border-bd-default space-y-0 overflow-hidden rounded-2xl border p-0 py-4">
-                  {(weeklyTranslatorLeaderboard || []).map((row: any, index: number) => (
-                    <RatingItemTranslator key={row.userId || index} row={row} index={index + 1} />
-                  ))}
+                <div className="bg-bgc-layer1 border-bd-default overflow-hidden rounded-2xl border p-0">
+                  <Tabs.Root defaultValue="weekly" className="w-full">
+                    <Tabs.List className="border-bd-default flex border-b">
+                      <Tabs.Trigger
+                        value="weekly"
+                        className="data-[state=active]:border-lav-500 data-[state=active]:text-txt-primary text-txt-secondary hover:text-txt-primary flex-1 cursor-pointer bg-transparent px-3 py-3 text-sm font-medium transition-colors data-[state=active]:border-b-2 data-[state=active]:font-semibold"
+                      >
+                        Top tuần
+                      </Tabs.Trigger>
+                      <Tabs.Trigger
+                        value="monthly"
+                        className="data-[state=active]:border-lav-500 data-[state=active]:text-txt-primary text-txt-secondary hover:text-txt-primary flex-1 cursor-pointer bg-transparent px-3 py-3 text-sm font-medium transition-colors data-[state=active]:border-b-2 data-[state=active]:font-semibold"
+                      >
+                        Top tháng
+                      </Tabs.Trigger>
+                    </Tabs.List>
+
+                    <Tabs.Content value="weekly" className="space-y-0 pb-4">
+                      {(weeklyTranslatorLeaderboard || []).map((row: any, index: number) => (
+                        <RatingItemTranslator
+                          key={row.userId || index}
+                          row={row}
+                          index={index + 1}
+                          showReward
+                        />
+                      ))}
+                    </Tabs.Content>
+
+                    <Tabs.Content value="monthly" className="space-y-0 pb-4">
+                      {(monthlyTranslatorLeaderboard || []).map((row: any, index: number) => (
+                        <RatingItemTranslator key={row.userId || index} row={row} index={index + 1} />
+                      ))}
+                    </Tabs.Content>
+                  </Tabs.Root>
                 </div>
               </div>
             </ResponsiveLazyRender>

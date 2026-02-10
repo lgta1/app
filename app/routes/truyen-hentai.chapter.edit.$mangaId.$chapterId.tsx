@@ -51,7 +51,7 @@ export async function loader({ request, params }: any) {
     throw new BusinessError("Không tìm thấy chương");
   }
 
-  return { chapter, mangaHandle: canonicalHandle, canSkipWatermark };
+  return { chapter, mangaHandle: canonicalHandle, canSkipWatermark, mangaGenres: (target as any)?.genres };
 }
 
 export async function action({ request, params }: any) {

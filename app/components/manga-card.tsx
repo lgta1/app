@@ -70,16 +70,9 @@ export function MangaCard({
   const posterVariant = getPosterVariantForContext(manga, isDesktop ? "cardDesktop" : "cardMobile");
   const posterVariants = (manga as any)?.posterVariants as any | undefined;
   const desktopPosterSrcSet = buildPosterSrcSet(posterVariants);
-  const mobileVariant = posterVariants?.w360 || posterVariants?.w320 || posterVariants?.w200 || posterVariants?.w220;
-  const mobileVariantWidth = posterVariants?.w360
-    ? posterVariants.w360.width || 360
-    : posterVariants?.w320
-    ? posterVariants.w320.width || 320
-    : posterVariants?.w200
-    ? posterVariants.w200.width || 200
-    : posterVariants?.w220
-    ? posterVariants.w220.width || 220
-    : undefined;
+  const mobileVariant = posterVariants?.w360 || posterVariants?.w320;
+  const defaultMobileWidth = mobileVariant === posterVariants?.w360 ? 360 : 320;
+  const mobileVariantWidth = mobileVariant?.width || (mobileVariant?.url ? defaultMobileWidth : undefined);
   const mobilePosterSrcSet = mobileVariant?.url && mobileVariantWidth
     ? `${mobileVariant.url} ${mobileVariantWidth}w`
     : undefined;
@@ -87,7 +80,7 @@ export function MangaCard({
   const posterSizes = variant === "bannerDesktop"
     ? "(min-width: 1024px) 20vw, 50vw"
     : "(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw";
-  const effectivePosterSizes = !isDesktop && mobileVariantWidth
+  const effectivePosterSizes = !isDesktop && mobilePosterSrcSet && mobileVariantWidth
     ? `${mobileVariantWidth}px`
     : posterSizes;
 

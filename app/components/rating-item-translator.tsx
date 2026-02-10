@@ -10,13 +10,18 @@ export type TranslatorLeaderboardRow = {
   rank: number;
 };
 
+const computeReward = (views: number) => Math.round(views / 1000);
+
 export default function RatingItemTranslator({
   row,
   index,
+  showReward,
 }: {
   row: TranslatorLeaderboardRow;
   index: number;
+  showReward?: boolean;
 }) {
+  const rewardAmount = showReward ? computeReward(row.totalViews) : 0;
   const color =
     (index === 1 && "text-[#FFE133]") ||
     (index === 2 && "text-[#5BD8FA]") ||
@@ -53,6 +58,15 @@ export default function RatingItemTranslator({
         <div className="flex items-center gap-2 text-txt-secondary text-xs">
           <Eye className="h-3 w-3" />
           <span>{row.totalViews.toLocaleString("vi-VN")} lượt xem</span>
+          {showReward ? (
+            <>
+              <span className="text-[10px] text-txt-secondary">•</span>
+              <span className="flex items-center gap-1">
+                <span>{rewardAmount.toLocaleString("vi-VN")}</span>
+                <img className="h-3 w-3" src="/images/icons/gold-icon.png" alt="Dâm Ngọc" />
+              </span>
+            </>
+          ) : null}
         </div>
       </div>
     </Wrapper>
