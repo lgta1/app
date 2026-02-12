@@ -179,3 +179,109 @@
 .animate-card-drop {
   animation: cardDrop 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
 }
+
+/* Translator shine text */
+@keyframes translatorGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes translatorSweep {
+  0% {
+    transform: translateX(-140%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  45% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateX(140%);
+    opacity: 0;
+  }
+}
+
+@keyframes translatorFlicker {
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 6px rgba(195, 160, 255, 0.22);
+  }
+  46% {
+    opacity: 0.96;
+    text-shadow: 0 0 7px rgba(212, 180, 255, 0.3);
+  }
+  50% {
+    opacity: 0.9;
+    text-shadow: 0 0 9px rgba(235, 210, 255, 0.45);
+  }
+  54% {
+    opacity: 0.98;
+    text-shadow: 0 0 7px rgba(205, 170, 255, 0.28);
+  }
+}
+
+.translator-shine {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+  color: #caa7ff;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background-image: linear-gradient(90deg, #e0c3ff 0%, #a67dff 45%, #d7b3ff 100%);
+  background-size: 200% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: translatorGradient 6s ease-in-out infinite, translatorFlicker 5.5s ease-in-out infinite;
+  will-change: background-position, opacity;
+  isolation: isolate;
+}
+
+.translator-shine::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  white-space: nowrap;
+  color: transparent;
+  background-image: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(236, 219, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 60%,
+    transparent 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  transform: translateX(-120%);
+  animation: translatorSweep 4.6s ease-in-out infinite;
+  opacity: 0.35;
+  filter: drop-shadow(0 0 4px rgba(214, 183, 255, 0.4));
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .translator-shine {
+    animation: none;
+  }
+  .translator-shine::after {
+    animation: none;
+    opacity: 0.4;
+    transform: translateX(0%);
+  }
+}

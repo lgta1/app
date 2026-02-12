@@ -14,14 +14,16 @@ interface RoleBadgeProps {
 export default function RoleBadge({ role, className = "", labelPrefix = "", hideLabel = false }: RoleBadgeProps) {
   if (!role) return null;
   if (isDichGia(role)) {
+    const label = hideLabel ? "" : `${labelPrefix} Dịch giả`;
     return (
       <span
         className={
-          `${className} shrink-0 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent text-[12px] font-semibold`
+          `${className} shrink-0 translator-shine`
         }
         aria-label="Dịch giả"
+        data-text={label}
       >
-        {hideLabel ? "" : `${labelPrefix} Dịch giả`}
+        {label}
       </span>
     );
   }

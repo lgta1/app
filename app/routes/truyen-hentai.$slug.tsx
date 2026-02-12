@@ -615,7 +615,12 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             }
             once
           >
-            <CommentDetail mangaId={manga.id} isLoggedIn={isLoggedIn} isAdmin={userIsAdmin} />
+            <CommentDetail
+              mangaId={manga.id}
+              mangaOwnerId={String(manga.ownerId)}
+              isLoggedIn={isLoggedIn}
+              isAdmin={userIsAdmin}
+            />
           </LazyRender>
         </section>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useFetcher } from "react-router-dom";
+import { useFetcher } from "react-router-dom";
 import { Edit, Eye, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -207,13 +207,13 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
           Tổng số view bạn kiếm được từ mọi truyện: {totalViewsText}
         </div>
         {!userId && (
-          <Link
-            to="/truyen-hentai/create"
+          <a
+            href="/truyen-hentai/create"
             className="flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 text-sm font-semibold text-black shadow-[0px_4px_8.9px_0px_rgba(196,69,255,0.25)] transition-all hover:opacity-90"
           >
             <Plus className="h-5 w-5" />
             Tạo truyện mới
-          </Link>
+          </a>
         )}
       </div>
 
@@ -254,7 +254,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                       <span className="text-lg font-bold text-white">{sttValue}</span>
                     </div>
                     <div className="flex items-start gap-3 md:border-l md:border-bd-default md:px-4">
-                      <Link to={buildMangaUrl(manga)} className="flex items-start gap-3">
+                      <a href={buildMangaUrl(manga)} className="flex items-start gap-3">
                         <LazyImage
                           className="w-20 min-w-[80px] rounded object-cover aspect-[2/3]"
                           src={posterUrl || manga.poster}
@@ -280,7 +280,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                             </div>
                           </div>
                         </div>
-                      </Link>
+                      </a>
                     </div>
                     <div className="flex flex-col gap-2 md:border-l md:border-bd-default md:px-4">
                       <div className="flex flex-wrap items-center gap-2">
@@ -303,13 +303,13 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                     </div>
                     {!userId && (
                       <div className="flex flex-col items-start gap-2 md:items-end md:border-l md:border-bd-default md:px-4 md:justify-self-stretch">
-                        <Link
-                          to={`/truyen-hentai/preview/${previewHandle}`}
+                        <a
+                          href={`/truyen-hentai/preview/${previewHandle}`}
                           className="flex items-center gap-1.5 rounded-lg border border-[#25EBAC] px-2.5 py-1.5 text-sm font-medium text-[#25EBAC] transition-colors hover:bg-[#25EBAC]/10"
                         >
                           <Edit className="h-4 w-4" />
                           <span>Quản lý</span>
-                        </Link>
+                        </a>
                         {isRejected && (
                           <button
                             type="button"

@@ -61,9 +61,7 @@ export default function ProfileUploaderCard({
               {displayName}
             </a>
             {isDichGia(uploaderRole || "") && (
-              <span
-                className="ml-0.5 shrink-0 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent text-[15px] font-semibold"
-              >
+              <span className="ml-0.5 shrink-0 translator-shine" data-text="– Dịch giả">
                 – Dịch giả
               </span>
             )}

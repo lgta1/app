@@ -29,6 +29,7 @@ import { formatDistanceToNow } from "~/utils/date.utils";
 
 interface CommentDetailProps {
   mangaId?: string;
+  mangaOwnerId?: string;
   postId?: string;
   isLoggedIn: boolean;
   isAdmin?: boolean;
@@ -379,10 +380,25 @@ function InlineComposerLine({
  * =========================== */
 export default function CommentDetail({
   mangaId,
+  mangaOwnerId,
   postId,
   isLoggedIn,
   isAdmin = false,
 }: CommentDetailProps) {
+  const getUserId = useCallback((user?: UserType | null) => {
+    if (!user) return "";
+    return String((user as any)?.id ?? (user as any)?._id ?? "");
+  }, []);
+  const isOwnerTranslator = useCallback(
+    (user?: UserType | null) => {
+      if (!user) return false;
+      if (!mangaOwnerId) return false;
+      const userId = getUserId(user);
+      if (!userId) return false;
+      return isDichGia(user.role ?? "") && String(mangaOwnerId) === userId;
+    },
+    [getUserId, mangaOwnerId],
+  );
   const [commentContent, setCommentContent] = useState(""); // composer lớn: bình luận cấp 1
   const [gifDialogOpen, setGifDialogOpen] = useState(false);
   const [composerGifs, setComposerGifs] = useState<string[]>([]); // GIF đính kèm cho composer chính
@@ -825,8 +841,10 @@ export default function CommentDetail({
                   title={`Xem trang của ${reply.userId?.name}`}
                 >
                   {reply.userId?.name}
-                  {isDichGia(reply.userId?.role || "") && (
-                    <span className="ml-1 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent font-semibold">– Dịch giả</span>
+                  {isOwnerTranslator(reply.userId) && (
+                    <span className="ml-1.5 translator-shine" data-text="– Dịch giả">
+                      – Dịch giả
+                    </span>
                   )}
                 </a>
                 <img
@@ -1076,8 +1094,10 @@ export default function CommentDetail({
                                 title={`Xem trang của ${comment.userId?.name}`}
                               >
                                 {comment.userId?.name}
-                                {isDichGia(comment.userId?.role || "") && (
-                                  <span className="ml-1 animate-[shine_3s_linear_infinite] bg-gradient-to-r from-[#C466FF] via-[#924DBF] to-[#C466FF] bg-clip-text text-transparent font-semibold">– Dịch giả</span>
+                                {isOwnerTranslator(comment.userId) && (
+                                  <span className="ml-1.5 translator-shine" data-text="– Dịch giả">
+                                    – Dịch giả
+                                  </span>
                                 )}
                               </a>
                               <img

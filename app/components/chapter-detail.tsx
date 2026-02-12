@@ -85,7 +85,12 @@ export function ChapterDetail({
 
   // Lấy id chapter an toàn: ưu tiên _id rồi tới id
   const chapterIdResolved = normalizeObjectId((chapter as any)?._id ?? (chapter as any)?.id);
-  const mangaIdResolved = normalizeObjectId((chapter as any)?.mangaId ?? (chapter as any)?.manga?._id ?? (chapter as any)?.manga?.id);
+  const mangaIdResolved = normalizeObjectId(
+    (chapter as any)?.mangaId ?? (chapter as any)?.manga?._id ?? (chapter as any)?.manga?.id,
+  );
+  const mangaOwnerIdResolved = normalizeObjectId(
+    (chapter as any)?.manga?.ownerId ?? (chapter as any)?.mangaOwnerId ?? (chapter as any)?.ownerId,
+  );
   const chapterSlugResolved = String((chapter as any)?.slug ?? "").trim();
   const chapterIdentity = useMemo(() => {
     if (chapterIdResolved) return `id:${chapterIdResolved}`;
@@ -1166,6 +1171,7 @@ useEffect(() => {
         {/* 🔹 Bình luận chương truyện (deferred) */}
         <CommentDetail
           mangaId={chapter.mangaId}
+          mangaOwnerId={mangaOwnerIdResolved || undefined}
           isLoggedIn={isLoggedIn}
           isAdmin={false}
         />
