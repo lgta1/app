@@ -12,6 +12,7 @@ import { initHotCarouselSnapshotScheduler } from "@/jobs/hot-carousel-snapshot.s
 import { initTmpUploadCleanupScheduler } from "@/jobs/tmp-upload-cleanup.server";
 import { initViHentaiAutoDownloadQueueWorker } from "@/jobs/vi-hentai-auto-download-queue.server";
 import { initViHentaiAutoUpdateScheduler } from "@/jobs/vi-hentai-auto-update.server";
+import { initSayHentaiAutoUpdateScheduler } from "@/jobs/sayhentai-auto-update.server";
 import {
   getCanonicalHostname,
   rewriteLegacySiteHostsDeepInPlace,
@@ -40,6 +41,7 @@ if (ENV.IS_PRODUCTION) {
   initTmpUploadCleanupScheduler();
   initViHentaiAutoDownloadQueueWorker();
   initViHentaiAutoUpdateScheduler();
+  initSayHentaiAutoUpdateScheduler();
 }
 
 export default function handleRequest(

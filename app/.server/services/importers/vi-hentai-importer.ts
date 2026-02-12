@@ -448,8 +448,26 @@ export type ViHentaiAutoDownloadResult = ViHentaiImportResult & {
   chapterErrors: Array<{ chapterUrl: string; message: string }>;
 };
 
-const buildHtmlHeaders = (url: string): Record<string, string> => {
+const SAYHENTAI_UA_POOL = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+];
+
+const isSayHentaiHost = (host: string) => host.toLowerCase().startsWith("sayhentai.");
+
+const isSayHentaiUrl = (url: string) => {
+  try {
+    const u = new URL(url);
+    return isSayHentaiHost(u.hostname);
+  } catch {
+    return false;
+  }
+};
+
+const buildHtmlHeaders = (url: string, userAgentOverride?: string): Record<string, string> => {
   const headers: Record<string, string> = { ...HEADERS };
+  if (userAgentOverride) headers["User-Agent"] = userAgentOverride;
   try {
     const u = new URL(url);
     headers.Referer = u.origin + "/";
@@ -463,7 +481,7 @@ const buildHtmlHeaders = (url: string): Record<string, string> => {
 const shouldRetryHtmlStatus = (status: number) =>
   status === 408 || status === 429 || status === 502 || status === 503 || status === 504 || status === 522 || status === 524;
 
-const fetchHtmlRaw = async (url: string, options: { signal?: AbortSignal } = {}) => {
+const fetchHtmlRaw = async (url: string, options: { signal?: AbortSignal } = {}, attempt = 0) => {
   const ac = new AbortController();
   const signal = options.signal;
   const timer = setTimeout(() => ac.abort(), VIHENTAI_HTML_TIMEOUT_MS);
@@ -482,6 +500,39 @@ const fetchHtmlRaw = async (url: string, options: { signal?: AbortSignal } = {})
   }
 
   try {
+    if (isSayHentaiUrl(url)) {
+      const userAgent = SAYHENTAI_UA_POOL[attempt % SAYHENTAI_UA_POOL.length];
+      const maxRedirects = 2;
+      let current = url;
+      for (let i = 0; i <= maxRedirects; i += 1) {
+        const response = await fetch(current, {
+          headers: buildHtmlHeaders(current, userAgent),
+          signal: ac.signal,
+          redirect: "manual",
+        });
+
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get("location");
+          if (!location) {
+            throw new Error(`Redirect without location (${response.status}) URL: ${current}`);
+          }
+          const nextUrl = new URL(location, current).toString();
+          if (!isSayHentaiUrl(nextUrl)) {
+            throw new Error(`Redirected to non-sayhentai host: ${nextUrl}`);
+          }
+          current = nextUrl;
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Không thể tải trang (${response.status} ${response.statusText}) URL: ${current}`);
+        }
+        return response.text();
+      }
+
+      throw new Error(`Too many redirects for URL: ${url}`);
+    }
+
     const response = await fetch(url, {
       headers: buildHtmlHeaders(url),
       signal: ac.signal,
@@ -516,7 +567,7 @@ const fetchHtmlWithRetry = async (url: string, options: { signal?: AbortSignal }
   let lastError: unknown;
   while (attempt <= maxRetries) {
     try {
-      return await fetchHtmlRaw(url, options);
+      return await fetchHtmlRaw(url, options, attempt);
     } catch (error: any) {
       lastError = error;
       const msg = String(error?.message || "");
@@ -524,7 +575,8 @@ const fetchHtmlWithRetry = async (url: string, options: { signal?: AbortSignal }
       const status = statusMatch ? Number(statusMatch[1]) : 0;
       const canRetry = !options.signal?.aborted && (status ? shouldRetryHtmlStatus(status) : true);
       if (!canRetry || attempt >= maxRetries) break;
-      const backoff = VIHENTAI_HTML_RETRY_DELAY_MS * (attempt + 1);
+      const baseDelay = isSayHentaiUrl(url) ? 60_000 : VIHENTAI_HTML_RETRY_DELAY_MS;
+      const backoff = baseDelay * (attempt + 1);
       await sleepWithAbort(backoff, options.signal);
     }
     attempt += 1;
@@ -1492,7 +1544,7 @@ const normalizeAnyUrl = (value?: string | null) => {
   return trimmed;
 };
 
-const parseChapterImagesFromHtml = (html: string, baseUrl: string): string[] => {
+export const parseChapterImagesFromHtml = (html: string, baseUrl: string): string[] => {
   const $ = load(html);
   const urls: string[] = [];
 
@@ -1544,6 +1596,160 @@ const parseChapterImagesFromHtml = (html: string, baseUrl: string): string[] => 
     seen.add(u);
     return true;
   });
+};
+
+export type ImportChapterFromSourceUrlOptions = {
+  request: Request;
+  mangaId: string;
+  chapterTitle?: string;
+  chapterUrl: string;
+  chapterNumberForPath: number;
+  asSystem?: boolean;
+  imageDelayMs?: number;
+  imageTimeoutMs?: number;
+  imageRetries?: number;
+  maxImagesPerChapter?: number;
+  abortSignal?: AbortSignal;
+};
+
+export const importChapterFromSourceUrl = async (
+  options: ImportChapterFromSourceUrlOptions,
+): Promise<{ imagesUploaded: number; bytesSaved?: number }> => {
+  const {
+    request,
+    mangaId,
+    chapterTitle = "",
+    chapterUrl,
+    chapterNumberForPath,
+    asSystem = true,
+    imageDelayMs = 150,
+    imageTimeoutMs = 30_000,
+    imageRetries = 2,
+    maxImagesPerChapter = 300,
+    abortSignal,
+  } = options;
+
+  const html = await fetchHtml(chapterUrl, { signal: abortSignal });
+  const imageUrls = parseChapterImagesFromHtml(html, chapterUrl);
+  if (!imageUrls.length) {
+    throw new Error("Không tìm thấy ảnh trong trang chương");
+  }
+  if (imageUrls.length > maxImagesPerChapter) {
+    throw new Error(`Số ảnh vượt giới hạn: ${imageUrls.length}/${maxImagesPerChapter}`);
+  }
+
+  const chapterPrefix = `manga-images/${mangaId}/${String(chapterNumberForPath).padStart(4, "0")}`;
+  const uploaded: UploadedRemoteFile[] = [];
+  const skipped: Array<{ url: string; reason: string }> = [];
+  let keptIndex = 0;
+  let bytesSaved = 0;
+
+  for (let imageIndex = 0; imageIndex < imageUrls.length; imageIndex += 1) {
+    const imgUrl = imageUrls[imageIndex];
+    if (imageIndex > 0 && imageDelayMs > 0) {
+      await sleepWithAbort(imageDelayMs, abortSignal);
+    }
+
+    if (shouldSkipByUrl(imgUrl)) {
+      skipped.push({ url: imgUrl, reason: "url_contains_/cover/" });
+      continue;
+    }
+
+    let fetched: { buffer: Buffer; contentType: string | null } | null = null;
+    try {
+      fetched = await fetchRemoteBufferWithRetry(imgUrl, {
+        timeoutMs: imageTimeoutMs,
+        retries: imageRetries,
+        retryDelayMs: 800,
+        signal: abortSignal,
+        headers: {
+          ...HEADERS,
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          Referer: chapterUrl,
+          Origin: new URL(chapterUrl).origin,
+        },
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      skipped.push({ url: imgUrl, reason: `fetch_error:${message}` });
+      continue;
+    }
+
+    const decision = await shouldKeepChapterImage({
+      url: imgUrl,
+      buffer: fetched.buffer,
+      contentType: fetched.contentType,
+    });
+    if (!decision.keep) {
+      skipped.push({ url: imgUrl, reason: decision.reason });
+      continue;
+    }
+
+    keptIndex += 1;
+    try {
+      const normalized = await normalizeChapterImageBuffer({
+        url: imgUrl,
+        buffer: fetched.buffer,
+        contentType: fetched.contentType,
+      });
+
+      const savedBytes = Math.max(0, fetched.buffer.length - normalized.buffer.length);
+      if (savedBytes > 0) bytesSaved += savedBytes;
+
+      const uploadedOne = await uploadImageBuffer(imgUrl, normalized.buffer, normalized.contentType, {
+        prefixPath: chapterPrefix,
+        filenameHintBase: `page-${String(keptIndex).padStart(3, "0")}`,
+        maxSizeInBytes: 9 * 1024 * 1024,
+      });
+      uploaded.push(uploadedOne);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      skipped.push({ url: imgUrl, reason: `upload_error:${message}` });
+      continue;
+    }
+  }
+
+  if (!uploaded.length) {
+    const sample = skipped.slice(0, 5).map((s) => `${s.reason}`).join(", ");
+    throw new Error(
+      `Không còn ảnh hợp lệ sau khi lọc (đã loại ${skipped.length}/${imageUrls.length}).` +
+        (sample ? ` Ví dụ lý do: ${sample}` : ""),
+    );
+  }
+
+  const contentUrls = uploaded.map((u) => u.url);
+  const fullPaths = uploaded.map((u) => u.fullPath).filter(Boolean);
+  const totalBytes = uploaded.reduce((sum, u) => sum + (u.sizeBytes || 0), 0);
+
+  try {
+    const { createChapter, createChapterAsAdmin } = await import("~/.server/mutations/chapter.mutation");
+    if (asSystem) {
+      await createChapterAsAdmin({
+        mangaId,
+        title: sanitizeWhitespace(chapterTitle) || "",
+        sourceChapterUrl: chapterUrl,
+        contentUrls,
+        contentBytes: totalBytes,
+      } as any);
+    } else {
+      await createChapter(request, {
+        mangaId,
+        title: sanitizeWhitespace(chapterTitle) || "",
+        sourceChapterUrl: chapterUrl,
+        contentUrls,
+        contentBytes: totalBytes,
+      } as any);
+    }
+  } catch (e) {
+    try {
+      if (fullPaths.length) await deletePublicFiles(fullPaths);
+    } catch {
+      // ignore
+    }
+    throw e;
+  }
+
+  return { imagesUploaded: uploaded.length, bytesSaved: bytesSaved || undefined };
 };
 
 async function mapWithConcurrency<T, R>(
