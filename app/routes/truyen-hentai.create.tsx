@@ -494,6 +494,14 @@ export default function CreateStory() {
                 <div className="flex min-w-fit items-center gap-1.5">
                   <ImageIcon className="text-txt-secondary mt-0.5 h-4 w-4" />
                   <label className="text-txt-primary font-sans text-base font-semibold">Ảnh bìa</label>
+                  <button
+                    type="button"
+                    className="text-txt-secondary border-bd-default hover:text-txt-primary inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold transition"
+                    title="Ảnh bìa sẽ được hệ thống quy chuẩn tự động, hãy chọn ảnh bìa có chất lượng tốt nhất, nét nhất có thể, chú ý ảnh bìa cần nhỏ hơn 5MB"
+                    aria-label="Thông tin ảnh bìa"
+                  >
+                    ?
+                  </button>
                 </div>
                 <div className="flex w-full flex-row items-start gap-4">
                   <div className="min-h-64 min-w-44">
@@ -512,15 +520,12 @@ export default function CreateStory() {
                         onFileSelect={handleFileSelect}
                         onClear={clearPosterImage}
                         preview={posterPreview}
-                        uploadText="Tải ảnh lên (kéo-thả được)"
+                        uploadText="Tải ảnh lên"
                         required
                         aspectRatio="poster"
                       />
                     </div>
-                  </div>
-                  <div className="flex h-64 flex-col justify-center gap-4 p-4">
-                    <p className="text-txt-secondary font-sans text-base font-medium">1. Ảnh có tỷ lệ 3:4</p>
-                    <p className="text-txt-secondary font-sans text-base font-medium">2. Ảnh có kích thước dưới 1MB</p>
+                    <p className="text-txt-secondary mt-2 text-xs font-medium">(hoặc kéo-thả)</p>
                   </div>
                 </div>
               </div>
@@ -598,7 +603,7 @@ export default function CreateStory() {
               <div className="flex flex-col gap-4">
                 <div className="flex min-w-fit items-center gap-1.5">
                   <Settings className="text-txt-secondary h-4 w-4" />
-                  <label className="text-txt-primary font-sans text-base font-semibold">Trạng thái / One-shot</label>
+                  <label className="text-txt-primary font-sans text-base font-semibold">Trạng thái</label>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -683,9 +688,9 @@ export default function CreateStory() {
                 </div>
               </div>
 
-                {/* Tên khác (không bắt buộc, nhỏ hơn) */}
+                {/* Tên khác (nhỏ hơn) */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-txt-secondary text-sm font-medium">Tên khác (không bắt buộc)</label>
+                  <label className="text-txt-secondary text-sm font-medium">Tên khác</label>
                   <input
                     type="text"
                     name="alternateTitle"
@@ -709,7 +714,7 @@ export default function CreateStory() {
                   showLetterNav={false}
                   helperText={
                     <>
-                      Gõ <b>a,b,c…</b> để lọc theo chữ đầu; gõ <b>nhiều từ khóa cùng lúc</b> để tìm nhanh hơn.
+                      Gõ <b>a,b,c…</b> để lọc theo chữ đầu.
                     </>
                   }
                 />
@@ -719,14 +724,13 @@ export default function CreateStory() {
               <div className="flex flex-col gap-4">
                 <div className="flex min-w-fit items-center gap-1.5">
                   <FileText className="text-txt-secondary mt-0.5 h-4 w-4" />
-                  <label className="text-txt-primary font-sans text-base font-semibold">Giới thiệu</label>
+                  <label className="text-txt-primary font-sans text-base font-semibold">Giới Thiệu/Tóm Tắt</label>
                 </div>
                 <div>
                   <textarea
                     name="description"
                     value={formData.description}
                     onChange={(e) => handleInputChange("description", e.target.value)}
-                    placeholder="Nhập nội dung giới thiệu"
                     rows={8}
                     className="bg-bgc-layer2 border-bd-default text-txt-secondary focus:border-lav-500 focus:text-txt-primary w-full resize-none rounded-xl border px-3 py-2.5 font-sans text-base font-medium focus:outline-none"
                   />

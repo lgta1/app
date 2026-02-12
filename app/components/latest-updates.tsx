@@ -30,7 +30,7 @@ export function LatestUpdates({
   showPagination = true,
   indexMode = false,
 }: LatestUpdatesProps) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   // Local paging states (no hook) to eliminate races
   const [page, setPage] = useState<number>(initialPage ?? 1);
   const [totalPages, setTotalPages] = useState<number>(initialTotalPages ?? 1);
@@ -51,11 +51,15 @@ export function LatestUpdates({
   const setUrlPage = (next: number, opts: { replace?: boolean } = {}) => {
     try {
       const { replace = false } = opts;
-      const url = new URL(window.location.href);
-      if (next > 1) url.searchParams.set("page", String(next));
-      else url.searchParams.delete("page");
-      const method: "pushState" | "replaceState" = replace ? "replaceState" : "pushState";
-      window.history[method](window.history.state, "", url.toString());
+      setSearchParams(
+        (prev) => {
+          const nextParams = new URLSearchParams(prev);
+          if (next > 1) nextParams.set("page", String(next));
+          else nextParams.delete("page");
+          return nextParams;
+        },
+        { replace, preventScrollReset: true },
+      );
     } catch {}
   };
 

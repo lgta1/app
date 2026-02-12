@@ -24,7 +24,7 @@ interface Props {
 export default function TopBannerMobileGrid({
   items,
   autoplayDelayMs = 3000,
-  spaceX = 12,
+  spaceX = 3,
   spaceY = 12,
 }: Props) {
   // iOS detection – prefer native scroll (cssMode) to avoid text raster blur during transforms
@@ -167,7 +167,7 @@ export default function TopBannerMobileGrid({
         slidesPerView={2} // viewport shows 2 columns side-by-side (original behavior)
         centeredSlides={false}
         slidesPerGroup={1} // move exactly 1 column per interaction/autoplay
-        spaceBetween={3} // fixed gap (25% of default 12) to avoid initial jitter
+        spaceBetween={spaceX} // keep Swiper gap aligned with SSR grid sizing
         slidesOffsetBefore={0}
         slidesOffsetAfter={0}
         loop={true}

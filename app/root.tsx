@@ -82,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const htmlStyle = cdnBase
     ? ({
         "--cdn-base": cdnBase,
-        "--cdn-bg-body": `url(${cdnBase}/avatar-uploads/bg/bg%20body%20chuan.webp)`,
+        "--cdn-bg-body": `url(${cdnBase}/avatar-uploads/bg/bgreal2.webp)`,
       } as CSSProperties)
     : undefined;
 

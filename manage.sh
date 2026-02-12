@@ -10,6 +10,7 @@ PM2_USER="${PM2_USER:-devuser}"
 RATE_LIMIT_SECONDS="${RATE_LIMIT_SECONDS:-600}"
 RATE_LIMIT_STATE_FILE="${RATE_LIMIT_STATE_FILE:-/tmp/ww-manage-last-run}"
 RATE_LIMIT_LOCK_FILE="${RATE_LIMIT_LOCK_FILE:-/tmp/ww-manage-lock}"
+CONFIRM_PHRASE="${CONFIRM_PHRASE:-XACNHAN}"
 
 rate_limit_guard() {
   # Allow override for emergency operations
@@ -43,14 +44,28 @@ with_lock() {
   rate_limit_guard
 }
 
+require_manual_confirm() {
+  if [[ ! -t 0 ]]; then
+    echo "[guard] Yeu cau xac nhan bang tay (khong chay trong non-interactive)." >&2
+    exit 3
+  fi
+
+  local input
+  read -r -p "Nhap ${CONFIRM_PHRASE} de tiep tuc: " input
+  if [[ "$input" != "$CONFIRM_PHRASE" ]]; then
+    echo "[guard] Xac nhan khong dung. Huy thao tac." >&2
+    exit 3
+  fi
+}
+
 pm2_exec() {
   if [[ "$(id -un)" == "$PM2_USER" ]]; then
-    pm2 "$@"
+    MANAGE_SH=1 pm2 "$@"
     return
   fi
 
   local cmd
-  cmd="cd $(printf '%q' "$PROJECT_DIR") && pm2"
+  cmd="cd $(printf '%q' "$PROJECT_DIR") && MANAGE_SH=1 pm2"
   for arg in "$@"; do
     cmd+=" $(printf '%q' "$arg")"
   done
@@ -105,6 +120,7 @@ rolling_pm2() {
 
 case "$1" in
   start)
+    require_manual_confirm
     with_lock
     # PM2 đôi khi bị trạng thái lỗi (process id bị lệch/mất), gây crash khi restart theo ecosystem.
     # Start theo kiểu idempotent: xoá instances cũ của dự án rồi start lại.
@@ -112,28 +128,34 @@ case "$1" in
     pm2_exec start ecosystem.config.cjs
     ;;
   stop)
+    require_manual_confirm
     pm2_exec stop all
     ;;
   restart)
+    require_manual_confirm
     with_lock
     pm2_exec restart all
     ;;
   reload)
+    require_manual_confirm
     with_lock
     pm2_exec reload all
     ;;
   rolling-restart)
+    require_manual_confirm
     with_lock
     # Sequential restart ww-1..ww-N with delay (seconds, default=5)
     rolling_pm2 restart "${2:-5}"
     ;;
   rolling-start)
+    require_manual_confirm
     with_lock
     # Sequential start ww-1..ww-N with delay (seconds, default=5)
     pm2_exec delete $(app_names) >/dev/null 2>&1 || true
     rolling_pm2 start "${2:-5}"
     ;;
   rolling-reload)
+    require_manual_confirm
     with_lock
     # Sequential reload ww-1..ww-N with delay (seconds, default=5)
     rolling_pm2 reload "${2:-5}"
@@ -148,6 +170,7 @@ case "$1" in
     pm2_exec monit
     ;;
   scale)
+    require_manual_confirm
     # Scale up/down số instances
     echo "Updating to $2 instances..."
     # Update số instances trong ecosystem.config.cjs

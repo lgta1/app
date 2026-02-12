@@ -143,6 +143,7 @@ export async function applyWatermark(
   const style = opts?.style === "stroke" ? "stroke" : "glow";
   const strokeColor = fill === "#FFFFFF" ? "#111111" : "#FFFFFF";
   const strokeWidth = Math.max(1, Math.round(fontSize * 0.08));
+  const textOpacity = 0.98;
   const baseTextMarkup = escapeXml(message).replace(escapeXml(brandText), `<tspan>${escapeXml(brandText)}</tspan>`);
 
   const glowDefs =
@@ -167,10 +168,10 @@ export async function applyWatermark(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}">\n` +
       (style === "glow" ? glowDefs : "") +
       `  <text x="${textX}" y="${textY}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="700" dominant-baseline="middle" text-anchor="middle"\n` +
-      `        fill="${fill}"` +
+      `        fill="${fill}" fill-opacity="${textOpacity}"` +
       (style === "glow"
         ? ` filter="url(#vhGlow)"`
-        : ` stroke="${strokeColor}" stroke-width="${strokeWidth}" paint-order="stroke" stroke-linejoin="round" stroke-linecap="round"`) +
+        : ` stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-opacity="${textOpacity}" paint-order="stroke" stroke-linejoin="round" stroke-linecap="round"`) +
       `${shouldClampText ? ` textLength=\"${maxTextWidth}\" lengthAdjust=\"spacingAndGlyphs\"` : ""}>\n` +
       `    ${
         style === "glow"

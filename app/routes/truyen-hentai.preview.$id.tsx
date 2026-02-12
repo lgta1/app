@@ -1142,23 +1142,26 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             <h2 className="text-txt-primary text-lg font-semibold">Chương đã đăng</h2>
             {/* Reorder toggle */}
             {(isAdminUser || isOwner) && localChapters.length > 1 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (isBulkRunning) return;
-                  setIsReorderMode((v) => !v);
-                  // Reset drag list when entering mode
-                  if (!isReorderMode) {
-                    const asc = [...localChapters].sort(
-                      (a: any, b: any) => (Number(a.chapterNumber) || 0) - (Number(b.chapterNumber) || 0),
-                    );
-                    setDragChapters(asc);
-                  }
-                }}
-                className="flex min-w-32 cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/20 px-4 py-3 text-xs font-semibold text-txt-secondary hover:border-[#DD94FF] hover:text-[#DD94FF]"
-              >
-                {isReorderMode ? "Thoát sắp xếp" : "Sắp xếp chương"}
-              </button>
+              <label className="flex items-center gap-2 rounded-full border border-white/15 bg-bgc-layer2 px-3 py-2 text-xs font-semibold text-txt-secondary">
+                <input
+                  type="checkbox"
+                  className="accent-[#D373FF]"
+                  disabled={isBulkRunning}
+                  checked={isReorderMode}
+                  onChange={(e) => {
+                    if (isBulkRunning) return;
+                    const next = e.target.checked;
+                    setIsReorderMode(next);
+                    if (next) {
+                      const asc = [...localChapters].sort(
+                        (a: any, b: any) => (Number(a.chapterNumber) || 0) - (Number(b.chapterNumber) || 0),
+                      );
+                      setDragChapters(asc);
+                    }
+                  }}
+                />
+                Sắp xếp
+              </label>
             )}
             {isAdminUser && (
               <button
@@ -1291,124 +1294,81 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               )}
             </div>
           </div>
+          {isReorderMode && (
+            <div className="text-txt-secondary text-xs">Kéo để đổi vị trí (1 = cũ nhất)</div>
+          )}
 
-          {/* Danh sách theo cột STT và Tên chương */}
-          {/* Normal view OR reorder mode */}
-          {isReorderMode ? (
-            <div className="flex max-h-[420px] flex-col overflow-y-auto rounded-lg border border-[#DD94FF]/40">
-              <div className="sticky top-0 z-[1] grid grid-cols-[56px_1fr_56px] items-center gap-3 border-b border-[#DD94FF]/40 bg-[#DD94FF]/10 px-4 py-2 text-xs font-semibold text-[#DD94FF]">
-                <div>STT</div>
-                <div>Kéo để đổi vị trí (1 = cũ nhất)</div>
-                <div className="text-right">Drag</div>
-              </div>
-              <div className="flex flex-col divide-y divide-white/10">
-                {dragChapters.map((chapter: any, idx: number) => (
-                  <div
-                    key={chapter.id}
-                    draggable
-                    onDragStart={(e) => {
-                      dragSrcIndexRef.current = idx;
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const from = dragSrcIndexRef.current;
-                      if (from == null || from === idx) return;
-                      setDragChapters((prev) => {
-                        const copy = [...prev];
-                        const [moved] = copy.splice(from, 1);
-                        copy.splice(idx, 0, moved);
-                        return copy;
-                      });
-                      dragSrcIndexRef.current = null;
-                    }}
-                    className="grid grid-cols-[56px_1fr_56px] items-center gap-3 px-4 py-2 bg-bgc-layer2 cursor-move select-none"
-                  >
-                    <div className="text-xs text-txt-secondary">{idx + 1}</div>
-                    <div className="truncate text-sm text-txt-primary">{chapter.title}</div>
-                    <div className="flex justify-end">
-                      <Menu className="h-4 w-4 text-[#DD94FF]" />
-                    </div>
-                  </div>
-                ))}
-                {dragChapters.length === 0 && (
-                  <div className="text-txt-secondary px-4 py-6 text-sm">Chưa có chương nào.</div>
-                )}
-              </div>
-              <div className="flex items-center justify-end gap-3 border-t border-[#DD94FF]/40 bg-[#DD94FF]/5 px-4 py-3">
-                <button
-                  disabled={isSavingOrder}
-                  onClick={() => {
-                    setIsReorderMode(false);
-                  }}
-                  className="rounded-md border border-white/20 px-4 py-2 text-xs font-semibold text-txt-secondary hover:text-white disabled:opacity-50"
-                >
-                  Hủy
-                </button>
-                <button
-                  disabled={isSavingOrder}
-                  onClick={async () => {
-                    if (isSavingOrder) return;
-                    setIsSavingOrder(true);
-                    try {
-                      const orderedIds = dragChapters.map((c: any) => c.id);
-                      const r = await fetch(`/api/chapters/reorder`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ mangaId: manga.id, orderedChapterIds: orderedIds }),
-                      });
-                      const data = await r.json();
-                      if (r.ok && data?.success) {
-                        // Optimistic update: assign new chapterNumber ascending then update localChapters
-                        const updated = dragChapters.map((c: any, i: number) => ({ ...c, chapterNumber: i + 1 }));
-                        setLocalChapters(updated);
-                        toast.success("Đã lưu thứ tự chương");
-                        setIsReorderMode(false);
-                      } else {
-                        toast.error(data?.error || "Lưu thứ tự thất bại");
-                      }
-                    } catch (e: any) {
-                      console.error("Reorder error", e);
-                      toast.error(e?.message || "Lưu thứ tự thất bại");
-                    } finally {
-                      setIsSavingOrder(false);
-                    }
-                  }}
-                  className="to-btn-primary flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-2 text-xs font-semibold text-black disabled:opacity-50"
-                >
-                  {isSavingOrder ? "Đang lưu…" : "Lưu sắp xếp"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            (() => {
-              const sorted = Array.isArray(localChapters)
-                ? [...localChapters].sort((a: any, b: any) => {
-                    const aN = Number(a?.chapterNumber) || 0;
-                    const bN = Number(b?.chapterNumber) || 0;
-                    return bN - aN;
-                  })
-                : [];
-              const headerGridClass = showChapterSize
-                ? "bg-bgc-layer1/60 sticky top-0 z-[1] grid grid-cols-[64px_1fr_120px_96px] items-center gap-3 border-b border-white/10 px-4 py-2 text-xs font-semibold text-txt-secondary"
+          {(() => {
+            const sorted = Array.isArray(localChapters)
+              ? [...localChapters].sort((a: any, b: any) => {
+                  const aN = Number(a?.chapterNumber) || 0;
+                  const bN = Number(b?.chapterNumber) || 0;
+                  return bN - aN;
+                })
+              : [];
+            const displayChapters = isReorderMode ? dragChapters : sorted;
+            const headerGridClass = showChapterSize
+              ? isReorderMode
+                ? "bg-bgc-layer1/60 sticky top-0 z-[1] grid grid-cols-[64px_1fr_120px_56px] items-center gap-3 border-b border-white/10 px-4 py-2 text-xs font-semibold text-txt-secondary"
+                : "bg-bgc-layer1/60 sticky top-0 z-[1] grid grid-cols-[64px_1fr_120px_96px] items-center gap-3 border-b border-white/10 px-4 py-2 text-xs font-semibold text-txt-secondary"
+              : isReorderMode
+                ? "bg-bgc-layer1/60 sticky top-0 z-[1] grid grid-cols-[64px_1fr_56px] items-center gap-3 border-b border-white/10 px-4 py-2 text-xs font-semibold text-txt-secondary"
                 : "bg-bgc-layer1/60 sticky top-0 z-[1] grid grid-cols-[64px_1fr_96px] items-center gap-3 border-b border-white/10 px-4 py-2 text-xs font-semibold text-txt-secondary";
-              const rowGridClass = showChapterSize
-                ? "grid grid-cols-[64px_1fr_120px_96px] items-center gap-3 px-4 py-2 bg-bgc-layer2"
+            const rowGridClass = showChapterSize
+              ? isReorderMode
+                ? "grid grid-cols-[64px_1fr_120px_56px] items-center gap-3 px-4 py-2 bg-bgc-layer2"
+                : "grid grid-cols-[64px_1fr_120px_96px] items-center gap-3 px-4 py-2 bg-bgc-layer2"
+              : isReorderMode
+                ? "grid grid-cols-[64px_1fr_56px] items-center gap-3 px-4 py-2 bg-bgc-layer2"
                 : "grid grid-cols-[64px_1fr_96px] items-center gap-3 px-4 py-2 bg-bgc-layer2";
-              return (
-                <div className="flex max-h-[304px] flex-col overflow-y-auto rounded-lg border border-white/10 md:max-h-[400px] lg:max-h-[492px]">
-                  <div className={headerGridClass}>
-                    <div>STT</div>
-                    <div>Tên chương</div>
-                    {showChapterSize && <div className="text-right pr-2">Dung lượng</div>}
-                    <div className="text-right pr-2">Hành động</div>
-                  </div>
-                  <div className="flex flex-col divide-y divide-white/10">
-                    {sorted.map((chapter: any, idx: number) => (
+            return (
+              <div className="flex max-h-[304px] flex-col overflow-y-auto rounded-lg border border-white/10 md:max-h-[400px] lg:max-h-[492px]">
+                <div className={headerGridClass}>
+                  <div>STT</div>
+                  <div>Tên chương</div>
+                  {showChapterSize && <div className="text-right pr-2">Dung lượng</div>}
+                  <div className="text-right pr-2">{isReorderMode ? "Kéo" : "Hành động"}</div>
+                </div>
+                <div className="flex flex-col divide-y divide-white/10">
+                  {displayChapters.map((chapter: any, idx: number) => {
+                    if (isReorderMode) {
+                      return (
+                        <div
+                          key={chapter.id}
+                          draggable
+                          onDragStart={(e) => {
+                            dragSrcIndexRef.current = idx;
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const from = dragSrcIndexRef.current;
+                            if (from == null || from === idx) return;
+                            setDragChapters((prev) => {
+                              const copy = [...prev];
+                              const [moved] = copy.splice(from, 1);
+                              copy.splice(idx, 0, moved);
+                              return copy;
+                            });
+                            dragSrcIndexRef.current = null;
+                          }}
+                          className={`${rowGridClass} cursor-move select-none`}
+                        >
+                          <div className="text-txt-secondary text-sm">{idx + 1}</div>
+                          <div className="truncate text-sm text-txt-primary">{chapter.title}</div>
+                          {showChapterSize && <div className="text-right text-sm text-txt-secondary pr-2">—</div>}
+                          <div className="flex justify-end">
+                            <Menu className="h-4 w-4 text-[#DD94FF]" />
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
                       <div key={chapter.id} className={rowGridClass}>
                         <div className="text-txt-secondary text-sm">{sorted.length - idx}</div>
                         <div className="text-txt-primary">
@@ -1459,7 +1419,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                                   setEditingTitle(String(chapter.title || ""));
                                 }
                               }}
-                              title="Sửa tên chương"
                             >
                               <span className="text-sm font-medium">{chapter.title}</span>
                             </button>
@@ -1525,14 +1484,60 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                           )}
                         </div>
                       </div>
-                    ))}
-                    {sorted.length === 0 && (
-                      <div className="text-txt-secondary px-4 py-6 text-sm">Chưa có chương nào.</div>
-                    )}
-                  </div>
+                    );
+                  })}
+                  {displayChapters.length === 0 && (
+                    <div className="text-txt-secondary px-4 py-6 text-sm">Chưa có chương nào.</div>
+                  )}
                 </div>
-              );
-            })()
+              </div>
+            );
+          })()}
+
+          {isReorderMode && (
+            <div className="flex items-center justify-end gap-3 border border-white/10 bg-bgc-layer1/40 px-4 py-3 rounded-lg">
+              <button
+                disabled={isSavingOrder}
+                onClick={() => {
+                  setIsReorderMode(false);
+                }}
+                className="rounded-md border border-white/20 px-4 py-2 text-xs font-semibold text-txt-secondary hover:text-white disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={isSavingOrder}
+                onClick={async () => {
+                  if (isSavingOrder) return;
+                  setIsSavingOrder(true);
+                  try {
+                    const orderedIds = dragChapters.map((c: any) => c.id);
+                    const r = await fetch(`/api/chapters/reorder`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ mangaId: manga.id, orderedChapterIds: orderedIds }),
+                    });
+                    const data = await r.json();
+                    if (r.ok && data?.success) {
+                      const updated = dragChapters.map((c: any, i: number) => ({ ...c, chapterNumber: i + 1 }));
+                      setLocalChapters(updated);
+                      toast.success("Đã lưu thứ tự chương");
+                      setIsReorderMode(false);
+                    } else {
+                      toast.error(data?.error || "Lưu thứ tự thất bại");
+                    }
+                  } catch (e: any) {
+                    console.error("Reorder error", e);
+                    toast.error(e?.message || "Lưu thứ tự thất bại");
+                  } finally {
+                    setIsSavingOrder(false);
+                  }
+                }}
+                className="to-btn-primary flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#DD94FF] px-4 py-2 text-xs font-semibold text-black disabled:opacity-50"
+              >
+                {isSavingOrder ? "Đang lưu…" : "Lưu sắp xếp"}
+              </button>
+            </div>
           )}
 
         </div>

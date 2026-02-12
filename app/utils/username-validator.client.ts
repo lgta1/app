@@ -17,6 +17,9 @@ export function validateUsername(username: string): UsernameValidationResult {
     return { isValid: false, error: "Username chỉ được chứa chữ cái, số và khoảng trắng" };
   }
 
+  const digitCount = (trimmed.match(/\d/g) ?? []).length;
+  if (digitCount > 6) return { isValid: false, error: "Username không được chứa quá 6 chữ số" };
+
   // Basic dangerous patterns guard
   const dangerousPatterns = [
     /script/i,

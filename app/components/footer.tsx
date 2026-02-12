@@ -43,7 +43,6 @@ export function Footer() {
                   >
                     vinahentai.contact@gmail.com
                   </a>{" "}
-                  hoặc <span className="text-pink-500">@vnhtcontact</span> (telegram)
                 </p>
                 <p className="text-txt-secondary text-sm leading-tight font-medium">
                   Copyright © 2025 Vinahentai
