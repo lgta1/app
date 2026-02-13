@@ -247,7 +247,10 @@ export const createChapterAsAdmin = async (
     totalBytes = await calculateChapterContentBytes(contentUrls);
   }
 
-  const finalNumber = (manga.chapters || 0) + 1;
+  const providedNumber = Number.isFinite((chapter as any).chapterNumber)
+    ? Number((chapter as any).chapterNumber)
+    : undefined;
+  const finalNumber = providedNumber && providedNumber > 0 ? providedNumber : (manga.chapters || 0) + 1;
 
   const rawTitle = (chapter.title ?? "").trim();
   const isPlaceholder = rawTitle === "...";
@@ -271,11 +274,19 @@ export const createChapterAsAdmin = async (
       });
 
       try {
-        await MangaModel.updateOne(
-          { _id: manga.id },
-          { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
-          { timestamps: false },
-        );
+        if (providedNumber && providedNumber > 0) {
+          await MangaModel.updateOne(
+            { _id: manga.id },
+            { $max: { chapters: providedNumber }, $set: { updatedAt: newChapter.createdAt } },
+            { timestamps: false },
+          );
+        } else {
+          await MangaModel.updateOne(
+            { _id: manga.id },
+            { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
+            { timestamps: false },
+          );
+        }
       } catch (updateError) {
         console.warn("[createChapterAsAdmin] Failed to update manga counters", updateError);
       }

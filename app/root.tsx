@@ -39,7 +39,7 @@ export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: appStylesheetUrl },
   { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
   { rel: "shortcut icon", href: "/favicon.ico" },
-  { rel: "preconnect", href: "https://cdn.vinahentai.fun", crossOrigin: "anonymous" },
+  { rel: "preconnect", href: "https://cdn.vinahentai.online", crossOrigin: "anonymous" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   // Google Fonts stylesheets are deferred and preloaded

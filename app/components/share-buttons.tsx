@@ -13,7 +13,7 @@ export function ShareButtons({ title, className }: ShareButtonsProps) {
   const CANONICAL_ORIGIN =
     typeof window !== "undefined"
       ? window.location.origin
-      : ((import.meta as any)?.env?.VITE_CANONICAL_ORIGIN as string | undefined) ?? "https://vinahentai.fun";
+      : ((import.meta as any)?.env?.VITE_CANONICAL_ORIGIN as string | undefined) ?? "https://vinahentai.online";
   const defaultUrl = `${CANONICAL_ORIGIN}${location.pathname}${location.search}`;
   const [shareUrl, setShareUrl] = React.useState(defaultUrl);
   const [copied, setCopied] = React.useState(false);

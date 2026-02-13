@@ -18,6 +18,7 @@ const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const MODE = NODE_ENV;
 
 const clientDir = path.join(__dirname, "build", "client");
+const publicDir = path.join(__dirname, "public");
 
 // Loaded once at startup; requires `npm run build` output.
 const build = await import("./build/server/index.js");
@@ -79,59 +80,69 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" || req.method === "HEAD") {
       if (shouldTryServeStatic(pathname)) {
         const rel = decodeURIComponent(pathname).replace(/^\/+/, "");
-        const filePath = path.join(clientDir, rel);
+        const staticRoots = [clientDir, publicDir];
 
-        // Prevent path traversal.
-        if (!filePath.startsWith(clientDir + path.sep)) {
-          res.statusCode = 400;
-          res.setHeader("Content-Type", "text/plain; charset=utf-8");
-          res.end("Bad Request");
-          return;
-        }
+        for (const rootDir of staticRoots) {
+          const filePath = path.join(rootDir, rel);
 
-        try {
-          const stat = fs.statSync(filePath);
-          if (stat.isFile()) {
-            const contentType = getContentType(filePath);
-            res.statusCode = 200;
-            res.setHeader("Content-Type", contentType);
+          // Prevent path traversal.
+          if (!filePath.startsWith(rootDir + path.sep)) {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "text/plain; charset=utf-8");
+            res.end("Bad Request");
+            return;
+          }
 
-            if (
-              pathname.startsWith("/assets/") ||
-              pathname.startsWith("/images/") ||
-              pathname.startsWith("/gif-meme/") ||
-              pathname.startsWith("/videos/") ||
-              pathname.startsWith("/audio/")
-            ) {
-              res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-            } else if (pathname.endsWith(".xml")) {
-              res.setHeader("Cache-Control", "public, max-age=0");
-            } else {
-              res.setHeader("Cache-Control", "public, max-age=300");
-            }
+          try {
+            const stat = fs.statSync(filePath);
+            if (stat.isFile()) {
+              const contentType = getContentType(filePath);
+              res.statusCode = 200;
+              res.setHeader("Content-Type", contentType);
 
-            if (req.method === "HEAD") {
-              res.end();
+              if (
+                pathname.startsWith("/assets/") ||
+                pathname.startsWith("/images/") ||
+                pathname.startsWith("/gif-meme/") ||
+                pathname.startsWith("/videos/") ||
+                pathname.startsWith("/audio/")
+              ) {
+                res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+              } else if (pathname.endsWith(".xml")) {
+                res.setHeader("Cache-Control", "public, max-age=0");
+              } else {
+                res.setHeader("Cache-Control", "public, max-age=300");
+              }
+
+              if (req.method === "HEAD") {
+                res.end();
+                return;
+              }
+
+              fs.createReadStream(filePath).pipe(res);
               return;
             }
+          } catch (err) {
+            // Continue to next static root.
+          }
+        }
 
-            fs.createReadStream(filePath).pipe(res);
-            return;
-          }
-        } catch (err) {
-          // Missing file: special-case removed sitemaps to return 404 (instead of bubbling to a 500).
-          if (isSitemapXmlPath(pathname) && pathname !== "/sitemap.xml" && pathname !== "/sitemapforfun2.xml") {
-            res.statusCode = 404;
-            res.setHeader("Content-Type", "text/plain; charset=utf-8");
-            res.setHeader("Cache-Control", "public, max-age=300");
-            res.end("Not Found");
-            return;
-          }
+        // Missing file: special-case removed sitemaps to return 404 (instead of bubbling to a 500).
+        if (
+          isSitemapXmlPath(pathname) &&
+          pathname !== "/sitemap.xml" &&
+          pathname !== "/sitemaponline.xml"
+        ) {
+          res.statusCode = 404;
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          res.setHeader("Cache-Control", "public, max-age=300");
+          res.end("Not Found");
+          return;
         }
       }
 
       // If it's a sitemap-like path without a static file, ensure a clean 404 (except the live ones).
-      if (isSitemapXmlPath(pathname) && pathname !== "/sitemap.xml" && pathname !== "/sitemapforfun2.xml") {
+      if (isSitemapXmlPath(pathname) && pathname !== "/sitemap.xml" && pathname !== "/sitemaponline.xml") {
         res.statusCode = 404;
         res.setHeader("Content-Type", "text/plain; charset=utf-8");
         res.setHeader("Cache-Control", "public, max-age=300");

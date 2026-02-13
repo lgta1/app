@@ -42,6 +42,8 @@ export const getLegacySiteHosts = (): string[] => {
   return fromEnv.length
     ? fromEnv
     : [
+        "vinahentai.fun",
+        "www.vinahentai.fun",
         "vinahentai.top",
         "www.vinahentai.top",
         "vinahentai.xyz",

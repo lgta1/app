@@ -38,19 +38,19 @@ for (let i = 0; i < instances; i++) {
       TMP_UPLOAD_CLEANUP_SCHEDULER: isPrimary ? "1" : "0",
       INTERNAL_JOB_TOKEN: "Lequoctruong98!",
 
-      CANONICAL_ORIGIN: "https://vinahentai.fun",
-      VITE_CANONICAL_ORIGIN: "https://vinahentai.fun",
-      CDN_BASE: "https://cdn.vinahentai.fun",
-      VITE_CDN_BASE: "https://cdn.vinahentai.fun",
+      CANONICAL_ORIGIN: "https://vinahentai.online",
+      VITE_CANONICAL_ORIGIN: "https://vinahentai.online",
+      CDN_BASE: "https://cdn.vinahentai.online",
+      VITE_CDN_BASE: "https://cdn.vinahentai.online",
 
       // Legacy hosts to rewrite out of SSR payloads / stored text.
       // Update these on future migrations instead of touching code.
-      LEGACY_SITE_HOSTS: "vinahentai.top,www.vinahentai.top,vinahentai.xyz,www.vinahentai.xyz,vinahentai.com,www.vinahentai.com",
-      LEGACY_CDN_HOSTS: "cdn.vinahentai.top,cdn.vinahentai.xyz,cdn.vinahentai.com,cdn.hoangsatruongsalacuavietnam.site",
+      LEGACY_SITE_HOSTS: "vinahentai.fun,www.vinahentai.fun,vinahentai.top,www.vinahentai.top,vinahentai.xyz,www.vinahentai.xyz,vinahentai.com,www.vinahentai.com",
+      LEGACY_CDN_HOSTS: "cdn.vinahentai.fun,cdn.vinahentai.top,cdn.vinahentai.xyz,cdn.vinahentai.com,cdn.hoangsatruongsalacuavietnam.site",
 
       // IMPORTANT: host-only cookies so sessions work on multiple apex domains
-      // (vinahentai.fun + vinahentai.one). Do NOT set a fixed cookie Domain.
-      // COOKIE_DOMAIN: ".vinahentai.fun",
+      // (vinahentai.online + vinahentai.one). Do NOT set a fixed cookie Domain.
+      // COOKIE_DOMAIN: ".vinahentai.online",
 
       MINIO_ENDPOINT: "f6de453e5fe8af5525fa232b5a6f498a.r2.cloudflarestorage.com",
       MINIO_USE_SSL: "true",

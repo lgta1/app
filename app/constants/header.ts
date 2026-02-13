@@ -31,6 +31,10 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "/images/icons/waifu-icon.png",
     mobile: true,
   },
+  {
+    label: "Đăng truyện",
+    href: "/truyen-hentai/manage",
+  },
 ];
 
 export const ADMIN_NAVIGATION_ITEMS: NavigationItem[] = [

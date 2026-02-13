@@ -281,7 +281,7 @@ export function meta({ data }: Route.MetaArgs) {
     ? [{ name: "robots", content: "noindex, nofollow, noarchive, noimageindex" }]
     : [];
 
-  const origin = data.origin || "https://vinahentai.fun";
+  const origin = data.origin || "https://vinahentai.online";
   const canonicalPath = data.manga.slug
     ? `/truyen-hentai/${data.manga.slug}`
     : `/truyen-hentai/${data.manga.id}`;

@@ -22,7 +22,7 @@ export async function loader(_args: LoaderFunctionArgs) {
   }
 
   try {
-    const sitemapPath = path.join(process.cwd(), "public", "sitemapforfun2.xml");
+    const sitemapPath = path.join(process.cwd(), "public", "sitemaponline.xml");
     const xml = await readFile(sitemapPath, "utf-8");
     return new Response(xml, {
       status: 200,
@@ -35,7 +35,7 @@ export async function loader(_args: LoaderFunctionArgs) {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: "/sitemapforfun2.xml",
+        Location: "/sitemaponline.xml",
         "Cache-Control": "public, max-age=300, s-maxage=300",
       },
     });

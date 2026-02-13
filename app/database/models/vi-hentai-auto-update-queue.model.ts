@@ -17,7 +17,9 @@ export type ViHentaiAutoUpdateQueueItem = {
   mangaId?: string;
   mangaSlug?: string;
   chaptersAdded?: number;
+  imagesFound?: number;
   imagesUploaded?: number;
+  errorDetail?: string;
   message?: string;
   startedAt?: Date;
   finishedAt?: Date;
@@ -75,7 +77,9 @@ const ViHentaiAutoUpdateQueueSchema = new Schema<ViHentaiAutoUpdateQueueType>(
           mangaId: String,
           mangaSlug: String,
           chaptersAdded: Number,
+          imagesFound: Number,
           imagesUploaded: Number,
+          errorDetail: String,
           message: String,
           startedAt: Date,
           finishedAt: Date,

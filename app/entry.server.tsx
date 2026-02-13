@@ -68,7 +68,11 @@ export default function handleRequest(
     // (Do this here so it also applies to /robots.txt, /sitemap.xml, etc.)
     try {
       const hostname = getRequestHostname();
-      const isLegacy = hostname === "vinahentai.top" || hostname === "vinahentai.xyz" || hostname === "vinahentai.com";
+      const isLegacy =
+        hostname === "vinahentai.top" ||
+        hostname === "vinahentai.xyz" ||
+        hostname === "vinahentai.com" ||
+        hostname === "vinahentai.fun";
       if (isLegacy) {
         const target = getRedirectUrl(request as any);
         const headers = new Headers(responseHeaders);

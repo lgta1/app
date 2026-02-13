@@ -5,7 +5,7 @@ const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\
 const normalizeBase = (base: string): string => String(base || "").trim().replace(/\/+$/g, "");
 
 const getKnownCdnHosts = (): string[] => {
-  const fixed = ["cdn.vinahentai.fun", "cdn.vinahentai.one"];
+  const fixed = ["cdn.vinahentai.online", "cdn.vinahentai.one"];
   const legacy = getLegacyCdnHosts();
   const fromEnv = (() => {
     const raw = (process.env.CDN_BASE ?? "").trim();

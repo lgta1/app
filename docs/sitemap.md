@@ -1,4 +1,4 @@
-# Sitemap (SEO) – Vinahentai.fun
+# Sitemap (SEO) – Vinahentai.online
 
 ## Mục tiêu
 - Có **1 sitemap index** duy nhất để submit lên Google Search Console.
@@ -22,10 +22,10 @@
 - Không có cron/job hoặc script tự động trong hệ thống.
 
 ## Robots
-- `public/robots.txt` trỏ tới `https://vinahentai.fun/sitemap_index_fun.xml`
+- `public/robots.txt` trỏ tới `https://vinahentai.online/sitemap_index_fun.xml`
 
 ## Gợi ý submit lên GSC
-- Chỉ submit **1 URL**: `https://vinahentai.fun/sitemap_index_fun.xml`
+- Chỉ submit **1 URL**: `https://vinahentai.online/sitemap_index_fun.xml`
 - Khi có thay đổi lớn (migrate domain/CDN, đổi cấu trúc URL): regenerate ngay và kiểm tra lỗi trong GSC.
 
 ## Lỗi thường gặp

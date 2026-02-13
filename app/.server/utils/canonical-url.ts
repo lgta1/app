@@ -1,10 +1,10 @@
-const DEFAULT_CANONICAL_ORIGIN = "https://vinahentai.fun";
+const DEFAULT_CANONICAL_ORIGIN = "https://vinahentai.online";
 
 const stripWww = (hostname: string): string => hostname.replace(/^www\./i, "");
 
 const isParallelApexHost = (hostname: string | undefined): boolean => {
   const host = stripWww(String(hostname ?? "").trim().toLowerCase());
-  return host === "vinahentai.fun" || host === "vinahentai.one";
+  return host === "vinahentai.online" || host === "vinahentai.one";
 };
 
 const TRACKING_QUERY_KEYS = new Set([
@@ -44,6 +44,7 @@ function getKnownSiteCanonicalOriginForHost(hostname: string | undefined): strin
   if (host === "vinahentai.top" || host === "www.vinahentai.top") return DEFAULT_CANONICAL_ORIGIN;
   if (host === "vinahentai.xyz" || host === "www.vinahentai.xyz") return DEFAULT_CANONICAL_ORIGIN;
   if (host === "vinahentai.com" || host === "www.vinahentai.com") return DEFAULT_CANONICAL_ORIGIN;
+  if (host === "vinahentai.fun" || host === "www.vinahentai.fun") return DEFAULT_CANONICAL_ORIGIN;
 
   return undefined;
 }

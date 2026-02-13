@@ -185,7 +185,7 @@ export function meta({ data }: any) {
     ? data.chapter.title
     : `Chap ${data.chapter.chapterNumber}`;
   const mangaTitle = data.mangaTitle ?? "VinaHentai";
-  const origin = data.origin || "https://vinahentai.fun";
+  const origin = data.origin || "https://vinahentai.online";
 
   const mangaSlugOrId = data.chapter.mangaSlug || data.chapter.mangaId || "";
   const chapterSlug = data.chapter.slug || "";

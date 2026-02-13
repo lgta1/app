@@ -445,6 +445,8 @@ export type ViHentaiAutoDownloadResult = ViHentaiImportResult & {
   chaptersImported: number;
   imagesUploaded: number;
   bytesSaved?: number;
+  imagesFound?: number;
+  errorDetail?: string;
   chapterErrors: Array<{ chapterUrl: string; message: string }>;
 };
 
@@ -1544,6 +1546,161 @@ const normalizeAnyUrl = (value?: string | null) => {
   return trimmed;
 };
 
+const decodeObfuscatedReaderPayloadAt = (html: string, start: number): string | null => {
+  if (start < 0) return null;
+  // Extract the eval(function(...)...)(...) call with balanced parentheses.
+  let openParens = 0;
+  let end = -1;
+  for (let i = start; i < html.length; i += 1) {
+    const ch = html[i];
+    if (ch === "(") openParens += 1;
+    else if (ch === ")") {
+      openParens -= 1;
+      if (openParens === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+  if (end < 0) return null;
+
+  const inner = html.slice(start + "eval(".length, end);
+
+  // Extract the argument list from the packer call: ...})("payload", 35, "abc", 13, 8, 25)
+  let argsRaw = "";
+  const argsMatch = inner.match(/\}\)\s*\(([\s\S]*)\)\s*$/);
+  if (argsMatch?.[1]) {
+    argsRaw = argsMatch[1].trim();
+  } else {
+    const looseMatch = inner.match(/\}\s*\(([\s\S]*)\)\s*$/);
+    if (!looseMatch?.[1]) return null;
+    argsRaw = looseMatch[1].trim();
+  }
+  if (!argsRaw) return null;
+
+  // Minimal arg parser: supports quoted strings and numbers.
+  const args: Array<string | number> = [];
+  let i = 0;
+  while (i < argsRaw.length) {
+    while (i < argsRaw.length && /\s|,/.test(argsRaw[i])) i += 1;
+    if (i >= argsRaw.length) break;
+    const ch = argsRaw[i];
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      i += 1;
+      let value = "";
+      while (i < argsRaw.length) {
+        const c = argsRaw[i];
+        if (c === "\\" && i + 1 < argsRaw.length) {
+          value += argsRaw[i + 1];
+          i += 2;
+          continue;
+        }
+        if (c === quote) {
+          i += 1;
+          break;
+        }
+        value += c;
+        i += 1;
+      }
+      args.push(value);
+      continue;
+    }
+    let num = "";
+    while (i < argsRaw.length && /[0-9]/.test(argsRaw[i])) {
+      num += argsRaw[i];
+      i += 1;
+    }
+    if (num) {
+      args.push(Number.parseInt(num, 10));
+    } else {
+      // Unknown token; bail out.
+      return null;
+    }
+  }
+
+  const [payload, _unused, alphabet, shift, sepIndex] = args;
+  if (typeof payload !== "string") return null;
+  if (typeof alphabet !== "string") return null;
+  if (typeof shift !== "number" || typeof sepIndex !== "number") return null;
+
+  const base = sepIndex;
+  const digits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/".split("");
+  const h = digits.slice(0, base);
+  const iDigits = digits.slice(0, 10);
+  const sep = alphabet[sepIndex];
+  if (!sep) return null;
+
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  const decodeNumber = (value: string) => {
+    let acc = 0;
+    const chars = value.split("").reverse();
+    for (let c = 0; c < chars.length; c += 1) {
+      const idx = h.indexOf(chars[c]);
+      if (idx === -1) continue;
+      acc += idx * Math.pow(base, c);
+    }
+    let out = "";
+    let j = acc;
+    while (j > 0) {
+      out = iDigits[j % 10] + out;
+      j = (j - (j % 10)) / 10;
+    }
+    return out || "0";
+  };
+
+  let decoded = "";
+  let buffer = "";
+  for (let idx = 0; idx < payload.length; idx += 1) {
+    const ch2 = payload[idx];
+    if (ch2 !== sep) {
+      buffer += ch2;
+      continue;
+    }
+    let replaced = buffer;
+    for (let j = 0; j < alphabet.length; j += 1) {
+      const token = alphabet[j];
+      if (!token) continue;
+      replaced = replaced.replace(new RegExp(escapeRegExp(token), "g"), String(j));
+    }
+    const num = Number(decodeNumber(replaced)) - shift;
+    decoded += String.fromCharCode(num);
+    buffer = "";
+  }
+
+  try {
+    // Match decodeURIComponent(escape(r))
+    return decodeURIComponent(escape(decoded));
+  } catch {
+    return decoded || null;
+  }
+};
+
+export const extractObfuscatedReaderUrls = (html: string): string[] => {
+  const evalToken = "eval(function";
+  const candidates: string[] = [];
+  let cursor = 0;
+  while (cursor < html.length) {
+    const idx = html.indexOf(evalToken, cursor);
+    if (idx < 0) break;
+    const decoded = decodeObfuscatedReaderPayloadAt(html, idx);
+    if (decoded) candidates.push(decoded);
+    cursor = idx + evalToken.length;
+  }
+
+  let best: string[] = [];
+  for (const decoded of candidates) {
+    const normalized = decoded.replace(/\\\//g, "/");
+    const matches = normalized.match(/https?:\/\/[^"'\s<>]+?\.(?:jpg|jpeg|png|webp|gif|avif)(?:\?[^"'\s<>]*)?/gi) || [];
+    if (matches.length > best.length) {
+      best = matches;
+    }
+  }
+
+  return best;
+};
+
 export const parseChapterImagesFromHtml = (html: string, baseUrl: string): string[] => {
   const $ = load(html);
   const urls: string[] = [];
@@ -1554,12 +1711,40 @@ export const parseChapterImagesFromHtml = (html: string, baseUrl: string): strin
     ".reader img",
     ".content img",
     "article img",
+    "picture source",
+    "source",
     "img",
   ];
+
+  const parseSrcset = (raw?: string | null) => {
+    if (!raw) return [] as string[];
+    return raw
+      .split(",")
+      .map((part) => part.trim().split(/\s+/)[0])
+      .filter(Boolean);
+  };
+
+  const parseJsonList = (raw?: string | null) => {
+    if (!raw) return [] as string[];
+    const trimmed = raw.trim();
+    if (!trimmed) return [] as string[];
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((v) => typeof v === "string") as string[];
+        }
+      } catch {
+        return [] as string[];
+      }
+    }
+    return [] as string[];
+  };
 
   const pushUrl = (raw?: string | null) => {
     const normalized = normalizeAnyUrl(raw);
     if (!normalized) return;
+    if (normalized.startsWith("data:") || normalized.startsWith("blob:")) return;
     let abs = normalized;
     try {
       abs = new URL(normalized, baseUrl).toString();
@@ -1570,23 +1755,79 @@ export const parseChapterImagesFromHtml = (html: string, baseUrl: string): strin
     urls.push(abs);
   };
 
+  const pushFromRaw = (raw?: string | null, isSrcset = false) => {
+    if (!raw) return;
+    if (isSrcset) {
+      parseSrcset(raw).forEach((u) => pushUrl(u));
+      return;
+    }
+    parseJsonList(raw).forEach((u) => pushUrl(u));
+    pushUrl(raw);
+  };
+
   for (const selector of selectors) {
     $(selector)
       .toArray()
       .forEach((el) => {
-        const img = $(el);
-        const attrs = ["data-src", "data-original", "data-lazy", "data-lazy-src", "src"] as const;
+        const node = $(el);
+        const attrs = [
+          "data-src",
+          "data-original",
+          "data-lazy",
+          "data-lazy-src",
+          "data-srcset",
+          "data-original-src",
+          "data-original-srcset",
+          "data-lazy-srcset",
+          "data-images",
+          "data-pages",
+          "data-page-images",
+          "data-chapter-images",
+          "src",
+          "srcset",
+        ] as const;
+
         for (const attr of attrs) {
-          const v = img.attr(attr);
-          if (v) {
-            pushUrl(v);
-            return;
-          }
+          const v = node.attr(attr);
+          if (!v) continue;
+          const isSrcset = attr.includes("srcset");
+          pushFromRaw(v, isSrcset);
         }
-        const srcset = img.attr("srcset")?.split(",")[0]?.trim().split(" ")[0];
-        if (srcset) pushUrl(srcset);
       });
     if (urls.length) break;
+  }
+
+  if (!urls.length) {
+    $("[data-images],[data-pages],[data-page-images],[data-chapter-images]")
+      .toArray()
+      .forEach((el) => {
+        const node = $(el);
+        const attrs = ["data-images", "data-pages", "data-page-images", "data-chapter-images"] as const;
+        for (const attr of attrs) {
+          const raw = node.attr(attr);
+          parseJsonList(raw).forEach((u) => pushUrl(u));
+        }
+      });
+  }
+
+  if (!urls.length) {
+    const matches = html.match(/https?:\/\/[^"'\s<>]+?\.(?:jpg|jpeg|png|webp|gif|avif)(?:\?[^"'\s<>]*)?/gi);
+    if (matches) {
+      matches.forEach((u) => pushUrl(u));
+    }
+  }
+
+  const decodedUrls = extractObfuscatedReaderUrls(html);
+  const nonCover = urls.filter((u) => !u.toLowerCase().includes("/cover/"));
+  if (decodedUrls.length) {
+    const preferDecoded = decodedUrls.length >= Math.max(nonCover.length, 5);
+    if (preferDecoded) {
+      // Replace with decoded reader payload when it looks more complete.
+      urls.length = 0;
+      decodedUrls.forEach((u) => pushUrl(u));
+    } else if (!nonCover.length) {
+      decodedUrls.forEach((u) => pushUrl(u));
+    }
   }
 
   // Dedup preserve order
@@ -1727,6 +1968,7 @@ export const importChapterFromSourceUrl = async (
       await createChapterAsAdmin({
         mangaId,
         title: sanitizeWhitespace(chapterTitle) || "",
+        chapterNumber: chapterIndex + 1,
         sourceChapterUrl: chapterUrl,
         contentUrls,
         contentBytes: totalBytes,
@@ -2513,6 +2755,7 @@ export async function autoDownloadViHentaiManga(
     chaptersImported: 0,
     imagesUploaded: 0,
     bytesSaved: 0,
+    imagesFound: 0,
     chapterErrors: [],
   };
 
@@ -2586,6 +2829,7 @@ export async function autoDownloadViHentaiManga(
       if (!imageUrls.length) {
         throw new Error("Không tìm thấy ảnh trong trang chương");
       }
+      resultBase.imagesFound = (resultBase.imagesFound || 0) + imageUrls.length;
       await emitProgress({
         stage: "chapter",
         message: `Đã tìm thấy ${imageUrls.length} ảnh, bắt đầu tải...`,
@@ -2731,6 +2975,7 @@ export async function autoDownloadViHentaiManga(
           await createChapterAsAdmin({
             mangaId: String(doc._id),
             title: sanitizeWhitespace(chapterEntry.title) || "",
+            chapterNumber: chapterIndex + 1,
             sourceChapterUrl: chapterUrl,
             contentUrls,
             contentBytes: totalBytes,
@@ -2785,6 +3030,7 @@ export async function autoDownloadViHentaiManga(
   }
 
   if (resultBase.chapterErrors.length) {
+    resultBase.errorDetail = resultBase.chapterErrors[0]?.message;
     resultBase.message = `Tạo truyện thành công, tải chương xong (${resultBase.chaptersImported}/${ordered.length}) nhưng có lỗi.`;
   } else {
     resultBase.message = `Tạo truyện + tải chương thành công (${resultBase.chaptersImported} chương, ${resultBase.imagesUploaded} ảnh)`;
@@ -2811,6 +3057,8 @@ export type ViHentaiAutoUpdateResult = {
   mangaSlug?: string;
   chaptersAdded: number;
   imagesUploaded: number;
+  imagesFound?: number;
+  errorDetail?: string;
   chapterErrors: Array<{ chapterUrl: string; message: string }>;
 };
 
@@ -2892,6 +3140,8 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
       mangaSlug: created.createdSlug,
       chaptersAdded: created.chaptersImported || 0,
       imagesUploaded: created.imagesUploaded || 0,
+      imagesFound: created.imagesFound || 0,
+      errorDetail: created.errorDetail,
       chapterErrors: Array.isArray(created.chapterErrors) ? created.chapterErrors : [],
     };
   }
@@ -2995,6 +3245,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
     mangaSlug: String(existing.slug || existing._id),
     chaptersAdded: 0,
     imagesUploaded: 0,
+    imagesFound: 0,
     chapterErrors: [],
   };
 
@@ -3021,6 +3272,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
       const html = await fetchViHentaiHtmlForAutoUpdate(chapterUrl);
       const imageUrls = parseChapterImagesFromHtml(html, chapterUrl);
       if (!imageUrls.length) throw new Error("Không tìm thấy ảnh trong trang chương");
+      result.imagesFound = (result.imagesFound || 0) + imageUrls.length;
       if (imageUrls.length > maxImagesPerChapter) {
         throw new Error(`Số ảnh vượt giới hạn: ${imageUrls.length}/${maxImagesPerChapter}`);
       }
@@ -3120,6 +3372,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
           await createChapterAsAdmin({
             mangaId,
             title: chapterTitle,
+            chapterNumber: chapterNumberForPath,
             sourceChapterUrl: chapterUrl,
             contentUrls,
             contentBytes: totalBytes,
@@ -3171,6 +3424,7 @@ export async function autoUpdateViHentaiManga(options: ViHentaiAutoUpdateOptions
   }
 
   if (result.chapterErrors.length) {
+    result.errorDetail = result.chapterErrors[0]?.message;
     result.message = `Cập nhật xong (${result.chaptersAdded}/${missingOrdered.length}) nhưng có lỗi.`;
   } else {
     result.message = `Cập nhật xong (${result.chaptersAdded} chương, ${result.imagesUploaded} ảnh).`;

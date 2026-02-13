@@ -20,7 +20,7 @@ const getCdnBaseForSiteHost = (hostname: string | undefined): string | undefined
   const host = stripWww((hostname ?? "").trim().toLowerCase());
   if (!host) return undefined;
   // Serve parallel domains with matching CDN subdomain.
-  if (host === "vinahentai.fun" || host === "vinahentai.one") return `https://cdn.${host}`;
+  if (host === "vinahentai.online" || host === "vinahentai.one") return `https://cdn.${host}`;
   return undefined;
 };
 
@@ -46,7 +46,8 @@ export const getLegacyCdnHosts = (): string[] => {
   // LEGACY_CDN_HOSTS=cdn.vinahentai.com,cdn.vinahentai.xyz
   return splitCsv(process.env.LEGACY_CDN_HOSTS).length
     ? splitCsv(process.env.LEGACY_CDN_HOSTS)
-    : [
+      : [
+        "cdn.vinahentai.fun",
         "cdn.vinahentai.top",
         "cdn.vinahentai.xyz",
         "cdn.vinahentai.com",

@@ -63,7 +63,7 @@ export const ENV = {
     if (explicit) return explicit;
 
     // Host-only cookies are required when serving multiple apex domains
-    // (e.g. vinahentai.fun + vinahentai.one). Browsers will reject a cookie
+    // (e.g. vinahentai.online + vinahentai.one). Browsers will reject a cookie
     // Domain that doesn't match the current request host.
     return undefined;
   })(),

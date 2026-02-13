@@ -90,7 +90,9 @@ type QueueItem = {
   mangaId?: string;
   mangaSlug?: string;
   chaptersAdded?: number;
+  imagesFound?: number;
   imagesUploaded?: number;
+  errorDetail?: string;
   message?: string;
 };
 
@@ -214,7 +216,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               mangaId: it.mangaId ? String(it.mangaId) : undefined,
               mangaSlug: it.mangaSlug ? String(it.mangaSlug) : undefined,
               chaptersAdded: typeof it.chaptersAdded === "number" ? it.chaptersAdded : undefined,
+              imagesFound: typeof it.imagesFound === "number" ? it.imagesFound : undefined,
               imagesUploaded: typeof it.imagesUploaded === "number" ? it.imagesUploaded : undefined,
+              errorDetail: it.errorDetail ? String(it.errorDetail) : undefined,
               message: it.message ? String(it.message) : undefined,
             }))
           : [],
@@ -360,7 +364,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 mangaId: it.mangaId ? String(it.mangaId) : undefined,
                 mangaSlug: it.mangaSlug ? String(it.mangaSlug) : undefined,
                 chaptersAdded: typeof it.chaptersAdded === "number" ? it.chaptersAdded : undefined,
+                imagesFound: typeof it.imagesFound === "number" ? it.imagesFound : undefined,
                 imagesUploaded: typeof it.imagesUploaded === "number" ? it.imagesUploaded : undefined,
+                errorDetail: it.errorDetail ? String(it.errorDetail) : undefined,
                 message: it.message ? String(it.message) : undefined,
               }))
             : [],
@@ -1011,6 +1017,14 @@ export default function AdminMangaAutoUpdate() {
                     ) : null}
                     {it.message ? (
                       <div className="break-words text-xs text-txt-secondary md:truncate">{it.message}</div>
+                    ) : null}
+                    {typeof it.imagesFound === "number" || typeof it.imagesUploaded === "number" ? (
+                      <div className="break-words text-xs text-txt-secondary md:truncate">
+                        Ảnh: lấy {it.imagesFound ?? 0} · tải {it.imagesUploaded ?? 0}
+                      </div>
+                    ) : null}
+                    {it.errorDetail ? (
+                      <div className="break-words text-xs text-red-200 md:truncate">Lỗi: {it.errorDetail}</div>
                     ) : null}
                   </td>
                   <td className="p-2">{itemBadge(it.status)}</td>

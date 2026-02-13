@@ -1,4 +1,3 @@
-import { redirect } from "react-router";
 import type { LoaderFunctionArgs } from "react-router-dom";
 
 const getHost = (request: Request): string => {
@@ -24,7 +23,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // ignore
   }
 
-  const res = redirect("/sitemapforfun3.xml", { status: 301 });
-  res.headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
-  return res;
+  return new Response("Not Found", {
+    status: 404,
+    headers: {
+      "Cache-Control": "public, max-age=300, s-maxage=300",
+    },
+  });
 }

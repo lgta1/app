@@ -101,7 +101,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export function meta({ data }: Route.MetaArgs) {
-  const origin = data?.origin ?? "https://vinahentai.fun";
+  const origin = data?.origin ?? "https://vinahentai.online";
   const canonical = origin ? `${origin}/` : "/";
   return [
     { title: "Vinahentai - Đọc truyện hentai 18+ KHÔNG QUẢNG CÁO" },
