@@ -7,7 +7,8 @@ const connectMongoDB = () => {
   console.info("Connecting to MongoDB...");
   mongoose
     .connect(ENV.MONGO.URI, {
-      maxPoolSize: 100,
+      maxPoolSize: ENV.MONGO.MAX_POOL_SIZE,
+      minPoolSize: ENV.MONGO.MIN_POOL_SIZE,
     })
     .catch((err: any) => {
       console.error("Error connecting MongoDB: " + err);

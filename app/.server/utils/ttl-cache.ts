@@ -1,8 +1,42 @@
+import { createClient } from "redis";
+
 type CacheEntry<T> =
   | { expiresAt: number; value: T }
   | { expiresAt: number; promise: Promise<T> };
 
 const DEFAULT_MAX_ENTRIES = 1000;
+
+let redisClient: ReturnType<typeof createClient> | null = null;
+let redisReady = false;
+let redisInitAttempted = false;
+
+const getRedisClient = async () => {
+  if (redisReady && redisClient) return redisClient;
+
+  const redisUrl = (process.env.REDIS_URL || "").trim();
+  if (!redisUrl) return null;
+  if (redisInitAttempted && !redisReady) return null;
+
+  redisInitAttempted = true;
+  try {
+    if (!redisClient) {
+      redisClient = createClient({ url: redisUrl, socket: { connectTimeout: 1000 } });
+      redisClient.on("error", () => {
+        redisReady = false;
+      });
+    }
+
+    if (!redisClient.isOpen) {
+      await redisClient.connect();
+    }
+
+    redisReady = true;
+    return redisClient;
+  } catch {
+    redisReady = false;
+    return null;
+  }
+};
 
 export class TtlCache {
   private map = new Map<string, CacheEntry<any>>();
@@ -25,6 +59,16 @@ export class TtlCache {
 
   async getOrSet<T>(key: string, ttlMs: number, factory: () => Promise<T>): Promise<T> {
     const now = Date.now();
+    const redis = await getRedisClient();
+
+    if (redis) {
+      const redisKey = `ww:${key}`;
+      const cached = await redis.get(redisKey);
+      if (cached !== null) {
+        return JSON.parse(cached) as T;
+      }
+    }
+
     const existing = this.map.get(key) as CacheEntry<T> | undefined;
 
     if (existing && now < existing.expiresAt) {
@@ -39,6 +83,12 @@ export class TtlCache {
 
     try {
       const value = await promise;
+
+      if (redis) {
+        const ttlSec = Math.max(1, Math.ceil(ttlMs / 1000));
+        await redis.set(`ww:${key}`, JSON.stringify(value), { EX: ttlSec });
+      }
+
       // If another call overwrote the key, don't clobber it.
       const current = this.map.get(key) as CacheEntry<T> | undefined;
       if (current && "promise" in current && current.promise === promise) {

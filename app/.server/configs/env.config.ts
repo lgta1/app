@@ -2,7 +2,9 @@ export const ENV = {
   MONGO: {
     URI:
       process.env.MONGO_URL ||
-      "mongodb://admin:yourpassword@localhost:27017/?authSource=admin&maxPoolSize=100&minPoolSize=10&retryWrites=true&retryReads=true&w=majority&readPreference=primaryPreferred&serverSelectionTimeoutMS=5000&connectTimeoutMS=10000",
+      "mongodb://admin:yourpassword@localhost:27017/?authSource=admin&retryWrites=true&retryReads=true&w=majority&readPreference=primaryPreferred&serverSelectionTimeoutMS=5000&connectTimeoutMS=10000",
+    MAX_POOL_SIZE: Number(process.env.MONGO_MAX_POOL_SIZE) || 40,
+    MIN_POOL_SIZE: Number(process.env.MONGO_MIN_POOL_SIZE) || 5,
     RECONNECT_INTERVAL: Number(process.env.MONGO_RECONNECT_INTERVAL) || 3000,
   },
   SESSION: {

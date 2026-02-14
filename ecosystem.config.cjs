@@ -1,4 +1,4 @@
-const instances = 6;           // chạy 6 tiến trình
+const instances = 5;           // chạy 5 tiến trình
 const basePort = 3001;         // 3001..3006
 
 const apps = [];
@@ -31,12 +31,15 @@ for (let i = 0; i < instances; i++) {
       NODE_ENV: "production",
       TZ: "Asia/Ho_Chi_Minh",
       PORT: basePort + i,                     // 3001 / 3002
+      MONGO_MAX_POOL_SIZE: "40",
+      MONGO_MIN_POOL_SIZE: "5",
       // Temporarily disable schedulers to prevent crash-loops when DB is down.
       // Re-enable after MongoDB connectivity is restored.
       LEADERBOARD_SCHEDULER: isPrimary ? "1" : "0",
       HOT_CAROUSEL_SCHEDULER: "0",
       CHAPTER_PUBLISH_SCHEDULER: isPrimary ? "1" : "0",
       TMP_UPLOAD_CLEANUP_SCHEDULER: isPrimary ? "1" : "0",
+      REDIS_URL: "redis://127.0.0.1:6379",
       INTERNAL_JOB_TOKEN: "Lequoctruong98!",
 
       CANONICAL_ORIGIN: "https://vinahentai.online",
