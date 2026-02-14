@@ -74,6 +74,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     "User-agent: *",
     "Allow: /",
     "",
+    `Sitemap: ${origin}/sitemap_index_online.xml`,
     `Sitemap: ${origin}/sitemaponline.xml`,
     "",
     "# Posts are disabled and should be removed from index.",

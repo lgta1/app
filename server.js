@@ -78,7 +78,7 @@ const server = http.createServer(async (req, res) => {
     const pathname = url.pathname;
 
     if (req.method === "GET" || req.method === "HEAD") {
-      if (shouldTryServeStatic(pathname)) {
+      if (shouldTryServeStatic(pathname) && pathname !== "/sitemap_index_online.xml") {
         const rel = decodeURIComponent(pathname).replace(/^\/+/, "");
         const staticRoots = [clientDir, publicDir];
 
@@ -131,7 +131,8 @@ const server = http.createServer(async (req, res) => {
         if (
           isSitemapXmlPath(pathname) &&
           pathname !== "/sitemap.xml" &&
-          pathname !== "/sitemaponline.xml"
+          pathname !== "/sitemaponline.xml" &&
+          pathname !== "/sitemap_index_online.xml"
         ) {
           res.statusCode = 404;
           res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -142,7 +143,12 @@ const server = http.createServer(async (req, res) => {
       }
 
       // If it's a sitemap-like path without a static file, ensure a clean 404 (except the live ones).
-      if (isSitemapXmlPath(pathname) && pathname !== "/sitemap.xml" && pathname !== "/sitemaponline.xml") {
+      if (
+        isSitemapXmlPath(pathname) &&
+        pathname !== "/sitemap.xml" &&
+        pathname !== "/sitemaponline.xml" &&
+        pathname !== "/sitemap_index_online.xml"
+      ) {
         res.statusCode = 404;
         res.setHeader("Content-Type", "text/plain; charset=utf-8");
         res.setHeader("Cache-Control", "public, max-age=300");
