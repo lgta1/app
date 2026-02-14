@@ -35,6 +35,7 @@ for (let i = 0; i < instances; i++) {
       // Re-enable after MongoDB connectivity is restored.
       LEADERBOARD_SCHEDULER: isPrimary ? "1" : "0",
       HOT_CAROUSEL_SCHEDULER: "0",
+      CHAPTER_PUBLISH_SCHEDULER: isPrimary ? "1" : "0",
       TMP_UPLOAD_CLEANUP_SCHEDULER: isPrimary ? "1" : "0",
       INTERNAL_JOB_TOKEN: "Lequoctruong98!",
 

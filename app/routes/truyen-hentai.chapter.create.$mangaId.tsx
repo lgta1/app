@@ -8,8 +8,10 @@ import { createChapter } from "@/mutations/chapter.mutation";
 import type { Route } from "./+types/manga.chapter.create.$mangaId";
 
 import { ChapterDetail } from "~/components/chapter-detail";
+import { CHAPTER_STATUS } from "~/constants/chapter";
 import { BusinessError } from "~/helpers/errors.helper";
 import { useFileOperations } from "~/hooks/use-file-operations";
+import { deletePublicFiles } from "~/utils/minio.utils";
 import {
   compressMultipleImages,
   formatFileSize,
@@ -82,6 +84,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ request, params }: Route.ActionArgs) {
   try {
+    const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60 * 1000;
     const formData = await request.formData();
     const mangaHandle = params.mangaId;
 
@@ -96,17 +99,62 @@ export async function action({ request, params }: Route.ActionArgs) {
     const mangaId = String((target as any).id ?? (target as any)._id ?? "");
 
     const title = formData.get("title") as string | null;
-    const contentUrls = JSON.parse(formData.get("contentUrls") as string);
+    const contentUrlsRaw = formData.get("contentUrls");
+    let contentUrls: string[] = [];
+    try {
+      contentUrls = JSON.parse(String(contentUrlsRaw || "[]"));
+    } catch {
+      throw new BusinessError("Dữ liệu ảnh không hợp lệ");
+    }
     const requestIdRaw = formData.get("requestId");
     const requestId = typeof requestIdRaw === "string" ? requestIdRaw.trim() : "";
+    const contentBytesRaw = formData.get("contentBytes");
+    const contentBytes =
+      typeof contentBytesRaw === "string" && contentBytesRaw.trim()
+        ? Number(contentBytesRaw)
+        : undefined;
+    const publishModeRaw = String(formData.get("publishMode") || "now").trim().toLowerCase();
+    const publishAtRaw = formData.get("publishAt");
+    const publishAtIso = typeof publishAtRaw === "string" ? publishAtRaw.trim() : "";
 
-    if (!contentUrls || contentUrls.length === 0) {
+    const publishMode = publishModeRaw === "draft" || publishModeRaw === "schedule" || publishModeRaw === "now"
+      ? publishModeRaw
+      : "now";
+
+    let scheduledAt: Date | undefined;
+    if (publishMode === "schedule") {
+      if (!publishAtIso) {
+        throw new BusinessError("Vui lòng chọn thời điểm hẹn giờ");
+      }
+      const parsed = new Date(publishAtIso);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BusinessError("Thời điểm hẹn giờ không hợp lệ");
+      }
+      const now = Date.now();
+      const ts = parsed.getTime();
+      if (ts <= now) {
+        throw new BusinessError("Thời điểm hẹn giờ phải lớn hơn hiện tại");
+      }
+      if (ts > now + MAX_SCHEDULE_AHEAD_MS) {
+        throw new BusinessError("Chỉ được hẹn giờ tối đa 30 ngày tới");
+      }
+      scheduledAt = parsed;
+    }
+
+    const targetStatus = publishMode === "draft"
+      ? CHAPTER_STATUS.PENDING
+      : publishMode === "schedule"
+        ? CHAPTER_STATUS.SCHEDULED
+        : CHAPTER_STATUS.APPROVED;
+
+    if (!Array.isArray(contentUrls) || contentUrls.length === 0) {
       throw new BusinessError("Vui lòng tải lên ít nhất một ảnh");
     }
 
     const { fileExists, getFullPathFromPublicUrl, getPublicFileUrl, moveFile } =
       await import("~/utils/minio.utils");
 
+    const movedDestinationPaths: string[] = [];
     const finalizeChapterUploads = async (rawUrls: string[], reqId: string): Promise<string[]> => {
       if (!Array.isArray(rawUrls) || rawUrls.length === 0) return [];
       if (!reqId) return rawUrls;
@@ -135,6 +183,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
         if (sourceExists) {
           await moveFile(fullPath, destinationFullPath);
+          movedDestinationPaths.push(destinationFullPath);
         } else {
           const destExists = await fileExists(destinationFullPath);
           if (!destExists) {
@@ -163,13 +212,44 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const finalContentUrls = await finalizeChapterUploads(contentUrls, requestId);
 
-    await createChapter(request, {
-      // Allow blank: server will normalize to "Chap N" after numbering if empty
-      title: (title ?? "").trim(),
-      contentUrls: finalContentUrls,
-      mangaId,
-      ...(requestId ? { requestId } : {}),
-    });
+    const hasTmpUrlWithoutRequestId =
+      !requestId &&
+      finalContentUrls.some((url) => {
+        const fullPath = getFullPathFromPublicUrl(String(url || ""));
+        return String(fullPath || "").includes(`${TMP_CHAPTER_PREFIX}/`);
+      });
+    if (hasTmpUrlWithoutRequestId) {
+      throw new BusinessError("Thiếu mã phiên upload, vui lòng tải ảnh lại và thử lại");
+    }
+
+    try {
+      await createChapter(request, {
+        // Allow blank: server will normalize to "Chap N" after numbering if empty
+        title: (title ?? "").trim(),
+        contentUrls: finalContentUrls,
+        mangaId,
+        status: targetStatus,
+        ...(scheduledAt ? { publishAt: scheduledAt } : {}),
+        ...(Number.isFinite(contentBytes) && (contentBytes as number) > 0
+          ? { contentBytes: Number(contentBytes) }
+          : {}),
+        ...(requestId ? { requestId } : {}),
+      });
+    } catch (createError) {
+      if (requestId) {
+        try {
+          const toDelete = movedDestinationPaths.filter((fullPath) =>
+            String(fullPath || "").includes(`${FINAL_CHAPTER_PREFIX}/`),
+          );
+          if (toDelete.length) {
+            await deletePublicFiles(toDelete);
+          }
+        } catch (cleanupError) {
+          console.warn("[chapter.create] cleanup moved files failed", cleanupError);
+        }
+      }
+      throw createError;
+    }
 
     // Sau khi tạo chương, trả link preview cho client điều hướng
     const nextHandle = target.slug || mangaId;
@@ -210,6 +290,12 @@ export default function CreateChapter() {
   const [mergeTailCount, setMergeTailCount] = useState(5);
   const [watermarkStyle, setWatermarkStyle] = useState<"glow" | "stroke">("glow");
   const [skipWatermark, setSkipWatermark] = useState(false);
+  const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
+  const [scheduleMonthOffset, setScheduleMonthOffset] = useState<0 | 1>(0);
+  const [scheduleDay, setScheduleDay] = useState<string>("");
+  const [scheduleHour, setScheduleHour] = useState<string>("");
+  const [scheduleMinute, setScheduleMinute] = useState<string>("");
+  const [scheduleError, setScheduleError] = useState<string>("");
 
   // Dropzone highlight
   const [dragOver, setDragOver] = useState(false);
@@ -224,6 +310,8 @@ export default function CreateChapter() {
   const formRef = useRef<HTMLFormElement>(null);
   const pendingServerSubmitRef = useRef(false);
   const requestIdRef = useRef<string | null>(null);
+  const submitPublishModeRef = useRef<"draft" | "now" | "schedule">("now");
+  const submitPublishAtRef = useRef<string>("");
   const uploadSessionRef = useRef<ReturnType<typeof uploadMultipleFilesCancelable> | null>(null);
   const { uploadMultipleFilesCancelable } = useFileOperations();
 
@@ -289,6 +377,99 @@ export default function CreateChapter() {
     }
     return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   };
+
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return [thisMonth, nextMonth];
+  }, []);
+
+  const selectedMonthDate = monthOptions[scheduleMonthOffset] || monthOptions[0];
+  const dayOptions = useMemo(() => {
+    const year = selectedMonthDate.getFullYear();
+    const month = selectedMonthDate.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const now = new Date();
+    const nowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const maxTime = now.getTime() + 30 * 24 * 60 * 60 * 1000;
+
+    const rows: Array<{ value: string; label: string; disabled: boolean }> = [];
+    for (let day = 1; day <= lastDay; day += 1) {
+      const candidate = new Date(year, month, day, 0, 0, 0, 0);
+      const candidateStart = candidate.getTime();
+      const disabled = candidateStart < nowStart || candidateStart > maxTime;
+      rows.push({ value: String(day), label: String(day), disabled });
+    }
+    return rows;
+  }, [selectedMonthDate]);
+
+  const isTodaySelected = useMemo(() => {
+    const day = Number(scheduleDay);
+    if (!Number.isFinite(day) || day < 1) return false;
+    const now = new Date();
+    return selectedMonthDate.getFullYear() === now.getFullYear() &&
+      selectedMonthDate.getMonth() === now.getMonth() &&
+      day === now.getDate();
+  }, [scheduleDay, selectedMonthDate]);
+
+  const validateScheduleInput = () => {
+    if (publishMode !== "schedule") {
+      return { valid: true, iso: "", error: "" };
+    }
+
+    const day = Number(scheduleDay);
+    const hour = Number(scheduleHour);
+    const minute = Number(scheduleMinute);
+    if (!Number.isFinite(day) || day < 1) {
+      return { valid: false, iso: "", error: "Vui lòng chọn ngày đăng" };
+    }
+    if (!Number.isFinite(hour) || hour < 0 || hour > 23) {
+      return { valid: false, iso: "", error: "Vui lòng nhập giờ hợp lệ (00-23)" };
+    }
+    if (!Number.isFinite(minute) || minute < 0 || minute > 59) {
+      return { valid: false, iso: "", error: "Vui lòng nhập phút hợp lệ (00-59)" };
+    }
+
+    const candidate = new Date(
+      selectedMonthDate.getFullYear(),
+      selectedMonthDate.getMonth(),
+      day,
+      hour,
+      minute,
+      0,
+      0,
+    );
+
+    if (Number.isNaN(candidate.getTime())) {
+      return { valid: false, iso: "", error: "Thời điểm đăng không hợp lệ" };
+    }
+
+    const now = new Date();
+    const maxDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    if (candidate.getTime() <= now.getTime()) {
+      return { valid: false, iso: "", error: "Thời điểm đăng phải lớn hơn hiện tại" };
+    }
+    if (candidate.getTime() > maxDate.getTime()) {
+      return { valid: false, iso: "", error: "Chỉ được hẹn giờ tối đa 30 ngày tới" };
+    }
+
+    return { valid: true, iso: candidate.toISOString(), error: "" };
+  };
+
+  const scheduleValidation = validateScheduleInput();
+  const canSubmitScheduled = publishMode === "schedule" && scheduleValidation.valid;
+
+  useEffect(() => {
+    if (publishMode !== "schedule") {
+      if (scheduleError) setScheduleError("");
+      return;
+    }
+    if (!scheduleError) return;
+    if (scheduleValidation.valid) {
+      setScheduleError("");
+    }
+  }, [publishMode, scheduleError, scheduleValidation.valid]);
 
   // unified add files (used by input change & drag-drop)
   const addFiles = async (filesLike: FileList | File[]) => {
@@ -612,13 +793,26 @@ export default function CreateChapter() {
 
       // Get content URLs
       const contentUrls = uploadResults.map((result) => result.url);
+      const totalBytesFromResults = uploadResults.reduce((sum, result) => {
+        return sum + (typeof result?.size === "number" ? result.size : 0);
+      }, 0);
+      const totalBytes = totalBytesFromResults > 0
+        ? totalBytesFromResults
+        : uploadContents.reduce((sum, file) => sum + (file?.size || 0), 0);
 
       // Create chapter using fetcher
       const formData = new FormData();
-        // Send raw trimmed title (can be empty). Server mutation will auto-fill.
-        formData.append("title", (title ?? "").trim());
+      // Send raw trimmed title (can be empty). Server mutation will auto-fill.
+      formData.append("title", (title ?? "").trim());
       formData.append("contentUrls", JSON.stringify(contentUrls));
-        formData.append("requestId", uploadRequestId);
+      if (totalBytes > 0) {
+        formData.append("contentBytes", String(totalBytes));
+      }
+      formData.append("requestId", uploadRequestId);
+      formData.append("publishMode", submitPublishModeRef.current);
+      if (submitPublishModeRef.current === "schedule" && submitPublishAtRef.current) {
+        formData.append("publishAt", submitPublishAtRef.current);
+      }
 
       setUploadProgress({ current: uploadResults.length, total: uploadResults.length, active: false });
       setIsCancellingUpload(false);
@@ -657,7 +851,21 @@ export default function CreateChapter() {
     }
   };
 
-  const handleExternalSubmit = () => {
+  const handleExternalSubmit = (mode: "draft" | "now" | "schedule") => {
+    if (mode === "schedule") {
+      const checked = validateScheduleInput();
+      if (!checked.valid) {
+        setScheduleError(checked.error);
+        return;
+      }
+      submitPublishAtRef.current = checked.iso;
+      setScheduleError("");
+    } else {
+      submitPublishAtRef.current = "";
+      setScheduleError("");
+    }
+
+    submitPublishModeRef.current = mode;
     if (formRef.current) {
       formRef.current.requestSubmit();
     }
@@ -1079,51 +1287,163 @@ export default function CreateChapter() {
                 Truyện ghép từ các ảnh ngắn sẽ tải nhanh hơn. Ảnh giữ nguyên thứ tự khi upload; có thể kéo-thả để đổi thứ tự hiển thị.
               </p>
 
-              <div className="bg-bgc-layer2 border-bd-default mt-2 flex w-full flex-col gap-3 rounded-xl border px-3 py-3">
-                <div className="text-txt-primary text-sm font-semibold">Chọn kiểu watermark</div>
-                <label className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name="watermarkStyle"
-                    value="glow"
-                    checked={watermarkStyle === "glow"}
-                    onChange={() => setWatermarkStyle("glow")}
-                    className="mt-1 h-4 w-4"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-txt-primary text-sm font-semibold">Glow tím hồng (mặc định)</span>
-                    <span className="text-txt-secondary text-xs">
-                      Phù hợp truyện có màu, truyện 3D. Chữ có hiệu ứng glow tím-hồng.
-                    </span>
+              <div className="bg-bgc-layer2 border-bd-default mt-6 w-full rounded-xl border p-6">
+                <div className="text-txt-primary mb-5 text-base font-semibold">Cài đặt hiển thị & đăng tải</div>
+
+                <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+                  <div className="md:w-1/2">
+                    <div className="text-txt-primary mb-4 text-sm font-medium">Chọn kiểu watermark</div>
+
+                    <div className="flex flex-col gap-4">
+                      <label className="flex cursor-pointer items-start gap-3">
+                        <input
+                          type="radio"
+                          name="watermarkStyle"
+                          value="glow"
+                          checked={watermarkStyle === "glow"}
+                          onChange={() => setWatermarkStyle("glow")}
+                          className="mt-1 h-4 w-4"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-txt-primary text-sm font-semibold">Glow tím hồng (mặc định)</span>
+                          <span className="text-txt-secondary mt-1 text-xs opacity-70">
+                            Phù hợp truyện có màu, truyện 3D. Chữ có hiệu ứng glow tím-hồng.
+                          </span>
+                        </div>
+                      </label>
+
+                      <label className="flex cursor-pointer items-start gap-3">
+                        <input
+                          type="radio"
+                          name="watermarkStyle"
+                          value="stroke"
+                          checked={watermarkStyle === "stroke"}
+                          onChange={() => setWatermarkStyle("stroke")}
+                          className="mt-1 h-4 w-4"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-txt-primary text-sm font-semibold">Stroke đen/trắng (không glow)</span>
+                          <span className="text-txt-secondary mt-1 text-xs opacity-70">
+                            Phù hợp truyện không màu, trắng đen. Chỉ viền stroke theo màu nền.
+                          </span>
+                        </div>
+                      </label>
+
+                      {canSkipWatermark && (
+                        <label className="mt-1 flex items-center gap-2 text-sm text-txt-primary">
+                          <input
+                            type="checkbox"
+                            checked={skipWatermark}
+                            onChange={(e) => setSkipWatermark(e.target.checked)}
+                            className="h-4 w-4"
+                          />
+                          Tắt watermark cho chương này
+                        </label>
+                      )}
+                    </div>
                   </div>
-                </label>
-                <label className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name="watermarkStyle"
-                    value="stroke"
-                    checked={watermarkStyle === "stroke"}
-                    onChange={() => setWatermarkStyle("stroke")}
-                    className="mt-1 h-4 w-4"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-txt-primary text-sm font-semibold">Stroke đen/trắng (không glow)</span>
-                    <span className="text-txt-secondary text-xs">
-                      Phù hợp truyện không màu, trắng đen. Chỉ viền stroke theo màu nền (đen khi chữ trắng, trắng khi chữ đen).
-                    </span>
+
+                  <div className="hidden self-stretch border-l border-white/10 md:block" />
+
+                  <div className="md:w-1/2">
+                    <div className="text-txt-primary mb-4 text-sm font-medium">Thời điểm đăng</div>
+
+                    <div className="flex flex-col gap-3">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-txt-primary">
+                        <input
+                          type="radio"
+                          name="publishMode"
+                          checked={publishMode === "now"}
+                          onChange={() => setPublishMode("now")}
+                          className="h-4 w-4"
+                        />
+                        Đăng ngay
+                      </label>
+
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-txt-primary">
+                        <input
+                          type="radio"
+                          name="publishMode"
+                          checked={publishMode === "schedule"}
+                          onChange={() => setPublishMode("schedule")}
+                          className="h-4 w-4"
+                        />
+                        Hẹn giờ đăng
+                      </label>
+                    </div>
+
+                    {publishMode === "schedule" ? (
+                      <div className="mt-4 pl-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-txt-secondary text-xs">Tháng</label>
+                            <select
+                              value={String(scheduleMonthOffset)}
+                              onChange={(e) => {
+                                const next = e.target.value === "1" ? 1 : 0;
+                                setScheduleMonthOffset(next as 0 | 1);
+                                setScheduleDay("");
+                              }}
+                              className="bg-bgc-layer1 border-bd-default text-txt-primary rounded-lg border px-3 py-2 text-sm"
+                            >
+                              <option value="0">Tháng {monthOptions[0].getMonth() + 1}</option>
+                              <option value="1">Tháng {monthOptions[1].getMonth() + 1}</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-txt-secondary text-xs">Ngày</label>
+                            <select
+                              value={scheduleDay}
+                              onChange={(e) => setScheduleDay(e.target.value)}
+                              className="bg-bgc-layer1 border-bd-default text-txt-primary rounded-lg border px-3 py-2 text-sm"
+                            >
+                              <option value="">Chọn ngày</option>
+                              {dayOptions.map((dayOpt) => (
+                                <option key={dayOpt.value} value={dayOpt.value} disabled={dayOpt.disabled}>
+                                  {dayOpt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-txt-secondary text-xs">Giờ đăng</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={scheduleHour}
+                                onChange={(e) => setScheduleHour(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                                placeholder="20"
+                                className="bg-bgc-layer1 border-bd-default text-txt-primary w-full rounded-lg border px-3 py-2 text-center text-sm"
+                                inputMode="numeric"
+                              />
+                              <span className="text-txt-secondary text-sm">:</span>
+                              <input
+                                value={scheduleMinute}
+                                onChange={(e) => setScheduleMinute(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                                placeholder="00"
+                                className="bg-bgc-layer1 border-bd-default text-txt-primary w-full rounded-lg border px-3 py-2 text-center text-sm"
+                                inputMode="numeric"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {(scheduleError || (publishMode === "schedule" && !scheduleValidation.valid)) ? (
+                          <div className="mt-2 text-xs text-red-400">
+                            {scheduleError || scheduleValidation.error}
+                          </div>
+                        ) : null}
+
+                        {isTodaySelected ? (
+                          <div className="text-txt-secondary mt-1 text-xs opacity-80">
+                            Lưu ý: nếu hẹn trong hôm nay, thời điểm phải lớn hơn hiện tại.
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
-                </label>
-                {canSkipWatermark && (
-                  <label className="flex items-center gap-2 text-sm text-txt-primary">
-                    <input
-                      type="checkbox"
-                      checked={skipWatermark}
-                      onChange={(e) => setSkipWatermark(e.target.checked)}
-                      className="h-4 w-4"
-                    />
-                    Tắt watermark cho chương này
-                  </label>
-                )}
+                </div>
               </div>
 
               {isAdminUser && (
@@ -1299,24 +1619,46 @@ export default function CreateChapter() {
 
           <button
             type="button"
-            onClick={handleExternalSubmit}
+            onClick={() => handleExternalSubmit("draft")}
             disabled={contents.length === 0 || isLoading}
-            className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-b from-[#DD94FF] to-[#D373FF] px-4 py-3 shadow-[0px_4px_8.899999618530273px_0px_rgba(196,69,255,0.25)] transition-colors hover:from-[#D373FF] hover:to-[#C962F9] disabled:cursor-not-allowed disabled:opacity-50 sm:w-52"
+            className="border-bd-default text-txt-primary hover:bg-white/5 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-40"
+          >
+            <span className="text-center text-sm font-semibold whitespace-nowrap">Lưu nháp</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleExternalSubmit("schedule")}
+            disabled={contents.length === 0 || isLoading || !canSubmitScheduled}
+            className={`flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl px-4 py-3 transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-44 ${
+              publishMode === "schedule"
+                ? "bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-black"
+                : "border-bd-default text-txt-primary border hover:bg-white/5"
+            }`}
+          >
+            <span className="text-center text-sm font-semibold whitespace-nowrap">Hẹn giờ đăng</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleExternalSubmit("now")}
+            disabled={contents.length === 0 || isLoading || publishMode === "schedule"}
+            className={`flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl px-4 py-3 transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-40 ${
+              publishMode === "now"
+                ? "bg-gradient-to-b from-[#DD94FF] to-[#D373FF] text-black"
+                : "border-bd-default text-txt-primary border hover:bg-white/5"
+            }`}
           >
             {compressionProgress.isCompressing || uploadProgress.active || isLoading ? (
-              <span className="text-center text-sm font-semibold text-black whitespace-normal">
+              <span className="text-center text-sm font-semibold whitespace-normal">
                 {compressionProgress.isCompressing
                   ? "Đang tối ưu dung lượng ảnh..."
                   : uploadProgress.active
                     ? `Đang tải... ${uploadProgress.current}/${uploadProgress.total}`
-                    : isLoading
-                      ? "Đang xử lý..."
-                      : "Tạo chương"}
+                    : "Đang xử lý..."}
               </span>
             ) : (
-              <span className="text-center text-sm font-semibold text-black whitespace-nowrap">
-                Tạo chương
-              </span>
+              <span className="text-center text-sm font-semibold whitespace-nowrap">Đăng ngay</span>
             )}
           </button>
         </div>

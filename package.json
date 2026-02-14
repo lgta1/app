@@ -14,6 +14,8 @@
     "backfill:manga-slugs": "tsx scripts/backfill-manga-slugs.ts",
     "backfill:poster-variants": "tsx scripts/backfill-poster-variants.ts",
     "backfill:chapter-slugs": "tsx scripts/backfill-chapter-slugs.ts",
+    "backfill:chapter-published-at": "tsx scripts/backfill-chapter-published-at.ts",
+    "repair:chapter-visibility": "tsx scripts/repair-chapter-visibility-soft-publish.ts",
     "import:vi-hentai": "tsx scripts/import-vi-hentai.ts",
     "migrate:cdn-host": "tsx scripts/migrate-cdn-host.ts --dry-run",
     "ops:inspect-vi-hentai-jobs": "tsx scripts/ops/inspect-vi-hentai-jobs.ts",

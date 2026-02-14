@@ -797,7 +797,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           }
         }
         // upload 1 lần cho cả chapter (sau nén nếu có)
-        let results: Array<{ url?: string; path?: string; location?: string; key?: string }>;
+        let results: Array<{ url?: string; path?: string; location?: string; key?: string; size?: number }>;
         try {
           const selection = bulkForceWatermarkAll ? null : buildWatermarkSelection(effectiveList);
 
@@ -835,6 +835,12 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         const uploads = (results || [])
           .map((r: any) => r?.url || r?.location || r?.path || r?.key)
           .filter((u: unknown): u is string => typeof u === "string" && u.length > 0);
+        const contentBytesFromResults = (results || []).reduce((sum, r: any) => {
+          return sum + (typeof r?.size === "number" ? r.size : 0);
+        }, 0);
+        const contentBytes = contentBytesFromResults > 0
+          ? contentBytesFromResults
+          : effectiveList.reduce((sum, file) => sum + (file?.size || 0), 0);
 
         if (uploads.length !== effectiveList.length) {
           console.error("[bulk] Missing URLs after upload", { chap, got: uploads.length, expect: effectiveList.length });
@@ -848,7 +854,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
         // gọi API headless tạo chapter
         try {
-          const body = { entries: [{ chapter: chap, urls: uploads, requestId: uploadRequestId }] };
+          const body = { entries: [{ chapter: chap, urls: uploads, requestId: uploadRequestId, contentBytes }] };
           const resp = await fetch(`/truyen-hentai/${mangaHandle}/bulk-upload-urls`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "fetch" },

@@ -8,7 +8,7 @@ import { CHAPTER_STATUS } from "~/constants/chapter";
 export async function getLatestChapterTitlesForMangaIds(mangaIds: string[]) {
   if (!Array.isArray(mangaIds) || mangaIds.length === 0) return {} as Record<string, string>;
   const docs: any[] = await ChapterModel.aggregate([
-    { $match: { mangaId: { $in: mangaIds }, status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] } } },
+    { $match: { mangaId: { $in: mangaIds }, status: CHAPTER_STATUS.APPROVED } },
     { $sort: { mangaId: 1, chapterNumber: -1, createdAt: -1 } },
     // Only keep the needed fields to reduce compute
     { $group: { _id: "$mangaId", title: { $first: "$title" } } },

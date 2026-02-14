@@ -7,12 +7,12 @@ import type { Route } from "./+types/manga.$mangaId.bulk-upload-urls";
 import { getMangaByIdAndOwner } from "@/queries/manga.query";
 import { createChapter } from "@/mutations/chapter.mutation";
 import { MANGA_STATUS } from "~/constants/manga";
-import { fileExists, getFullPathFromPublicUrl, getPublicFileUrl, moveFile } from "~/utils/minio.utils";
+import { deletePublicFiles, fileExists, getFullPathFromPublicUrl, getPublicFileUrl, moveFile } from "~/utils/minio.utils";
 
 // 👉 Dùng server-only mutation
 import { systemBanDirect } from "~/.server/mutations/system-ban.direct";
 
-type Entry = { chapter?: string; urls: string[]; requestId?: string };
+type Entry = { chapter?: string; urls: string[]; requestId?: string; contentBytes?: number };
 
 const TMP_CHAPTER_PREFIX = "tmp/manga-images";
 const FINAL_CHAPTER_PREFIX = "manga-images";
@@ -54,12 +54,18 @@ async function banAndFail(uploaderId: string, reason: string) {
   );
 }
 
-const finalizeChapterUploads = async (rawUrls: string[], requestId?: string): Promise<string[]> => {
-  if (!Array.isArray(rawUrls) || rawUrls.length === 0) return [];
-  if (!requestId) return rawUrls;
+const finalizeChapterUploads = async (
+  rawUrls: string[],
+  requestId?: string,
+): Promise<{ urls: string[]; movedDestinationPaths: string[] }> => {
+  if (!Array.isArray(rawUrls) || rawUrls.length === 0) {
+    return { urls: [], movedDestinationPaths: [] };
+  }
+  if (!requestId) return { urls: rawUrls, movedDestinationPaths: [] };
 
   const tmpPrefix = `${TMP_CHAPTER_PREFIX}/${requestId}`;
   const results: string[] = new Array(rawUrls.length);
+  const movedDestinationPaths: string[] = [];
   const concurrency = 5;
   let nextIndex = 0;
   let stopped = false;
@@ -82,6 +88,7 @@ const finalizeChapterUploads = async (rawUrls: string[], requestId?: string): Pr
 
     if (sourceExists) {
       await moveFile(fullPath, destinationFullPath);
+      movedDestinationPaths.push(destinationFullPath);
     } else {
       const destExists = await fileExists(destinationFullPath);
       if (!destExists) {
@@ -105,7 +112,7 @@ const finalizeChapterUploads = async (rawUrls: string[], requestId?: string): Pr
     throw error;
   }
 
-  return results;
+  return { urls: results, movedDestinationPaths };
 };
 
 /* ============ ACTION ============ */
@@ -151,6 +158,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     for (const entry of entries) {
       const rawUrls = Array.isArray(entry?.urls) ? entry.urls : [];
       const requestId = typeof entry?.requestId === "string" ? entry.requestId.trim() : "";
+      const providedContentBytes = Number.isFinite((entry as any)?.contentBytes)
+        ? Number((entry as any).contentBytes)
+        : 0;
       if (rawUrls.length === 0) {
         return Response.json({ error: `Chapter "${entry?.chapter ?? ""}" không có ảnh.` }, { status: 400 });
       }
@@ -169,45 +179,75 @@ export async function action({ request, params }: Route.ActionArgs) {
 
       // Rule: size từng ảnh + tổng size chapter
       let total = 0;
-      for (const u of urls) {
-        const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(), 12_000);
-        let size: number | null = null;
-        try { size = await headGetSize(u, ctl.signal); }
-        finally { clearTimeout(timer); }
-
-        if (size === null) {
-          if (REQUIRE_KNOWN_SIZES) {
-            return Response.json(
-              {
-                error: `Không xác định được dung lượng ảnh ở "${title}" → dừng bulk, KHÔNG ban.`,
-                createdChapters,
-                savedImages,
-                warnings,
-              },
-              { status: 400 },
-            );
-          }
-          continue;
-        }
-
-        if (size > MAX_IMAGE_BYTES) {
-          return await banAndFail(
-            user.id,
-            "[Bulk] SPAM",
-          );
-        }
-
-        total += size;
+      if (providedContentBytes > 0) {
+        total = providedContentBytes;
         if (total > MAX_CHAPTER_BYTES) {
           return await banAndFail(
             user.id,
             "[Bulk] SPAM",
           );
         }
+      } else {
+        for (const u of urls) {
+          const ctl = new AbortController();
+          const timer = setTimeout(() => ctl.abort(), 12_000);
+          let size: number | null = null;
+          try { size = await headGetSize(u, ctl.signal); }
+          finally { clearTimeout(timer); }
+
+          if (size === null) {
+            if (REQUIRE_KNOWN_SIZES) {
+              return Response.json(
+                {
+                  error: `Không xác định được dung lượng ảnh ở "${title}" → dừng bulk, KHÔNG ban.`,
+                  createdChapters,
+                  savedImages,
+                  warnings,
+                },
+                { status: 400 },
+              );
+            }
+            continue;
+          }
+
+          if (size > MAX_IMAGE_BYTES) {
+            return await banAndFail(
+              user.id,
+              "[Bulk] SPAM",
+            );
+          }
+
+          total += size;
+          if (total > MAX_CHAPTER_BYTES) {
+            return await banAndFail(
+              user.id,
+              "[Bulk] SPAM",
+            );
+          }
+        }
       }
 
-      const finalUrls = await finalizeChapterUploads(urls, requestId);
+      const finalized = await finalizeChapterUploads(urls, requestId);
+      const finalUrls = finalized.urls;
+      const movedDestinationPaths = finalized.movedDestinationPaths;
+
+      const hasTmpUrlWithoutRequestId =
+        !requestId &&
+        finalUrls.some((url) => {
+          const fullPath = getFullPathFromPublicUrl(String(url || ""));
+          return String(fullPath || "").includes(`${TMP_CHAPTER_PREFIX}/`);
+        });
+      if (hasTmpUrlWithoutRequestId) {
+        return Response.json(
+          {
+            error: `Thiếu mã phiên upload ở chapter "${title}", vui lòng tải lại ảnh`,
+            createdChapters,
+            savedImages,
+            warnings,
+          },
+          { status: 400 },
+        );
+      }
 
       // Tạo chapter
       try {
@@ -220,6 +260,18 @@ export async function action({ request, params }: Route.ActionArgs) {
         createdChapters += 1;
         savedImages += finalUrls.length;
       } catch (e: any) {
+        if (requestId) {
+          try {
+            const toDelete = movedDestinationPaths.filter((fullPath) =>
+              String(fullPath || "").includes(`${FINAL_CHAPTER_PREFIX}/`),
+            );
+            if (toDelete.length) {
+              await deletePublicFiles(toDelete);
+            }
+          } catch (cleanupError) {
+            console.warn("[bulk-upload-urls] cleanup moved files failed", cleanupError);
+          }
+        }
         console.error("[bulk-upload-urls] createChapter error:", e?.stack || e);
         return Response.json(
           { error: `Tạo chapter "${title}" lỗi: ${e?.message || String(e)}`, createdChapters, savedImages, warnings },

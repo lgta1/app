@@ -119,7 +119,7 @@ export async function loader({ params, request }: any) {
   // Prev/next by STT, but return both number + slug for routing
   let preChapter: any;
   let nextChapter: any;
-  const statuses = [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING];
+  const statuses = [CHAPTER_STATUS.APPROVED];
   const currentNumber = Number((chapter as any).chapterNumber);
 
   if (Number.isFinite(currentNumber)) {

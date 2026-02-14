@@ -2,4 +2,5 @@ export const CHAPTER_STATUS = {
   PENDING: 0,
   APPROVED: 1,
   REJECTED: 2,
+  SCHEDULED: 3,
 };

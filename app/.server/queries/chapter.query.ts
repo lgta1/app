@@ -31,7 +31,7 @@ export const getChaptersByMangaId = async (mangaId: string, user?: UserType) => 
   if (manga.ownerId !== user?.id && !isAdmin(user?.role || "")) {
     query = {
       ...query,
-      status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] },
+      status: CHAPTER_STATUS.APPROVED,
     };
   }
 
@@ -71,14 +71,7 @@ export const getChapterByMangaIdAndNumber = async (
     await ensureChapterSlug(normalized);
   }
 
-  if (
-    normalized?.status === CHAPTER_STATUS.APPROVED ||
-    normalized?.status === CHAPTER_STATUS.PENDING
-  ) {
-    return normalized;
-  }
-
-  if (manga.ownerId === user?.id || isAdmin(user?.role || "")) {
+  if (normalized?.status === CHAPTER_STATUS.APPROVED) {
     return normalized;
   }
 
@@ -106,14 +99,7 @@ export const getChapterByMangaIdAndSlug = async (
   const chapter = chapterRaw ? withId(chapterRaw as any) : null;
   const normalized = chapter ? normalizeChapter(chapter) : null;
 
-  if (
-    normalized?.status === CHAPTER_STATUS.APPROVED ||
-    normalized?.status === CHAPTER_STATUS.PENDING
-  ) {
-    return normalized;
-  }
-
-  if (manga.ownerId === user?.id || isAdmin(user?.role || "")) {
+  if (normalized?.status === CHAPTER_STATUS.APPROVED) {
     return normalized;
   }
 

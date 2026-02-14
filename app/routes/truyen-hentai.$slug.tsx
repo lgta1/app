@@ -162,7 +162,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const [chapters, weeklyLeaderboard, sameAuthorManga, recommendedManga, genreDisplayMap] =
     await Promise.all([
-      getChaptersByMangaId(manga.id, currentUser),
+      getChaptersByMangaId(manga.id, null),
       getLeaderboard("weekly"),
       // Bỏ lấy monthlyLeaderboard để lazy load phía client
       getMangaBySameAuthor(manga.author, manga.id, 4, {

@@ -16,6 +16,42 @@ import { rewriteLegacyCdnUrl } from "~/.server/utils/cdn-url";
 const MAX_IMAGES_UNAPPROVED = 100;
 const MAX_PER_IMAGE_UNAPPROVED = 5 * 1024 * 1024; // 5MB
 const MAX_TOTAL_UNAPPROVED = 130 * 1024 * 1024; // 130MB
+const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60 * 1000;
+
+const resolveNextChapterNumber = async (mangaId: string): Promise<number> => {
+  const latest = await ChapterModel.findOne({ mangaId })
+    .select({ chapterNumber: 1 })
+    .sort({ chapterNumber: -1 })
+    .lean();
+  const latestNumber = Number((latest as any)?.chapterNumber || 0);
+  return latestNumber + 1;
+};
+
+const resolveIncomingStatus = (rawStatus: unknown): number => {
+  const status = Number(rawStatus);
+  return status === CHAPTER_STATUS.PENDING ||
+      status === CHAPTER_STATUS.APPROVED ||
+      status === CHAPTER_STATUS.REJECTED ||
+      status === CHAPTER_STATUS.SCHEDULED
+    ? status
+    : CHAPTER_STATUS.APPROVED;
+};
+
+const resolveScheduleTimestamp = (rawPublishAt: unknown): Date => {
+  const value = rawPublishAt instanceof Date ? rawPublishAt : new Date(String(rawPublishAt || ""));
+  if (Number.isNaN(value.getTime())) {
+    throw new BusinessError("Thời điểm hẹn giờ không hợp lệ");
+  }
+  const now = Date.now();
+  const ts = value.getTime();
+  if (ts <= now) {
+    throw new BusinessError("Thời điểm hẹn giờ phải lớn hơn hiện tại");
+  }
+  if (ts > now + MAX_SCHEDULE_AHEAD_MS) {
+    throw new BusinessError("Chỉ được hẹn giờ tối đa 30 ngày tới");
+  }
+  return value;
+};
 
 function fullPathFromPublicUrl(url: string): string {
   try {
@@ -125,11 +161,21 @@ export const createChapter = async (
     (u) => rewriteLegacyCdnUrl(u),
   );
 
+  const incomingStatus = resolveIncomingStatus((chapter as any).status);
+  const isImmediatePublish = incomingStatus === CHAPTER_STATUS.APPROVED;
+  const isScheduledPublish = incomingStatus === CHAPTER_STATUS.SCHEDULED;
+  const publishAt = isScheduledPublish ? resolveScheduleTimestamp((chapter as any).publishAt) : undefined;
+  const publishedAt = isImmediatePublish ? new Date() : undefined;
+
   // Unapproved gating rules (skip for admins)
   let totalBytes = 0;
   if (!isAdmin(userInfo.role) && manga.status !== MANGA_STATUS.APPROVED) {
     // 1) Only one chapter allowed until approved
-    if ((manga.chapters || 0) >= 1) {
+    const existingCount = await ChapterModel.countDocuments({
+      mangaId: chapter.mangaId,
+      status: { $ne: CHAPTER_STATUS.REJECTED },
+    });
+    if (existingCount >= 1) {
       throw new BusinessError(
         "Truyện chưa được duyệt chỉ được đăng tối đa 1 chương",
       );
@@ -146,7 +192,7 @@ export const createChapter = async (
   }
 
   // Determine final chapter number BEFORE creation (do not mutate manga yet)
-  const finalNumber = (manga.chapters || 0) + 1;
+  const finalNumber = await resolveNextChapterNumber(String(chapter.mangaId));
 
   const rawTitle = (chapter.title ?? "").trim();
   const isPlaceholder = rawTitle === "..."; // legacy placeholder to ignore
@@ -169,24 +215,28 @@ export const createChapter = async (
         title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
         chapterNumber: finalNumber,
         slug: chapterSlug,
+        status: incomingStatus,
+        ...(publishAt ? { publishAt } : {}),
+        ...(publishedAt ? { publishedAt } : {}),
         ...(requestId ? { requestId } : {}),
       });
 
-      // Atomically bump chapters & set updatedAt to the new chapter's createdAt without auto timestamps
-      try {
-        await MangaModel.updateOne(
-          { _id: manga.id },
-          { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
-          { timestamps: false },
-        );
-      } catch (updateError) {
-        console.warn("[createChapter] Failed to update manga counters", updateError);
-      }
+      if (isImmediatePublish) {
+        try {
+          await MangaModel.updateOne(
+            { _id: manga.id },
+            { $max: { chapters: finalNumber }, $set: { updatedAt: publishedAt || newChapter.createdAt } },
+            { timestamps: false },
+          );
+        } catch (updateError) {
+          console.warn("[createChapter] Failed to update manga counters", updateError);
+        }
 
-      try {
-        await notifyNewChapter(newChapter, manga);
-      } catch (notifyError) {
-        console.warn("[createChapter] Failed to notify followers", notifyError);
+        try {
+          await notifyNewChapter(newChapter, manga);
+        } catch (notifyError) {
+          console.warn("[createChapter] Failed to notify followers", notifyError);
+        }
       }
 
       return newChapter;
@@ -247,10 +297,18 @@ export const createChapterAsAdmin = async (
     totalBytes = await calculateChapterContentBytes(contentUrls);
   }
 
+  const incomingStatus = resolveIncomingStatus((chapter as any).status);
+  const isImmediatePublish = incomingStatus === CHAPTER_STATUS.APPROVED;
+  const isScheduledPublish = incomingStatus === CHAPTER_STATUS.SCHEDULED;
+  const publishAt = isScheduledPublish ? resolveScheduleTimestamp((chapter as any).publishAt) : undefined;
+  const publishedAt = isImmediatePublish ? new Date() : undefined;
+
   const providedNumber = Number.isFinite((chapter as any).chapterNumber)
     ? Number((chapter as any).chapterNumber)
     : undefined;
-  const finalNumber = providedNumber && providedNumber > 0 ? providedNumber : (manga.chapters || 0) + 1;
+  const finalNumber = providedNumber && providedNumber > 0
+    ? providedNumber
+    : await resolveNextChapterNumber(String(chapter.mangaId));
 
   const rawTitle = (chapter.title ?? "").trim();
   const isPlaceholder = rawTitle === "...";
@@ -270,31 +328,28 @@ export const createChapterAsAdmin = async (
         title: isPlaceholder ? `Chap ${finalNumber}` : finalTitle,
         chapterNumber: finalNumber,
         slug: chapterSlug,
+        status: incomingStatus,
+        ...(publishAt ? { publishAt } : {}),
+        ...(publishedAt ? { publishedAt } : {}),
         ...(requestId ? { requestId } : {}),
       });
 
-      try {
-        if (providedNumber && providedNumber > 0) {
+      if (isImmediatePublish) {
+        try {
           await MangaModel.updateOne(
             { _id: manga.id },
-            { $max: { chapters: providedNumber }, $set: { updatedAt: newChapter.createdAt } },
+            { $max: { chapters: finalNumber }, $set: { updatedAt: publishedAt || newChapter.createdAt } },
             { timestamps: false },
           );
-        } else {
-          await MangaModel.updateOne(
-            { _id: manga.id },
-            { $inc: { chapters: 1 }, $set: { updatedAt: newChapter.createdAt } },
-            { timestamps: false },
-          );
+        } catch (updateError) {
+          console.warn("[createChapterAsAdmin] Failed to update manga counters", updateError);
         }
-      } catch (updateError) {
-        console.warn("[createChapterAsAdmin] Failed to update manga counters", updateError);
-      }
 
-      try {
-        await notifyNewChapter(newChapter, manga);
-      } catch (notifyError) {
-        console.warn("[createChapterAsAdmin] Failed to notify followers", notifyError);
+        try {
+          await notifyNewChapter(newChapter, manga);
+        } catch (notifyError) {
+          console.warn("[createChapterAsAdmin] Failed to notify followers", notifyError);
+        }
       }
       return newChapter;
     } catch (e: any) {

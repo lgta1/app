@@ -55,6 +55,7 @@ export async function action({ request }: Route.ActionArgs) {
       [CHAPTER_STATUS.PENDING]: "Chờ duyệt",
       [CHAPTER_STATUS.APPROVED]: "Đã duyệt",
       [CHAPTER_STATUS.REJECTED]: "Bị trả về",
+      [CHAPTER_STATUS.SCHEDULED]: "Hẹn giờ đăng",
     };
 
     return Response.json({

@@ -19,6 +19,8 @@ export type ChapterType = {
   chapterNumber?: number;
   contentUrls: string[];
   contentBytes?: number;
+  publishAt?: Date;
+  publishedAt?: Date;
   mangaId: string;
   status?: number;
   createdAt: Date;
@@ -39,6 +41,8 @@ const ChapterSchema = new Schema<ChapterType>(
     chapterNumber: { type: Number, required: true },
     contentUrls: { type: [String], required: true },
     contentBytes: { type: Number, default: 0 },
+    publishAt: { type: Date },
+    publishedAt: { type: Date },
     mangaId: { type: String, required: true, ref: "Manga" },
     status: { type: Number, enum: CHAPTER_STATUS, default: CHAPTER_STATUS.PENDING },
   },
@@ -51,5 +55,7 @@ ChapterSchema.index({ mangaId: 1, slug: 1 }, { unique: true, sparse: true }); //
 ChapterSchema.index({ mangaId: 1, requestId: 1 }, { unique: true, sparse: true }); // Idempotency key for create
 ChapterSchema.index({ mangaId: 1, sourceChapterUrl: 1 }, { unique: true, sparse: true }); // Upstream URL dedup/sync
 ChapterSchema.index({ mangaId: 1, createdAt: -1 }); // List chapters của manga theo thời gian
+ChapterSchema.index({ status: 1, publishAt: 1 }); // Scheduled publish scan
+ChapterSchema.index({ mangaId: 1, status: 1, chapterNumber: -1 }); // Public chapter listing
 
 export const ChapterModel = model("Chapter", ChapterSchema);

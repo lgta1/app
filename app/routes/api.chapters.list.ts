@@ -25,7 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       await ensureChapterSlugsForManga(mangaId);
     }
 
-    // Lấy danh sách chapters với status APPROVED và PENDING, sắp xếp theo chapterNumber
+    // Chỉ lấy chapters đã publish (APPROVED), sắp xếp theo chapterNumber
     // Cache ngắn để giảm tải DB vì endpoint này bị gọi rất nhiều (mỗi trang chapter).
     const chapters = await sharedTtlCache.getOrSet(
       `api:chapters-list:${mangaId}`,
@@ -33,7 +33,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       () =>
         ChapterModel.find({
           mangaId: mangaId,
-          status: { $in: [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.PENDING] },
+          status: CHAPTER_STATUS.APPROVED,
         })
           .select("chapterNumber title status slug")
           .sort({ chapterNumber: -1 })

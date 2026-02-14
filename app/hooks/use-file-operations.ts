@@ -115,10 +115,6 @@ export function useFileOperations() {
         }
       }
 
-        if (options.watermarkSkip) {
-          formData.append("watermarkSkip", "true");
-        }
-
       if (options.watermarkSkip) {
         formData.append("watermarkSkip", "true");
       }
@@ -292,10 +288,6 @@ export function useFileOperations() {
             if (options.watermarkStyle) {
               formData.append("watermarkStyle", options.watermarkStyle);
             }
-          }
-
-          if (options.watermarkSkip) {
-            formData.append("watermarkSkip", "true");
           }
 
           if (options.watermarkSkip) {

@@ -28,6 +28,11 @@ const statuses = {
     text: "text-teal-400",
     bg: "bg-teal-400/10",
   },
+  [CHAPTER_STATUS.SCHEDULED]: {
+    label: "Hẹn giờ đăng",
+    text: "text-sky-300",
+    bg: "bg-sky-300/10",
+  },
 };
 
 export function ChapterStatusDropdown({
