@@ -313,7 +313,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       ?.replace(/^www\./i, "")
       ?.toLowerCase();
     if (host === "vinahentai.one") {
-      responseHeaders.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      responseHeaders.set("X-Robots-Tag", "noindex, nofollow, noarchive, noimageindex, nosnippet, notranslate, max-snippet:0");
     }
   } catch {
     // ignore

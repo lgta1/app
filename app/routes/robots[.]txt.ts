@@ -64,7 +64,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "public, max-age=300, s-maxage=300",
-        "X-Robots-Tag": "noindex, nofollow, noarchive",
+        "X-Robots-Tag": "noindex, nofollow, noarchive, noimageindex, nosnippet, notranslate, max-snippet:0",
       },
     });
   }

@@ -92,7 +92,7 @@ export default function handleRequest(
     try {
       const hostname = getRequestHostname();
       if (hostname === "vinahentai.one") {
-        responseHeaders.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+        responseHeaders.set("X-Robots-Tag", "noindex, nofollow, noarchive, noimageindex, nosnippet, notranslate, max-snippet:0");
       }
     } catch {
       // ignore

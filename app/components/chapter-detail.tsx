@@ -811,7 +811,7 @@ useEffect(() => {
             <a
               href="https://vinahentai.one"
               target="_blank"
-              rel="noopener noreferrer"
+              rel="nofollow noopener noreferrer"
               className="text-[17px] font-semibold text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.85)] hover:text-green-300"
             >
               Vinahentai.one

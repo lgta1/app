@@ -13,10 +13,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Backup domain should not expose a sitemap.
   if (host === "vinahentai.one") {
     return new Response("Not Found", {
-      status: 404,
+      status: 410,
       headers: {
         "Cache-Control": "public, max-age=300, s-maxage=300",
-        "X-Robots-Tag": "noindex, nofollow, noarchive",
+        "X-Robots-Tag": "noindex, nofollow, noarchive, noimageindex, nosnippet, notranslate, max-snippet:0",
       },
     });
   }
