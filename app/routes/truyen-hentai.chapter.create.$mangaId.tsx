@@ -18,8 +18,11 @@ import {
   getImageSegmentMeta,
   mergeImagesVertically,
   splitLongImages,
-  validateImageFile,
 } from "~/utils/image-compression.utils";
+import {
+  buildChapterUploadValidationMessage,
+  validateChapterUploadFiles,
+} from "~/utils/chapter-upload-validation.utils";
 import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
 
 // BEGIN <feature> CHAPTER_LOADER_IMPORTS_PERMISSION>
@@ -476,15 +479,20 @@ export default function CreateChapter() {
     const list = Array.from(filesLike);
     if (list.length === 0) return;
 
-    // Validate first
-    try {
-      list.forEach((file) => validateImageFile(file));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "File không hợp lệ");
+    const validation = validateChapterUploadFiles(list);
+    const validationMessage = buildChapterUploadValidationMessage(validation);
+    if (validationMessage) {
+      toast.error(validationMessage);
+    }
+
+    if (validation.validFiles.length === 0) {
+      toast.error("Không có ảnh hợp lệ để thêm.");
       return;
     }
 
-    const splitList = skipCut ? list : await splitLongImages(list, { maxHeight: 3000 });
+    const splitList = skipCut
+      ? validation.validFiles
+      : await splitLongImages(validation.validFiles, { maxHeight: 3000 });
 
     // BEGIN <feature> CHAPTER_SKIP_COMPRESSION_ADD_FILES>
     if (skipCompression) {
@@ -606,10 +614,6 @@ export default function CreateChapter() {
   // ====== BEGIN <feature> FOLDER_PICKER_SUPPORT_REFS> ======
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const IMAGE_EXT = ["jpg","jpeg","png","webp","gif","bmp","tiff","tif"];
-  const isImageName = (name: string) =>
-    IMAGE_EXT.includes(name.split(".").pop()?.toLowerCase() || "");
-
   // (3) Helper loại file ẩn/rác + path utils
   const pathOf = (f: File) => (f as any).webkitRelativePath || f.name;
   const nameOf = (p: string) => p.split("/").pop() || p;
@@ -623,31 +627,29 @@ export default function CreateChapter() {
     const all = Array.from(e.target.files || []);
     if (!all.length) return;
 
-    // (3) Lọc ảnh + bỏ file ẩn
-    let onlyImages = all
-      .filter((f) => (f.type && f.type.startsWith("image/")) || isImageName(f.name))
-      .filter((f) => !isHiddenFile(f));
+    // (3) Bỏ file ẩn, còn lại để validator phân loại hợp lệ/không hợp lệ
+    let candidateFiles = all.filter((f) => !isHiddenFile(f));
 
-    if (onlyImages.length === 0) {
-      toast.error("Không tìm thấy ảnh trong thư mục đã chọn");
+    if (candidateFiles.length === 0) {
+      toast.error("Không tìm thấy file phù hợp trong thư mục đã chọn");
       e.target.value = "";
       return;
     }
 
     // (4) Giới hạn số lượng lớn + confirm
-    if (onlyImages.length > MAX_FILES) {
-      const ok = confirm(`Thư mục có ${onlyImages.length} ảnh. Chỉ lấy ${MAX_FILES} ảnh đầu, OK?`);
+    if (candidateFiles.length > MAX_FILES) {
+      const ok = confirm(`Thư mục có ${candidateFiles.length} file. Chỉ lấy ${MAX_FILES} file đầu, OK?`);
      if (!ok) { e.target.value = ""; return; }
-      onlyImages = onlyImages.slice(0, MAX_FILES);
+      candidateFiles = candidateFiles.slice(0, MAX_FILES);
     }
 
     // (6) Toast khi nhiều ảnh để UX mượt hơn
-    const needSortToast = onlyImages.length > TOAST_SORT_THRESHOLD;
-    if (needSortToast) toast.loading(`Đang sắp xếp ${onlyImages.length} ảnh...`, { id: "folder-sort" });
+    const needSortToast = candidateFiles.length > TOAST_SORT_THRESHOLD;
+    if (needSortToast) toast.loading(`Đang sắp xếp ${candidateFiles.length} file...`, { id: "folder-sort" });
 
     // (5) Sort ổn định theo thư mục -> tên (dùng collator memo)
     const dirOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
-    onlyImages.sort((a, b) => {
+    candidateFiles.sort((a, b) => {
       const pa = pathOf(a), pb = pathOf(b);
       const da = dirOf(pa), db = dirOf(pb);
       const byDir = collator.compare(da, db);
@@ -659,7 +661,7 @@ export default function CreateChapter() {
 
     if (needSortToast) toast.dismiss("folder-sort");
 
-    await addFiles(onlyImages);
+  await addFiles(candidateFiles);
 
     // Cho phép chọn lại cùng thư mục
     e.target.value = "";

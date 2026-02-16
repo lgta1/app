@@ -233,15 +233,22 @@ export function LatestUpdates({
             })}
           </div>
 
-          {/* Index mode: chỉ hiện nút dẫn tới trang danh sách page=2 */}
+          {/* Index mode: CTA chính giữ UX đi thẳng trang 2; vẫn có link canonical phụ cho crawl */}
           {indexMode ? (
-            <div className="mt-8 flex justify-center">
+            <div className="mt-8 flex flex-col items-center gap-2">
               <a
                 href="/danh-sach?page=2"
                 className="rounded-xl bg-btn-primary px-4 py-2 text-sm font-semibold text-bgc-layer1 hover:opacity-90 active:opacity-80"
                 aria-label="Xem thêm"
               >
                 Xem thêm
+              </a>
+              <a
+                href="/danh-sach"
+                className="text-txt-secondary text-xs underline-offset-2 hover:underline"
+                aria-label="Mở trang 1 danh sách truyện"
+              >
+                Trang 1 danh sách
               </a>
             </div>
           ) : (

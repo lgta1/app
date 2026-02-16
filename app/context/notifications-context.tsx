@@ -25,6 +25,7 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(nul
 type ProviderProps = {
   children: ReactNode;
   initialUnreadCount?: number;
+  initialNotifications?: NotificationType[];
 };
 
 const normalizeNotifications = (rows: NotificationType[] | undefined | null) => {
@@ -51,12 +52,23 @@ const postNotificationAction = async (payload: Record<string, string>) => {
 export function NotificationsProvider({
   children,
   initialUnreadCount = 0,
+  initialNotifications,
 }: ProviderProps) {
   const fetcher = useFetcher<NotificationsResponse>();
-  const [notifications, setNotifications] = useState<NotificationType[]>([]);
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const hasInitialSnapshot = Array.isArray(initialNotifications);
+  const initialRows = useMemo(
+    () => normalizeNotifications(initialNotifications).slice(0, MAX_CLIENT_NOTIFICATIONS),
+    [initialNotifications],
+  );
+  const [notifications, setNotifications] = useState<NotificationType[]>(initialRows);
+  const [unreadCount, setUnreadCount] = useState(() => {
+    if (initialRows.length > 0) {
+      return initialRows.filter((item) => !item.isRead).length;
+    }
+    return initialUnreadCount;
+  });
   const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(hasInitialSnapshot);
   const [error, setError] = useState<string | null>(null);
   const pendingLoadRef = useRef(false);
 
@@ -84,6 +96,14 @@ export function NotificationsProvider({
     if (hasLoaded) return;
     setUnreadCount(initialUnreadCount);
   }, [initialUnreadCount, hasLoaded]);
+
+  useEffect(() => {
+    if (!hasInitialSnapshot) return;
+    setNotifications(initialRows);
+    const unread = initialRows.filter((item) => !item.isRead).length;
+    setUnreadCount(unread);
+    setHasLoaded(true);
+  }, [hasInitialSnapshot, initialRows]);
 
   useEffect(() => {
     if (!pendingLoadRef.current) return;

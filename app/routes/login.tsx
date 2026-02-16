@@ -24,6 +24,7 @@ export const meta: MetaFunction = () => {
       content:
         "Đăng nhập Vinahentai để tiếp tục đọc, theo dõi và lưu truyện 18+ yêu thích. Trải nghiệm mượt, ít quảng cáo.",
     },
+    { name: "robots", content: "noindex, follow, noarchive" },
   ];
 };
 

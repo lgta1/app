@@ -184,7 +184,6 @@ const main = async () => {
       { loc: `${CANONICAL_ORIGIN}/leaderboard/revenue`, lastmod: nowIso, changefreq: "daily", priority: "0.5" },
       { loc: `${CANONICAL_ORIGIN}/leaderboard/waifu`, lastmod: nowIso, changefreq: "daily", priority: "0.6" },
       { loc: `${CANONICAL_ORIGIN}/waifu/leaderboard`, lastmod: nowIso, changefreq: "daily", priority: "0.6" },
-      { loc: `${CANONICAL_ORIGIN}/waifu/summon`, lastmod: nowIso, changefreq: "daily", priority: "0.5" },
     ];
 
     const genreDocs = await GenresModel.find({}, { slug: 1, updatedAt: 1 }).lean();

@@ -804,38 +804,62 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Discord CTA */}
-        <div className="bg-bgc-layer2 flex flex-col items-center gap-2 rounded-xl p-3 sm:flex-row sm:justify-between relative z-20">
-          <div className="text-txt-primary font-sans text-base font-medium">
-            Truy cập{" "}
+        {/* Community CTA */}
+        <div className="relative z-20 flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="text-txt-primary text-center font-sans text-base font-medium">
+              Truy cập{" "}
+              <a
+                href="https://vinahentai.one"
+                target="_blank"
+                rel="nofollow noopener noreferrer"
+                className="text-[17px] font-semibold text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.85)] hover:text-green-300"
+              >
+                Vinahentai.one
+              </a>
+              {" "}khi <span className="font-semibold text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.9)]">bị chặn/web sập</span>.
+              <span>{"\u00A0\u00A0\u00A0"}</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
             <a
-              href="https://vinahentai.one"
+              href="https://www.facebook.com/groups/2994904437381840/"
               target="_blank"
-              rel="nofollow noopener noreferrer"
-              className="text-[17px] font-semibold text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.85)] hover:text-green-300"
+              rel="noopener noreferrer"
+              aria-label="Vào Group Facebook"
+              className="flex items-center justify-center gap-2.5 rounded-xl bg-[#1877F2] px-4 py-3 shadow transition-all hover:scale-105"
             >
-              Vinahentai.one
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.099 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.413c0-3.007 1.792-4.669 4.533-4.669 1.313 0 2.686.235 2.686.235v2.953h-1.514c-1.491 0-1.956.929-1.956 1.882v2.259h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.099 24 12.073z" />
+              </svg>
+              <span className="font-sans text-sm font-semibold text-white">
+                Vào Group Facebook
+              </span>
             </a>
-            {" "}khi bị chặn hoặc tải ứng dụng 1.1.1.1 để truy cập
+            <a
+              href="https://discord.gg/equKSnEDUB"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Tham gia Discord"
+              className="flex items-center justify-center gap-2.5 rounded-xl bg-[#5865F2] px-4 py-3 shadow transition-all hover:scale-105"
+            >
+              <img
+                src="/images/icons/discord-white.svg"
+                alt=""
+                className="h-5 w-5"
+                aria-hidden="true"
+              />
+              <span className="font-sans text-sm font-semibold text-white">
+                Tham gia Discord
+              </span>
+            </a>
           </div>
-          <a
-            href="https://discord.gg/equKSnEDUB"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Tham gia Discord VinaHentai"
-            className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#6B8CFF] to-[#D373FF] px-4 py-3 shadow transition-all hover:scale-105"
-          >
-            <img
-              src="/images/icons/discord-white.svg"
-              alt=""
-              className="h-5 w-5"
-              aria-hidden="true"
-            />
-            <span className="font-sans text-sm font-semibold">
-              Tham gia Discord VinaHentai
-            </span>
-          </a>
         </div>
+      </div>
       </div>
 
       {/* Content */}

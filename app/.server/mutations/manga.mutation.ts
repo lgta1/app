@@ -4,6 +4,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 import { generateMangaShareImage } from "@/services/share-image.svc";
 
 import { MANGA_CONTENT_TYPE, MANGA_STATUS, MANGA_USER_STATUS, type MangaContentType } from "~/constants/manga";
+import { CHAPTER_STATUS } from "~/constants/chapter";
 import { ChapterModel } from "~/database/models/chapter.model";
 import { CommentModel } from "~/database/models/comment.model";
 import { UserLikeCommentModel } from "~/database/models/user-like-comment.model";
@@ -464,6 +465,27 @@ export const approveManga = async (request: Request, mangaId: string) => {
     { $set: { status: MANGA_STATUS.APPROVED } },
     { timestamps: false },
   );
+
+  // Khi duyệt manga, tự động duyệt các chapter đang pending để public có thể hiển thị ngay.
+  // Không đụng chapter rejected/scheduled để tránh phá workflow riêng.
+  try {
+    const now = new Date();
+    await ChapterModel.updateMany(
+      {
+        mangaId: String(resolved.targetId),
+        status: CHAPTER_STATUS.PENDING,
+      },
+      {
+        $set: {
+          status: CHAPTER_STATUS.APPROVED,
+          publishedAt: now,
+        },
+      },
+      { timestamps: false },
+    );
+  } catch (error) {
+    console.warn("[approveManga] approve pending chapters failed", error);
+  }
 
   // Notify followers (non-blocking, best-effort) when manga is released (approved).
   if (!wasApproved) {

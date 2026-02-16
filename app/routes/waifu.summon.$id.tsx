@@ -43,6 +43,7 @@ export function meta({ params }: Route.MetaArgs) {
   return [
     { title },
     { name: "description", content: description },
+    { name: "robots", content: "noindex, follow, noarchive" },
     { property: "og:type", content: "website" },
     { property: "og:title", content: title },
     { property: "og:description", content: description },

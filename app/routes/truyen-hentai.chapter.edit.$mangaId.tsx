@@ -27,8 +27,11 @@ import {
   formatFileSize,
   getImageSegmentMeta,
   splitLongImages,
-  validateImageFile,
 } from "~/utils/image-compression.utils";
+import {
+  buildChapterUploadValidationMessage,
+  validateChapterUploadFiles,
+} from "~/utils/chapter-upload-validation.utils";
 import { selectWatermarkIndexes } from "~/utils/watermark-selection.utils";
 import { resolveMangaHandle } from "~/database/helpers/manga-slug.helper";
 
@@ -273,15 +276,20 @@ export function EditChapterView() {
       }
     }
 
-    // Validate files first
-    try {
-      list.forEach((file) => validateImageFile(file));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "File không hợp lệ");
+    const validation = validateChapterUploadFiles(list);
+    const validationMessage = buildChapterUploadValidationMessage(validation);
+    if (validationMessage) {
+      toast.error(validationMessage);
+    }
+
+    if (validation.validFiles.length === 0) {
+      toast.error("Không có ảnh hợp lệ để thêm.");
       return;
     }
 
-    const splitList = skipCut ? list : await splitLongImages(list, { maxHeight: 3000 });
+    const splitList = skipCut
+      ? validation.validFiles
+      : await splitLongImages(validation.validFiles, { maxHeight: 3000 });
 
     // Set compression progress
     setCompressionProgress({

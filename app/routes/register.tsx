@@ -27,6 +27,7 @@ export const meta: MetaFunction = () => {
       content:
         "Tạo tài khoản Vinahentai để theo dõi truyện 18+ vietsub, đồng bộ danh sách yêu thích và nhận cập nhật nhanh. Trải nghiệm mượt, ít quảng cáo.",
     },
+    { name: "robots", content: "noindex, follow, noarchive" },
   ];
 };
 

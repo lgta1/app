@@ -23,6 +23,20 @@ const TRACKING_QUERY_KEYS = new Set([
   "utm_marketing_tactic",
 ]);
 
+const CANONICAL_DROP_QUERY_KEYS = new Set([
+  "debug",
+  "nofonts",
+  "registersuccess",
+  "redirect",
+  "_data",
+  "_datarouteid",
+]);
+
+const CANONICAL_DROP_ALL_QUERY_PATHS = new Set([
+  "/login",
+  "/register",
+]);
+
 function getRequestOrigin(request: Request): string | undefined {
   try {
     const forwardedProto = request.headers.get("x-forwarded-proto") ?? "";
@@ -71,6 +85,29 @@ function stripTrackingParams(search: string): string {
   return nextStr ? `?${nextStr}` : "";
 }
 
+function stripCanonicalParams(pathname: string, search: string): string {
+  if (!search) return "";
+
+  const normalizedPath = normalizePathname(pathname).toLowerCase();
+  if (CANONICAL_DROP_ALL_QUERY_PATHS.has(normalizedPath)) return "";
+
+  const params = new URLSearchParams(search);
+  for (const key of Array.from(params.keys())) {
+    const k = key.toLowerCase();
+    if (k.startsWith("utm_") || TRACKING_QUERY_KEYS.has(k) || CANONICAL_DROP_QUERY_KEYS.has(k)) {
+      params.delete(key);
+    }
+  }
+
+  if (params.get("page") === "1") params.delete("page");
+  if ((params.get("sort") || "").toLowerCase() === "updatedat") params.delete("sort");
+
+  const entries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const next = new URLSearchParams(entries);
+  const nextStr = next.toString();
+  return nextStr ? `?${nextStr}` : "";
+}
+
 function normalizeOrigin(input: string | undefined): string | undefined {
   const raw = (input ?? "").trim();
   if (!raw) return undefined;
@@ -79,6 +116,14 @@ function normalizeOrigin(input: string | undefined): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function shouldForceHttps(hostname: string | undefined): boolean {
+  const host = String(hostname ?? "").trim().toLowerCase();
+  if (!host) return false;
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+  if (host.endsWith(".local")) return false;
+  return true;
 }
 
 export const CANONICAL_ORIGIN =
@@ -106,9 +151,12 @@ export function getCanonicalUrl(request: Request): string {
   // to the primary domain via env. That would make the backup domain emit primary-domain
   // canonicals and can cause the UI to generate absolute links to the primary domain.
   const useEnvOrigin = Boolean(envOrigin) && !isParallelApexHost(effective.hostname);
-  const canonicalOrigin = (useEnvOrigin ? envOrigin : undefined) ?? knownCanonical ?? effective.origin;
+  const effectiveOrigin = shouldForceHttps(effective.hostname)
+    ? `https://${effective.host}`
+    : effective.origin;
+  const canonicalOrigin = (useEnvOrigin ? envOrigin : undefined) ?? knownCanonical ?? effectiveOrigin;
   const canonicalPath = normalizePathname(effective.pathname);
-  const canonicalSearch = stripTrackingParams(effective.search);
+  const canonicalSearch = stripCanonicalParams(canonicalPath, effective.search);
 
   return new URL(`${canonicalPath}${canonicalSearch}`, canonicalOrigin).toString();
 }
@@ -128,7 +176,8 @@ export function getRedirectUrl(request: Request): string {
   const forcedOrigin = knownCanonical ?? undefined;
 
   const nextHost = stripWww(effective.host);
-  const nextOrigin = forcedOrigin ?? `${effective.protocol}//${nextHost}`;
+  const nextProtocol = shouldForceHttps(effective.hostname) ? "https:" : effective.protocol;
+  const nextOrigin = forcedOrigin ?? `${nextProtocol}//${nextHost}`;
   const normalizedPath = normalizePathname(effective.pathname);
   const normalizedSearch = stripTrackingParams(effective.search);
   return new URL(`${normalizedPath}${normalizedSearch}`, nextOrigin).toString();

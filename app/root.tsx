@@ -14,12 +14,13 @@ import { useLocation, useNavigate, useRevalidator } from "react-router-dom";
 import type { Route } from "./+types/root";
 
 import { getAllGenres } from "@/queries/genres.query";
-import { countUnreadNotifications, pruneNotificationsForUser } from "~/.server/queries/notification.query";
+import { getNotificationsWithUnreadCount } from "~/.server/queries/notification.query";
 import { getUserInfoFromSession } from "@/services/session.svc";
 import { ErrorBoundary as CustomErrorBoundary } from "~/components/error-boundary";
 import { Footer } from "~/components/footer";
 import { Header } from "~/components/header";
 import { NotificationsProvider } from "~/context/notifications-context";
+import type { NotificationType } from "~/database/models/notification.model";
 import { DEFAULT_SHARE_IMAGE } from "~/constants/share-images";
 import { isAdmin } from "~/helpers/user.helper";
 import DialogWarningAdultContent from "~/components/dialog-warning-adult-content";
@@ -348,12 +349,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
 
     let unreadCount = 0;
+    let initialNotifications: NotificationType[] = [];
     try {
-      await pruneNotificationsForUser(user.id);
-      unreadCount = await countUnreadNotifications(user.id);
+      const result = await getNotificationsWithUnreadCount(user.id, 10);
+      unreadCount = result.totalUnreadCount;
+      initialNotifications = result.notifications;
     } catch {}
     return json(
-      { isAdmin: isAdmin(user.role), user, genres, unreadCount, isBot, ageVerified, origin, canonicalUrl, cdnBase },
+      { isAdmin: isAdmin(user.role), user, genres, unreadCount, initialNotifications, isBot, ageVerified, origin, canonicalUrl, cdnBase },
       { headers: responseHeaders },
     );
   }
@@ -368,6 +371,7 @@ type RootLoaderData = {
   user?: any;
   genres: any[];
   unreadCount?: number;
+  initialNotifications?: NotificationType[];
   isBot?: boolean;
   ageVerified?: boolean;
   origin?: string;
@@ -385,6 +389,7 @@ export default function App() {
   const effectiveIsAdmin = effectiveUser ? isAdmin((effectiveUser as any).role) : isAdminFromLoader;
   const genres = data?.genres ?? [];
   const unreadCount = data?.unreadCount;
+  const initialNotifications = data?.initialNotifications;
   const isBot = data?.isBot;
   const ageVerified = data?.ageVerified;
   const navigate = useNavigate();
@@ -568,7 +573,6 @@ export default function App() {
   const isHome = location.pathname === "/";
   const isSummon = location.pathname.startsWith("/waifu/summon");
   const isChapter = location.pathname.includes("/chapter/");
-  const isMangaDetail = /^\/manga\/[^/]+$/.test(location.pathname);
 
   // 18+ warning overlay should only appear on pillar entry pages.
   const normalizedPath = (location.pathname.replace(/\/+$/, "") || "/") as string;
@@ -744,8 +748,9 @@ export default function App() {
   return (
       <NotificationsProvider
         key={effectiveUser ? effectiveUser.id : "guest"}
-      initialUnreadCount={typeof unreadCount === "number" ? unreadCount : 0}
-    >
+        initialUnreadCount={typeof unreadCount === "number" ? unreadCount : 0}
+        initialNotifications={initialNotifications}
+      >
       <DialogWarningAdultContent
         enabled={isAdultWarningPillar}
         defaultOpen={isAdultWarningPillar && !ageVerified}
