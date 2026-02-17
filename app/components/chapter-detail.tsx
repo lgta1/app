@@ -11,6 +11,8 @@ import {
   ArrowUpToLine,
   ArrowDownToLine,
   AlertTriangle,
+  Settings,
+  X,
 } from "lucide-react";
 
 import ReportDialog from "./dialog-report";
@@ -45,6 +47,18 @@ const normalizeObjectId = (value: unknown): string => {
   }
   return "";
 };
+
+type ReaderMode = "vertical" | "horizontal";
+type HorizontalDirection = "ltr" | "rtl";
+type DesktopPageSpread = 1 | 2;
+
+type ReaderSettings = {
+  mode: ReaderMode;
+  direction: HorizontalDirection;
+  desktopSpread: DesktopPageSpread;
+};
+
+const READER_SETTINGS_STORAGE_KEY = "vh_reader_settings_v1";
 
 
 type ChapterDetailProps = {
@@ -198,6 +212,14 @@ export function ChapterDetail({
   const [hasCompletedReading, setHasCompletedReading] = useState(false);
   const [readingStartTime, setReadingStartTime] = useState<number | null>(null);
   const [viewportIndex, setViewportIndex] = useState(0);
+  const [readerMode, setReaderMode] = useState<ReaderMode>("vertical");
+  const [horizontalDirection, setHorizontalDirection] = useState<HorizontalDirection>("ltr");
+  const [desktopPageSpread, setDesktopPageSpread] = useState<DesktopPageSpread>(1);
+  const [isReaderSettingsOpen, setIsReaderSettingsOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [horizontalPageIndex, setHorizontalPageIndex] = useState(0);
+  const [isReaderUiVisible, setIsReaderUiVisible] = useState(true);
+  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
 
   const rewardFetcher = useFetcher();
   const expFetcher = useFetcher();
@@ -216,6 +238,233 @@ export function ChapterDetail({
   const readingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastImageRef = useRef<HTMLImageElement | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const horizontalReaderRef = useRef<HTMLDivElement | null>(null);
+  const uiAutoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const chapterImageCacheRef = useRef<Map<string, Set<number>>>(new Map());
+
+  useEffect(() => {
+    const applyViewport = () => {
+      setIsMobileViewport(window.matchMedia("(max-width: 767px)").matches);
+    };
+    applyViewport();
+    window.addEventListener("resize", applyViewport);
+    return () => window.removeEventListener("resize", applyViewport);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(READER_SETTINGS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<ReaderSettings>;
+      const mode = parsed.mode === "horizontal" ? "horizontal" : "vertical";
+      const direction = parsed.direction === "rtl" ? "rtl" : "ltr";
+      const desktopSpread = parsed.desktopSpread === 2 ? 2 : 1;
+      setReaderMode(mode);
+      setHorizontalDirection(direction);
+      setDesktopPageSpread(desktopSpread);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      const payload: ReaderSettings = {
+        mode: readerMode,
+        direction: horizontalDirection,
+        desktopSpread: desktopPageSpread,
+      };
+      localStorage.setItem(READER_SETTINGS_STORAGE_KEY, JSON.stringify(payload));
+    } catch {}
+  }, [readerMode, horizontalDirection, desktopPageSpread]);
+
+  const totalPages = chapter.contentUrls.length;
+  const effectivePageSpread: DesktopPageSpread = !isMobileViewport && readerMode === "horizontal" && desktopPageSpread === 2 ? 2 : 1;
+
+  const clampPageIndex = useCallback((value: number) => {
+    if (!Number.isFinite(value) || totalPages <= 0) return 0;
+    return Math.min(Math.max(0, Math.round(value)), Math.max(0, totalPages - 1));
+  }, [totalPages]);
+
+  useEffect(() => {
+    setHorizontalPageIndex(0);
+    setIsReaderUiVisible(true);
+    setIsProgressExpanded(false);
+    if (uiAutoHideTimerRef.current) {
+      clearTimeout(uiAutoHideTimerRef.current);
+      uiAutoHideTimerRef.current = null;
+    }
+  }, [chapterIdentity]);
+
+  useEffect(() => {
+    setHorizontalPageIndex((prev) => {
+      const safe = clampPageIndex(prev);
+      if (effectivePageSpread === 1) return safe;
+      return Math.max(0, safe - (safe % 2));
+    });
+  }, [effectivePageSpread, clampPageIndex]);
+
+  const scheduleReaderUiAutoHide = useCallback(() => {
+    if (readerMode !== "horizontal" || isReaderSettingsOpen) return;
+    if (uiAutoHideTimerRef.current) clearTimeout(uiAutoHideTimerRef.current);
+    uiAutoHideTimerRef.current = setTimeout(() => {
+      setIsReaderUiVisible(false);
+      setIsProgressExpanded(false);
+    }, 2500);
+  }, [readerMode, isReaderSettingsOpen]);
+
+  const revealReaderUi = useCallback((expandProgress = false) => {
+    setIsReaderUiVisible(true);
+    if (expandProgress) setIsProgressExpanded(true);
+    scheduleReaderUiAutoHide();
+  }, [scheduleReaderUiAutoHide]);
+
+  useEffect(() => {
+    if (readerMode !== "horizontal") {
+      setIsReaderUiVisible(true);
+      setIsProgressExpanded(false);
+      if (uiAutoHideTimerRef.current) {
+        clearTimeout(uiAutoHideTimerRef.current);
+        uiAutoHideTimerRef.current = null;
+      }
+      return;
+    }
+
+    revealReaderUi(false);
+    return () => {
+      if (uiAutoHideTimerRef.current) {
+        clearTimeout(uiAutoHideTimerRef.current);
+        uiAutoHideTimerRef.current = null;
+      }
+    };
+  }, [readerMode, isReaderSettingsOpen, revealReaderUi]);
+
+  const goNextHorizontalPage = useCallback(() => {
+    const step = effectivePageSpread;
+    setHorizontalPageIndex((prev) => clampPageIndex(prev + step));
+    revealReaderUi(false);
+  }, [effectivePageSpread, clampPageIndex, revealReaderUi]);
+
+  const goPrevHorizontalPage = useCallback(() => {
+    const step = effectivePageSpread;
+    setHorizontalPageIndex((prev) => clampPageIndex(prev - step));
+    revealReaderUi(false);
+  }, [effectivePageSpread, clampPageIndex, revealReaderUi]);
+
+  const handleLeftAction = useCallback(() => {
+    if (horizontalDirection === "rtl") goNextHorizontalPage();
+    else goPrevHorizontalPage();
+  }, [horizontalDirection, goNextHorizontalPage, goPrevHorizontalPage]);
+
+  const handleRightAction = useCallback(() => {
+    if (horizontalDirection === "rtl") goPrevHorizontalPage();
+    else goNextHorizontalPage();
+  }, [horizontalDirection, goNextHorizontalPage, goPrevHorizontalPage]);
+
+  const handleHorizontalPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "touch" && e.pointerType !== "pen") {
+      pointerStartRef.current = null;
+      return;
+    }
+    pointerStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+    revealReaderUi(false);
+  }, [revealReaderUi]);
+
+  const handleHorizontalPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+    if (!start) return;
+
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    const elapsed = Date.now() - start.time;
+
+    if (absDx > 40 && absDx > absDy) {
+      if (dx < 0) handleRightAction();
+      else handleLeftAction();
+      return;
+    }
+
+    if (absDx <= 12 && absDy <= 12 && elapsed <= 320) {
+      const target = e.currentTarget;
+      const rect = target.getBoundingClientRect();
+      const ratioX = (e.clientX - rect.left) / Math.max(1, rect.width);
+      if (ratioX >= 0.33 && ratioX <= 0.67) {
+        setIsReaderUiVisible((prev) => {
+          const next = !prev;
+          if (next) {
+            setIsProgressExpanded(true);
+            scheduleReaderUiAutoHide();
+          } else {
+            setIsProgressExpanded(false);
+          }
+          return next;
+        });
+        return;
+      }
+
+      if (ratioX < 0.33) handleLeftAction();
+      else handleRightAction();
+    }
+  }, [handleLeftAction, handleRightAction, scheduleReaderUiAutoHide]);
+
+  useEffect(() => {
+    if (readerMode !== "horizontal") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (horizontalDirection === "rtl") goNextHorizontalPage();
+        else goPrevHorizontalPage();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (horizontalDirection === "rtl") goPrevHorizontalPage();
+        else goNextHorizontalPage();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [readerMode, horizontalDirection, goNextHorizontalPage, goPrevHorizontalPage]);
+
+  const horizontalDisplayedUrls = useMemo(() => {
+    if (readerMode !== "horizontal") return [] as string[];
+    const first = chapter.contentUrls[horizontalPageIndex];
+    if (effectivePageSpread === 1) return first ? [first] : [];
+    const second = chapter.contentUrls[horizontalPageIndex + 1];
+    if (horizontalDirection === "rtl") {
+      return [second, first].filter((url): url is string => Boolean(url));
+    }
+    return [first, second].filter((url): url is string => Boolean(url));
+  }, [readerMode, chapter.contentUrls, horizontalPageIndex, effectivePageSpread, horizontalDirection]);
+
+  useEffect(() => {
+    if (readerMode !== "horizontal") return;
+    const chapterKey = chapterIdentity;
+    const cacheForChapter = chapterImageCacheRef.current.get(chapterKey) ?? new Set<number>();
+    chapterImageCacheRef.current.set(chapterKey, cacheForChapter);
+
+    const targets = [
+      horizontalPageIndex,
+      horizontalPageIndex + 1,
+      horizontalPageIndex + 2,
+      horizontalPageIndex + 3,
+      horizontalPageIndex - 1,
+    ].filter((idx) => idx >= 0 && idx < totalPages);
+
+    targets.forEach((idx) => {
+      if (cacheForChapter.has(idx)) return;
+      const url = chapter.contentUrls[idx];
+      if (!url) return;
+      const img = new Image();
+      img.decoding = "async";
+      img.loading = "eager";
+      img.src = url;
+      cacheForChapter.add(idx);
+    });
+  }, [readerMode, chapterIdentity, chapter.contentUrls, horizontalPageIndex, totalPages]);
 
   // Fetch chapters list
   useEffect(() => {
@@ -762,6 +1011,9 @@ useEffect(() => {
     setViewportIndex((prev) => (index === prev ? prev : index));
   }, []);
 
+  const currentPageDisplay = Math.max(1, Math.min(totalPages, horizontalPageIndex + 1));
+  const shouldHideBottomBar = hideBottomBar || (readerMode === "horizontal" && !isReaderUiVisible);
+
   return (
     <>
       <Toaster position="bottom-right" />
@@ -864,41 +1116,219 @@ useEffect(() => {
 
       {/* Content */}
       <div className="relative z-0 -mx-4 my-6 flex flex-col items-center justify-center overflow-x-hidden sm:mx-0 sm:my-8">
-        {chapter.contentUrls.map((url, index) => {
-          const isLastImage = index === chapter.contentUrls.length - 1;
-          const isImageLoaded = loadedImages.has(url);
-          const eager = index === 0;
-          const isHighPriority = Math.abs(index - viewportIndex) <= 1;
-          const fetchPriority = isHighPriority ? "high" : (index === 0 ? "high" : "low");
-          const decodeBeforeDisplay = index <= viewportIndex + 3;
-          return (
-            <div key={url} className="w-full max-w-[1080px]">
-              <div
-                className="relative flex w-full items-center justify-center"
-                style={isImageLoaded ? undefined : { minHeight: "600px" }}
-              >
-                {!isImageLoaded && (
-                  <div className="absolute inset-0 rounded-xl bg-[rgba(255,255,255,0.02)]" />
-                )}
+        <div className={`mb-3 flex w-full max-w-[1080px] items-center justify-center px-2 transition-opacity duration-200 sm:px-0 ${readerMode === "horizontal" && !isReaderUiVisible ? "pointer-events-none opacity-0" : "opacity-100"}`}>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setIsReaderSettingsOpen((prev) => !prev);
+                setIsReaderUiVisible(true);
+              }}
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0B0F1A]/85 px-3 py-2 text-sm font-medium text-white/90"
+              aria-label="Cài đặt chế độ đọc"
+            >
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Cài đặt chế độ đọc</span>
+            </button>
 
-                <LazyImage
-                  ref={isLastImage ? lastImageRef : undefined}
-                  src={url}
-                  alt={`Chapter ${index + 1}`}
-                  className={`w-full ${isImageLoaded ? "opacity-100" : "opacity-0"}`}
-                  eager={eager}
-                  rootMargin={computedRootMargin}
-                  fetchPriority={fetchPriority as any}
-                  priority={isHighPriority ? "high" : "low"}
-                  decodeBeforeDisplay={decodeBeforeDisplay}
-                  onVisible={() => handleImageVisible(index)}
-                  onLoad={() => handleImageLoad(url)}
-                />
+            {!isMobileViewport && isReaderSettingsOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[280px] rounded-2xl border border-white/10 bg-[#0B0F1A] p-4 shadow-2xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-semibold text-white">Cài đặt chế độ đọc</div>
+                  <button
+                    type="button"
+                    onClick={() => setIsReaderSettingsOpen(false)}
+                    className="rounded-lg border border-white/10 p-1.5 text-white/80"
+                    aria-label="Đóng cài đặt"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="space-y-3 text-sm text-white/90">
+                  <div>
+                    <div className="mb-1 text-white/70">Chế độ đọc</div>
+                    <div className="space-y-1">
+                      <button type="button" onClick={() => setReaderMode("vertical")} className={`w-full rounded-lg border px-3 py-2 text-left ${readerMode === "vertical" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>↕ Dọc</button>
+                      <button type="button" onClick={() => setReaderMode("horizontal")} className={`w-full rounded-lg border px-3 py-2 text-left ${readerMode === "horizontal" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>↔ Ngang</button>
+                    </div>
+                  </div>
+
+                  {readerMode === "horizontal" && (
+                    <div>
+                      <div className="mb-1 text-white/70">Hướng đọc</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setHorizontalDirection("ltr")} className={`rounded-lg border px-3 py-2 ${horizontalDirection === "ltr" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>→ Trái sang phải</button>
+                        <button type="button" onClick={() => setHorizontalDirection("rtl")} className={`rounded-lg border px-3 py-2 ${horizontalDirection === "rtl" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>← Phải sang trái</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {readerMode === "horizontal" && (
+                    <div>
+                      <div className="mb-1 text-white/70">Hiển thị trang</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setDesktopPageSpread(1)} className={`rounded-lg border px-3 py-2 ${desktopPageSpread === 1 ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>
+                          <span className="inline-flex items-center gap-2">
+                            <span aria-hidden="true" className="inline-flex h-4 w-3 rounded-[2px] border border-current" />
+                            <span>1 trang</span>
+                          </span>
+                        </button>
+                        <button type="button" onClick={() => setDesktopPageSpread(2)} className={`rounded-lg border px-3 py-2 ${desktopPageSpread === 2 ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>
+                          <span className="inline-flex items-center gap-2">
+                            <span aria-hidden="true" className="inline-flex items-center gap-0.5">
+                              <span className="inline-flex h-4 w-3 rounded-[2px] border border-current" />
+                              <span className="inline-flex h-4 w-3 rounded-[2px] border border-current" />
+                            </span>
+                            <span>2 trang</span>
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+            )}
+          </div>
+        </div>
+
+        {readerMode === "vertical" ? (
+          chapter.contentUrls.map((url, index) => {
+            const isLastImage = index === chapter.contentUrls.length - 1;
+            const isImageLoaded = loadedImages.has(url);
+            const eager = index === 0;
+            const isHighPriority = Math.abs(index - viewportIndex) <= 1;
+            const fetchPriority = isHighPriority ? "high" : (index === 0 ? "high" : "low");
+            const decodeBeforeDisplay = index <= viewportIndex + 3;
+            return (
+              <div key={url} className="w-full max-w-[1080px]">
+                <div
+                  className="relative flex w-full items-center justify-center"
+                  style={isImageLoaded ? undefined : { minHeight: "600px" }}
+                >
+                  {!isImageLoaded && (
+                    <div className="absolute inset-0 rounded-xl bg-[rgba(255,255,255,0.02)]" />
+                  )}
+
+                  <LazyImage
+                    ref={isLastImage ? lastImageRef : undefined}
+                    src={url}
+                    alt={`Chapter ${index + 1}`}
+                    className={`w-full ${isImageLoaded ? "opacity-100" : "opacity-0"}`}
+                    eager={eager}
+                    rootMargin={computedRootMargin}
+                    fetchPriority={fetchPriority as any}
+                    priority={isHighPriority ? "high" : "low"}
+                    decodeBeforeDisplay={decodeBeforeDisplay}
+                    onVisible={() => handleImageVisible(index)}
+                    onLoad={() => handleImageLoad(url)}
+                  />
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="relative w-full max-w-[1080px]">
+            <div
+              ref={horizontalReaderRef}
+              onPointerDown={handleHorizontalPointerDown}
+              onPointerUp={handleHorizontalPointerUp}
+              onMouseMove={() => revealReaderUi(false)}
+              className={`relative flex w-full touch-pan-y items-center justify-center overflow-hidden rounded-xl ${isMobileViewport ? "min-h-[68vh] bg-black" : "h-[100vh] bg-transparent"}`}
+            >
+              <div className={`grid w-full gap-2 ${horizontalDisplayedUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                {horizontalDisplayedUrls.map((url, idx) => (
+                  <div key={`${url}-${idx}`} className="flex items-center justify-center">
+                    <img
+                      src={url}
+                      alt={`Trang ${horizontalPageIndex + idx + 1}`}
+                      className={isMobileViewport ? "max-h-[88vh] w-auto max-w-full object-contain" : "h-[100vh] w-auto object-contain"}
+                      loading={idx === 0 ? "eager" : "lazy"}
+                      decoding="async"
+                      draggable={false}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                aria-label="Trang trước"
+                onClick={handleLeftAction}
+                className="absolute inset-y-0 left-0 w-1/4 cursor-pointer bg-transparent"
+              />
+              <button
+                type="button"
+                aria-label="Trang sau"
+                onClick={handleRightAction}
+                className="absolute inset-y-0 right-0 w-1/4 cursor-pointer bg-transparent"
+              />
             </div>
-          );
-        })}
+
+            {(isReaderUiVisible || isProgressExpanded) && (
+              <div className="mt-2 w-full px-2 sm:px-0">
+                <div className="mx-auto w-full max-w-[1080px] rounded-xl border border-white/10 bg-[#0B0F1A]/90 p-2 backdrop-blur">
+                  <div className="mb-1 text-center text-xs font-semibold text-white/80">
+                    {currentPageDisplay} / {Math.max(totalPages, 1)}
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(totalPages - 1, 0)}
+                    step={effectivePageSpread}
+                    value={horizontalPageIndex}
+                    onChange={(e) => {
+                      setHorizontalPageIndex(clampPageIndex(Number(e.target.value)));
+                      revealReaderUi(true);
+                    }}
+                    onPointerDown={() => revealReaderUi(true)}
+                    className="w-full accent-blue-500"
+                    aria-label="Tiến độ trang"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {isMobileViewport && isReaderSettingsOpen && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-50 bg-black/40"
+            onClick={() => setIsReaderSettingsOpen(false)}
+            aria-label="Đóng cài đặt"
+          />
+          <div className="fixed inset-x-0 bottom-0 z-[60] rounded-t-2xl border-t border-white/10 bg-[#0B0F1A] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-base font-semibold text-white">Cài đặt chế độ đọc</div>
+              <button type="button" onClick={() => setIsReaderSettingsOpen(false)} className="rounded-lg border border-white/10 p-2 text-white/80" aria-label="Đóng">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm text-white/90">
+              <div>
+                <div className="mb-1 text-white/70">Chế độ đọc</div>
+                <div className="space-y-1">
+                  <button type="button" onClick={() => setReaderMode("vertical")} className={`w-full rounded-lg border px-3 py-2 text-left ${readerMode === "vertical" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>↕ Dọc</button>
+                  <button type="button" onClick={() => setReaderMode("horizontal")} className={`w-full rounded-lg border px-3 py-2 text-left ${readerMode === "horizontal" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>↔ Ngang</button>
+                </div>
+              </div>
+
+              {readerMode === "horizontal" && (
+                <div>
+                  <div className="mb-1 text-white/70">Hướng đọc</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setHorizontalDirection("ltr")} className={`rounded-lg border px-3 py-2 ${horizontalDirection === "ltr" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>→ Trái sang phải</button>
+                    <button type="button" onClick={() => setHorizontalDirection("rtl")} className={`rounded-lg border px-3 py-2 ${horizontalDirection === "rtl" ? "border-lav-500 bg-white/10 text-lav-500" : "border-white/10 text-white/90"}`}>← Phải sang trái</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Static navigation + report (under content) */}
       <div className="mx-auto mb-6 flex w-full max-w-[1080px] flex-col gap-2 px-0">
@@ -1092,7 +1522,7 @@ useEffect(() => {
         ref={barRef}
         className={[
           "fixed bottom-0 left-0 right-0 z-40 w-full will-change-transform transition-transform duration-200 ease-out",
-          hideBottomBar ? "translate-y-full" : "translate-y-0",
+          shouldHideBottomBar ? "translate-y-full" : "translate-y-0",
         ].join(" ")}
         style={{
           paddingBottom: "env(safe-area-inset-bottom)",
