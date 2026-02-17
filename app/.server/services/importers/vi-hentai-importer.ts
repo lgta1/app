@@ -1819,13 +1819,23 @@ export const parseChapterImagesFromHtml = (html: string, baseUrl: string): strin
 
   const decodedUrls = extractObfuscatedReaderUrls(html);
   const nonCover = urls.filter((u) => !u.toLowerCase().includes("/cover/"));
+  const isLikelyPlaceholderUrl = (value: string) => {
+    const lower = value.toLowerCase();
+    if (lower.includes("/storage/images/default/loading.gif")) return true;
+    if (lower.includes("/imgs/fav") && /\/fav\d+\.png(?:\?|$)/i.test(lower)) return true;
+    if (lower.includes("placeholder") || lower.includes("spinner") || lower.includes("loading")) return true;
+    return false;
+  };
+
+  const nonCoverMeaningful = nonCover.filter((u) => !isLikelyPlaceholderUrl(u));
   if (decodedUrls.length) {
-    const preferDecoded = decodedUrls.length >= Math.max(nonCover.length, 5);
+    const preferDecoded =
+      nonCoverMeaningful.length === 0 || decodedUrls.length >= Math.max(nonCoverMeaningful.length, 2);
     if (preferDecoded) {
       // Replace with decoded reader payload when it looks more complete.
       urls.length = 0;
       decodedUrls.forEach((u) => pushUrl(u));
-    } else if (!nonCover.length) {
+    } else if (!nonCoverMeaningful.length) {
       decodedUrls.forEach((u) => pushUrl(u));
     }
   }
