@@ -1,15 +1,25 @@
 import { ROLES } from "~/constants/user";
 import { MangaModel } from "~/database/models/manga.model";
-import { StatisticModel } from "~/database/models/statistic.model";
 import { UserModel } from "~/database/models/user.model";
 
 export const getStatistic = async () => {
-  const statistic = await StatisticModel.findOne({});
-  const totalMembers = await UserModel.countDocuments({ role: ROLES.USER });
-  const totalManga = await MangaModel.countDocuments({});
+  const [totalMembers, totalManga, totalViewsAgg] = await Promise.all([
+    UserModel.countDocuments({ role: ROLES.USER }),
+    MangaModel.countDocuments({}),
+    MangaModel.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalViews: { $sum: { $ifNull: ["$viewNumber", 0] } },
+        },
+      },
+    ]),
+  ]);
+
+  const totalViews = Number(totalViewsAgg?.[0]?.totalViews ?? 0);
 
   return {
-    totalViews: statistic?.totalViews || 0,
+    totalViews: Number.isFinite(totalViews) ? totalViews : 0,
     totalMembers: totalMembers || 0,
     totalManga: totalManga || 0,
   };

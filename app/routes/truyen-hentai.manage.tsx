@@ -64,12 +64,12 @@ export default function MangaManage() {
                     🚀 Muốn trở thành Dịch Giả chính thức?
                   </div>
                   <div>
-                    Chỉ cần đăng đủ 3 truyện có chất lượng dịch ổn định, bạn sẽ được xét cấp role Dịch Giả.
+                    Chỉ cần đăng đủ 3 truyện có chất lượng dịch ổn định, chúng tôi rất vinh dự được trao cho bạn role Dịch Giả.
                   </div>
                   <div className="mt-2">Khi đạt role, bạn sẽ nhận được quyền:</div>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     <li>⚡ Truyện được duyệt ngay lập tức – không cần chờ admin</li>
-                    <li>💎 Nhận dâm ngọc hàng tuần</li>
+                    <li>💎 Nhận ngay 100 Dâm ngọc, và nhận Dn hàng tuần theo số views</li>
                     <li>🎖 Được công nhận là Dịch Giả chính thức trong hệ thống</li>
                     <li>🔥Bạn rất ngầu, là rồng phượng trong loài người</li>
                   </ul>
@@ -206,12 +206,9 @@ export default function MangaManage() {
                     </ul>
                     <div>👉 WEBP 95–99% là lựa chọn rất tốt cho web truyện.</div>
                     <div>❌ Về PNG</div>
-                    <div>PNG là định dạng lossless.</div>
-                    <ul className="list-disc space-y-1 pl-5">
-                      <li>Dung lượng nặng hơn nhiều</li>
-                      <li>Không hiển thị đẹp hơn khi đăng web</li>
-                    </ul>
-                    <div>📌 PNG nên dùng để lưu file gốc. Không nên dùng để đăng truyện nếu muốn tối ưu tốc độ.</div>
+                    <div>PNG là định dạng lưu thông tin (các bước dịch, layers,...) vì thế dung lượng cực nặng.</div>
+                    <div>Không hiển thị đẹp hơn khi đăng web.</div>
+                    <div>📌 PNG chỉ nên dùng để lưu file gốc. Không dùng để đăng truyện.</div>
                   </div>
                   <div>
                     <div className="font-semibold text-white">🧠 CÂU CHỐT</div>

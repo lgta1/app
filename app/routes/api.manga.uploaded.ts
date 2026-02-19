@@ -4,6 +4,7 @@ import { getUserInfoFromSession } from "@/services/session.svc";
 
 import { MangaModel } from "~/database/models/manga.model";
 import { isAdmin } from "~/helpers/user.helper";
+import { DISPLAY_VIEW_FACTOR, toDisplayView } from "~/utils/display-view.utils";
 import { getCdnBase } from "~/.server/utils/cdn-url";
 import { rewriteCdnHostsDeepInPlace } from "~/.server/utils/cdn-host-rewrite";
 
@@ -43,7 +44,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
       MangaModel.countDocuments(matchCondition),
       MangaModel.aggregate([
         { $match: matchCondition },
-        { $group: { _id: null, totalViews: { $sum: { $ifNull: ["$viewNumber", 0] } } } },
+        {
+          $group: {
+            _id: null,
+            totalViews: {
+              $sum: {
+                $round: [{ $multiply: [{ $ifNull: ["$viewNumber", 0] }, DISPLAY_VIEW_FACTOR] }, 0],
+              },
+            },
+          },
+        },
       ]),
     ]);
 
@@ -52,11 +62,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const isAdminUser = Boolean(sessionUser && isAdmin(sessionUser.role));
 
     // Chuyển đổi dữ liệu
-    const mangaList = uploadedMangas.map((manga) => ({
-      ...manga.toObject(),
-      id: manga._id.toString(),
-      slug: manga.slug,
-    }));
+    const mangaList = uploadedMangas.map((manga) => {
+      const obj = manga.toObject();
+      return {
+        ...obj,
+        id: manga._id.toString(),
+        slug: manga.slug,
+        viewNumber: toDisplayView((obj as any).viewNumber),
+      };
+    });
 
     try {
       rewriteCdnHostsDeepInPlace(mangaList as any, getCdnBase(request as any));

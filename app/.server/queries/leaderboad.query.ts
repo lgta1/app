@@ -460,7 +460,7 @@ const aggregateHotCarouselSnapshot = async (opts?: {
     const penalty = Math.min(weeklyPenalty + monthlyPenalty, 0.7);
     const penaltyMultiplier = 1 - penalty;
 
-    // Genre penalty: if manga has one of the penalized genres, reduce score by 60%.
+    // Genre penalty: if manga has one of the penalized genres, reduce score by 70%.
     // Apply to manga only (not COSPLAY).
     const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
     const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
@@ -471,7 +471,7 @@ const aggregateHotCarouselSnapshot = async (opts?: {
     const hasManhwaGenre =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       genreSlugs.some((slug) => penalizedGenreSlugs.has(slug));
-    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
+    const genreMultiplier = hasManhwaGenre ? 0.3 : 1;
 
     // Disturbing tags (guro/scat): disable update boost.
     const hasDisturbingTags =
@@ -715,7 +715,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     const penalty = Math.min(weeklyPenalty + monthlyPenalty, 0.7);
     const penaltyMultiplier = 1 - penalty;
 
-    // Genre penalty: if manga has one of the penalized genres, reduce score by 60%.
+    // Genre penalty: if manga has one of the penalized genres, reduce score by 70%.
     // Apply to manga only (not COSPLAY).
     const contentType = (story as any)?.contentType ?? MANGA_CONTENT_TYPE.MANGA;
     const genres = Array.isArray((story as any)?.genres) ? ((story as any).genres as unknown[]) : [];
@@ -726,7 +726,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     const hasManhwaGenre =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       genreSlugs.some((slug) => penalizedGenreSlugs.has(slug));
-    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
+    const genreMultiplier = hasManhwaGenre ? 0.3 : 1;
 
     const hasDisturbingTags =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
@@ -880,7 +880,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     const steps: string[] = [];
     steps.push("BASE SCORE (rolling 36h buckets)");
     steps.push(`views_0_2h=${Math.max(0, Number((doc as any)?.views_0_2h) || 0)}, views_2_8h=${Math.max(0, Number((doc as any)?.views_2_8h) || 0)}, views_8_24h=${Math.max(0, Number((doc as any)?.views_8_24h) || 0)}, views_24_36h=${Math.max(0, Number((doc as any)?.views_24_36h) || 0)}`);
-    steps.push(`viewsWeighted = v0_2h*1.5 + v2_8h*1.3 + v8_24h*1.0 + v24_36h*1.0 = ${breakdown.baseScoreViewsWeighted}`);
+    steps.push(`viewsWeighted = v0_2h*1.5 + v2_8h*1.3 + v8_24h*1.0 + v24_36h*0.5 = ${breakdown.baseScoreViewsWeighted}`);
     steps.push(`viewsScore = viewsWeighted * VIEW_WEIGHT(${ENV.LEADERBOARD?.daily?.VIEW_WEIGHT ?? 1}) = ${breakdown.baseScoreViewsContribution}`);
     steps.push("commentScore is ignored in HOT carousel scoring");
     steps.push(`baseScore = viewsScore = ${breakdown.baseScore}`);
@@ -890,7 +890,7 @@ export const getHotCarouselLeaderboardWithScores = async (): Promise<HotCarousel
     steps.push(`monthlyRank=${breakdown.monthlyRank ?? "-"}, monthlyPenalty=${breakdown.monthlyPenalty}`);
     steps.push(`penaltyTotal = ${breakdown.penalty} => penaltyMultiplier = ${breakdown.penaltyMultiplier}`);
     steps.push(`updatedAt: ${breakdown.hoursSinceUpdatedAt != null ? `${breakdown.hoursSinceUpdatedAt.toFixed(2)}h ago` : "n/a"} => updateBoostMultiplier = ${breakdown.updateBoostMultiplier}`);
-    steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-60%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
+    steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-70%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
     steps.push(`tags guro/scat: ${breakdown.hasDisturbingTags ? "-50%" : "no"} => disturbingMultiplier = ${breakdown.disturbingMultiplier}`);
     steps.push(`chapters=${breakdown.chapters} (1 => +30%, 2-5 => +10%) => lowChapterBoostMultiplier = ${breakdown.lowChapterBoostMultiplier}`);
     steps.push(`adjustedScore = ${breakdown.baseScore} * ${breakdown.hotStreakMultiplier} * ${breakdown.penaltyMultiplier} * ${breakdown.updateBoostMultiplier} * ${breakdown.genreMultiplier} * ${breakdown.disturbingMultiplier} * ${breakdown.lowChapterBoostMultiplier} = ${breakdown.adjustedScore}`);
@@ -999,7 +999,7 @@ export const getHotCarouselSnapshotWithScores = async (): Promise<HotCarouselSco
     const hasManhwaGenre =
       (contentType === MANGA_CONTENT_TYPE.MANGA || contentType == null) &&
       genres.some((g) => typeof g === "string" && g.trim().toLowerCase() === "manhwa");
-    const genreMultiplier = hasManhwaGenre ? 0.4 : 1;
+    const genreMultiplier = hasManhwaGenre ? 0.3 : 1;
 
     const genreSlugs = genres
       .filter((g) => typeof g === "string")
@@ -1114,7 +1114,7 @@ export const getHotCarouselSnapshotWithScores = async (): Promise<HotCarouselSco
     const steps: string[] = [];
     steps.push("BASE SCORE (rolling 36h buckets)");
     steps.push(`views_0_2h=${Math.max(0, Number((doc as any)?.views_0_2h) || 0)}, views_2_8h=${Math.max(0, Number((doc as any)?.views_2_8h) || 0)}, views_8_24h=${Math.max(0, Number((doc as any)?.views_8_24h) || 0)}, views_24_36h=${Math.max(0, Number((doc as any)?.views_24_36h) || 0)}`);
-    steps.push(`viewsWeighted = v0_2h*1.5 + v2_8h*1.3 + v8_24h*1.0 + v24_36h*1.0 = ${breakdown.baseScoreViewsWeighted}`);
+    steps.push(`viewsWeighted = v0_2h*1.5 + v2_8h*1.3 + v8_24h*1.0 + v24_36h*0.5 = ${breakdown.baseScoreViewsWeighted}`);
     steps.push(`viewsScore = viewsWeighted * VIEW_WEIGHT(${ENV.LEADERBOARD?.daily?.VIEW_WEIGHT ?? 1}) = ${breakdown.baseScoreViewsContribution}`);
     steps.push("commentScore is ignored in HOT carousel scoring");
     steps.push(`baseScore = viewsScore = ${breakdown.baseScore}`);
@@ -1124,7 +1124,7 @@ export const getHotCarouselSnapshotWithScores = async (): Promise<HotCarouselSco
     steps.push(`monthlyRank=${breakdown.monthlyRank ?? "-"}, monthlyPenalty=${breakdown.monthlyPenalty}`);
     steps.push(`penaltyTotal = ${breakdown.penalty} => penaltyMultiplier = ${breakdown.penaltyMultiplier}`);
     steps.push(`updatedAt: ${breakdown.hoursSinceUpdatedAt != null ? `${breakdown.hoursSinceUpdatedAt.toFixed(2)}h ago` : "n/a"} => updateBoostMultiplier = ${breakdown.updateBoostMultiplier}`);
-    steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-60%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
+    steps.push(`genre manhwa: ${breakdown.hasManhwaGenre ? "-70%" : "no"} => genreMultiplier = ${breakdown.genreMultiplier}`);
     steps.push(`tags guro/scat: ${breakdown.hasDisturbingTags ? "-50%" : "no"} => disturbingMultiplier = ${breakdown.disturbingMultiplier}`);
     steps.push(`chapters=${breakdown.chapters} (1 => +30%, 2-5 => +10%) => lowChapterBoostMultiplier = ${breakdown.lowChapterBoostMultiplier}`);
     steps.push(`adjustedScore = ${breakdown.baseScore} * ${breakdown.hotStreakMultiplier} * ${breakdown.penaltyMultiplier} * ${breakdown.updateBoostMultiplier} * ${breakdown.genreMultiplier} * ${breakdown.disturbingMultiplier} * ${breakdown.lowChapterBoostMultiplier} = ${breakdown.adjustedScore}`);
@@ -1227,7 +1227,7 @@ const buildHotCarouselPipeline = (limit: number) => {
             { $multiply: [{ $ifNull: ["$views_0_2h", 0] }, 1.5] },
             { $multiply: [{ $ifNull: ["$views_2_8h", 0] }, 1.3] },
             { $multiply: [{ $ifNull: ["$views_8_24h", 0] }, 1.0] },
-            { $multiply: [{ $ifNull: ["$views_24_36h", 0] }, 1.0] },
+            { $multiply: [{ $ifNull: ["$views_24_36h", 0] }, 0.5] },
           ],
         },
       },

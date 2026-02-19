@@ -4,6 +4,7 @@ import { Eye } from "lucide-react";
 import type { MangaType } from "~/database/models/manga.model";
 import { formatDistanceToNow } from "~/utils/date.utils";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { toDisplayView } from "~/utils/display-view.utils";
 import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 interface LeaderboardTopMangaProps {
@@ -48,7 +49,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
                     <Eye className="text-txt-primary h-3 w-3" />
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {(topManga[1]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
+                      {toDisplayView(topManga[1]?.viewNumber).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
@@ -86,7 +87,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
                     <Eye className="text-txt-primary h-3 w-3" />
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {(topManga[0]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
+                      {toDisplayView(topManga[0]?.viewNumber).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
@@ -124,7 +125,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
                     <Eye className="text-txt-primary h-3 w-3" />
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {(topManga[2]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
+                      {toDisplayView(topManga[2]?.viewNumber).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
@@ -164,7 +165,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
                     <Eye className="text-txt-primary h-3 w-3" />
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {(topManga[0]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
+                      {toDisplayView(topManga[0]?.viewNumber).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
@@ -202,7 +203,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
                     <Eye className="text-txt-primary h-3 w-3" />
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {(topManga[1]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
+                      {toDisplayView(topManga[1]?.viewNumber).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">
@@ -240,7 +241,7 @@ export function LeaderboardTopManga({ topManga }: LeaderboardTopMangaProps) {
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-md">
                     <Eye className="text-txt-primary h-3 w-3" />
                     <span className="text-txt-primary line-clamp-1 text-[10px] font-medium">
-                      {(topManga[2]?.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
+                      {toDisplayView(topManga[2]?.viewNumber).toLocaleString("vi-VN")} lượt xem
                     </span>
                   </div>
                   <div className="bg-bgc-layer-semi-neutral flex items-center justify-center rounded-full px-1.5 py-1 backdrop-blur-md" title="Điểm truyện">

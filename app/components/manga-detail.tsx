@@ -11,6 +11,7 @@ import { formatDate, formatTime } from "~/utils/date.utils";
 import { getChapterDisplayName } from "../utils/chapter.utils";
 import { toSlug } from "~/utils/slug.utils"; // dùng để tạo slug
 import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
+import { toDisplayView } from "~/utils/display-view.utils";
 
 type DescriptionPart =
   | { type: "text"; value: string }
@@ -677,37 +678,20 @@ export function MangaDetail({
     }
   };
 
-  useEffect(() => {
-    const checkFollowStatus = async () => {
-      try {
-        const response = await fetch(`/api/manga-status?mangaId=${mangaIdSafe}`);
-        const data = await response.json();
-        if (response.ok) setIsFollowing(Boolean(data?.isFollowing));
-      } catch (error) {
-        console.error("Error checking follow status:", error);
-      }
-    };
-
-    if (mangaIdSafe) {
-      checkFollowStatus();
-    }
-  }, [mangaIdSafe]);
-
-// ==== GET tiến độ đọc (yêu cầu đã đăng nhập) ====
+// ==== GET trạng thái + tiến độ đọc (gộp 1 request) ====
 useEffect(() => {
   let canceled = false;
 
-  // helper đọc local fallback
   const readLocal = () => {
     try {
       const raw = localStorage.getItem(`manga_progress_${mangaIdSafe}`);
       if (!raw) return null;
       const obj = JSON.parse(raw);
       const rawChap = obj?.chapterNumber;
-      if (typeof rawChap === 'number' && Number.isFinite(rawChap) && rawChap >= 1) {
+      if (typeof rawChap === "number" && Number.isFinite(rawChap) && rawChap >= 1) {
         return rawChap;
       }
-      if (typeof rawChap === 'string') {
+      if (typeof rawChap === "string") {
         const parsed = Number(rawChap);
         return Number.isFinite(parsed) && parsed >= 1 ? parsed : null;
       }
@@ -719,71 +703,59 @@ useEffect(() => {
 
   async function load() {
     if (!mangaIdSafe) {
+      setIsFollowing(false);
       setLastReadChapter(null);
       return;
     }
 
-    // Oneshot: không cần tiến độ "đang dở" → không đọc localStorage, không gọi API.
-    if (hasOneshotGenre) {
-      if (!canceled) setLastReadChapter(null);
-      return;
-    }
-
-    // Khi chưa đăng nhập (hoặc trang preview ẩn actions), chỉ dùng localStorage.
-    // Tránh gọi /api/manga-progress gây 401 và tốn CPU.
-    if (!isLoggedIn || hideActions) {
-      const nLocal = readLocal();
-      if (!canceled) setLastReadChapter(nLocal);
-      return;
-    }
+    const shouldReadProgressFromServer = !hasOneshotGenre && isLoggedIn && !hideActions;
 
     try {
       const res = await fetch(
-        `/api/manga-progress?mangaId=${encodeURIComponent(mangaIdSafe)}`,
-        { credentials: "include", headers: { Accept: "application/json" } }
+        `/api/manga-status?mangaId=${encodeURIComponent(mangaIdSafe)}&includeProgress=${shouldReadProgressFromServer ? "1" : "0"}`,
+        { credentials: "include", headers: { Accept: "application/json" } },
       );
 
-      // Server không OK → thử local
-      if (!res.ok) {
-        const nLocal = readLocal();
-        if (!canceled) setLastReadChapter(nLocal);
-        return;
-      }
-
-      // Dùng tên biến khác "json" để tránh đụng "data" ở scope khác
       const json: any = await res.json().catch(() => null);
       if (canceled) return;
 
-      // 200 nhưng body lỗi → thử local
-      if (!json || json?.error) {
-        const nLocal = readLocal();
-        if (!canceled) setLastReadChapter(nLocal);
+      if (res.ok) {
+        setIsFollowing(Boolean(json?.isFollowing));
+      }
+
+      if (hasOneshotGenre) {
+        setLastReadChapter(null);
         return;
       }
 
-      // 200 OK nhưng chapterNumber thiếu/không hợp lệ → thử local
+      if (!shouldReadProgressFromServer || !res.ok || !json || json?.error) {
+        setLastReadChapter(readLocal());
+        return;
+      }
+
       const raw = json?.chapterNumber;
       const n = raw == null ? null : Number(raw);
       const serverHasValid = Number.isFinite(n) && (n as number) >= 1;
 
       if (serverHasValid) {
         const finalN = n as number;
-        if (!canceled) setLastReadChapter(finalN);
-        // Đồng bộ local để lần sau
+        setLastReadChapter(finalN);
         try {
           localStorage.setItem(
             `manga_progress_${mangaIdSafe}`,
-            JSON.stringify({ chapterNumber: finalN, updatedAt: new Date().toISOString() })
+            JSON.stringify({ chapterNumber: finalN, updatedAt: new Date().toISOString() }),
           );
         } catch {}
       } else {
-        const nLocal = readLocal();
-        if (!canceled) setLastReadChapter(nLocal);
+        setLastReadChapter(readLocal());
       }
     } catch {
-      // Lỗi mạng → fallback local
-      const nLocal = readLocal();
-      if (!canceled) setLastReadChapter(nLocal);
+      if (canceled) return;
+      if (hasOneshotGenre) {
+        setLastReadChapter(null);
+        return;
+      }
+      setLastReadChapter(readLocal());
     }
   }
 
@@ -792,10 +764,16 @@ useEffect(() => {
     canceled = true;
   };
 }, [mangaIdSafe, isLoggedIn, hideActions, hasOneshotGenre]);
-// ==== END GET tiến độ đọc ====
+// ==== END GET trạng thái + tiến độ đọc ====
 
 
   const handleFollowToggle = async () => {
+    if (!isLoggedIn) {
+      const next = typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/";
+      window.location.href = `/login?redirectTo=${encodeURIComponent(next)}`;
+      return;
+    }
+
     if (isLoadingFollow) return;
     setIsLoadingFollow(true);
 
@@ -990,11 +968,11 @@ useEffect(() => {
                     const slug = translatorSlugs[i] || toSlug(String(name));
                     return (
                       (isMobile ? (
-                        <a key={`tr-${slug}-${i}`} href={`/translators/${slug}`} className={chipRectVariants.outlineSubtle + " w-fit"} title={name} aria-label={`Xem dịch giả ${name}`}>
+                        <a key={`tr-${slug}-${i}`} href={`/translators/${slug}`} className={chipRectVariants.outlineSubtle + " w-fit max-w-[286px]"} title={name} aria-label={`Xem dịch giả ${name}`}>
                           <span className="capitalize">{name}</span>
                         </a>
                       ) : (
-                        <Link key={`tr-${slug}-${i}`} to={`/translators/${slug}`} className={chipRectVariants.outlineSubtle + " w-fit"} title={name} aria-label={`Xem dịch giả ${name}`}>
+                        <Link key={`tr-${slug}-${i}`} to={`/translators/${slug}`} className={chipRectVariants.outlineSubtle + " w-fit max-w-[286px]"} title={name} aria-label={`Xem dịch giả ${name}`}>
                           <span className="capitalize">{name}</span>
                         </Link>
                       ))
@@ -1064,7 +1042,7 @@ useEffect(() => {
               <span className="text-txt-secondary inline-flex items-center gap-1.5 text-sm" title="Lượt xem">
                 <Eye className="h-4 w-4" />
                 <span className="text-txt-primary font-medium">
-                  {(viewNumber ?? 0).toLocaleString("vi-VN")}
+                  {toDisplayView(viewNumber).toLocaleString("vi-VN")}
                 </span>
               </span>
               {/* ⭐ Điểm truyện (tổng hợp từ đánh giá các chương) */}
@@ -1243,7 +1221,7 @@ useEffect(() => {
                 <div className="grid grid-cols-[auto_auto] items-start justify-end gap-x-6 text-right">
                   <span className="text-txt-secondary flex items-center justify-end gap-1 text-sm whitespace-nowrap">
                     <Eye className="h-4 w-4" />
-                    {(chapter.viewNumber ?? 0).toLocaleString("vi-VN")}
+                    {toDisplayView(chapter.viewNumber).toLocaleString("vi-VN")}
                   </span>
                   <time
                     className="text-txt-secondary text-sm whitespace-nowrap"

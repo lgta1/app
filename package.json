@@ -20,7 +20,10 @@
     "import:vi-hentai": "tsx scripts/import-vi-hentai.ts",
     "migrate:cdn-host": "tsx scripts/migrate-cdn-host.ts --dry-run",
     "ops:inspect-vi-hentai-jobs": "tsx scripts/ops/inspect-vi-hentai-jobs.ts",
-    "ops:clear-system-lock": "tsx scripts/ops/clear-system-lock.ts"
+    "ops:clear-system-lock": "tsx scripts/ops/clear-system-lock.ts",
+    "ops:analyze-origin-access": "tsx scripts/ops/analyze-origin-access.ts",
+    "ops:benchmark-search": "tsx scripts/ops/benchmark-smart-search.ts",
+    "ops:restore-manga-updatedat": "tsx scripts/ops/restore-manga-updatedat-from-latest-chapter.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.888.0",

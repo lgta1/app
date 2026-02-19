@@ -4,6 +4,7 @@ import { Eye } from "lucide-react";
 
 import type { MangaType } from "~/database/models/manga.model";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { toDisplayView } from "~/utils/display-view.utils";
 import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
 
 export default function RatingItem({
@@ -69,7 +70,7 @@ export default function RatingItem({
           <div className="flex items-center gap-1.5 backdrop-blur-md">
             <Eye className="text-txt-primary h-3 w-3" />
             <span className="text-txt-primary text-xs font-medium">
-              {(manga.viewNumber ?? 0).toLocaleString("vi-VN")} lượt xem
+              {toDisplayView(manga.viewNumber).toLocaleString("vi-VN")} lượt xem
             </span>
           </div>
           <div className="flex items-center gap-1.5 backdrop-blur-md">

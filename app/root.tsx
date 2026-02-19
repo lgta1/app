@@ -29,9 +29,9 @@ import { getDefaultBlacklistTagSlugs } from "~/constants/blacklist-tags";
 
 import appStylesheetUrl from "./app.css?url";
 
-const BAN_CHECK_INTERVAL_MINUTES = 1;
-const BAN_CHECK_INTERVAL_MS = BAN_CHECK_INTERVAL_MINUTES * 60 * 1000;
-const LAST_BAN_CHECK_KEY = "lastBanCheck";
+const USER_STATUS_TTL_MINUTES = 15;
+const USER_STATUS_TTL_MS = USER_STATUS_TTL_MINUTES * 60 * 1000;
+const USER_STATUS_CACHE_KEY = "vh_user_status_cache_v1";
 
 const GA4_MEASUREMENT_ID = "G-BDQQK9ZZBJ";
 const ENABLE_GA4 = import.meta.env.PROD;
@@ -301,9 +301,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   const cdnBase = getCdnBase(request as any).replace(/\/+$/, "");
 
   const responseHeaders = new Headers();
-  // Prevent CDN/Cloudflare from caching HTML/data responses and serving stale asset-hash refs
-  responseHeaders.set("Cache-Control", "private, no-store, max-age=0");
-  responseHeaders.set("Vary", "Cookie");
+  if (user) {
+    // Session-sensitive root payload: never cache.
+    responseHeaders.set("Cache-Control", "private, no-store, max-age=0");
+    responseHeaders.set("Vary", "Cookie");
+  } else {
+    // Anonymous root data: allow short edge/browser caching to reduce origin hits.
+    responseHeaders.set(
+      "Cache-Control",
+      "public, max-age=10, s-maxage=60, stale-while-revalidate=60, stale-if-error=86400",
+    );
+  }
 
   // Backup domain should not be indexed.
   try {
@@ -397,6 +405,7 @@ export default function App() {
   const revalidator = useRevalidator();
   const lastHomeRevalidateAtRef = useRef<number>(0);
   const lastPathnameRef = useRef<string | null>(null);
+  const userStatusInFlightRef = useRef<Promise<void> | null>(null);
 
   const lastPathRef = useRef<string | null>(null);
   const lastNavFromPathRef = useRef<string | null>(null);
@@ -593,46 +602,125 @@ export default function App() {
   }, [user, clientUser]);
 
   useEffect(() => {
-    if (!effectiveUser) return;
-
-    const checkUserBanStatus = async () => {
+    const userId = String((effectiveUser as any)?.id ?? "");
+    if (!userId) {
       try {
-        const response = await fetch("/api/user-status", {
-          headers: { Accept: "application/json" },
-        });
-        const data = await response.json();
-        if (data?.success && data?.data?.isBanned) {
-          navigate("/logout");
-        }
-        // Sync blacklist tags to localStorage for client components (e.g., MangaCard)
+        localStorage.removeItem(USER_STATUS_CACHE_KEY);
+      } catch {}
+      return;
+    }
+
+    let canceled = false;
+
+    const readCachedStatus = () => {
+      try {
+        const raw = localStorage.getItem(USER_STATUS_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as {
+          userId?: string;
+          fetchedAt?: number;
+          isBanned?: boolean;
+          blacklistTags?: string[];
+        };
+        if (!parsed || String(parsed.userId || "") !== userId) return null;
+        if (!Number.isFinite(Number(parsed.fetchedAt))) return null;
+        return {
+          userId,
+          fetchedAt: Number(parsed.fetchedAt),
+          isBanned: Boolean(parsed.isBanned),
+          blacklistTags: Array.isArray(parsed.blacklistTags) ? parsed.blacklistTags : [],
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    const applyStatus = (status: { isBanned: boolean; blacklistTags: string[] }) => {
+      if (status.isBanned) {
+        navigate("/logout");
+      }
+      try {
+        localStorage.setItem("vh_blacklist_tags", JSON.stringify(status.blacklistTags));
+      } catch {}
+    };
+
+    const fetchAndCacheStatus = async () => {
+      const response = await fetch("/api/user-status", {
+        headers: { Accept: "application/json" },
+      });
+      const data = await response.json();
+      if (!data?.success) return;
+
+      const payload = {
+        userId,
+        fetchedAt: Date.now(),
+        isBanned: Boolean(data?.data?.isBanned),
+        blacklistTags: Array.isArray(data?.data?.blacklistTags) ? data.data.blacklistTags : [],
+      };
+
+      try {
+        localStorage.setItem(USER_STATUS_CACHE_KEY, JSON.stringify(payload));
+      } catch {}
+
+      applyStatus(payload);
+    };
+
+    const ensureUserStatus = async (force = false) => {
+      if (canceled) return;
+
+      const cached = readCachedStatus();
+      if (!force && cached && Date.now() - cached.fetchedAt < USER_STATUS_TTL_MS) {
+        applyStatus(cached);
+        return;
+      }
+
+      if (userStatusInFlightRef.current) {
         try {
-          const list = (data?.data?.blacklistTags || []) as string[];
-          if (Array.isArray(list)) {
-            localStorage.setItem("vh_blacklist_tags", JSON.stringify(list));
-          }
+          await userStatusInFlightRef.current;
         } catch {}
-      } catch (error) {
-        console.error("Error checking user ban status:", error);
+        return;
+      }
+
+      const inFlight = (async () => {
+        try {
+          await fetchAndCacheStatus();
+        } catch (error) {
+          console.error("Error checking user ban status:", error);
+        }
+      })();
+
+      userStatusInFlightRef.current = inFlight;
+      try {
+        await inFlight;
+      } finally {
+        if (userStatusInFlightRef.current === inFlight) {
+          userStatusInFlightRef.current = null;
+        }
       }
     };
 
-    const shouldCheckNow = () => {
-      const lastCheck = localStorage.getItem(LAST_BAN_CHECK_KEY);
-      if (!lastCheck) return true;
-      const diff = Date.now() - parseInt(lastCheck, 10);
-      return diff >= BAN_CHECK_INTERVAL_MS;
-    };
+    ensureUserStatus(false);
 
-    const performBanCheck = () => {
-      if (shouldCheckNow()) {
-        localStorage.setItem(LAST_BAN_CHECK_KEY, Date.now().toString());
-        checkUserBanStatus();
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        ensureUserStatus(false);
       }
     };
 
-    performBanCheck();
-    const id = setInterval(performBanCheck, BAN_CHECK_INTERVAL_MS);
-    return () => clearInterval(id);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        ensureUserStatus(false);
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      canceled = true;
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [effectiveUser, navigate]);
 
   // If UI shows guest but session exists, try to refresh user once on client
@@ -674,29 +762,6 @@ export default function App() {
       }
     }
   }, [location.pathname, revalidator]);
-
-  // Revalidate root loader when page is restored from bfcache
-  useEffect(() => {
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        revalidator.revalidate();
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        revalidator.revalidate();
-      }
-    };
-
-    window.addEventListener("pageshow", handlePageShow);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("pageshow", handlePageShow);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [revalidator]);
 
   // Fallback vá lỗi: nếu click vào link nội bộ mà SPA không điều hướng, ép điều hướng full page
   useEffect(() => {

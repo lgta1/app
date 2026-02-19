@@ -50,11 +50,25 @@ const POSTER_ASPECT_TOLERANCE = 0.01;
 const ASPECT_THREE_FOUR = 3 / 4;
 const ASPECT_TWO_THREE = 2 / 3;
 
-const SEGMENT_MAX_HEIGHT = 3000;
+const SEGMENT_MAX_HEIGHT_RATIO = 3;
 const SEGMENT_GROUP_ID_KEY = "__segmentGroupId";
 const SEGMENT_INDEX_KEY = "__segmentIndex";
 const SEGMENT_COUNT_KEY = "__segmentCount";
 const SEGMENT_NOWATERMARK_KEY = "__noWatermark";
+
+const resolveSegmentMaxHeight = (
+  imageWidth: number,
+  opts?: { maxHeight?: number; maxHeightRatio?: number },
+) => {
+  if (typeof opts?.maxHeight === "number" && Number.isFinite(opts.maxHeight) && opts.maxHeight > 0) {
+    return Math.max(1, Math.floor(opts.maxHeight));
+  }
+  const ratio =
+    typeof opts?.maxHeightRatio === "number" && Number.isFinite(opts.maxHeightRatio) && opts.maxHeightRatio > 0
+      ? opts.maxHeightRatio
+      : SEGMENT_MAX_HEIGHT_RATIO;
+  return Math.max(1, Math.floor(imageWidth * ratio));
+};
 
 export const getImageSegmentMeta = (file: File): ImageSegmentMeta => {
   const anyFile = file as any;
@@ -95,14 +109,14 @@ const buildSegmentFileName = (name: string, segmentIndex: number) => {
 };
 
 /**
- * Cắt ảnh dài theo chiều dọc (maxHeight).
+ * Cắt ảnh dài theo chiều dọc.
+ * - Mặc định: maxHeight = width * 3 (ví dụ 1000x5000 => 1000x3000 + 1000x2000).
  * - Tạo meta segment để điều khiển watermark sau này.
  */
 export async function splitLongImages(
   files: File[],
-  opts?: { maxHeight?: number },
+  opts?: { maxHeight?: number; maxHeightRatio?: number },
 ): Promise<File[]> {
-  const maxHeight = opts?.maxHeight ?? SEGMENT_MAX_HEIGHT;
   const results: File[] = [];
 
   for (let i = 0; i < files.length; i++) {
@@ -128,7 +142,20 @@ export async function splitLongImages(
       dims = null;
     }
 
-    if (!dims || dims.height <= maxHeight) {
+    if (!dims) {
+      results.push(
+        setImageSegmentMeta(file, {
+          groupId,
+          segmentIndex: 0,
+          segmentCount: 1,
+          noWatermark: false,
+        }),
+      );
+      continue;
+    }
+
+    const maxHeightByWidth = resolveSegmentMaxHeight(dims.width, opts);
+    if (dims.height <= maxHeightByWidth) {
       results.push(
         setImageSegmentMeta(file, {
           groupId,
@@ -144,11 +171,12 @@ export async function splitLongImages(
     const img = await loadImage(dataUrl);
     const width = img.naturalWidth || img.width;
     const height = img.naturalHeight || img.height;
-    const segmentCount = Math.ceil(height / maxHeight);
+    const maxHeightByImage = resolveSegmentMaxHeight(width, opts);
+    const segmentCount = Math.ceil(height / maxHeightByImage);
 
     for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex++) {
-      const sy = segmentIndex * maxHeight;
-      const sHeight = Math.min(maxHeight, height - sy);
+      const sy = segmentIndex * maxHeightByImage;
+      const sHeight = Math.min(maxHeightByImage, height - sy);
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = sHeight;

@@ -206,7 +206,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (actionType !== "adminUpdatePoster") {
       return Response.json({ success: false, error: "Hành động không hợp lệ" }, { status: 400 });
     }
-
     const [{ requireLogin }, { resolveMangaHandle }, { MangaModel }] = await Promise.all([
       import("~/.server/services/auth.server"),
       import("~/database/helpers/manga-slug.helper"),
@@ -267,6 +266,18 @@ export async function action({ request, params }: Route.ActionArgs) {
     console.error("[manga detail] adminUpdatePoster error", error);
     return Response.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
+}
+
+export function shouldRevalidate({ currentUrl, nextUrl, formMethod, defaultShouldRevalidate }: any) {
+  if (formMethod) return defaultShouldRevalidate;
+
+  const samePath = currentUrl?.pathname === nextUrl?.pathname;
+  const sameSearch = currentUrl?.search === nextUrl?.search;
+  if (samePath && sameSearch) {
+    return false;
+  }
+
+  return defaultShouldRevalidate;
 }
 
 export function meta({ data }: Route.MetaArgs) {
@@ -527,8 +538,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             </li>
             <li>
               <span className="text-txt-focus" title={manga.title || "Manga"}>
-                {(manga.title || "Manga").length > 20
-                  ? (manga.title || "Manga").slice(0, 19).trimEnd() + "…"
+                {(manga.title || "Manga").length > 60
+                  ? (manga.title || "Manga").slice(0, 59).trimEnd() + "…"
                   : (manga.title || "Manga")}
               </span>
             </li>
@@ -559,8 +570,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               </li>
               <li>
                 <span className="text-txt-focus" title={manga.title || "Manga"}>
-                  {(manga.title || "Manga").length > 20
-                    ? (manga.title || "Manga").slice(0, 19).trimEnd() + "…"
+                  {(manga.title || "Manga").length > 40
+                    ? (manga.title || "Manga").slice(0, 39).trimEnd() + "…"
                     : (manga.title || "Manga")}
                 </span>
               </li>

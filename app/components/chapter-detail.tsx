@@ -60,6 +60,151 @@ type ReaderSettings = {
 
 const READER_SETTINGS_STORAGE_KEY = "vh_reader_settings_v1";
 
+const CHAPTER_VIEW_POST_COOLDOWN_MS = 30 * 60 * 1000;
+
+const READING_EVENTS_QUEUE_KEY = "vh:reading-events:queue:v1";
+const READING_EVENTS_LAST_FLUSH_KEY = "vh:reading-events:last-flush-at:v1";
+const READING_EVENTS_FLUSH_INTERVAL_MS = 5 * 60 * 1000;
+const READING_EVENTS_MIN_FLUSH_GAP_MS = 45 * 1000;
+const READING_EVENTS_QUEUE_MAX = 200;
+const CHAPTER_LIST_CACHE_TTL_MS = 10 * 60 * 1000;
+const CHAPTER_LIST_CACHE_KEY_PREFIX = "vh:chapter-list:v1:";
+
+const getSessionTimestamp = (key: string): number => {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return 0;
+    const ts = Number.parseInt(raw, 10);
+    return Number.isFinite(ts) ? ts : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const markSessionTimestamp = (key: string, ts = Date.now()) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, String(ts));
+  } catch {
+    // ignore
+  }
+};
+
+const isRecentlyMarkedInSession = (key: string, cooldownMs: number) => {
+  const ts = getSessionTimestamp(key);
+  if (!ts) return false;
+  return Date.now() - ts < cooldownMs;
+};
+
+type QueuedReadingEvent = {
+  mangaId: string;
+  chapterId?: string;
+  chapterNumber?: number;
+  ts: number;
+};
+
+type ChapterListItem = {
+  value: number;
+  label: string;
+  slug?: string;
+  __title?: string;
+};
+
+type CachedChapterListPayload = {
+  mangaId: string;
+  at: number;
+  items: ChapterListItem[];
+};
+
+const getChapterListCacheKey = (mangaId: string) => `${CHAPTER_LIST_CACHE_KEY_PREFIX}${mangaId}`;
+
+const readChapterListCache = (mangaId: string): CachedChapterListPayload | null => {
+  if (typeof window === "undefined") return null;
+  if (!mangaId) return null;
+  try {
+    const raw = window.localStorage.getItem(getChapterListCacheKey(mangaId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedChapterListPayload;
+    if (!parsed || parsed.mangaId !== mangaId || !Array.isArray(parsed.items)) return null;
+    const at = Number(parsed.at);
+    if (!Number.isFinite(at) || at <= 0) return null;
+    return {
+      mangaId,
+      at,
+      items: parsed.items,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeChapterListCache = (mangaId: string, items: ChapterListItem[]) => {
+  if (typeof window === "undefined") return;
+  if (!mangaId || !Array.isArray(items) || items.length === 0) return;
+  try {
+    const payload: CachedChapterListPayload = {
+      mangaId,
+      at: Date.now(),
+      items,
+    };
+    window.localStorage.setItem(getChapterListCacheKey(mangaId), JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+};
+
+const readReadingEventsQueue = (): QueuedReadingEvent[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(READING_EVENTS_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => ({
+        mangaId: String(item?.mangaId || "").trim(),
+        chapterId: String(item?.chapterId || "").trim() || undefined,
+        chapterNumber: Number.isFinite(Number(item?.chapterNumber)) ? Number(item.chapterNumber) : undefined,
+        ts: Number.isFinite(Number(item?.ts)) ? Number(item.ts) : Date.now(),
+      }))
+      .filter((item) => Boolean(item.mangaId));
+  } catch {
+    return [];
+  }
+};
+
+const writeReadingEventsQueue = (queue: QueuedReadingEvent[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    const normalized = queue.slice(-READING_EVENTS_QUEUE_MAX);
+    window.sessionStorage.setItem(READING_EVENTS_QUEUE_KEY, JSON.stringify(normalized));
+  } catch {
+    // ignore
+  }
+};
+
+const enqueueReadingEvent = (event: QueuedReadingEvent) => {
+  const queue = readReadingEventsQueue();
+  const dedupeKey = `${event.mangaId}:${event.chapterId || ""}:${event.chapterNumber || ""}`;
+  const exists = queue.some(
+    (item) => `${item.mangaId}:${item.chapterId || ""}:${item.chapterNumber || ""}` === dedupeKey,
+  );
+  if (exists) return;
+  queue.push(event);
+  writeReadingEventsQueue(queue);
+};
+
+const shouldFlushReadingEvents = () => {
+  const lastAt = getSessionTimestamp(READING_EVENTS_LAST_FLUSH_KEY);
+  if (!lastAt) return true;
+  return Date.now() - lastAt >= READING_EVENTS_MIN_FLUSH_GAP_MS;
+};
+
+const markReadingEventsFlushedNow = () => {
+  markSessionTimestamp(READING_EVENTS_LAST_FLUSH_KEY);
+};
+
 
 type ChapterDetailProps = {
   chapter: ChapterType & {
@@ -153,7 +298,7 @@ export function ChapterDetail({
   const navigate = useNavigate();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [hasClaimedThisChapter, setHasClaimedThisChapter] = useState(false);
-  const [chapters, setChapters] = useState<Array<{ value: number; label: string; slug?: string }>>([]);
+  const [chapters, setChapters] = useState<ChapterListItem[]>([]);
 
   // === Sticky bottom auto hide/show ===
   const [hideBottomBar, setHideBottomBar] = useState(false);
@@ -451,6 +596,7 @@ export function ChapterDetail({
       horizontalPageIndex + 1,
       horizontalPageIndex + 2,
       horizontalPageIndex + 3,
+      horizontalPageIndex + 4,
       horizontalPageIndex - 1,
     ].filter((idx) => idx >= 0 && idx < totalPages);
 
@@ -469,12 +615,23 @@ export function ChapterDetail({
   // Fetch chapters list
   useEffect(() => {
     if (!mangaIdResolved) return;
+
+    if (!isLoggedIn) {
+      const cached = readChapterListCache(mangaIdResolved);
+      if (cached?.items?.length) {
+        setChapters(cached.items);
+      }
+      if (cached && Date.now() - cached.at < CHAPTER_LIST_CACHE_TTL_MS) {
+        return;
+      }
+    }
+
     chaptersFetcher.load(`/api/chapters/list?mangaId=${mangaIdResolved}`);
     // The fetcher instance is stable for the component lifetime; including it here
     // causes React to treat each state change as a new dependency and re-run the
     // effect in a tight loop. We only need to refetch when the manga changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mangaIdResolved]);
+  }, [mangaIdResolved, isLoggedIn]);
 
   // Handle chapters list response
   useEffect(() => {
@@ -491,9 +648,12 @@ export function ChapterDetail({
           slug: c.slug,
         }));
         setChapters(normalized);
+        if (!isLoggedIn && mangaIdResolved) {
+          writeChapterListCache(mangaIdResolved, normalized);
+        }
       }
     }
-  }, [chaptersFetcher.data]);
+  }, [chaptersFetcher.data, isLoggedIn, mangaIdResolved]);
 
   // Sync reaction state only when switching to a different chapter.
   // Avoids overwriting optimistic/confirmed reaction with stale loader data during re-renders.
@@ -731,22 +891,15 @@ export function ChapterDetail({
       );
     } catch {}
 
-    // Chỉ sync lên server khi đã đăng nhập (tránh 401 spam).
-    if (!isLoggedIn) return;
-
-    const fd = new FormData();
-    fd.append("mangaId", mId);
-    fd.append("chapterNumber", String(cNum));
-
-    // Fire-and-forget, không chặn UI
-    fetch("/api/manga-progress", {
-      method: "POST",
-      body: fd,
-      credentials: "include",
-    }).catch(() => {
-      // im lặng: không ảnh hưởng UX
+    // CPU-first: không sync per-chapter lên server.
+    // Chỉ đẩy event vào queue để flush theo lô.
+    enqueueReadingEvent({
+      mangaId: mId,
+      chapterId: chapterIdResolved || undefined,
+      chapterNumber: cNum,
+      ts: Date.now(),
     });
-  }, [chapter?.mangaId, chapter?.chapterNumber, isLoggedIn]);
+  }, [chapter?.mangaId, chapter?.chapterNumber, chapterIdResolved]);
   // ==== END POST tiến độ đọc ====
 
 // ==== POST tăng view CHỈ KHI user ở trang đủ 60 giây (liền mạch, pause/resume) ====
@@ -754,6 +907,11 @@ useEffect(() => {
   const id = chapterIdResolved;
   const hasFallback = Boolean(chapter?.mangaId && chapter?.chapterNumber);
   if (!id && !hasFallback) return;
+
+  const chapterViewKey = `vh:chapter-view:${chapterIdentity}`;
+  if (isRecentlyMarkedInSession(chapterViewKey, CHAPTER_VIEW_POST_COOLDOWN_MS)) {
+    return;
+  }
 
   const REQUIRED = 30_000; // 30s visible liên tục
   let accumulated = 0;
@@ -763,31 +921,25 @@ useEffect(() => {
 
   const postViewOnce = async () => {
     if (posted) return;
-    posted = true;
-    try {
-      const fd = new FormData();
-      if (id) {
-        fd.append("chapterId", String(id));
-      }
-      if (chapter?.mangaId) {
-        fd.append("mangaId", String(chapter.mangaId));
-      }
-      if (chapter?.chapterNumber) {
-        fd.append("chapterNumber", String(chapter.chapterNumber));
-      }
-
-      const res = await fetch("/api/chapter-view", {
-        method: "POST",
-        body: fd,
-        cache: "no-store",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        console.error("/api/chapter-view failed", res.status);
-      }
-    } catch (e) {
-      console.error("/api/chapter-view error", e);
+    if (isRecentlyMarkedInSession(chapterViewKey, CHAPTER_VIEW_POST_COOLDOWN_MS)) {
+      posted = true;
+      return;
     }
+    posted = true;
+
+    const mangaId = String(chapter?.mangaId || "").trim();
+    if (!mangaId) {
+      posted = false;
+      return;
+    }
+
+    enqueueReadingEvent({
+      mangaId,
+      chapterId: id ? String(id) : undefined,
+      chapterNumber: Number.isFinite(Number(chapter?.chapterNumber)) ? Number(chapter?.chapterNumber) : undefined,
+      ts: Date.now(),
+    });
+    markSessionTimestamp(chapterViewKey);
   };
 
   const clearRunTimer = () => {
@@ -835,8 +987,86 @@ useEffect(() => {
     document.removeEventListener("visibilitychange", onVis);
     handleHidden();
   };
-}, [chapterIdResolved, chapter?.mangaId, chapter?.chapterNumber]);
+}, [chapterIdResolved, chapter?.mangaId, chapter?.chapterNumber, chapterIdentity]);
 // ==== END POST tăng view sau 60s ====
+
+// ==== FLUSH batch reading events (CPU-first) ====
+useEffect(() => {
+  let flushing = false;
+
+  const flushReadingEvents = async (reason: string) => {
+    if (flushing) return;
+    if (!shouldFlushReadingEvents()) return;
+
+    const queue = readReadingEventsQueue();
+    if (!queue.length) return;
+
+    const payload = JSON.stringify({
+      reason,
+      events: queue.slice(-READING_EVENTS_QUEUE_MAX).map((event) => ({
+        mangaId: event.mangaId,
+        chapterId: event.chapterId,
+        chapterNumber: event.chapterNumber,
+        ts: event.ts,
+      })),
+    });
+
+    flushing = true;
+    try {
+      let accepted = false;
+
+      if (reason !== "interval" && typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        const blob = new Blob([payload], { type: "application/json" });
+        accepted = navigator.sendBeacon("/api/reading-events-batch", blob);
+      }
+
+      if (!accepted) {
+        const res = await fetch("/api/reading-events-batch", {
+          method: "POST",
+          body: payload,
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          keepalive: reason !== "interval",
+          cache: "no-store",
+        });
+        accepted = res.ok;
+      }
+
+      if (accepted) {
+        writeReadingEventsQueue([]);
+        markReadingEventsFlushedNow();
+      }
+    } catch {
+      // keep queue for next flush attempt
+    } finally {
+      flushing = false;
+    }
+  };
+
+  const intervalId = window.setInterval(() => {
+    flushReadingEvents("interval");
+  }, READING_EVENTS_FLUSH_INTERVAL_MS);
+
+  const onPageHide = () => {
+    flushReadingEvents("pagehide");
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") {
+      flushReadingEvents("hidden");
+    }
+  };
+
+  window.addEventListener("pagehide", onPageHide);
+  document.addEventListener("visibilitychange", onVisibility);
+
+  return () => {
+    window.clearInterval(intervalId);
+    window.removeEventListener("pagehide", onPageHide);
+    document.removeEventListener("visibilitychange", onVisibility);
+    flushReadingEvents("unmount");
+  };
+}, []);
+// ==== END FLUSH batch reading events ====
 
 
   const handleImageLoad = (url: string) => {
@@ -972,7 +1202,8 @@ useEffect(() => {
   // Giới hạn chiều dài hiển thị tiêu đề chương trên nút dropdown (sticky bottom & static bar)
   const truncateTitle = (s: string, limit: number) => (s.length > limit ? s.slice(0, limit).trimEnd() + "…" : s);
   const isDesktop = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(min-width: 1024px)").matches;
-  const titleLimit = isDesktop ? 40 : 10; // desktop: 40, mobile: 10
+  const titleLimit = isDesktop ? 80 : 10; // desktop: 80, mobile: 10
+  const breadcrumbLabelLimit = isDesktop ? 40 : 20; // desktop: x2, mobile giữ nguyên
   const buttonLabel = truncateTitle(displayTitle, titleLimit);
   const renderChapterOption = (opt: any) => String(opt?.label ?? "");
 
@@ -1017,9 +1248,68 @@ useEffect(() => {
   return (
     <>
       <Toaster position="bottom-right" />
-      {/* Header + Discord CTA */}
+      {/* Community CTA */}
+      <div className="mx-auto mb-4 flex w-full max-w-[1080px] justify-center px-4 sm:px-6 lg:px-0">
+        <div className="relative z-20 flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="text-txt-primary text-center font-sans text-base font-medium">
+              Truy cập{" "}
+              <a
+                href="https://vinahentai.one"
+                target="_blank"
+                rel="nofollow noopener noreferrer"
+                className="text-[17px] font-semibold text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.85)] hover:text-green-300"
+              >
+                Vinahentai.one
+              </a>
+              {" "}khi <span className="font-semibold text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.9)]">bị chặn/web sập</span>.
+              <span>{"\u00A0\u00A0\u00A0"}</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <a
+                href="https://discord.gg/equKSnEDUB"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Tham gia Discord"
+                className="flex items-center justify-center gap-2.5 rounded-xl bg-[#5865F2] px-4 py-3 shadow transition-all hover:scale-105"
+              >
+                <img
+                  src="/images/icons/discord-white.svg"
+                  alt=""
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                />
+                <span className="font-sans text-sm font-semibold text-white">
+                  Tham gia Discord
+                </span>
+              </a>
+              <a
+                href="https://www.facebook.com/groups/2994904437381840/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Vào Group Facebook"
+                className="flex items-center justify-center gap-2.5 rounded-xl bg-[#1877F2] px-4 py-3 shadow transition-all hover:scale-105"
+              >
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.099 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.413c0-3.007 1.792-4.669 4.533-4.669 1.313 0 2.686.235 2.686.235v2.953h-1.514c-1.491 0-1.956.929-1.956 1.882v2.259h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.099 24 12.073z" />
+                </svg>
+                <span className="font-sans text-sm font-semibold text-white">
+                  <span className="sm:hidden">Facebook</span>
+                  <span className="hidden sm:inline">Vào Group Facebook</span>
+                </span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Header */}
       <div className="bg-bgc-layer1 border-bd-default mx-auto flex w-full max-w-[1080px] flex-col gap-4 rounded-xl border p-4 sm:p-6 isolate">
-        {/* Header */}
         <div className="flex flex-col gap-2">
           <nav
             aria-label="Breadcrumb"
@@ -1029,7 +1319,7 @@ useEffect(() => {
               {normalizedBreadcrumbItems.map((item, index) => {
                 const isLast = index === normalizedBreadcrumbItems.length - 1;
                 const originalLabel = String(item.label ?? "");
-                const truncated = truncateBreadcrumbLabel(originalLabel, 20);
+                const truncated = truncateBreadcrumbLabel(originalLabel, breadcrumbLabelLimit);
                 return (
                   <li key={`${item.label}-${index}`} className="flex items-center gap-0.5 sm:gap-1">
                     {item.href && !isLast ? (
@@ -1055,63 +1345,6 @@ useEffect(() => {
             {displayTitle}
           </div>
         </div>
-
-        {/* Community CTA */}
-        <div className="relative z-20 flex justify-center">
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <div className="text-txt-primary text-center font-sans text-base font-medium">
-              Truy cập{" "}
-              <a
-                href="https://vinahentai.one"
-                target="_blank"
-                rel="nofollow noopener noreferrer"
-                className="text-[17px] font-semibold text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.85)] hover:text-green-300"
-              >
-                Vinahentai.one
-              </a>
-              {" "}khi <span className="font-semibold text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.9)]">bị chặn/web sập</span>.
-              <span>{"\u00A0\u00A0\u00A0"}</span>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-            <a
-              href="https://www.facebook.com/groups/2994904437381840/"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Vào Group Facebook"
-              className="flex items-center justify-center gap-2.5 rounded-xl bg-[#1877F2] px-4 py-3 shadow transition-all hover:scale-105"
-            >
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.099 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.413c0-3.007 1.792-4.669 4.533-4.669 1.313 0 2.686.235 2.686.235v2.953h-1.514c-1.491 0-1.956.929-1.956 1.882v2.259h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.099 24 12.073z" />
-              </svg>
-              <span className="font-sans text-sm font-semibold text-white">
-                Vào Group Facebook
-              </span>
-            </a>
-            <a
-              href="https://discord.gg/equKSnEDUB"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Tham gia Discord"
-              className="flex items-center justify-center gap-2.5 rounded-xl bg-[#5865F2] px-4 py-3 shadow transition-all hover:scale-105"
-            >
-              <img
-                src="/images/icons/discord-white.svg"
-                alt=""
-                className="h-5 w-5"
-                aria-hidden="true"
-              />
-              <span className="font-sans text-sm font-semibold text-white">
-                Tham gia Discord
-              </span>
-            </a>
-          </div>
-        </div>
-      </div>
       </div>
 
       {/* Content */}
@@ -1128,7 +1361,7 @@ useEffect(() => {
               aria-label="Cài đặt chế độ đọc"
             >
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Cài đặt chế độ đọc</span>
+              <span>Cài đặt chế độ đọc</span>
             </button>
 
             {!isMobileViewport && isReaderSettingsOpen && (
@@ -1250,18 +1483,22 @@ useEffect(() => {
                 ))}
               </div>
 
-              <button
-                type="button"
-                aria-label="Trang trước"
-                onClick={handleLeftAction}
-                className="absolute inset-y-0 left-0 w-1/4 cursor-pointer bg-transparent"
-              />
-              <button
-                type="button"
-                aria-label="Trang sau"
-                onClick={handleRightAction}
-                className="absolute inset-y-0 right-0 w-1/4 cursor-pointer bg-transparent"
-              />
+              {!isMobileViewport && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Trang trước"
+                    onClick={handleLeftAction}
+                    className="absolute inset-y-0 left-0 w-1/4 cursor-pointer bg-transparent"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Trang sau"
+                    onClick={handleRightAction}
+                    className="absolute inset-y-0 right-0 w-1/4 cursor-pointer bg-transparent"
+                  />
+                </>
+              )}
             </div>
 
             {(isReaderUiVisible || isProgressExpanded) && (

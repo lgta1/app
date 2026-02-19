@@ -289,7 +289,7 @@ export function EditChapterView() {
 
     const splitList = skipCut
       ? validation.validFiles
-      : await splitLongImages(validation.validFiles, { maxHeight: 3000 });
+      : await splitLongImages(validation.validFiles);
 
     // Set compression progress
     setCompressionProgress({

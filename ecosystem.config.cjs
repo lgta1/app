@@ -52,6 +52,10 @@ for (let i = 0; i < instances; i++) {
       LEGACY_SITE_HOSTS: "vinahentai.fun,www.vinahentai.fun,vinahentai.top,www.vinahentai.top,vinahentai.xyz,www.vinahentai.xyz,vinahentai.com,www.vinahentai.com",
       LEGACY_CDN_HOSTS: "cdn.vinahentai.fun,cdn.vinahentai.top,cdn.vinahentai.xyz,cdn.vinahentai.com,cdn.hoangsatruongsalacuavietnam.site",
 
+      ACCESS_LOG_ENABLED: "true",
+      ACCESS_LOG_ONLY_CLOUDFLARE: "true",
+      ACCESS_LOG_SAMPLE_RATE: "1",
+
       // IMPORTANT: host-only cookies so sessions work on multiple apex domains
       // (vinahentai.online + vinahentai.one). Do NOT set a fixed cookie Domain.
       // COOKIE_DOMAIN: ".vinahentai.online",

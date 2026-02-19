@@ -53,7 +53,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
   const totalViewsValue =
     typeof responseMeta?.totalViews === "number"
       ? responseMeta.totalViews
-      : uploadedMangas.reduce((sum, manga) => sum + (manga.viewNumber || 0), 0);
+      : uploadedMangas.reduce((sum, manga) => sum + Number(manga.viewNumber || 0), 0);
   const totalViewsText = totalViewsValue.toLocaleString();
   const isAdminUser = Boolean(responseMeta?.isAdminUser);
 
@@ -275,7 +275,7 @@ export function ProfileMangaUploaded({ userId }: ProfileMangaUploadedProps) {
                             <div className="flex items-center gap-1.5 rounded-[32px] backdrop-blur-[3.40px]">
                               <Eye className="text-txt-secondary h-3 w-3" />
                               <span className="text-txt-secondary text-xs font-medium">
-                                {manga.viewNumber?.toLocaleString()}
+                                {Number(manga.viewNumber || 0).toLocaleString("vi-VN")}
                               </span>
                             </div>
                           </div>

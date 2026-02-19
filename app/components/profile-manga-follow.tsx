@@ -8,6 +8,7 @@ import { Pagination } from "~/components/pagination";
 import type { MangaType } from "~/database/models/manga.model";
 import { usePagination } from "~/hooks/use-pagination";
 import { buildMangaUrl } from "~/utils/manga-url.utils";
+import { toDisplayView } from "~/utils/display-view.utils";
 
 interface ProfileMangaFollowProps {
   userId?: string;
@@ -132,7 +133,7 @@ export function ProfileMangaFollow({ userId }: ProfileMangaFollowProps) {
                   <div className="grid grid-cols-2 gap-3 text-xs font-semibold text-txt-secondary sm:flex sm:flex-wrap sm:gap-4">
                     <div className="flex items-center gap-1">
                       <Eye className="h-3.5 w-3.5" />
-                      <span>{manga.viewNumber?.toLocaleString() ?? 0}</span>
+                      <span>{toDisplayView(manga.viewNumber).toLocaleString("vi-VN")}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="tabular-nums">

@@ -1978,7 +1978,7 @@ export const importChapterFromSourceUrl = async (
       await createChapterAsAdmin({
         mangaId,
         title: sanitizeWhitespace(chapterTitle) || "",
-        chapterNumber: chapterIndex + 1,
+        chapterNumber: chapterNumberForPath,
         sourceChapterUrl: chapterUrl,
         contentUrls,
         contentBytes: totalBytes,

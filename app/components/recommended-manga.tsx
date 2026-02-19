@@ -44,6 +44,7 @@ export default function RecommendedManga({ mangaList, variant = "detail-vertical
     const slides = useMemo(() => items.slice(0, 10), [items]);
     const shouldLoop = slides.length > columns;
     const renderSlides = useMemo(() => (shouldLoop ? slides.concat(slides) : slides), [slides, shouldLoop]);
+    const autoScrollEnabled = false;
 
     const updateLayout = useCallback(() => {
       const el = trackRef.current;
@@ -115,13 +116,13 @@ export default function RecommendedManga({ mangaList, variant = "detail-vertical
     );
 
     useEffect(() => {
-      if (!shouldLoop || !cardWidth) return;
+      if (!autoScrollEnabled || !shouldLoop || !cardWidth) return;
       const interval = window.setInterval(() => {
         if (paused || dragging) return;
         scrollByStep(1);
       }, 3600);
       return () => window.clearInterval(interval);
-    }, [scrollByStep, paused, dragging, shouldLoop, cardWidth]);
+    }, [autoScrollEnabled, scrollByStep, paused, dragging, shouldLoop, cardWidth]);
 
     useEffect(() => {
       const el = trackRef.current;

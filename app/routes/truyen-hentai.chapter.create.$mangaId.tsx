@@ -492,7 +492,7 @@ export default function CreateChapter() {
 
     const splitList = skipCut
       ? validation.validFiles
-      : await splitLongImages(validation.validFiles, { maxHeight: 3000 });
+      : await splitLongImages(validation.validFiles);
 
     // BEGIN <feature> CHAPTER_SKIP_COMPRESSION_ADD_FILES>
     if (skipCompression) {

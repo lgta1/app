@@ -211,6 +211,18 @@ export function meta({ data }: any) {
   ];
 }
 
+export function shouldRevalidate({ currentUrl, nextUrl, formMethod, defaultShouldRevalidate }: any) {
+  if (formMethod) return defaultShouldRevalidate;
+
+  const samePath = currentUrl?.pathname === nextUrl?.pathname;
+  const sameSearch = currentUrl?.search === nextUrl?.search;
+  if (samePath && sameSearch) {
+    return false;
+  }
+
+  return defaultShouldRevalidate;
+}
+
 export default function ChapterReader() {
   const { chapter, recommendedManga, isLoggedIn, rewardEligibility } = useLoaderData<typeof loader>();
 

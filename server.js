@@ -17,6 +17,16 @@ dotenv.config({
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const MODE = NODE_ENV;
 
+const ACCESS_LOG_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.ACCESS_LOG_ENABLED ?? "false"));
+const ACCESS_LOG_ONLY_CLOUDFLARE = /^(1|true|yes|on)$/i.test(
+  String(process.env.ACCESS_LOG_ONLY_CLOUDFLARE ?? "true"),
+);
+const ACCESS_LOG_SAMPLE_RATE = (() => {
+  const parsed = Number.parseFloat(String(process.env.ACCESS_LOG_SAMPLE_RATE ?? "1"));
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.max(0, Math.min(1, parsed));
+})();
+
 const clientDir = path.join(__dirname, "build", "client");
 const publicDir = path.join(__dirname, "public");
 
@@ -71,13 +81,102 @@ const shouldTryServeStatic = (pathname) => {
 
 const isSitemapXmlPath = (pathname) => /^\/sitemap.*\.xml$/i.test(pathname);
 
+const BOT_PROBE_404_PATTERNS = [
+  /^\/wp-login\.php$/i,
+  /^\/xmlrpc\.php$/i,
+  /^\/wp-admin(?:\/|$)/i,
+  /^\/wp-content(?:\/|$)/i,
+  /^\/wp-includes(?:\/|$)/i,
+  /^\/actuator(?:\/|$)/i,
+  /^\/package\/dynamic_js\//i,
+  /^\/\.well-known\/(?:passkey-endpoints|assetlinks\.json)$/i,
+];
+
+const isKnownBotProbePath = (pathname) => BOT_PROBE_404_PATTERNS.some((pattern) => pattern.test(pathname));
+
+const shouldLogAccessEntry = (req) => {
+  if (!ACCESS_LOG_ENABLED) return false;
+  if (ACCESS_LOG_SAMPLE_RATE <= 0) return false;
+  if (ACCESS_LOG_SAMPLE_RATE < 1 && Math.random() > ACCESS_LOG_SAMPLE_RATE) return false;
+
+  if (!ACCESS_LOG_ONLY_CLOUDFLARE) return true;
+  return Boolean(req.headers["cf-ray"] || req.headers["cf-connecting-ip"] || req.headers["cf-ipcountry"]);
+};
+
+const normalizeHeaderValue = (value) => {
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return value;
+  return undefined;
+};
+
 const server = http.createServer(async (req, res) => {
+  const startedAt = process.hrtime.bigint();
+  const shouldLogAccess = shouldLogAccessEntry(req);
+  if (shouldLogAccess) {
+    res.once("finish", () => {
+      try {
+        const host = req.headers.host ?? "localhost";
+        const url = new URL(req.url ?? "/", `http://${host}`);
+        const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+        const responseBytes = normalizeHeaderValue(res.getHeader("content-length"));
+        const cacheControl = normalizeHeaderValue(res.getHeader("cache-control"));
+        const cfCacheStatus = normalizeHeaderValue(req.headers["cf-cache-status"]);
+
+        const entry = {
+          ts: new Date().toISOString(),
+          method: req.method,
+          path: url.pathname,
+          query: url.search || undefined,
+          status: res.statusCode,
+          durationMs: Number(durationMs.toFixed(2)),
+          bytes: responseBytes ? Number.parseInt(responseBytes, 10) || undefined : undefined,
+          cacheControl,
+          cf: {
+            ray: normalizeHeaderValue(req.headers["cf-ray"]),
+            connectingIp: normalizeHeaderValue(req.headers["cf-connecting-ip"]),
+            ipCountry: normalizeHeaderValue(req.headers["cf-ipcountry"]),
+            visitor: normalizeHeaderValue(req.headers["cf-visitor"]),
+            cacheStatus: cfCacheStatus,
+          },
+          hasSessionCookie: /(?:^|;\s*)__session=/.test(req.headers.cookie || ""),
+          referer: normalizeHeaderValue(req.headers.referer),
+          userAgent: normalizeHeaderValue(req.headers["user-agent"]),
+        };
+
+        console.log(`[origin-access] ${JSON.stringify(entry)}`);
+      } catch {
+        // ignore logging failures
+      }
+    });
+  }
+
   try {
     const host = req.headers.host ?? "localhost";
     const url = new URL(req.url ?? "/", `http://${host}`);
     const pathname = url.pathname;
 
     if (req.method === "GET" || req.method === "HEAD") {
+      if (pathname === "/apple-touch-icon-120x120-precomposed.png") {
+        res.statusCode = 301;
+        res.setHeader("Location", "/apple-touch-icon-120x120.png");
+        res.setHeader("Cache-Control", "public, max-age=300, s-maxage=86400");
+        res.end();
+        return;
+      }
+
+      if (isKnownBotProbePath(pathname)) {
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.setHeader(
+          "Cache-Control",
+          "public, max-age=60, s-maxage=86400, stale-while-revalidate=60, stale-if-error=86400",
+        );
+        res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
+        res.end("Not Found");
+        return;
+      }
+
       if (shouldTryServeStatic(pathname) && pathname !== "/sitemap_index_online.xml") {
         const rel = decodeURIComponent(pathname).replace(/^\/+/, "");
         const staticRoots = [clientDir, publicDir];
@@ -163,10 +262,16 @@ const server = http.createServer(async (req, res) => {
       const cookieHeader = req.headers.cookie || "";
       const hasSession = /(?:^|;\s*)__session=/.test(cookieHeader);
       const accept = req.headers.accept || "";
-      const isHtmlRequest = req.method === "GET" && (accept.includes("text/html") || accept === "" || accept.includes("*/*"));
 
       const pathname = (new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`))
         .pathname.replace(/\/+$/, "") || "/";
+      const isDataRequest = pathname.endsWith(".data");
+      const isApiReadRequest = pathname.startsWith("/api/") && req.method === "GET";
+      const isHtmlRequest =
+        req.method === "GET" &&
+        !isDataRequest &&
+        !isApiReadRequest &&
+        (accept.includes("text/html") || accept === "" || accept.includes("*/*"));
 
       const isMangaDetailPage =
         /^\/truyen-hentai\/[^/]+$/.test(pathname) &&
@@ -213,6 +318,23 @@ const server = http.createServer(async (req, res) => {
           res.setHeader(
             "Cache-Control",
             `public, max-age=0, s-maxage=${edgeTtlSeconds}, stale-while-revalidate=60, stale-if-error=86400`,
+          );
+          return;
+        }
+
+        const isAnonReadMissingCacheControl =
+          !hasSession &&
+          !isHtmlRequest &&
+          req.method === "GET" &&
+          res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          !res.hasHeader("Cache-Control") &&
+          (isDataRequest || isApiReadRequest);
+
+        if (isAnonReadMissingCacheControl) {
+          res.setHeader(
+            "Cache-Control",
+            "public, max-age=10, s-maxage=60, stale-while-revalidate=60, stale-if-error=86400",
           );
         }
       };

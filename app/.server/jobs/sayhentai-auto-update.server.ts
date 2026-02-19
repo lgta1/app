@@ -97,15 +97,22 @@ const normalizeSayPath = (raw: string, origin: string): string | null => {
 const normalizeVinaPath = (raw: string): string | null => {
   const trimmed = String(raw || "").trim();
   if (!trimmed) return null;
+  const decodePathSafe = (value: string) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
   try {
     const url = new URL(trimmed, "https://vinahentai.local");
-    const pathname = url.pathname.replace(/\/+$/, "");
+    const pathname = decodePathSafe(url.pathname).replace(/\/+$/, "");
     if (!pathname.startsWith("/")) return null;
     if (/^\/truyen-hentai\//i.test(pathname) || /^\/truyen\//i.test(pathname)) return pathname;
     const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
     return `/truyen-hentai/${normalized.replace(/^\//, "")}`;
   } catch {
-    const normalized = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    const normalized = decodePathSafe(trimmed.startsWith("/") ? trimmed : `/${trimmed}`);
     if (/^\/truyen-hentai\//i.test(normalized) || /^\/truyen\//i.test(normalized)) {
       return normalized.replace(/\/+$/, "");
     }

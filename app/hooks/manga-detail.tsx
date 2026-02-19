@@ -10,6 +10,7 @@ import type { MangaType } from "~/database/models/manga.model";
 import { formatDate, formatTime } from "~/utils/date.utils";
 import { getChapterDisplayName } from "../utils/chapter.utils";
 import { toSlug } from "~/utils/slug.utils"; // dùng để tạo slug
+import { toDisplayView } from "~/utils/display-view.utils";
 
 interface MangaDetailProps {
   manga: MangaType;
@@ -443,27 +444,10 @@ export function MangaDetail({ manga, chapters, hideActions, hideChaptersList }: 
     }
   };
 
-  useEffect(() => {
-    const checkFollowStatus = async () => {
-      try {
-        const response = await fetch(`/api/manga-status?mangaId=${mangaIdSafe}`);
-        const data = await response.json();
-        if (response.ok) setIsFollowing(Boolean(data?.isFollowing));
-      } catch (error) {
-        console.error("Error checking follow status:", error);
-      }
-    };
-
-    if (mangaIdSafe) {
-      checkFollowStatus();
-    }
-  }, [mangaIdSafe]);
-
-// ==== GET tiến độ đọc (yêu cầu đã đăng nhập) ====
+// ==== GET trạng thái + tiến độ đọc (gộp 1 request) ====
 useEffect(() => {
   let canceled = false;
 
-  // helper đọc local fallback
   const readLocal = () => {
     try {
       const raw = localStorage.getItem(`manga_progress_${mangaIdSafe}`);
@@ -478,57 +462,47 @@ useEffect(() => {
 
   async function load() {
     if (!mangaIdSafe) {
+      setIsFollowing(false);
       setLastReadChapter(null);
       return;
     }
 
     try {
       const res = await fetch(
-        `/api/manga-progress?mangaId=${encodeURIComponent(mangaIdSafe)}`,
-        { credentials: "include", headers: { Accept: "application/json" } }
+        `/api/manga-status?mangaId=${encodeURIComponent(mangaIdSafe)}&includeProgress=1`,
+        { credentials: "include", headers: { Accept: "application/json" } },
       );
 
-      // Server không OK → thử local
-      if (!res.ok) {
-        const nLocal = readLocal();
-        if (!canceled) setLastReadChapter(nLocal);
-        return;
-      }
-
-      // Dùng tên biến khác "json" để tránh đụng "data" ở scope khác
       const json: any = await res.json().catch(() => null);
       if (canceled) return;
 
-      // 200 nhưng body lỗi → thử local
-      if (!json || json?.error) {
-        const nLocal = readLocal();
-        if (!canceled) setLastReadChapter(nLocal);
+      if (res.ok) {
+        setIsFollowing(Boolean(json?.isFollowing));
+      }
+
+      if (!res.ok || !json || json?.error) {
+        setLastReadChapter(readLocal());
         return;
       }
 
-      // 200 OK nhưng chapterNumber thiếu/không hợp lệ → thử local
       const raw = json?.chapterNumber;
       const n = raw == null ? null : Number(raw);
       const serverHasValid = Number.isFinite(n) && (n as number) >= 1;
 
       if (serverHasValid) {
         const finalN = n as number;
-        if (!canceled) setLastReadChapter(finalN);
-        // Đồng bộ local để lần sau
+        setLastReadChapter(finalN);
         try {
           localStorage.setItem(
             `manga_progress_${mangaIdSafe}`,
-            JSON.stringify({ chapterNumber: finalN, updatedAt: new Date().toISOString() })
+            JSON.stringify({ chapterNumber: finalN, updatedAt: new Date().toISOString() }),
           );
         } catch {}
       } else {
-        const nLocal = readLocal();
-        if (!canceled) setLastReadChapter(nLocal);
+        setLastReadChapter(readLocal());
       }
     } catch {
-      // Lỗi mạng → fallback local
-      const nLocal = readLocal();
-      if (!canceled) setLastReadChapter(nLocal);
+      if (!canceled) setLastReadChapter(readLocal());
     }
   }
 
@@ -537,10 +511,16 @@ useEffect(() => {
     canceled = true;
   };
 }, [mangaIdSafe]);
-// ==== END GET tiến độ đọc ====
+// ==== END GET trạng thái + tiến độ đọc ====
 
 
   const handleFollowToggle = async () => {
+    const next = typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/";
+    if (!document.cookie.includes("__session=")) {
+      window.location.href = `/login?redirectTo=${encodeURIComponent(next)}`;
+      return;
+    }
+
     if (isLoadingFollow) return;
     setIsLoadingFollow(true);
 
@@ -684,11 +664,11 @@ useEffect(() => {
                     const slug = translatorSlugs[i] || toSlug(String(name));
                     return (
                       (isMobile ? (
-                        <a key={`tr-${slug}-${i}`} href={`/translators/${slug}`} className={chipVariants.outlineSubtle + " w-fit"} title={name} aria-label={`Xem dịch giả ${name}`}>
+                        <a key={`tr-${slug}-${i}`} href={`/translators/${slug}`} className={chipVariants.outlineSubtle + " w-fit max-w-[286px]"} title={name} aria-label={`Xem dịch giả ${name}`}>
                           <span className="capitalize">{name}</span>
                         </a>
                       ) : (
-                        <Link key={`tr-${slug}-${i}`} to={`/translators/${slug}`} className={chipVariants.outlineSubtle + " w-fit"} title={name} aria-label={`Xem dịch giả ${name}`}>
+                        <Link key={`tr-${slug}-${i}`} to={`/translators/${slug}`} className={chipVariants.outlineSubtle + " w-fit max-w-[286px]"} title={name} aria-label={`Xem dịch giả ${name}`}>
                           <span className="capitalize">{name}</span>
                         </Link>
                       ))
@@ -731,7 +711,7 @@ useEffect(() => {
               <span className="text-txt-secondary inline-flex items-center gap-1.5 text-sm" title="Lượt xem">
                 <Eye className="h-4 w-4" />
                 <span className="text-txt-primary font-medium">
-                  {(viewNumber ?? 0).toLocaleString("vi-VN")}
+                  {toDisplayView(viewNumber).toLocaleString("vi-VN")}
                 </span>
               </span>
               {/* 🔖 Lượt theo dõi */}
@@ -908,7 +888,7 @@ useEffect(() => {
                 <div className="flex items-center gap-6">
                   <span className="text-txt-secondary flex items-center gap-1 text-sm">
                     <Eye className="h-4 w-4" />
-                    {(chapter.viewNumber ?? 0).toLocaleString("vi-VN")}
+                    {toDisplayView(chapter.viewNumber).toLocaleString("vi-VN")}
                   </span>
                   <time
                     className="text-txt-secondary text-sm"

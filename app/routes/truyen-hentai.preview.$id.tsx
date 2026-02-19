@@ -778,7 +778,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           // KHÔNG continue; để server thực thi rule & BAN
         }
 
-        const splitList = skipCut ? list : await splitLongImages(list, { maxHeight: 3000 });
+        const splitList = skipCut ? list : await splitLongImages(list);
 
         // Optional compression cho bulk (per chapter) nếu đã tick
         let effectiveList = splitList;
