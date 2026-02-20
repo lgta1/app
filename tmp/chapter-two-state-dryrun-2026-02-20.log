@@ -1,0 +1,50 @@
+
+> ops:migrate-chapter-status-two-state
+> tsx scripts/ops/migrate-chapter-status-two-state.ts
+
+[chapter-status:migrate] mode=DRY_RUN candidates=3
+[chapter-status:migrate] {
+  before: {
+    id: '699401702732c98c95351bbe',
+    mangaId: '6993c2475cb9005b678dc80b',
+    chapterNumber: 1,
+    status: 0,
+    publishAt: undefined,
+    publishedAt: 2026-02-17T05:49:36.113Z
+  },
+  after: {
+    status: 1,
+    publishAt: undefined,
+    publishedAt: 2026-02-17T05:49:36.113Z
+  }
+}
+[chapter-status:migrate] {
+  before: {
+    id: '69976d1f0610715368ec6057',
+    mangaId: '69976cbff526e47912ba1e91',
+    chapterNumber: 1,
+    status: 0,
+    publishAt: undefined,
+    publishedAt: 2026-02-19T20:05:49.650Z
+  },
+  after: {
+    status: 1,
+    publishAt: undefined,
+    publishedAt: 2026-02-19T20:05:49.650Z
+  }
+}
+[chapter-status:migrate] {
+  before: {
+    id: '69979a2c21ada314c5bb7c11',
+    mangaId: '699793f99a6f7bc6915a4c81',
+    chapterNumber: 1,
+    status: 0,
+    publishAt: undefined,
+    publishedAt: 2026-02-19T23:18:04.982Z
+  },
+  after: {
+    status: 1,
+    publishAt: undefined,
+    publishedAt: 2026-02-19T23:18:04.982Z
+  }
+}

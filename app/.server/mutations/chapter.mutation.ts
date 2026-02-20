@@ -29,9 +29,7 @@ const resolveNextChapterNumber = async (mangaId: string): Promise<number> => {
 
 const resolveIncomingStatus = (rawStatus: unknown): number => {
   const status = Number(rawStatus);
-  return status === CHAPTER_STATUS.PENDING ||
-      status === CHAPTER_STATUS.APPROVED ||
-      status === CHAPTER_STATUS.REJECTED ||
+  return status === CHAPTER_STATUS.APPROVED ||
       status === CHAPTER_STATUS.SCHEDULED
     ? status
     : CHAPTER_STATUS.APPROVED;
@@ -433,7 +431,6 @@ export const updateChapter = async (
     ...updateData,
     ...(normalizedContentUrls ? { contentUrls: normalizedContentUrls } : null),
     title: isPlaceholder ? `Chap ${chapterNumber}` : finalTitle,
-    status: CHAPTER_STATUS.PENDING,
   };
 
   if (typeof updatedContentBytes === "number") {

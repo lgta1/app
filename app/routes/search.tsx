@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, Link, useLoaderData } from "react-router-dom";
+import { Form, Link, Outlet, useLoaderData, useLocation } from "react-router-dom";
 
 import { buildMangaUrl } from "~/utils/manga-url.utils";
 import { getPosterVariantForContext } from "~/utils/poster-variants.utils";
@@ -97,6 +97,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function SearchPage() {
+  const location = useLocation();
+  const isBaseSearchRoute = location.pathname === "/search";
+
+  if (!isBaseSearchRoute) {
+    return <Outlet />;
+  }
+
   const data = useLoaderData<typeof loader>();
   const hasQuery = Boolean(data.query.trim());
 

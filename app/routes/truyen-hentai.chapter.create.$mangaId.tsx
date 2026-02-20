@@ -120,7 +120,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const publishAtRaw = formData.get("publishAt");
     const publishAtIso = typeof publishAtRaw === "string" ? publishAtRaw.trim() : "";
 
-    const publishMode = publishModeRaw === "draft" || publishModeRaw === "schedule" || publishModeRaw === "now"
+    const publishMode = publishModeRaw === "schedule" || publishModeRaw === "now"
       ? publishModeRaw
       : "now";
 
@@ -144,9 +144,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       scheduledAt = parsed;
     }
 
-    const targetStatus = publishMode === "draft"
-      ? CHAPTER_STATUS.PENDING
-      : publishMode === "schedule"
+    const targetStatus = publishMode === "schedule"
         ? CHAPTER_STATUS.SCHEDULED
         : CHAPTER_STATUS.APPROVED;
 
@@ -313,7 +311,7 @@ export default function CreateChapter() {
   const formRef = useRef<HTMLFormElement>(null);
   const pendingServerSubmitRef = useRef(false);
   const requestIdRef = useRef<string | null>(null);
-  const submitPublishModeRef = useRef<"draft" | "now" | "schedule">("now");
+  const submitPublishModeRef = useRef<"now" | "schedule">("now");
   const submitPublishAtRef = useRef<string>("");
   const uploadSessionRef = useRef<ReturnType<typeof uploadMultipleFilesCancelable> | null>(null);
   const { uploadMultipleFilesCancelable } = useFileOperations();
@@ -853,7 +851,7 @@ export default function CreateChapter() {
     }
   };
 
-  const handleExternalSubmit = (mode: "draft" | "now" | "schedule") => {
+  const handleExternalSubmit = (mode: "now" | "schedule") => {
     if (mode === "schedule") {
       const checked = validateScheduleInput();
       if (!checked.valid) {
@@ -1617,15 +1615,6 @@ export default function CreateChapter() {
             <span className="text-txt-focus text-center text-sm font-semibold">
               Xem trước
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleExternalSubmit("draft")}
-            disabled={contents.length === 0 || isLoading}
-            className="border-bd-default text-txt-primary hover:bg-white/5 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-40"
-          >
-            <span className="text-center text-sm font-semibold whitespace-nowrap">Lưu nháp</span>
           </button>
 
           <button

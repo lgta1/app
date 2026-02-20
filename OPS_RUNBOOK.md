@@ -161,13 +161,19 @@ curl -I https://www.vinahentai.online/danh-sach | head
   - `/truyen-hentai/:mangaSlug/:chapterSlug` : 30 phút
 
 ### Lưu ý quan trọng
-- Mặc định Cloudflare **không** cache HTML dù origin có `s-maxage`.
-- Để Cloudflare thực sự cache HTML, cần tạo **Cache Rule** kiểu “Cache Everything/Eligible for cache” cho đúng các path trên và **bypass** khi có cookie `__session`.
-- Khuyến nghị cấu hình Cache Rule:
   - Condition: path thuộc allowlist ở trên **và** `http.request.headers["cookie"]` **không** chứa `__session=`
   - Action: Eligible for cache (Cache Everything)
   - Edge TTL: Respect origin
   - Browser TTL: Respect origin
+
+### Endpoint API user-state của chapter
+- Route: `/api/chapter/user-state*`
+- Mục tiêu: **anonymous cache ở edge**, còn request có `__session` thì **bypass cache** (dynamic/personalized).
+- Rule gợi ý trên Cloudflare:
+  - Rule 1 (ưu tiên cao): If `http.request.uri.path starts_with "/api/chapter/user-state"` AND `http.cookie contains "__session="` → **Bypass cache**
+  - Rule 2: If `http.request.uri.path starts_with "/api/chapter/user-state"` → **Eligible for cache**
+  - Origin header hiện tại đã trả `public, s-maxage=120, stale-while-revalidate=60` cho anonymous và `no-store` cho logged-in.
+  - Nếu chưa có 2 rule trên, DevTools thường sẽ thấy `CF-Cache-Status: DYNAMIC` dù response có header cache.
 
 ### /__manifest (request “nóng”)
 - `/__manifest?...` là request do React Router lazy route discovery.

@@ -30,7 +30,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     // Validate status value
-    const validStatuses = Object.values(CHAPTER_STATUS);
+    const validStatuses = [CHAPTER_STATUS.APPROVED, CHAPTER_STATUS.SCHEDULED];
     if (!validStatuses.includes(status)) {
       return Response.json({ error: "Trạng thái không hợp lệ" }, { status: 400 });
     }
@@ -46,15 +46,25 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json({ error: "Thông tin chương không khớp" }, { status: 400 });
     }
 
-    // Update chapter status
+    const now = new Date();
+    const nextUpdate =
+      status === CHAPTER_STATUS.APPROVED
+        ? {
+            status,
+            publishedAt: now,
+            publishAt: undefined,
+          }
+        : {
+            status,
+            publishedAt: undefined,
+          };
+
     await ChapterModel.findByIdAndUpdate(chapterId, {
-      status: status,
+      $set: nextUpdate,
     });
 
     const statusLabels = {
-      [CHAPTER_STATUS.PENDING]: "Chờ duyệt",
       [CHAPTER_STATUS.APPROVED]: "Đã duyệt",
-      [CHAPTER_STATUS.REJECTED]: "Bị trả về",
       [CHAPTER_STATUS.SCHEDULED]: "Hẹn giờ đăng",
     };
 

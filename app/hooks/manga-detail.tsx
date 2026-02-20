@@ -107,7 +107,6 @@ function CollapsibleGenreChips({ genres }: CollapsibleGenreChipsProps) {
             <Link
               key={`${slug}-${idx}`}
               to={`/genres/${slug}`}
-              prefetch="intent"
               className={genreChipClass + " w-fit"}
               title={label}
               aria-label={`Xem thể loại ${label}`}
@@ -149,7 +148,6 @@ function CollapsibleGenreChips({ genres }: CollapsibleGenreChipsProps) {
                 <Link
                   key={`${slug}-rest-${idx}`}
                   to={`/genres/${slug}`}
-                  prefetch="intent"
                   className={genreChipClass + " w-fit"}
                   title={label}
                   aria-label={`Xem thể loại ${label}`}

@@ -2,7 +2,7 @@
 import CommentDetail from "~/components/comment-detail";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast, Toaster } from "react-hot-toast";
-import { useFetcher, useNavigate, Link } from "react-router-dom";
+import { useFetcher, useNavigate, Link, useRouteLoaderData } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -67,8 +67,6 @@ const READING_EVENTS_LAST_FLUSH_KEY = "vh:reading-events:last-flush-at:v1";
 const READING_EVENTS_FLUSH_INTERVAL_MS = 5 * 60 * 1000;
 const READING_EVENTS_MIN_FLUSH_GAP_MS = 45 * 1000;
 const READING_EVENTS_QUEUE_MAX = 200;
-const CHAPTER_LIST_CACHE_TTL_MS = 10 * 60 * 1000;
-const CHAPTER_LIST_CACHE_KEY_PREFIX = "vh:chapter-list:v1:";
 
 const getSessionTimestamp = (key: string): number => {
   if (typeof window === "undefined") return 0;
@@ -109,49 +107,6 @@ type ChapterListItem = {
   label: string;
   slug?: string;
   __title?: string;
-};
-
-type CachedChapterListPayload = {
-  mangaId: string;
-  at: number;
-  items: ChapterListItem[];
-};
-
-const getChapterListCacheKey = (mangaId: string) => `${CHAPTER_LIST_CACHE_KEY_PREFIX}${mangaId}`;
-
-const readChapterListCache = (mangaId: string): CachedChapterListPayload | null => {
-  if (typeof window === "undefined") return null;
-  if (!mangaId) return null;
-  try {
-    const raw = window.localStorage.getItem(getChapterListCacheKey(mangaId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CachedChapterListPayload;
-    if (!parsed || parsed.mangaId !== mangaId || !Array.isArray(parsed.items)) return null;
-    const at = Number(parsed.at);
-    if (!Number.isFinite(at) || at <= 0) return null;
-    return {
-      mangaId,
-      at,
-      items: parsed.items,
-    };
-  } catch {
-    return null;
-  }
-};
-
-const writeChapterListCache = (mangaId: string, items: ChapterListItem[]) => {
-  if (typeof window === "undefined") return;
-  if (!mangaId || !Array.isArray(items) || items.length === 0) return;
-  try {
-    const payload: CachedChapterListPayload = {
-      mangaId,
-      at: Date.now(),
-      items,
-    };
-    window.localStorage.setItem(getChapterListCacheKey(mangaId), JSON.stringify(payload));
-  } catch {
-    // ignore
-  }
 };
 
 const readReadingEventsQueue = (): QueuedReadingEvent[] => {
@@ -218,24 +173,25 @@ type ChapterDetailProps = {
     nextChapterSlug?: string;
     mangaSlug?: string;
   };
+  chapterList?: Array<{
+    value: number;
+    label: string;
+    slug?: string;
+    title?: string;
+  }>;
   isEnableClaimReward?: boolean;
-  rewardEligibility?: {
-    canClaim: boolean;
-    remaining: number;
-    nextEligibleAt?: string;
-  } | null;
   recommendedManga?: MangaType[];
-  /** Nếu chưa đăng nhập, không gọi các API yêu cầu session (tránh 401 spam). */
-  isLoggedIn?: boolean;
 };
 
 export function ChapterDetail({
   chapter,
+  chapterList = [],
   isEnableClaimReward: isEnableClaimGold = false,
-  rewardEligibility,
   recommendedManga = [],
-  isLoggedIn = false,
 }: ChapterDetailProps) {
+  const rootData = useRouteLoaderData("root") as { user?: { id?: string } } | undefined;
+  const rootUserId = String((rootData as any)?.user?.id ?? "").trim();
+
   const truncateBreadcrumbLabel = (label: string, max = 20) => {
     const s = String(label ?? "");
     if (s.length <= max) return s;
@@ -298,7 +254,23 @@ export function ChapterDetail({
   const navigate = useNavigate();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [hasClaimedThisChapter, setHasClaimedThisChapter] = useState(false);
-  const [chapters, setChapters] = useState<ChapterListItem[]>([]);
+  const chapters = useMemo<ChapterListItem[]>(() => {
+    if (!Array.isArray(chapterList)) return [];
+    return chapterList
+      .map((item) => ({
+        value: Number(item?.value),
+        label: String(item?.label ?? "").trim(),
+        slug: typeof item?.slug === "string" ? item.slug : undefined,
+        __title: typeof item?.title === "string" ? item.title : undefined,
+      }))
+      .filter((item) => Number.isFinite(item.value) && item.value > 0 && Boolean(item.label));
+  }, [chapterList]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [rewardEligibility, setRewardEligibility] = useState<{
+    canClaim: boolean;
+    remaining: number;
+    nextEligibleAt?: string;
+  } | null>(null);
 
   // === Sticky bottom auto hide/show ===
   const [hideBottomBar, setHideBottomBar] = useState(false);
@@ -363,12 +335,9 @@ export function ChapterDetail({
   const [isReaderSettingsOpen, setIsReaderSettingsOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [horizontalPageIndex, setHorizontalPageIndex] = useState(0);
-  const [isReaderUiVisible, setIsReaderUiVisible] = useState(true);
-  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
 
   const rewardFetcher = useFetcher();
   const expFetcher = useFetcher();
-  const chaptersFetcher = useFetcher();
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
   const [chapterLikeCount, setChapterLikeCount] = useState<number>(
     Math.max(0, Number((chapter as any)?.likeNumber) || 0),
@@ -377,14 +346,11 @@ export function ChapterDetail({
     Math.max(0, Number((chapter as any)?.dislikeNumber) || 0),
   );
   const [chapterScore, setChapterScore] = useState<number>(Number((chapter as any)?.chapScore) || 0);
-  const [userReaction, setUserReaction] = useState<"like" | "dislike" | null>(
-    ((chapter as any)?.userReaction as any) ?? null,
-  );
+  const [userReaction, setUserReaction] = useState<"like" | "dislike" | null>(null);
   const readingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastImageRef = useRef<HTMLImageElement | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const horizontalReaderRef = useRef<HTMLDivElement | null>(null);
-  const uiAutoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const chapterImageCacheRef = useRef<Map<string, Set<number>>>(new Map());
 
@@ -432,12 +398,6 @@ export function ChapterDetail({
 
   useEffect(() => {
     setHorizontalPageIndex(0);
-    setIsReaderUiVisible(true);
-    setIsProgressExpanded(false);
-    if (uiAutoHideTimerRef.current) {
-      clearTimeout(uiAutoHideTimerRef.current);
-      uiAutoHideTimerRef.current = null;
-    }
   }, [chapterIdentity]);
 
   useEffect(() => {
@@ -448,52 +408,15 @@ export function ChapterDetail({
     });
   }, [effectivePageSpread, clampPageIndex]);
 
-  const scheduleReaderUiAutoHide = useCallback(() => {
-    if (readerMode !== "horizontal" || isReaderSettingsOpen) return;
-    if (uiAutoHideTimerRef.current) clearTimeout(uiAutoHideTimerRef.current);
-    uiAutoHideTimerRef.current = setTimeout(() => {
-      setIsReaderUiVisible(false);
-      setIsProgressExpanded(false);
-    }, 2500);
-  }, [readerMode, isReaderSettingsOpen]);
-
-  const revealReaderUi = useCallback((expandProgress = false) => {
-    setIsReaderUiVisible(true);
-    if (expandProgress) setIsProgressExpanded(true);
-    scheduleReaderUiAutoHide();
-  }, [scheduleReaderUiAutoHide]);
-
-  useEffect(() => {
-    if (readerMode !== "horizontal") {
-      setIsReaderUiVisible(true);
-      setIsProgressExpanded(false);
-      if (uiAutoHideTimerRef.current) {
-        clearTimeout(uiAutoHideTimerRef.current);
-        uiAutoHideTimerRef.current = null;
-      }
-      return;
-    }
-
-    revealReaderUi(false);
-    return () => {
-      if (uiAutoHideTimerRef.current) {
-        clearTimeout(uiAutoHideTimerRef.current);
-        uiAutoHideTimerRef.current = null;
-      }
-    };
-  }, [readerMode, isReaderSettingsOpen, revealReaderUi]);
-
   const goNextHorizontalPage = useCallback(() => {
     const step = effectivePageSpread;
     setHorizontalPageIndex((prev) => clampPageIndex(prev + step));
-    revealReaderUi(false);
-  }, [effectivePageSpread, clampPageIndex, revealReaderUi]);
+  }, [effectivePageSpread, clampPageIndex]);
 
   const goPrevHorizontalPage = useCallback(() => {
     const step = effectivePageSpread;
     setHorizontalPageIndex((prev) => clampPageIndex(prev - step));
-    revealReaderUi(false);
-  }, [effectivePageSpread, clampPageIndex, revealReaderUi]);
+  }, [effectivePageSpread, clampPageIndex]);
 
   const handleLeftAction = useCallback(() => {
     if (horizontalDirection === "rtl") goNextHorizontalPage();
@@ -511,8 +434,7 @@ export function ChapterDetail({
       return;
     }
     pointerStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
-    revealReaderUi(false);
-  }, [revealReaderUi]);
+  }, []);
 
   const handleHorizontalPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
@@ -537,23 +459,13 @@ export function ChapterDetail({
       const rect = target.getBoundingClientRect();
       const ratioX = (e.clientX - rect.left) / Math.max(1, rect.width);
       if (ratioX >= 0.33 && ratioX <= 0.67) {
-        setIsReaderUiVisible((prev) => {
-          const next = !prev;
-          if (next) {
-            setIsProgressExpanded(true);
-            scheduleReaderUiAutoHide();
-          } else {
-            setIsProgressExpanded(false);
-          }
-          return next;
-        });
         return;
       }
 
       if (ratioX < 0.33) handleLeftAction();
       else handleRightAction();
     }
-  }, [handleLeftAction, handleRightAction, scheduleReaderUiAutoHide]);
+  }, [handleLeftAction, handleRightAction]);
 
   useEffect(() => {
     if (readerMode !== "horizontal") return;
@@ -612,48 +524,56 @@ export function ChapterDetail({
     });
   }, [readerMode, chapterIdentity, chapter.contentUrls, horizontalPageIndex, totalPages]);
 
-  // Fetch chapters list
   useEffect(() => {
-    if (!mangaIdResolved) return;
+    let cancelled = false;
+    const controller = new AbortController();
 
-    if (!isLoggedIn) {
-      const cached = readChapterListCache(mangaIdResolved);
-      if (cached?.items?.length) {
-        setChapters(cached.items);
-      }
-      if (cached && Date.now() - cached.at < CHAPTER_LIST_CACHE_TTL_MS) {
+    const run = async () => {
+      if (!chapterIdResolved || !rootUserId) {
+        setIsLoggedIn(false);
+        setRewardEligibility(null);
+        setUserReaction(null);
         return;
       }
-    }
 
-    chaptersFetcher.load(`/api/chapters/list?mangaId=${mangaIdResolved}`);
-    // The fetcher instance is stable for the component lifetime; including it here
-    // causes React to treat each state change as a new dependency and re-run the
-    // effect in a tight loop. We only need to refetch when the manga changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mangaIdResolved, isLoggedIn]);
+      try {
+        const response = await fetch(
+          `/api/chapter/user-state?chapterId=${encodeURIComponent(chapterIdResolved)}`,
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
 
-  // Handle chapters list response
-  useEffect(() => {
-    if (chaptersFetcher.data) {
-      const response = chaptersFetcher.data as {
-        success: boolean;
-        chapters?: Array<any>;
-      };
-      if (response.success && response.chapters) {
-        const normalized = response.chapters.map((c: any) => ({
-          value: c.value,
-          label: c.label,
-          __title: c.title ?? c.name ?? c.chapterTitle ?? "",
-          slug: c.slug,
-        }));
-        setChapters(normalized);
-        if (!isLoggedIn && mangaIdResolved) {
-          writeChapterListCache(mangaIdResolved, normalized);
+        const data = await response.json().catch(() => null);
+        if (cancelled) return;
+
+        if (!response.ok || !data?.success) {
+          setIsLoggedIn(false);
+          setRewardEligibility(null);
+          setUserReaction(null);
+          return;
         }
+
+        setIsLoggedIn(Boolean(data.isLoggedIn));
+        setRewardEligibility(data.rewardEligibility ?? null);
+        setUserReaction((data.userReaction as "like" | "dislike" | null) ?? null);
+      } catch (error: any) {
+        if (cancelled || error?.name === "AbortError") return;
+        setIsLoggedIn(false);
+        setRewardEligibility(null);
+        setUserReaction(null);
       }
-    }
-  }, [chaptersFetcher.data, isLoggedIn, mangaIdResolved]);
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [chapterIdentity, chapterIdResolved, rootUserId]);
 
   // Sync reaction state only when switching to a different chapter.
   // Avoids overwriting optimistic/confirmed reaction with stale loader data during re-renders.
@@ -661,7 +581,6 @@ export function ChapterDetail({
     setChapterLikeCount(Math.max(0, Number((chapter as any)?.likeNumber) || 0));
     setChapterDislikeCount(Math.max(0, Number((chapter as any)?.dislikeNumber) || 0));
     setChapterScore(Number((chapter as any)?.chapScore) || 0);
-    setUserReaction(((chapter as any)?.userReaction as any) ?? null);
   }, [chapterIdentity]);
 
   const submitReaction = useCallback(
@@ -1243,7 +1162,7 @@ useEffect(() => {
   }, []);
 
   const currentPageDisplay = Math.max(1, Math.min(totalPages, horizontalPageIndex + 1));
-  const shouldHideBottomBar = hideBottomBar || (readerMode === "horizontal" && !isReaderUiVisible);
+  const shouldHideBottomBar = hideBottomBar;
 
   return (
     <>
@@ -1349,13 +1268,12 @@ useEffect(() => {
 
       {/* Content */}
       <div className="relative z-0 -mx-4 my-6 flex flex-col items-center justify-center overflow-x-hidden sm:mx-0 sm:my-8">
-        <div className={`mb-3 flex w-full max-w-[1080px] items-center justify-center px-2 transition-opacity duration-200 sm:px-0 ${readerMode === "horizontal" && !isReaderUiVisible ? "pointer-events-none opacity-0" : "opacity-100"}`}>
+        <div className="mb-3 flex w-full max-w-[1080px] items-center justify-center px-2 transition-opacity duration-200 sm:px-0">
           <div className="relative">
             <button
               type="button"
               onClick={() => {
                 setIsReaderSettingsOpen((prev) => !prev);
-                setIsReaderUiVisible(true);
               }}
               className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0B0F1A]/85 px-3 py-2 text-sm font-medium text-white/90"
               aria-label="Cài đặt chế độ đọc"
@@ -1465,7 +1383,6 @@ useEffect(() => {
               ref={horizontalReaderRef}
               onPointerDown={handleHorizontalPointerDown}
               onPointerUp={handleHorizontalPointerUp}
-              onMouseMove={() => revealReaderUi(false)}
               className={`relative flex w-full touch-pan-y items-center justify-center overflow-hidden rounded-xl ${isMobileViewport ? "min-h-[68vh] bg-black" : "h-[100vh] bg-transparent"}`}
             >
               <div className={`grid w-full gap-2 ${horizontalDisplayedUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -1501,29 +1418,25 @@ useEffect(() => {
               )}
             </div>
 
-            {(isReaderUiVisible || isProgressExpanded) && (
-              <div className="mt-2 w-full px-2 sm:px-0">
-                <div className="mx-auto w-full max-w-[1080px] rounded-xl border border-white/10 bg-[#0B0F1A]/90 p-2 backdrop-blur">
-                  <div className="mb-1 text-center text-xs font-semibold text-white/80">
-                    {currentPageDisplay} / {Math.max(totalPages, 1)}
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(totalPages - 1, 0)}
-                    step={effectivePageSpread}
-                    value={horizontalPageIndex}
-                    onChange={(e) => {
-                      setHorizontalPageIndex(clampPageIndex(Number(e.target.value)));
-                      revealReaderUi(true);
-                    }}
-                    onPointerDown={() => revealReaderUi(true)}
-                    className="w-full accent-blue-500"
-                    aria-label="Tiến độ trang"
-                  />
+            <div className="mt-2 w-full px-2 sm:px-0">
+              <div className="mx-auto w-full max-w-[1080px] rounded-xl border border-white/10 bg-[#0B0F1A]/90 p-2 backdrop-blur">
+                <div className="mb-1 text-center text-xs font-semibold text-white/80">
+                  {currentPageDisplay} / {Math.max(totalPages, 1)}
                 </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(totalPages - 1, 0)}
+                  step={effectivePageSpread}
+                  value={horizontalPageIndex}
+                  onChange={(e) => {
+                    setHorizontalPageIndex(clampPageIndex(Number(e.target.value)));
+                  }}
+                  className="w-full accent-blue-500"
+                  aria-label="Tiến độ trang"
+                />
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>

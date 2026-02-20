@@ -13,16 +13,6 @@ interface ChapterStatusDropdownProps {
 }
 
 const statuses = {
-  [CHAPTER_STATUS.PENDING]: {
-    label: "Chờ duyệt",
-    text: "text-yellow-300",
-    bg: "bg-yellow-300/10",
-  },
-  [CHAPTER_STATUS.REJECTED]: {
-    label: "Bị trả về",
-    text: "text-rose-500",
-    bg: "bg-rose-500/10",
-  },
   [CHAPTER_STATUS.APPROVED]: {
     label: "Đã duyệt",
     text: "text-teal-400",

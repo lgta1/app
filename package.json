@@ -23,6 +23,7 @@
     "ops:clear-system-lock": "tsx scripts/ops/clear-system-lock.ts",
     "ops:analyze-origin-access": "tsx scripts/ops/analyze-origin-access.ts",
     "ops:benchmark-search": "tsx scripts/ops/benchmark-smart-search.ts",
+    "ops:migrate-chapter-status-two-state": "tsx scripts/ops/migrate-chapter-status-two-state.ts",
     "ops:restore-manga-updatedat": "tsx scripts/ops/restore-manga-updatedat-from-latest-chapter.ts"
   },
   "dependencies": {
