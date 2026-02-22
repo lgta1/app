@@ -592,8 +592,8 @@ export default function App() {
 
   // Banner chỉ hiện ở trang chủ
   const hideBanner = !isHome;
-  // Footer giờ chỉ hiển thị tại trang chủ
-  const hideFooter = !isHome;
+  // Footer hiển thị trên toàn site (trừ chapter reader và summon — trải nghiệm full-screen)
+  const hideFooter = isChapter || isSummon;
 
   useEffect(() => {
     if (user && user !== clientUser) {
@@ -831,7 +831,7 @@ export default function App() {
         autoPrefetchNotifications={false}
       />
       <Outlet />
-      {!hideFooter && <Footer />}
+      {!hideFooter && <Footer />}{/* footer rendered globally via root layout — no per-route re-fetch */}
     </NotificationsProvider>
   );
 }
