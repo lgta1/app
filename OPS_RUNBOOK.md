@@ -175,6 +175,16 @@ curl -I https://www.vinahentai.online/danh-sach | head
   - Origin header hiện tại đã trả `public, s-maxage=120, stale-while-revalidate=60` cho anonymous và `no-store` cho logged-in.
   - Nếu chưa có 2 rule trên, DevTools thường sẽ thấy `CF-Cache-Status: DYNAMIC` dù response có header cache.
 
+### Endpoint API manga-status
+- Route: `/api/manga-status*`
+- Mục tiêu: **anonymous cache ở edge**, còn request có `__session` thì **bypass cache**.
+- Rule gợi ý trên Cloudflare:
+  - Rule 1 (ưu tiên cao): If `http.request.uri.path starts_with "/api/manga-status"` AND `http.cookie contains "__session="` → **Bypass cache**
+  - Rule 2: If `http.request.uri.path starts_with "/api/manga-status"` → **Eligible for cache**
+  - Edge TTL: **Use cache-control header if present**
+  - Browser TTL: **Respect origin TTL**
+  - Origin header hiện tại cho anonymous: `public, s-maxage=120, stale-while-revalidate=60`.
+
 ### /__manifest (request “nóng”)
 - `/__manifest?...` là request do React Router lazy route discovery.
 - Hiện tại app đã cấu hình `routeDiscovery: { mode: "initial" }` nên HTML không còn tham chiếu tới `/__manifest` nữa (giảm hẳn request “nóng”).

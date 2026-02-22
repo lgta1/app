@@ -9,7 +9,17 @@ import { UserReadChapterModel } from "~/database/models/user-read-chapter.model"
 
 const privateShortCacheHeaders = {
   "Cache-Control": "private, max-age=10, stale-while-revalidate=30",
+  "CDN-Cache-Control": "no-store",
+  "Cloudflare-CDN-Cache-Control": "no-store",
+  "Surrogate-Control": "no-store",
   Vary: "Cookie",
+};
+
+const anonymousCacheHeaders = {
+  "Cache-Control": "public, max-age=900, s-maxage=900, stale-while-revalidate=120",
+  "CDN-Cache-Control": "public, s-maxage=900, stale-while-revalidate=120",
+  "Cloudflare-CDN-Cache-Control": "public, s-maxage=900, stale-while-revalidate=120",
+  "Surrogate-Control": "public, s-maxage=900, stale-while-revalidate=120",
 };
 
 function buildMangaIdCandidates(id: string) {
@@ -33,11 +43,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
       );
     }
 
+    const cookieHeader = request.headers.get("Cookie") || "";
+    const hasSessionCookie = /(?:^|;\s*)__session=/.test(cookieHeader);
+    if (!hasSessionCookie) {
+      return Response.json(
+        { isLiked: false, isFollowing: false, chapterNumber: null },
+        { headers: anonymousCacheHeaders },
+      );
+    }
+
     const user = await getUserInfoFromSession(request);
     if (!user) {
       return Response.json(
         { isLiked: false, isFollowing: false, chapterNumber: null },
-        { headers: { "Cache-Control": "public, max-age=30, s-maxage=120" } },
+        { headers: anonymousCacheHeaders },
       );
     }
 

@@ -16,10 +16,10 @@ const noStoreHeaders = {
 };
 
 const anonymousCacheHeaders = {
-  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=60",
-  "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=60",
-  "Cloudflare-CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=60",
-  "Surrogate-Control": "public, s-maxage=120, stale-while-revalidate=60",
+  "Cache-Control": "public, max-age=900, s-maxage=900, stale-while-revalidate=120",
+  "CDN-Cache-Control": "public, s-maxage=900, stale-while-revalidate=120",
+  "Cloudflare-CDN-Cache-Control": "public, s-maxage=900, stale-while-revalidate=120",
+  "Surrogate-Control": "public, s-maxage=900, stale-while-revalidate=120",
 };
 
 function getTodayInVietnam(d = new Date()): string {
