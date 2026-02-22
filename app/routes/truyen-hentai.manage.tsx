@@ -216,6 +216,81 @@ export default function MangaManage() {
                     <div>Làm được một chương tử tế là bạn đã trở thành dịch giả truyện tranh nghiệp dư rồi.</div>
                   </div>
                 </div>
+
+                {/* Kinh nghiệm chia sẻ từ dịch giả */}
+                <div className="mt-6 space-y-4">
+                  <div className="text-base font-semibold text-white">💬 KINH NGHIỆM CHIA SẺ TỪ DỊCH GIẢ</div>
+
+                  <div className="rounded-xl border border-sky-400/20 bg-sky-400/5 p-4 space-y-4">
+                    <div className="text-sm font-semibold text-sky-300">✍️ Dịch Giả Kirin</div>
+
+                    {/* Bộ font gợi ý */}
+                    <div>
+                      <div className="mb-1 font-semibold text-white">📦 Gợi ý các bộ font <span className="font-normal text-white/60">(Cre: Yuki Team)</span></div>
+                      <ul className="space-y-1 pl-1">
+                        {[
+                          { name: "Teddy", url: "https://drive.google.com/drive/folders/0B82qhrQFHEqUNlZ2Z3hwMk1lbnc?resourcekey=0-Lm6B35SiuZom-fnO4m1WLg" },
+                          { name: "MTO", url: "https://drive.google.com/drive/folders/1Z9d0F31su97K9_uY3FEdJJBjgwzXhZf8" },
+                          { name: "UEE", url: "https://drive.google.com/drive/folders/14sPPvxRYDrob49jl_PBSQLIzN_WuJrKj" },
+                          { name: "SVN", url: "https://drive.google.com/drive/folders/14i9WlvW4iWEG94OkZFkF1v9P5-DsrKHH" },
+                        ].map(({ name, url }) => (
+                          <li key={name} className="flex items-center gap-2">
+                            <span className="w-12 shrink-0 font-semibold text-white/80">{name}</span>
+                            <a href={url} target="_blank" rel="noreferrer" className="truncate text-purple-300 underline hover:text-purple-200">{url}</a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Gợi ý dùng font */}
+                    <div>
+                      <div className="mb-1 font-semibold text-white">🖊️ Gợi ý dùng font theo loại thoại</div>
+                      <ul className="space-y-1.5 pl-1">
+                        <li><span className="text-white/80">Thoại bình thường:</span> <span className="text-white">Astro City</span> hoặc <span className="text-white">AnimeAce3</span> <span className="text-white/50">(Teddy)</span></li>
+                        <li><span className="text-white/80">La lớn / quát:</span> <span className="text-white">ObelixPro TB</span> <span className="text-white/50">(Teddy)</span></li>
+                        <li><span className="text-white/80">Lời kể chuyện:</span> <span className="text-white">DigitalStrip 2</span> <span className="text-white/50">(Teddy)</span></li>
+                        <li><span className="text-white/80">Suy nghĩ nhân vật:</span> <span className="text-white">Wildwords2 TB Bold Italic</span> <span className="text-white/50">(Teddy)</span></li>
+                        <li>
+                          <span className="text-white/80">Rên la 18+ (Ah, Oh, Ưm…):</span>{" "}
+                          <a href="https://drive.google.com/drive/folders/1gn1BFp9814kJXEn8byp23QLLI76iN_td" target="_blank" rel="noreferrer" className="text-purple-300 underline hover:text-purple-200">SJ Brightest Melody</a>
+                          {" "}hoặc{" "}
+                          <a href="https://drive.google.com/drive/folders/1fNpkDs_TiyFRTjr-bNwZwf6DRQJiUJ8Y" target="_blank" rel="noreferrer" className="text-purple-300 underline hover:text-purple-200">SJ CDX Amraam</a>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Bổ sung nâng cao */}
+                    <div>
+                      <div className="mb-1 font-semibold text-white">⚡ Bổ sung nâng cao</div>
+                      <ul className="space-y-1.5 pl-1">
+                        <li>
+                          <span className="text-white/80">Run rẩy / lo sợ:</span>{" "}
+                          <a href="https://drive.google.com/drive/folders/1Z_6vx89qjT1X7NqCaNWMbrHgPNcjFfJy" target="_blank" rel="noreferrer" className="text-purple-300 underline hover:text-purple-200">SJ Fluxus LT</a>
+                        </li>
+                        <li>
+                          <span className="text-white/80">Ma quỷ / kinh dị:</span>{" "}
+                          <a href="https://drive.google.com/drive/folders/1JONnAbUzqlWBszH5yIldfpJyPdCUI9ot" target="_blank" rel="noreferrer" className="text-purple-300 underline hover:text-purple-200">SJ CCCarryOnScreaming</a>
+                          {" "}hoặc{" "}
+                          <a href="https://www.svnfont.com/viet-hoa-svn-another-danger/" target="_blank" rel="noreferrer" className="text-purple-300 underline hover:text-purple-200">SVN-Another Danger</a>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Kinh nghiệm thực chiến */}
+                    <div>
+                      <div className="mb-1 font-semibold text-white">🛠️ Kinh nghiệm thực chiến</div>
+                      <ul className="list-disc space-y-2 pl-5">
+                        <li>
+                          <span className="text-white">Thoại đè lên background bắt buộc phải có Stroke</span> để chữ nổi bật.{" "}
+                          <span className="text-white/60">(Photoshop: Tab Layer → Double click vào layer Text → Layer Style → Stroke → Position: Outside. Tùy chỉnh Size và Color theo ý muốn.)</span>
+                        </li>
+                        <li>
+                          <span className="text-white">Thoại trong bong bóng thoại phải căn giữa</span> — trừ một số trường hợp đặc biệt như giới thiệu nhân vật thì căn trái như bình thường.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             </Dialog.Content>
           </Dialog.Portal>

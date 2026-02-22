@@ -93,7 +93,15 @@ export function UserDropdownMenu({
         );
       }
       return (
-        <button key={label} type="button" className={`${sharedClasses} cursor-pointer`} onClick={() => { setIsUserMenuOpen(false); handleClick(); }}>
+        <button
+          key={label}
+          type="button"
+          className={`${sharedClasses} cursor-pointer`}
+          // onMouseDown preventDefault prevents :focus-visible from triggering on mouse click in Chrome
+          // (Chrome treats <button> specially: shows focus-visible ring on click, unlike <a> elements)
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { setIsUserMenuOpen(false); handleClick(); }}
+        >
           {inner}
         </button>
       );
