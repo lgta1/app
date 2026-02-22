@@ -955,8 +955,9 @@ const CHAPTER_IMAGE_FILTERS = {
   watermarkDims: new Set(["1798x2544", "2544x1798"]),
   watermarkMinBytes: 311 * 1024,
   watermarkMaxBytes: 315 * 1024,
-  minWidthPx: 151,
-  minHeightPx: 601,
+  // Orientation-agnostic: lọc theo tổng pixel thay vì width/height cố định.
+  // 250001px = ngưỡng tối thiểu (ảnh 500x500=250000px bị loại, 838x471=394498px được giữ).
+  minTotalPx: 250_001,
   minBytes: 20 * 1024,
   minGifBytes: 70 * 1024,
 };
@@ -1159,11 +1160,11 @@ async function shouldKeepChapterImage(options: {
     }
   }
 
-  if (typeof width === "number" && width < CHAPTER_IMAGE_FILTERS.minWidthPx) {
-    return { keep: false, reason: `width_too_small(<${CHAPTER_IMAGE_FILTERS.minWidthPx})` };
-  }
-  if (typeof height === "number" && height < CHAPTER_IMAGE_FILTERS.minHeightPx) {
-    return { keep: false, reason: `height_too_small(<${CHAPTER_IMAGE_FILTERS.minHeightPx})` };
+  if (typeof width === "number" && typeof height === "number") {
+    const totalPx = width * height;
+    if (totalPx < CHAPTER_IMAGE_FILTERS.minTotalPx) {
+      return { keep: false, reason: `total_px_too_small(${totalPx}<${CHAPTER_IMAGE_FILTERS.minTotalPx})` };
+    }
   }
 
   return { keep: true, width, height };
