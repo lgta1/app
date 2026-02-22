@@ -592,8 +592,8 @@ export default function App() {
 
   // Banner chỉ hiện ở trang chủ
   const hideBanner = !isHome;
-  // Footer hiển thị trên toàn site (trừ chapter reader và summon — trải nghiệm full-screen)
-  const hideFooter = isChapter || isSummon;
+  // Footer hiển thị trên toàn site — chỉ ẩn ở trang summon (full-screen experience)
+  const hideFooter = isSummon;
 
   useEffect(() => {
     if (user && user !== clientUser) {
